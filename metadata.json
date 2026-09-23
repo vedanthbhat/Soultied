@@ -1,0 +1,6 @@
+{
+  "name": "Thread & Bean - Cozy Pixel Couples Home",
+  "description": "A private cozy pixel-art home for two with customizable human avatars, shared room, and daily questions.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
