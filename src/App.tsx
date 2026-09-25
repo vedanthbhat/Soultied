@@ -14,6 +14,7 @@ import { SpacePanel, LetterPanel } from './components/SpacePanel';
 import { DailyQuestionCard } from './components/DailyQuestionCard';
 import { QuestionsPage } from './components/QuestionsPage';
 import { UsPage } from './components/UsPage';
+import { WatchParty } from './components/WatchParty';
 import type { Seat, HotspotId } from './pixel/room';
 import type { UserProfile } from './types';
 
@@ -91,6 +92,7 @@ const Home: React.FC = () => {
       letter: letterUnread ? 'A letter for you two ✉' : 'Today’s letter',
       fire: 'Poke the fire',
       photo: 'Us',
+      remote: 'Watch something together',
     };
     const meLabel = `${currentUser.name} · change my look`;
     if (host) l.left = host.id === currentUser.id ? meLabel : host.name;
@@ -102,6 +104,7 @@ const Home: React.FC = () => {
   const onHotspot = (id: HotspotId) => {
     if (id === 'letter') openPanel('question');
     else if (id === 'photo') openPanel('us');
+    else if (id === 'remote') openPanel('watch');
     else if (id === 'left' || id === 'right') {
       const who = id === 'left' ? host : guest;
       if (!who) openPanel('space');
@@ -111,6 +114,14 @@ const Home: React.FC = () => {
   };
 
   const seats = welcomeOpen && draftSeats ? draftSeats : { left: liveLeft, right: liveRight };
+
+  if (panel === 'watch' && !welcomeOpen) {
+    return (
+      <div className="font-['Pixelify_Sans',sans-serif]">
+        <WatchParty onExit={() => openPanel(null)} />
+      </div>
+    );
+  }
 
   return (
     <div className="font-['Pixelify_Sans',sans-serif]">

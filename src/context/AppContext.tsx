@@ -15,7 +15,7 @@ import { QUESTIONS_CATALOGUE } from '../data/questionsCatalogue';
  * localStorage; real two-device pairing needs the backend milestone.
  */
 
-export type Panel = 'question' | 'questions' | 'us' | 'wardrobe' | 'space' | null;
+export type Panel = 'question' | 'questions' | 'us' | 'wardrobe' | 'space' | 'watch' | null;
 export type JoinResult = 'ok' | 'not_found' | 'full' | 'expired';
 
 interface PersistedState {

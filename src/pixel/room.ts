@@ -27,7 +27,7 @@ export interface RoomState {
   hover?: HotspotId | null;
 }
 
-export type HotspotId = 'left' | 'right' | 'letter' | 'fire' | 'photo';
+export type HotspotId = 'left' | 'right' | 'letter' | 'fire' | 'photo' | 'remote';
 
 export interface Hotspot {
   id: HotspotId;
@@ -51,6 +51,7 @@ export const HOTSPOTS: Hotspot[] = [
   { id: 'letter', x: TABLE.x + 19, y: TABLE.y - 9, w: 18, h: 12 },
   { id: 'fire', x: FIRE.openX, y: FIRE.openY, w: FIRE.openW, h: FIRE.openB - FIRE.openY },
   { id: 'photo', x: 138, y: 43, w: 12, h: 12 },
+  { id: 'remote', x: TABLE.x + 36, y: TABLE.y - 4, w: 10, h: 6 },
 ];
 
 /* ------------------------------------------------------------------------ */
@@ -590,6 +591,11 @@ function drawTable(L: Layer) {
   L.vline(x + 10, y - 5, 5, P.creamD);
   L.rect(x + 4, y - 4, 2, 2, P.creamD);
   L.hline(x + 6, y - 5, 5, '#6b4633');
+  // TV remote: click it to watch something together
+  L.rect(x + 38, y - 2, 7, 2, '#2c2527');
+  L.set(x + 39, y - 2, '#c4453f');
+  L.set(x + 41, y - 2, '#8a9a72');
+  L.set(x + 43, y - 2, '#e6d6b8');
   L.rect(x + w - 14, y - 5, 5, 5, P.sage);
   L.vline(x + w - 10, y - 5, 5, P.sageD);
   L.rect(x + w - 16, y - 4, 2, 2, P.sageD);
