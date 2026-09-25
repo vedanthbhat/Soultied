@@ -1,6 +1,6 @@
 # Asset Manifest & Role Documentation
 
-This document describes all referenced art assets, their role, dimensions, transparency, and usage in Thread & Bean.
+This document describes all referenced art assets, their role, dimensions, transparency, and usage in Soultied.
 
 | Logical Name | Source File | Role | Dimensions | Transparency | Notes |
 |---|---|---|---|---|---|

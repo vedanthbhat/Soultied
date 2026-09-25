@@ -1,15 +1,19 @@
 export interface AvatarConfig {
-  rendererVersion: number;
-  bodyPreset: 'short' | 'medium' | 'tall';
-  skinPaletteId: string;
-  hairStyleId: string;
-  hairPaletteId: string;
-  topId: string;
-  bottomId: string;
-  shoesId: string;
-  glassesId: string;
-  hatId: string;
-  accessoryId: string;
+  rendererVersion: 2;
+  height: 'short' | 'medium' | 'tall';
+  skin: string;
+  hairStyle: string;
+  hairColor: string;
+  facialHair: string;
+  top: string;
+  topColor: string;
+  bottom: string;
+  bottomColor: string;
+  shoes: string;
+  shoesColor: string;
+  glasses: string;
+  hat: string;
+  extra: string;
 }
 
 export interface UserProfile {

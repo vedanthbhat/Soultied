@@ -9,32 +9,56 @@
 }
 
 @theme {
-  --font-pixel: 'Pixelify Sans', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-pixel: 'Pixelify Sans', ui-sans-serif, system-ui, sans-serif;
   --color-warm-cream: #F7EBD4;
-  --color-ink: #483B36;
-  --color-cocoa: #805847;
-  --color-sage: #8C9B75;
-  --color-terracotta: #BD725D;
-  --color-butter: #E4BB6B;
-  --color-thread: #A84F4B;
+  --color-ink: #3a2a26;
+  --color-cocoa: #7a5a48;
+  --color-sage: #8a9a72;
+  --color-terracotta: #b8674f;
+  --color-butter: #e2b359;
+  --color-thread: #a84f4b;
   --color-lavender: #A89BAF;
 }
 
 :root {
-  --font-pixel: 'Pixelify Sans', ui-sans-serif, system-ui, sans-serif;
-  font-family: 'Pixelify Sans', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --ink: #2b1e1c;
+  --ink-soft: #3a2a26;
+  --muted: #7a5a48;
+  --paper: #f4e8d0;
+  --paper-2: #eadbbd;
+  --paper-shade: #d6c29c;
+  --paper-hi: #fff8ea;
+  --terracotta: #b8674f;
+  --terracotta-d: #8f4b3a;
+  --sage: #8a9a72;
+  --sage-d: #6a7856;
+  --thread: #a84f4b;
+  --butter: #e2b359;
+  --px: 3px;
+
+  font-family: 'Pixelify Sans', ui-sans-serif, system-ui, sans-serif;
   font-size: 18px;
   line-height: 1.5;
-  letter-spacing: 0;
-  color: #483B36;
-  background-color: #F7EBD4;
+  color: var(--ink-soft);
+  background-color: #1a1214;
 }
 
 * {
   box-sizing: border-box;
 }
 
-/* Ensure all form controls, buttons, textareas, dialogs inherit Pixelify Sans */
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  overflow: hidden;
+  background: #1a1214;
+}
+
 button,
 input,
 optgroup,
@@ -45,28 +69,279 @@ label {
   font-family: inherit;
 }
 
-/* Pixel rendering helper for pixel sprites */
 .pixelated {
   image-rendering: pixelated;
-  image-rendering: -moz-crisp-edges;
   image-rendering: crisp-edges;
 }
 
-/* Custom scrollbars matching the cozy warm palette */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+/* ---------- Pixel UI kit ------------------------------------------------ */
+
+/* Everything inside a pixel surface loses rounded corners. */
+.px-ui,
+.px-ui * {
+  border-radius: 0 !important;
 }
 
-::-webkit-scrollbar-track {
-  background: #F0DFC4;
+/* Notched 3px border drawn with box-shadows (keeps corners "cut"). */
+.px-box {
+  position: relative;
+  background: var(--paper);
+  color: var(--ink-soft);
+  box-shadow:
+    0 calc(var(--px) * -1) 0 0 var(--ink),
+    0 var(--px) 0 0 var(--ink),
+    calc(var(--px) * -1) 0 0 0 var(--ink),
+    var(--px) 0 0 0 var(--ink),
+    inset 0 calc(var(--px) * -2) 0 0 var(--paper-shade),
+    inset 0 var(--px) 0 0 var(--paper-hi);
 }
 
-::-webkit-scrollbar-thumb {
-  background: #BD725D;
-  border-radius: 4px;
+.px-shadow {
+  filter: drop-shadow(6px 6px 0 rgba(18, 10, 12, 0.45));
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: #805847;
+.px-inset {
+  background: var(--paper-2);
+  box-shadow:
+    0 calc(var(--px) * -1) 0 0 var(--paper-shade),
+    0 var(--px) 0 0 var(--paper-hi),
+    calc(var(--px) * -1) 0 0 0 var(--paper-shade),
+    var(--px) 0 0 0 var(--paper-hi);
+}
+
+.px-btn {
+  --bg: var(--terracotta);
+  --bg-d: var(--terracotta-d);
+  --fg: #fff4e2;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5em;
+  padding: 0.5em 1.05em 0.6em;
+  background: var(--bg);
+  color: var(--fg);
+  font-weight: 600;
+  line-height: 1.1;
+  cursor: pointer;
+  user-select: none;
+  border: 0;
+  box-shadow:
+    0 calc(var(--px) * -1) 0 0 var(--ink),
+    0 var(--px) 0 0 var(--ink),
+    calc(var(--px) * -1) 0 0 0 var(--ink),
+    var(--px) 0 0 0 var(--ink),
+    inset 0 calc(var(--px) * -1.5) 0 0 var(--bg-d),
+    inset 0 var(--px) 0 0 rgba(255, 255, 255, 0.22);
+  transition: transform 60ms steps(2), filter 120ms;
+}
+.px-btn:hover {
+  filter: brightness(1.07);
+}
+.px-btn:active {
+  transform: translateY(2px);
+  box-shadow:
+    0 calc(var(--px) * -1) 0 0 var(--ink),
+    0 var(--px) 0 0 var(--ink),
+    calc(var(--px) * -1) 0 0 0 var(--ink),
+    var(--px) 0 0 0 var(--ink),
+    inset 0 var(--px) 0 0 var(--bg-d);
+}
+.px-btn:disabled {
+  --bg: #b9a98f;
+  --bg-d: #9a8a70;
+  cursor: not-allowed;
+  filter: none;
+  transform: none;
+}
+.px-btn--sage {
+  --bg: var(--sage);
+  --bg-d: var(--sage-d);
+}
+.px-btn--paper {
+  --bg: var(--paper);
+  --bg-d: var(--paper-shade);
+  --fg: var(--ink-soft);
+}
+.px-btn--ink {
+  --bg: #3a2a26;
+  --bg-d: #241816;
+  --fg: #f4e8d0;
+}
+.px-btn--small {
+  padding: 0.3em 0.7em 0.4em;
+  font-size: 0.85em;
+}
+
+.px-btn:focus-visible,
+.px-chip:focus-visible,
+.px-input:focus-visible,
+.px-link:focus-visible,
+.px-swatch:focus-visible {
+  outline: 3px solid var(--butter);
+  outline-offset: 5px;
+}
+
+.px-input {
+  width: 100%;
+  padding: 0.5em 0.75em;
+  font-size: 1em;
+  color: var(--ink-soft);
+  background: #fbf3e2;
+  border: 0;
+  outline: none;
+  box-shadow:
+    0 calc(var(--px) * -1) 0 0 var(--ink),
+    0 var(--px) 0 0 var(--ink),
+    calc(var(--px) * -1) 0 0 0 var(--ink),
+    var(--px) 0 0 0 var(--ink),
+    inset 0 var(--px) 0 0 var(--paper-shade);
+}
+.px-input::placeholder {
+  color: #a08a74;
+}
+.px-input:focus {
+  background: #fffaf0;
+}
+
+.px-label {
+  display: block;
+  font-size: 0.85em;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 0.45em;
+  letter-spacing: 0.02em;
+}
+
+.px-chip {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 4px 3px;
+  background: var(--paper-2);
+  color: var(--ink-soft);
+  border: 0;
+  cursor: pointer;
+  font-size: 0.72em;
+  line-height: 1.1;
+  box-shadow:
+    0 calc(var(--px) * -1) 0 0 var(--paper-shade),
+    0 var(--px) 0 0 var(--paper-shade),
+    calc(var(--px) * -1) 0 0 0 var(--paper-shade),
+    var(--px) 0 0 0 var(--paper-shade);
+}
+.px-chip:hover {
+  background: #f1e3c7;
+}
+.px-chip[aria-pressed='true'] {
+  background: #fff6e4;
+  box-shadow:
+    0 calc(var(--px) * -1) 0 0 var(--terracotta),
+    0 var(--px) 0 0 var(--terracotta),
+    calc(var(--px) * -1) 0 0 0 var(--terracotta),
+    var(--px) 0 0 0 var(--terracotta);
+}
+
+.px-swatch {
+  width: 26px;
+  height: 26px;
+  border: 0;
+  cursor: pointer;
+  box-shadow:
+    inset 0 -4px 0 0 rgba(0, 0, 0, 0.2),
+    0 calc(var(--px) * -1) 0 0 var(--paper-shade),
+    0 var(--px) 0 0 var(--paper-shade),
+    calc(var(--px) * -1) 0 0 0 var(--paper-shade),
+    var(--px) 0 0 0 var(--paper-shade);
+}
+.px-swatch[aria-pressed='true'] {
+  box-shadow:
+    inset 0 -4px 0 0 rgba(0, 0, 0, 0.2),
+    0 calc(var(--px) * -1) 0 0 var(--ink),
+    0 var(--px) 0 0 var(--ink),
+    calc(var(--px) * -1) 0 0 0 var(--ink),
+    var(--px) 0 0 0 var(--ink),
+    0 0 0 6px var(--paper),
+    0 0 0 9px var(--terracotta);
+}
+
+.px-tab {
+  padding: 0.35em 0.8em 0.45em;
+  font-weight: 600;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+}
+.px-tab[aria-selected='true'] {
+  color: var(--ink-soft);
+  border-bottom-color: var(--terracotta);
+}
+
+.px-link {
+  color: var(--terracotta-d);
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  padding: 0;
+  font: inherit;
+}
+
+.px-divider {
+  height: 3px;
+  background: repeating-linear-gradient(90deg, var(--paper-shade) 0 6px, transparent 6px 9px);
+}
+
+/* Scrollbars inside panels */
+.px-scroll::-webkit-scrollbar {
+  width: 12px;
+}
+.px-scroll::-webkit-scrollbar-track {
+  background: var(--paper-2);
+}
+.px-scroll::-webkit-scrollbar-thumb {
+  background: var(--terracotta);
+  border: 3px solid var(--paper-2);
+}
+
+/* Step-y entrance for panels (pixel feel, no blur) */
+@keyframes px-pop {
+  0% {
+    transform: translateY(12px);
+    opacity: 0;
+  }
+  60% {
+    transform: translateY(-2px);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+.px-pop {
+  animation: px-pop 220ms steps(4) both;
+}
+
+@keyframes px-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.px-fade {
+  animation: px-fade 300ms steps(5) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .px-pop,
+  .px-fade {
+    animation: none;
+  }
 }

@@ -197,7 +197,7 @@ export const UsPage: React.FC = () => {
           <div>
             <h2 className="text-xl font-bold text-[#483B36]">Your Appearance</h2>
             <p className="text-sm text-[#805847] mt-1">
-              Change your clothes, hairstyle, skin tone, or try photo assistance anytime.
+              Change your clothes, hair, skin tone and little extras anytime.
             </p>
           </div>
 
