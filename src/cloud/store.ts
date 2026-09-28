@@ -18,6 +18,7 @@ import {
 import type { ActivityItem, AvatarConfig, CoupleSpace } from '../types';
 import type { CardAnswer, LetterDay, LetterKind } from '../letters/engine';
 import type { CouchState } from '../couch';
+import type { TitleInfo, TogetherLog } from '../stream/protocol';
 
 /**
  * Where a couple's things live in Firestore:
@@ -288,6 +289,30 @@ export const writeCouchSeen = (db: Firestore, sid: string, uid: string, today: s
 
 export const writeCouchShown = (db: Firestore, sid: string, uid: string, level: number) =>
   setDoc(metaRef(db, sid, 'couch'), { shown: { [uid]: level } }, { merge: true });
+
+/* ---------- Netflix / Prime together: what you've watched as a pair ---------- */
+
+const streamRef = (db: Firestore, sid: string) => doc(db, 'spaces', sid, 'meta', 'stream');
+
+export const subscribeStreamLog = (db: Firestore, sid: string, fn: (log: TogetherLog) => void) =>
+  onSnapshot(
+    streamRef(db, sid),
+    (s) => {
+      const v = (s.data() || {}) as Partial<TogetherLog>;
+      fn({ seen: v.seen || {}, shows: v.shows || {} });
+    },
+    () => undefined
+  );
+
+export const writeWatched = (db: Firestore, sid: string, t: TitleInfo, pos: number) =>
+  setDoc(
+    streamRef(db, sid),
+    {
+      seen: { [t.key]: { show: t.show, episode: t.episode, at: Date.now() } },
+      shows: { [t.showKey]: { show: t.show, episode: t.episode, key: t.key, url: t.url, pos, at: Date.now() } },
+    },
+    { merge: true }
+  );
 
 export const writeActivity = (db: Firestore, sid: string, a: Omit<ActivityItem, 'id' | 'timestamp'>) => {
   const id = newId('act');

@@ -19,6 +19,7 @@ import type { Seat, HotspotId } from './pixel/room';
 import type { UserProfile } from './types';
 import { prettyDate } from './letters/engine';
 import { COUCH_STEPS } from './couch';
+import { StreamChip, StreamHubProvider } from './stream/StreamHub';
 
 const seatOf = (u: UserProfile | null | undefined, placeholder = ''): Seat =>
   u ? { avatar: u.avatar, name: u.name, status: u.status } : { avatar: null, name: placeholder, status: 'empty' };
@@ -187,6 +188,8 @@ const Home: React.FC = () => {
         }}
       />
 
+      {!welcomeOpen && !veil && <StreamChip />}
+
       {couchNote && !welcomeOpen && (
         <div className="fixed left-1/2 bottom-5 z-30 -translate-x-1/2 px-ui w-[min(92vw,460px)]" role="status">
           <div className="px-box px-shadow px-fade px-4 py-2.5 text-center leading-snug">{couchNote}</div>
@@ -240,7 +243,9 @@ const Home: React.FC = () => {
 export default function App() {
   return (
     <AppProvider>
-      <Home />
+      <StreamHubProvider>
+        <Home />
+      </StreamHubProvider>
     </AppProvider>
   );
 }

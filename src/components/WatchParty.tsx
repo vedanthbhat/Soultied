@@ -6,6 +6,8 @@ import { AvatarThumb } from './PixelAvatarRenderer';
 import { projectedPosition, WatchEvent, WatchTransport } from '../watch/sync';
 import { loadYouTubeApi, parseYouTubeId, parseYouTubeStart, describeYouTubeError, YTPlayer, YTState } from '../watch/youtube';
 import { CallButtons, CamFrame, PartnerAudio, usePushToTalkKey, useWatchCall } from './WatchCall';
+import { PixelPanel } from './PixelPanel';
+import { StreamPanel } from './StreamPanel';
 
 /**
  * Watch together (YouTube). The camera swings round behind the couch; the
@@ -104,6 +106,7 @@ export const WatchParty: React.FC<{ onExit: () => void }> = ({ onExit }) => {
   const [draft, setDraft] = useState('');
   const [link, setLink] = useState('');
   const [chatOpen, setChatOpen] = useState(false);
+  const [streamOpen, setStreamOpen] = useState(false);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -625,6 +628,9 @@ export const WatchParty: React.FC<{ onExit: () => void }> = ({ onExit }) => {
           </button>
         ))}
         {partnerUser && <CallButtons call={call} view={view} partnerName={partnerName} />}
+        <button className="px-btn px-btn--paper px-btn--small" onClick={() => setStreamOpen(true)} title="Watch Netflix or Prime Video together">
+          Netflix / Prime
+        </button>
         {audioBlocked && view?.remote && (
           <button
             className="px-btn px-btn--sage px-btn--small"
@@ -737,6 +743,12 @@ export const WatchParty: React.FC<{ onExit: () => void }> = ({ onExit }) => {
             </div>
           )}
         </>
+      )}
+
+      {streamOpen && (
+        <PixelPanel title="Netflix & Prime Video" kicker="Watch together" onClose={() => setStreamOpen(false)} width={600}>
+          <StreamPanel />
+        </PixelPanel>
       )}
 
       {/* the camera swinging round: a quick stepped fade from black */}

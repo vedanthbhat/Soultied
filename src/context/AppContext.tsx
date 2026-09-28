@@ -21,6 +21,7 @@ import { CouchState, checkIn, couchLevel, emptyCouch, normalizeCouch } from '../
 import { CloudUser, cloud, cloudEnabled, describeAuthError, signInAsTestUser, signInWithGoogle, signOut as cloudSignOut, watchAuth } from '../cloud/firebase';
 import * as store from '../cloud/store';
 import { LiveChannel, browserChannel, firestoreChannel } from '../cloud/live';
+import type { Firestore } from 'firebase/firestore';
 
 /**
  * The app's state. Two homes for it:
@@ -120,8 +121,13 @@ interface AppContextType {
   signIn: () => Promise<void>;
   signOut: () => Promise<void>;
   moveOnline: () => Promise<void>;
-  openLive: <E extends { by: string; at: number }>(topic: 'watch' | 'escape') => LiveChannel<E>;
+  openLive: <E extends { by: string; at: number }>(topic: LiveTopic) => LiveChannel<E>;
+  /** Firestore + ids when this place lives online (for features with their own documents) */
+  cloudTarget: () => { db: Firestore; sid: string; uid: string } | null;
+  addActivity: (a: Omit<ActivityItem, 'id' | 'timestamp'>) => void;
 }
+
+export type LiveTopic = 'watch' | 'escape' | 'stream';
 
 const AppContext = createContext<AppContextType | null>(null);
 
@@ -876,13 +882,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   /** The live line to your person: through Firebase when you're online, between tabs otherwise. */
   const openLive = useCallback(
-    <E extends { by: string; at: number }>(topic: 'watch' | 'escape'): LiveChannel<E> => {
+    <E extends { by: string; at: number }>(topic: LiveTopic): LiveChannel<E> => {
       const c = cloud();
       if (cloudMode && c && cloudSpaceId) return firestoreChannel<E>(c.db, cloudSpaceId, topic);
       return browserChannel<E>(`soultied-${topic}-${eff.space?.id || 'solo'}`);
     },
     [cloudMode, cloudSpaceId, eff.space?.id]
   );
+
+  const addActivity: AppContextType['addActivity'] = (a) => {
+    const o = online();
+    if (o) {
+      store.writeActivity(o.db, o.sid, a).catch(warn('activity'));
+      return;
+    }
+    setState((s) => ({ ...s, activities: pushActivity(a)(s.activities) }));
+  };
 
   // tests against the emulator sign in without a Google popup
   useEffect(() => {
@@ -938,6 +953,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         signOut,
         moveOnline,
         openLive,
+        cloudTarget: online,
+        addActivity,
       }}
     >
       {children}

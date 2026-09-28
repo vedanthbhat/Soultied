@@ -283,6 +283,14 @@ export class WatchCall {
     }
   }
 
+  /** Ask for the microphone now (kept muted), so push-to-talk works later from another tab. */
+  async prepareMic() {
+    if (this.mic) return;
+    const asking = this.talk(true);
+    this.holding = false;
+    await asking;
+  }
+
   clearError() {
     this.set({ error: null });
   }
