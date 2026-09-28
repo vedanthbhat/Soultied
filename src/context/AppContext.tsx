@@ -22,7 +22,7 @@ import {
  * localStorage; real two-device pairing needs the backend milestone.
  */
 
-export type Panel = 'question' | 'questions' | 'us' | 'wardrobe' | 'space' | 'watch' | null;
+export type Panel = 'question' | 'questions' | 'us' | 'wardrobe' | 'space' | 'watch' | 'escape' | null;
 export type JoinResult = 'ok' | 'not_found' | 'full' | 'expired';
 
 export type LetterBadge = 'answer' | 'reveal' | null;

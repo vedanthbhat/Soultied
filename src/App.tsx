@@ -14,6 +14,7 @@ import { SpacePanel } from './components/SpacePanel';
 import { LettersPanel } from './components/letters/LettersPanel';
 import { UsPage } from './components/UsPage';
 import { WatchParty } from './components/WatchParty';
+import { EscapeGame } from './components/escape/EscapeGame';
 import type { Seat, HotspotId } from './pixel/room';
 import type { UserProfile } from './types';
 import { prettyDate } from './letters/engine';
@@ -100,6 +101,7 @@ const Home: React.FC = () => {
       fire: 'Poke the fire',
       photo: 'Us',
       remote: 'Watch something together',
+      door: 'The dark door',
     };
     const meLabel = `${currentUser.name} · change my look`;
     if (host) l.left = host.id === currentUser.id ? meLabel : host.name;
@@ -112,6 +114,7 @@ const Home: React.FC = () => {
     if (id === 'letter') openPanel('question');
     else if (id === 'photo') openPanel('us');
     else if (id === 'remote') openPanel('watch');
+    else if (id === 'door') openPanel('escape');
     else if (id === 'left' || id === 'right') {
       const who = id === 'left' ? host : guest;
       if (!who) openPanel('space');
@@ -121,6 +124,14 @@ const Home: React.FC = () => {
   };
 
   const seats = welcomeOpen && draftSeats ? draftSeats : { left: liveLeft, right: liveRight };
+
+  if (panel === 'escape' && !welcomeOpen) {
+    return (
+      <div className="font-['Pixelify_Sans',sans-serif]">
+        <EscapeGame onExit={() => openPanel(null)} />
+      </div>
+    );
+  }
 
   if (panel === 'watch' && !welcomeOpen) {
     return (

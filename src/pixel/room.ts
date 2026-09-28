@@ -27,7 +27,7 @@ export interface RoomState {
   hover?: HotspotId | null;
 }
 
-export type HotspotId = 'left' | 'right' | 'letter' | 'fire' | 'photo' | 'remote';
+export type HotspotId = 'left' | 'right' | 'letter' | 'fire' | 'photo' | 'remote' | 'door';
 
 export interface Hotspot {
   id: HotspotId;
@@ -44,6 +44,7 @@ const SEAT_LEFT_X = 219;
 const SEAT_RIGHT_X = 245;
 const FIRE = { x: 128, cx: 128, openX: 114, openW: 29, openY: 78, openB: 116 };
 const TABLE = { x: 205, y: 163, w: 54 };
+const DOOR = { x: 160, y: 64, w: 24 };
 
 export const HOTSPOTS: Hotspot[] = [
   { id: 'left', x: SEAT_LEFT_X - 10, y: 112, w: 20, h: 38 },
@@ -52,6 +53,7 @@ export const HOTSPOTS: Hotspot[] = [
   { id: 'fire', x: FIRE.openX, y: FIRE.openY, w: FIRE.openW, h: FIRE.openB - FIRE.openY },
   { id: 'photo', x: 138, y: 43, w: 12, h: 12 },
   { id: 'remote', x: TABLE.x + 36, y: TABLE.y - 4, w: 10, h: 6 },
+  { id: 'door', x: DOOR.x - 1, y: DOOR.y - 2, w: DOOR.w + 2, h: FLOOR_Y - DOOR.y + 2 },
 ];
 
 /* ------------------------------------------------------------------------ */
@@ -425,6 +427,50 @@ function drawGallery(L: Layer) {
   });
 }
 
+/** A small, very dark door between the chimney and the pictures. */
+function drawDarkDoor(L: Layer) {
+  const { x, y, w } = DOOR;
+  const h = FLOOR_Y - y;
+  // frame with a rounded top
+  for (let j = 0; j < h; j++)
+    for (let i = -2; i < w + 2; i++) {
+      const top = j < 6 && (i + 0.5 - w / 2) ** 2 + ((j - 6) * 2) ** 2 > (w / 2 + 2) ** 2;
+      if (top) continue;
+      const frame = i < 0 || i >= w || j < 2;
+      L.set(x + i, y + j, frame ? '#2a1f1a' : '#1d1519');
+    }
+  // panels
+  for (const [px, py] of [
+    [3, 8],
+    [13, 8],
+    [3, 30],
+    [13, 30],
+  ])
+    L.rect(x + px, y + py, 8, 18, '#241b22');
+  L.vline(x + w - 1, y + 3, h - 3, '#140f12');
+  // iron hinges and handle
+  for (const hy of [12, h - 14]) L.rect(x, y + hy, 4, 2, '#3a3437');
+  L.rect(x + w - 5, y + 30, 2, 3, '#4a4046');
+}
+
+function drawDoorGlow(L: Layer, t: number, hover: boolean) {
+  const { x, y, w } = DOOR;
+  const pulse = 0.5 + 0.5 * Math.sin(t * 1.6);
+  const leak = hover ? '#d9c2ff' : pulse > 0.5 ? '#9d7ad6' : '#7e5fb3';
+  for (let i = 1; i < w - 1; i++) L.glow(x + i, FLOOR_Y - 1, leak);
+  // a faint puddle of light on the floor boards
+  for (let i = 2; i < w - 2; i++) if ((i + Math.floor(t * 2)) % 3) L.glow(x + i, FLOOR_Y, mix(leak, '#6f4b31', 0.55));
+  // keyhole
+  L.glow(x + w - 5, y + 35, hover ? '#fff4ff' : '#c9a8ff');
+  L.glow(x + w - 5, y + 36, hover ? '#e8d8ff' : '#9d7ad6');
+  if (hover) {
+    for (let j = 2; j < FLOOR_Y - y; j += 2) {
+      L.glow(x - 3, y + j, '#e8d8ff');
+      L.glow(x + w + 2, y + j, '#e8d8ff');
+    }
+  }
+}
+
 function drawLamp(L: Layer) {
   // floor lamp at the couch's right
   const x = 290;
@@ -637,6 +683,7 @@ function staticLayer(): Layer {
   drawWindow(L);
   drawFireplace(L);
   drawGallery(L);
+  drawDarkDoor(L);
   drawBookshelf(L);
   drawLamp(L);
   drawRug(L);
@@ -1018,6 +1065,7 @@ export function renderRoom(state: RoomState, t: number): PixelBuffer {
   const L = FRAME;
   L.copyFrom(staticLayer());
   drawFire(L, t, state.fire);
+  drawDoorGlow(L, t, state.hover === 'door');
   drawCandles(L, t);
   drawSnow(L, t);
   drawPhotoPortrait(L, state);

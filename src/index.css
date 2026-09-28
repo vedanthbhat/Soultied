@@ -37,6 +37,9 @@
   --px: 3px;
 
   font-family: 'Pixelify Sans', ui-sans-serif, system-ui, sans-serif;
+  /* the pixel font's fi / fl ligatures render as a single odd glyph ("file" → "Ale") */
+  font-variant-ligatures: none;
+  font-feature-settings: 'liga' 0, 'clig' 0;
   font-size: 18px;
   line-height: 1.5;
   color: var(--ink-soft);
