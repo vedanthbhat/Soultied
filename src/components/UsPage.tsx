@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useApp } from '../context/AppContext';
+import { COUCH_STEPS, couchLine } from '../couch';
 import { PixelAvatarRenderer } from './PixelAvatarRenderer';
 import { PixelIcon, SpriteName } from './letters/PixelIcon';
 import { scoreDay } from '../letters/engine';
@@ -15,7 +16,7 @@ const Stat: React.FC<{ icon: SpriteName; value: string; label: string }> = ({ ic
 );
 
 export const UsPage: React.FC = () => {
-  const { space, currentUser, partnerUser, activities, streak, letters, updateSpaceDetails, openPanel } = useApp();
+  const { space, currentUser, partnerUser, activities, streak, letters, updateSpaceDetails, openPanel, couchLevel } = useApp();
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(space?.name || '');
   const [since, setSince] = useState(space?.togetherSince || '');
@@ -127,7 +128,11 @@ export const UsPage: React.FC = () => {
         <Stat icon="seal" value={`${streak.best} ${streak.best === 1 ? 'day' : 'days'}`} label="Best streak" />
         <Stat icon="envelope" value={String(streak.together)} label="Letters opened" />
         <Stat icon="heart" value={sync === null ? '—' : `${sync}%`} label="In sync" />
+        {partnerUser && (
+          <Stat icon="couch" value={couchLevel >= COUCH_STEPS ? 'Side by side' : `${couchLevel} of ${COUCH_STEPS}`} label="Closer on the couch" />
+        )}
       </div>
+      {partnerUser && <p className="m-0 -mt-1 text-sm text-[var(--muted)]">{couchLine(couchLevel, partnerUser.name)}</p>}
 
       <div className="flex gap-3 flex-wrap">
         <button className="px-btn" onClick={() => openPanel('wardrobe')}>

@@ -10,7 +10,16 @@ interface Props {
   onHotspot?: (id: HotspotId) => void;
   /** Dim + blur-free darken the room (e.g. behind onboarding). 0..1 */
   dim?: number;
+  /** how close they sit on the couch, 0..1 */
+  closeness?: number;
+  /** when true, a change in closeness plays as a little scoot; otherwise they just sit there */
+  scoot?: boolean;
+  /** called when a scoot finishes, with the closeness they ended up at */
+  onScooted?: (closeness: number) => void;
 }
+
+/** one step along the couch (1/7) takes about a second and a half */
+const SCOOT_PER_SECOND = 1 / 7 / 1.5;
 
 interface Fit {
   scale: number;
@@ -34,12 +43,18 @@ function computeFit(w: number, h: number): Fit {
  * The whole screen is the room. The canvas is 320x180 real pixels, scaled
  * to cover the viewport with nearest-neighbour upscaling.
  */
-export const RoomCanvas: React.FC<Props> = ({ left, right, letterUnread, labels, onHotspot, dim = 0 }) => {
+export const RoomCanvas: React.FC<Props> = ({ left, right, letterUnread, labels, onHotspot, dim = 0, closeness = 0, scoot = false, onScooted }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [fit, setFit] = useState<Fit>(() => computeFit(window.innerWidth, window.innerHeight));
   const [hover, setHover] = useState<HotspotId | null>(null);
-  const stateRef = useRef<RoomState>({ left, right, letterUnread, fire: 0.6, hover: null });
+  const stateRef = useRef<RoomState>({ left, right, letterUnread, fire: 0.6, hover: null, closeness, heartAt: -1 });
   const fireBoost = useRef(0);
+  const target = useRef(closeness);
+  target.current = closeness;
+  const scootRef = useRef(scoot);
+  scootRef.current = scoot;
+  const scootedRef = useRef(onScooted);
+  scootedRef.current = onScooted;
 
   stateRef.current.left = left;
   stateRef.current.right = right;
@@ -67,8 +82,26 @@ export const RoomCanvas: React.FC<Props> = ({ left, right, letterUnread, labels,
     const tick = (now: number) => {
       raf = requestAnimationFrame(tick);
       if (document.hidden || now - last < interval) return;
+      const dt = Math.min(0.25, (now - last) / 1000);
       last = now;
       const t = (now - start) / 1000;
+      // shuffle along the couch toward where they belong now
+      const st = stateRef.current;
+      const cur = st.closeness ?? 0;
+      const goal = target.current;
+      if (Math.abs(goal - cur) > 1e-4 && !scootRef.current && !st.scooting) {
+        st.closeness = goal;
+      } else if (Math.abs(goal - cur) > 1e-4) {
+        if (!st.scooting) {
+          st.scooting = true;
+          if (goal > cur) st.heartAt = t;
+        }
+        const step = SCOOT_PER_SECOND * (reduced ? 4 : 1) * dt;
+        st.closeness = goal > cur ? Math.min(goal, cur + step) : Math.max(goal, cur - step);
+      } else if (st.scooting) {
+        st.scooting = false;
+        scootedRef.current?.(goal);
+      }
       fireBoost.current = Math.max(0, fireBoost.current - 0.012);
       stateRef.current.fire = Math.min(1, 0.6 + fireBoost.current);
       const buf = renderRoom(stateRef.current, reduced ? t * 0.3 : t);
@@ -89,7 +122,7 @@ export const RoomCanvas: React.FC<Props> = ({ left, right, letterUnread, labels,
 
   const pick = (clientX: number, clientY: number) => {
     const p = toScene(clientX, clientY);
-    const id = hitTest(p.x, p.y);
+    const id = hitTest(p.x, p.y, stateRef.current.closeness);
     return id && labels[id] ? id : null;
   };
 
@@ -98,7 +131,7 @@ export const RoomCanvas: React.FC<Props> = ({ left, right, letterUnread, labels,
     onHotspot?.(id);
   };
 
-  const tag = hover ? hotspotRect(hover) : null;
+  const tag = hover ? hotspotRect(hover, stateRef.current.closeness) : null;
 
   return (
     <div className="fixed inset-0 overflow-hidden bg-[#1a1214]" aria-hidden={false}>

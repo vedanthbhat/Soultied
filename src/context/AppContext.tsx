@@ -15,7 +15,9 @@ import {
   scoreDay,
   streakInfo,
   todayKey,
+  addDays,
 } from '../letters/engine';
+import { CouchState, checkIn, couchLevel, emptyCouch, normalizeCouch } from '../couch';
 
 /**
  * Local-only prototype state. Everything lives in this browser's
@@ -36,6 +38,7 @@ interface PersistedState {
   space: CoupleSpace | null;
   letters: LettersState;
   activities: ActivityItem[];
+  couch: CouchState;
 }
 
 interface AppContextType {
@@ -63,6 +66,13 @@ interface AppContextType {
   afterDarkOpen: boolean;
   mendStreak: () => void;
   streak: StreakInfo;
+  /** how close you sit on the couch: 0 (the two ends) to COUCH_STEPS (side by side) */
+  couchLevel: number;
+  /** days you've both shown up, all time */
+  couchDays: number;
+  /** the closeness I last watched happen; below couchLevel means there's a scoot to show me */
+  couchShown: number;
+  markCouchShown: (level: number) => void;
   /** what the letter on the coffee table should say */
   letterBadge: LetterBadge;
   switchActiveUser: (userId: string) => void;
@@ -115,6 +125,7 @@ function emptyState(): PersistedState {
     space: null,
     letters: emptyLetters(),
     activities: [],
+    couch: emptyCouch(),
   };
 }
 
@@ -140,6 +151,12 @@ function demoState(): PersistedState {
       createdAt,
     },
     letters: demoLetters('space-demo', createdAt.slice(0, 10), 'user-aanya', 'user-rohan', todayKey()),
+    // three days together so far; Rohan hasn't been in today, so switching to him scoots you closer
+    couch: {
+      seen: { 'user-aanya': addDays(todayKey(), -1), 'user-rohan': addDays(todayKey(), -1) },
+      together: [-6, -4, -1].map((n) => addDays(todayKey(), n)),
+      shown: { 'user-aanya': 3, 'user-rohan': 3 },
+    },
     activities: [
       { id: 'act-1', type: 'question_revealed', title: 'Letter opened together', description: 'In sync on 4 of 5.', timestamp: 'Yesterday' },
       { id: 'act-2', type: 'avatar_updated', title: 'Wardrobe refresh', description: 'Rohan put on a terracotta cardigan and round glasses.', timestamp: '3 days ago' },
@@ -173,6 +190,7 @@ function load(): PersistedState {
         userA,
         userB: normalizeUser(p.userB, DEFAULT_AVATAR_B),
         letters,
+        couch: normalizeCouch(p.couch),
       };
     }
     // Carry over an older prototype save: keep the space + people, reset looks.
@@ -233,6 +251,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const { userA, userB, activeUserId } = state;
   const currentUser = activeUserId === userA.id || !userB ? userA : userB;
   const partnerUser = currentUser.id === userA.id ? userB : userA;
+
+  // Showing up: once a day each, and a day you're both here scoots you closer on the couch.
+  const partnerId = partnerUser?.id || null;
+  useEffect(() => {
+    if (!state.setupComplete) return;
+    setState((s) => {
+      const next = checkIn(s.couch, currentUser.id, partnerId, today);
+      return next === s.couch ? s : { ...s, couch: next };
+    });
+  }, [state.setupComplete, currentUser.id, partnerId, today]);
+
+  const markCouchShown = (level: number) =>
+    setState((s) => {
+      const me = s.activeUserId === s.userA.id || !s.userB ? s.userA.id : s.userB.id;
+      if ((s.couch.shown[me] ?? 0) >= level) return s;
+      return { ...s, couch: { ...s.couch, shown: { ...s.couch.shown, [me]: level } } };
+    });
 
   const afterDarkOpen = !!partnerUser && !!state.letters.afterDarkOn[currentUser.id] && !!state.letters.afterDarkOn[partnerUser.id];
 
@@ -462,6 +497,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         afterDarkOpen,
         mendStreak,
         streak,
+        couchLevel: couchLevel(state.couch),
+        couchDays: state.couch.together.length,
+        couchShown: state.couch.shown[currentUser.id] ?? 0,
+        markCouchShown,
         letterBadge,
         switchActiveUser,
         updateSpaceDetails,

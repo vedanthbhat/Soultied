@@ -18,6 +18,7 @@ import { EscapeGame } from './components/escape/EscapeGame';
 import type { Seat, HotspotId } from './pixel/room';
 import type { UserProfile } from './types';
 import { prettyDate } from './letters/engine';
+import { COUCH_STEPS } from './couch';
 
 const seatOf = (u: UserProfile | null | undefined, placeholder = ''): Seat =>
   u ? { avatar: u.avatar, name: u.name, status: u.status } : { avatar: null, name: placeholder, status: 'empty' };
@@ -68,6 +69,7 @@ const WardrobePanel: React.FC = () => {
 
 const Home: React.FC = () => {
   const { setupComplete, currentUser, partnerUser, space, panel, openPanel, letterBadge, getLetter, today } = useApp();
+  const { couchLevel, couchShown, markCouchShown } = useApp();
   const [joinCode] = useState(readJoinCode);
   const [welcomeOpen, setWelcomeOpen] = useState(() => !setupComplete || !!joinCode);
   const [draftSeats, setDraftSeats] = useState<{ left: Seat; right: Seat } | null>(null);
@@ -125,6 +127,29 @@ const Home: React.FC = () => {
 
   const seats = welcomeOpen && draftSeats ? draftSeats : { left: liveLeft, right: liveRight };
 
+  // A day you both showed up: once the room is in view, scoot closer (each of you sees it once).
+  const scootPending = couchShown < couchLevel;
+  const [scootGo, setScootGo] = useState(false);
+  const [couchNote, setCouchNote] = useState<string | null>(null);
+  useEffect(() => {
+    if (!scootPending || welcomeOpen || panel) return;
+    const t = window.setTimeout(() => {
+      setScootGo(true);
+      setCouchNote(
+        couchLevel >= COUCH_STEPS
+          ? `Seven days of showing up. You and ${partnerUser?.name || 'your person'} are sitting side by side now.`
+          : `You both showed up, so you scooted a little closer on the couch. ${couchLevel} of ${COUCH_STEPS}.`
+      );
+    }, 900);
+    return () => window.clearTimeout(t);
+  }, [scootPending, welcomeOpen, panel, couchLevel, partnerUser]);
+  useEffect(() => {
+    if (!couchNote) return;
+    const t = window.setTimeout(() => setCouchNote(null), 6500);
+    return () => window.clearTimeout(t);
+  }, [couchNote]);
+  const closeness = (scootPending && !scootGo ? couchShown : couchLevel) / COUCH_STEPS;
+
   if (panel === 'escape' && !welcomeOpen) {
     return (
       <div className="font-['Pixelify_Sans',sans-serif]">
@@ -150,7 +175,21 @@ const Home: React.FC = () => {
         labels={labels}
         onHotspot={onHotspot}
         dim={panel ? 0.25 : 0}
+        closeness={closeness}
+        scoot={scootGo}
+        onScooted={(c) => {
+          if (scootPending && c * COUCH_STEPS >= couchLevel - 1e-6) {
+            markCouchShown(couchLevel);
+            setScootGo(false);
+          }
+        }}
       />
+
+      {couchNote && !welcomeOpen && (
+        <div className="fixed left-1/2 bottom-5 z-30 -translate-x-1/2 px-ui w-[min(92vw,460px)]" role="status">
+          <div className="px-box px-shadow px-fade px-4 py-2.5 text-center leading-snug">{couchNote}</div>
+        </div>
+      )}
 
       {welcomeOpen ? (
         <Welcome

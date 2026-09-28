@@ -62,6 +62,10 @@ export const SPRITES = {
     rows: ['..kkk..', '.k...k.', '.k...k.', 'kkkkkkk', 'kkk.kkk', 'kkk.kkk', 'kkkkkkk'],
     pal: { k: '#7a5a48' },
   },
+  couch: {
+    rows: ['..ccccccc..', '.cCCCCCCCc.', 'aacccccccaa', 'aaCCCCCCCaa', 'aakkkkkkkaa', '.d.......d.'],
+    pal: { c: '#b8674f', C: '#cc7c62', a: '#95513e', k: '#763f31', d: '#5a3a2c' },
+  },
   stitch: {
     rows: ['y.y.y.y', '.y.y.y.', 'y.y.y.y'],
     pal: { y: '#b48c4a' },

@@ -25,6 +25,12 @@ export interface RoomState {
   fire: number;
   /** highlight a hotspot (hover) */
   hover?: HotspotId | null;
+  /** how close the two sit on the couch: 0 = the two ends, 1 = side by side (fractional mid-scoot) */
+  closeness?: number;
+  /** true while they're shuffling along the couch */
+  scooting?: boolean;
+  /** scene time a little heart started floating up between them (-1 for none) */
+  heartAt?: number;
 }
 
 export type HotspotId = 'left' | 'right' | 'letter' | 'fire' | 'photo' | 'remote' | 'door';
@@ -40,15 +46,22 @@ export interface Hotspot {
 // Layout constants shared by drawing + hotspots
 const FLOOR_Y = 121;
 const COUCH = { x: 186, y: 121, w: 92, seatY: 140, baseY: 150 };
-const SEAT_LEFT_X = 219;
-const SEAT_RIGHT_X = 245;
+const COUCH_MID = COUCH.x + COUCH.w / 2;
+/** half the gap between the two seats: at the two ends of the couch, and side by side */
+const SEAT_FAR = 26;
+const SEAT_NEAR = 7;
+
+/** Where the two sit, given how close they've grown (0..1). */
+export function seatXs(closeness = 0) {
+  const c = Math.max(0, Math.min(1, closeness));
+  const d = Math.round(SEAT_FAR + (SEAT_NEAR - SEAT_FAR) * c);
+  return { left: COUCH_MID - d, right: COUCH_MID + d };
+}
 const FIRE = { x: 128, cx: 128, openX: 114, openW: 29, openY: 78, openB: 116 };
 const TABLE = { x: 205, y: 163, w: 54 };
 const DOOR = { x: 160, y: 64, w: 24 };
 
-export const HOTSPOTS: Hotspot[] = [
-  { id: 'left', x: SEAT_LEFT_X - 10, y: 112, w: 20, h: 38 },
-  { id: 'right', x: SEAT_RIGHT_X - 10, y: 112, w: 20, h: 38 },
+const HOTSPOTS: Hotspot[] = [
   { id: 'letter', x: TABLE.x + 19, y: TABLE.y - 9, w: 18, h: 12 },
   { id: 'fire', x: FIRE.openX, y: FIRE.openY, w: FIRE.openW, h: FIRE.openB - FIRE.openY },
   { id: 'photo', x: 138, y: 43, w: 12, h: 12 },
@@ -878,15 +891,33 @@ function pickColor(b: PixelBuffer, x: number, y: number) {
   return '#' + [b.data[i], b.data[i + 1], b.data[i + 2]].map((n) => n.toString(16).padStart(2, '0')).join('');
 }
 
-function seatCharacter(L: Layer, seat: Seat, cx: number, t: number, phase: number, hover: boolean) {
+/**
+ * One person on the couch. `lift` hops them up a pixel while they scoot along;
+ * `lean` tips their head a pixel toward the other person once they're side by side.
+ */
+function seatCharacter(L: Layer, seat: Seat, cx: number, t: number, phase: number, hover: boolean, lift = 0, lean = 0) {
   if (!seat.avatar || seat.status === 'empty') return;
   const blink = (t + phase) % 4.2 < 0.12;
-  const bob = Math.sin((t + phase) * 1.6) > 0.55 ? 1 : 0;
+  const bob = lift ? 0 : Math.sin((t + phase) * 1.6) > 0.55 ? 1 : 0;
   const asleep = seat.status === 'offline' || seat.status === 'away';
-  const { buf, anchor } = renderCharacter(seat.avatar, 'sit', { blink, bob, sleepy: asleep });
+  const { buf, anchor, headTop } = renderCharacter(seat.avatar, 'sit', { blink, bob, sleepy: asleep });
   const x = cx - anchor.x;
-  const y = COUCH.seatY - anchor.y;
-  L.blit(buf, x, y);
+  const y = COUCH.seatY - anchor.y - lift;
+  if (lean) {
+    // the head (everything above the shoulders) shifts; the body stays put
+    const neck = headTop + 9;
+    const head = new PixelBuffer(buf.w, buf.h);
+    const body = new PixelBuffer(buf.w, buf.h);
+    for (let j = 0; j < buf.h; j++)
+      for (let i = 0; i < buf.w; i++) {
+        const k = (j * buf.w + i) * 4;
+        if (!buf.data[k + 3]) continue;
+        const dst = j < neck ? head : body;
+        for (let c = 0; c < 4; c++) dst.data[k + c] = buf.data[k + c];
+      }
+    L.blit(body, x, y);
+    L.blit(head, x + lean, y);
+  } else L.blit(buf, x, y);
   if (hover) {
     // soft rim highlight
     for (let j = 0; j < buf.h; j++)
@@ -939,13 +970,22 @@ function drawEmptySeat(L: Layer, cx: number, t: number, hover: boolean) {
   L.glow(bx + 2, by, '#fff1c9');
 }
 
-function drawThread(L: Layer, state: RoomState, t: number) {
+function drawThread(L: Layer, state: RoomState, t: number, lx: number, rx: number) {
   if (!state.left.avatar || !state.right.avatar || state.right.status === 'empty' || state.left.status === 'empty') return;
-  // the red thread — from one lap to the other, gently sagging
-  const x0 = SEAT_LEFT_X + 5;
-  const x1 = SEAT_RIGHT_X - 5;
+  // the red thread — from one lap to the other, gently sagging (less as they sit closer)
+  const x0 = lx + 5;
+  const x1 = rx - 5;
   const y0 = COUCH.seatY - 1;
-  const sag = 3 + Math.sin(t * 1.2) * 0.6;
+  if (x1 - x0 < 6) {
+    // side by side: the thread is just a little knot between their hands
+    const kx = Math.round((x0 + x1) / 2);
+    L.set(kx - 1, y0, '#c4453f');
+    L.set(kx, y0 + 1, '#c4453f');
+    L.set(kx + 1, y0, '#c4453f');
+    L.set(kx, y0, '#e0685f');
+    return;
+  }
+  const sag = Math.min(3, (x1 - x0) / 6) + Math.sin(t * 1.2) * 0.6;
   let prev = -1;
   for (let x = x0; x <= x1; x++) {
     const u = (x - x0) / (x1 - x0);
@@ -954,6 +994,21 @@ function drawThread(L: Layer, state: RoomState, t: number) {
     if (prev >= 0 && Math.abs(y - prev) > 1) L.set(x, (y + prev) >> 1, '#c4453f');
     prev = y;
   }
+}
+
+/** A small heart floating up from between them. */
+function drawHeart(L: Layer, cx: number, t: number, since: number) {
+  const age = t - since;
+  if (age < 0 || age > 2.6) return;
+  const y = Math.round(COUCH.seatY - 36 - age * 7);
+  const x = Math.round(cx + Math.sin(age * 4) * 1.5);
+  const a = Math.round(255 * Math.min(1, (2.6 - age) / 0.8));
+  const rows = ['.##.##.', '#######', '#######', '.#####.', '..###..', '...#...'];
+  rows.forEach((row, j) =>
+    [...row].forEach((k, i) => {
+      if (k === '#') L.glow(x - 3 + i, y + j, i === 1 && j === 1 ? '#ffd0cb' : '#e0605a', a);
+    })
+  );
 }
 
 function drawForeground(L: Layer) {
@@ -1072,13 +1127,22 @@ export function renderRoom(state: RoomState, t: number): PixelBuffer {
   drawCat(L, t);
 
   // characters on the couch (left seat first so the right one overlaps on lean)
+  const closeness = state.closeness ?? 0;
+  const { left: lx, right: rx } = seatXs(closeness);
   const leftEmpty = !state.left.avatar || state.left.status === 'empty';
   const rightEmpty = !state.right.avatar || state.right.status === 'empty';
-  if (leftEmpty) drawEmptySeat(L, SEAT_LEFT_X, t, state.hover === 'left');
-  else seatCharacter(L, state.left, SEAT_LEFT_X, t, 0, state.hover === 'left');
-  if (rightEmpty) drawEmptySeat(L, SEAT_RIGHT_X, t, state.hover === 'right');
-  else seatCharacter(L, state.right, SEAT_RIGHT_X, t, 1.7, state.hover === 'right');
-  drawThread(L, state, t);
+  // a little hop on alternate frames while they shuffle along
+  const lift = state.scooting && Math.floor(t * 8) % 2 === 0 ? 1 : 0;
+  const snug = closeness >= 1 && !state.scooting && !leftEmpty && !rightEmpty;
+  if (leftEmpty) drawEmptySeat(L, lx, t, state.hover === 'left');
+  else seatCharacter(L, state.left, lx, t, 0, state.hover === 'left', lift, snug ? 1 : 0);
+  if (rightEmpty) drawEmptySeat(L, rx, t, state.hover === 'right');
+  else seatCharacter(L, state.right, rx, t, 1.7, state.hover === 'right', lift, snug ? -1 : 0);
+  drawThread(L, state, t, lx, rx);
+  const heartAt = state.heartAt ?? -1;
+  if (heartAt >= 0 && t - heartAt < 2.6) drawHeart(L, (lx + rx) / 2, t, heartAt);
+  // side by side: now and then a heart drifts up on its own
+  else if (snug) drawHeart(L, (lx + rx) / 2, t % 9, 0);
 
   drawTable(L);
   drawSteam(L, t);
@@ -1092,13 +1156,24 @@ export function renderRoom(state: RoomState, t: number): PixelBuffer {
 /** Focal point to keep in view when the screen is narrower than 16:9. */
 export const ROOM_FOCUS_X = 232;
 
-export function hitTest(x: number, y: number): HotspotId | null {
-  for (const h of HOTSPOTS) if (x >= h.x && x < h.x + h.w && y >= h.y && y < h.y + h.h) return h.id;
+/** The clickable spots, with the two seats wherever the couple is sitting now. */
+export function hotspots(closeness = 0): Hotspot[] {
+  const { left, right } = seatXs(closeness);
+  const w = Math.min(20, right - left + 2);
+  return [
+    { id: 'left', x: left - Math.floor(w / 2), y: 112, w, h: 38 },
+    { id: 'right', x: right - Math.ceil(w / 2) + 1, y: 112, w, h: 38 },
+    ...HOTSPOTS,
+  ];
+}
+
+export function hitTest(x: number, y: number, closeness = 0): HotspotId | null {
+  for (const h of hotspots(closeness)) if (x >= h.x && x < h.x + h.w && y >= h.y && y < h.y + h.h) return h.id;
   return null;
 }
 
-export function hotspotRect(id: HotspotId) {
-  return HOTSPOTS.find((h) => h.id === id)!;
+export function hotspotRect(id: HotspotId, closeness = 0) {
+  return hotspots(closeness).find((h) => h.id === id)!;
 }
 
 void hex;
