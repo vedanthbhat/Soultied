@@ -4,7 +4,7 @@ import type { UserProfile } from '../../types';
 import { ROOMS, roomById } from '../../escape/rooms';
 import type { RoomDef, RoomId, Side } from '../../escape/types';
 import { viewOf } from '../../escape/types';
-import { Channel, EscapeEvent, EscapeSave, Progress, formatTime, loadSave, localChannel, mergeProgress, storeSave } from '../../escape/sync';
+import { Channel, EscapeEvent, EscapeSave, Progress, formatTime, loadSave, mergeProgress, storeSave } from '../../escape/sync';
 import { sfx } from '../../escape/sfx';
 import { AvatarThumb } from '../PixelAvatarRenderer';
 import { SceneView } from './SceneView';
@@ -31,8 +31,9 @@ interface ChatMsg {
  * each of you plays one half and holds half of the clues.
  */
 export const EscapeGame: React.FC<{ onExit: () => void }> = ({ onExit }) => {
-  const { currentUser, partnerUser, space } = useApp();
+  const { currentUser, partnerUser, space, openLive } = useApp();
   const me = currentUser.id;
+  const partnerId = partnerUser?.id || null;
   const spaceId = space?.id || 'solo';
   const creatorIsMe = !space || space.creatorId === me;
   const mySide: Side = creatorIsMe ? 'a' : 'b';
@@ -64,7 +65,9 @@ export const EscapeGame: React.FC<{ onExit: () => void }> = ({ onExit }) => {
   const room = roomById(roomId);
   const step = progress?.step ?? 0;
   const puzzle = room.puzzles[step];
-  const partnerHere = !!partnerUser && now - partnerSeen < 12000;
+  // online, pings are further apart (every message is a small write)
+  const [lineKind, setLineKind] = useState<'local' | 'online'>('local');
+  const partnerHere = !!partnerUser && now - partnerSeen < (lineKind === 'online' ? 50000 : 12000);
 
   /* ---------- the line to the other device ---------- */
   const chanRef = useRef<Channel<EscapeEvent> | null>(null);
@@ -96,9 +99,10 @@ export const EscapeGame: React.FC<{ onExit: () => void }> = ({ onExit }) => {
   );
 
   useEffect(() => {
-    if (!partnerUser) return;
-    const ch = localChannel<EscapeEvent>(`soultied-escape-${spaceId}`);
+    if (!partnerId) return;
+    const ch = openLive<EscapeEvent>('escape');
     chanRef.current = ch;
+    setLineKind(ch.kind);
     const off = ch.subscribe((e) => {
       if (e.by === me) return;
       setPartnerSeen(Date.now());
@@ -132,7 +136,7 @@ export const EscapeGame: React.FC<{ onExit: () => void }> = ({ onExit }) => {
       }
     });
     ch.send({ type: 'hello', by: me, at: Date.now() });
-    const ping = window.setInterval(() => ch.send({ type: 'ping', by: me, at: Date.now() }), 5000);
+    const ping = window.setInterval(() => ch.send({ type: 'ping', by: me, at: Date.now() }), ch.kind === 'online' ? 20000 : 5000);
     const bye = () => ch.send({ type: 'bye', by: me, at: Date.now() });
     window.addEventListener('pagehide', bye);
     return () => {
@@ -143,7 +147,7 @@ export const EscapeGame: React.FC<{ onExit: () => void }> = ({ onExit }) => {
       ch.close();
       chanRef.current = null;
     };
-  }, [spaceId, me, partnerUser, startGame]);
+  }, [openLive, me, partnerId, startGame]);
 
   // tell the partner which door I'm standing at
   useEffect(() => {

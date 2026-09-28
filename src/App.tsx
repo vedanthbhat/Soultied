@@ -69,7 +69,7 @@ const WardrobePanel: React.FC = () => {
 
 const Home: React.FC = () => {
   const { setupComplete, currentUser, partnerUser, space, panel, openPanel, letterBadge, getLetter, today } = useApp();
-  const { couchLevel, couchShown, markCouchShown } = useApp();
+  const { couchLevel, couchShown, markCouchShown, cloudStatus, demo } = useApp();
   const [joinCode] = useState(readJoinCode);
   const [welcomeOpen, setWelcomeOpen] = useState(() => !setupComplete || !!joinCode);
   const [draftSeats, setDraftSeats] = useState<{ left: Seat; right: Seat } | null>(null);
@@ -149,6 +149,8 @@ const Home: React.FC = () => {
     return () => window.clearTimeout(t);
   }, [couchNote]);
   const closeness = (scootPending && !scootGo ? couchShown : couchLevel) / COUCH_STEPS;
+  // signed in and still fetching your place: don't flash a room that isn't yours yet
+  const veil = cloudStatus === 'checking' && !welcomeOpen && !demo;
 
   if (panel === 'escape' && !welcomeOpen) {
     return (
@@ -201,6 +203,10 @@ const Home: React.FC = () => {
             setWelcomeOpen(false);
           }}
         />
+      ) : veil ? (
+        <div className="fixed inset-0 z-30 flex items-center justify-center bg-[rgba(30,22,18,0.55)] px-ui" role="status">
+          <div className="px-box px-shadow px-fade px-6 py-4 text-xl">Opening the door…</div>
+        </div>
       ) : (
         <>
           <TopNav letterUnread={letterUnread} />

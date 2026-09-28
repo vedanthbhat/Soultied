@@ -73,7 +73,7 @@ const LetterView: React.FC<{
   me: UserProfile;
   partner: UserProfile;
 }> = ({ kind, me, partner }) => {
-  const { getLetter, answerCard, sealLetter, markLetterSeen, today, switchActiveUser } = useApp();
+  const { getLetter, answerCard, sealLetter, markLetterSeen, today, switchActiveUser, cloudMode } = useApp();
   const day = getLetter(kind, today) as LetterDay;
   const mine = day.by[me.id];
   const night = kind === 'afterDark';
@@ -95,9 +95,11 @@ const LetterView: React.FC<{
           {partner.name} hasn’t sealed {night ? 'tonight’s After dark cards' : 'today’s letter'} yet. It opens for both of you the moment
           they do.
         </p>
-        <button className="px-link text-sm" onClick={() => switchActiveUser(partner.id)}>
-          Prototype: answer as {partner.name}
-        </button>
+        {!cloudMode && (
+          <button className="px-link text-sm" onClick={() => switchActiveUser(partner.id)}>
+            Prototype: answer as {partner.name}
+          </button>
+        )}
       </div>
     );
   }

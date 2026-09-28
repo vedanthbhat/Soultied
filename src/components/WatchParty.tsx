@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import { renderWatchRoom, WATCH_W, WATCH_H, TV_SCREEN, ICONS, ReactionKind, WatchState } from '../pixel/watchRoom';
 import { PixelBuffer } from '../pixel/buffer';
 import { AvatarThumb } from './PixelAvatarRenderer';
-import { localTransport, projectedPosition, WatchEvent, WatchTransport } from '../watch/sync';
+import { projectedPosition, WatchEvent, WatchTransport } from '../watch/sync';
 import { loadYouTubeApi, parseYouTubeId, parseYouTubeStart, describeYouTubeError, YTPlayer, YTState } from '../watch/youtube';
 import { CallButtons, CamFrame, PartnerAudio, usePushToTalkKey, useWatchCall } from './WatchCall';
 
@@ -76,7 +76,7 @@ const ReactionIcon: React.FC<{ kind: ReactionKind }> = ({ kind }) => {
 };
 
 export const WatchParty: React.FC<{ onExit: () => void }> = ({ onExit }) => {
-  const { currentUser, partnerUser, space } = useApp();
+  const { currentUser, partnerUser, space, openLive } = useApp();
   const me = currentUser.id;
   const roomId = space?.id || 'solo';
   const creatorIsMe = !space || space.creatorId === me;
@@ -296,14 +296,19 @@ export const WatchParty: React.FC<{ onExit: () => void }> = ({ onExit }) => {
 
   /* ---------- transport lifecycle ---------- */
   useEffect(() => {
-    const t = localTransport(roomId);
+    const t: WatchTransport = openLive<WatchEvent>('watch');
     transportRef.current = t;
+    // online, every message is a small write, so check in less often
+    const online = t.kind === 'online';
     const off = t.subscribe((e) => onRemoteRef.current(e));
     t.send({ type: 'hello', by: me, at: Date.now() });
-    const ping = window.setInterval(() => {
-      t.send({ type: 'ping', by: me, at: Date.now() });
-      if (Date.now() - lastSeen.current > 12000) setPartnerHere(false);
-    }, 5000);
+    const ping = window.setInterval(
+      () => {
+        t.send({ type: 'ping', by: me, at: Date.now() });
+        if (Date.now() - lastSeen.current > (online ? 50000 : 12000)) setPartnerHere(false);
+      },
+      online ? 20000 : 5000
+    );
     const bye = () => t.send({ type: 'bye', by: me, at: Date.now() });
     window.addEventListener('pagehide', bye);
     return () => {
@@ -314,7 +319,7 @@ export const WatchParty: React.FC<{ onExit: () => void }> = ({ onExit }) => {
       t.close();
       transportRef.current = null;
     };
-  }, [roomId, me]);
+  }, [openLive, me]);
   const onRemoteRef = useRef(onRemote);
   onRemoteRef.current = onRemote;
 
@@ -407,7 +412,7 @@ export const WatchParty: React.FC<{ onExit: () => void }> = ({ onExit }) => {
       if (!p || leaderRef.current !== me || Date.now() < suppressUntil.current) return;
       if (p.getPlayerState() !== YTState.PLAYING) return;
       send({ type: 'state', videoId: videoIdRef.current, pos: p.getCurrentTime(), playing: true, by: me, at: Date.now() });
-    }, 4000);
+    }, transportRef.current?.kind === 'online' ? 15000 : 4000);
     const remember = window.setInterval(() => {
       const p = playerRef.current;
       if (!p || !videoIdRef.current) return;

@@ -8,7 +8,7 @@ import { AvatarThumb } from './PixelAvatarRenderer';
  * screens a small tab stays visible to open it.
  */
 export const TopNav: React.FC<{ letterUnread: boolean }> = ({ letterUnread }) => {
-  const { space, currentUser, partnerUser, panel, openPanel, switchActiveUser } = useApp();
+  const { space, currentUser, partnerUser, panel, openPanel, switchActiveUser, cloudMode } = useApp();
   const [open, setOpen] = useState(false);
   const [hint, setHint] = useState(true);
   const closeTimer = useRef<number | null>(null);
@@ -117,7 +117,7 @@ export const TopNav: React.FC<{ letterUnread: boolean }> = ({ letterUnread }) =>
                 <span className={`inline-block w-2.5 h-2.5 ${partnerUser?.status === 'online' ? 'bg-[var(--sage)]' : 'bg-[#b9a98f]'}`} />
                 {presence}
               </span>
-              {partnerUser && (
+              {partnerUser && !cloudMode && (
                 <button
                   className="px-btn px-btn--paper px-btn--small"
                   title="Prototype only: see the room as your partner"

@@ -1,0 +1,102 @@
+rules_version = '2';
+
+// Soultied: only the two people in a place can see or change anything in it.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+    function me() {
+      return request.auth.uid;
+    }
+    function spacePath(sid) {
+      return /databases/$(database)/documents/spaces/$(sid);
+    }
+    function isMember(sid) {
+      return signedIn() && me() in get(spacePath(sid)).data.members;
+    }
+    // for writes batched together with creating the place
+    function isMemberAfter(sid) {
+      return signedIn() && me() in getAfter(spacePath(sid)).data.members;
+    }
+
+    // An invite code points at a place. Anyone signed in who has the code can
+    // read it (to see whose invite it is); nobody can list them.
+    match /invites/{code} {
+      allow get: if signedIn();
+      allow list: if false;
+      allow create: if request.resource.data.spaceId is string
+        && isMemberAfter(request.resource.data.spaceId);
+      // only the place a code already belongs to can touch it again
+      allow update: if isMember(resource.data.spaceId)
+        && request.resource.data.spaceId == resource.data.spaceId;
+      allow delete: if false;
+    }
+
+    match /spaces/{sid} {
+      allow get, list: if signedIn() && me() in resource.data.members;
+
+      allow create: if signedIn()
+        && request.resource.data.creatorId == me()
+        && request.resource.data.members == [me()]
+        && request.resource.data.id == sid;
+
+      allow update: if signedIn() && (
+        // either of you can rename the place, set your anniversary, refresh the invite
+        (me() in resource.data.members
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['name', 'togetherSince', 'partnerPlaceholderName', 'inviteCode', 'inviteExpiresAt', 'inviteExpiresAtMs', 'timezone']))
+        ||
+        // taking the empty seat with a valid, unexpired invite code
+        (!(me() in resource.data.members)
+          && resource.data.get('partnerId', null) == null
+          && resource.data.members.size() == 1
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['partnerId', 'members', 'joinCode', 'partnerPlaceholderName'])
+          && request.resource.data.partnerId == me()
+          && request.resource.data.members == resource.data.members.concat([me()])
+          && request.resource.data.joinCode == resource.data.inviteCode
+          && request.time.toMillis() < resource.data.inviteExpiresAtMs)
+      );
+
+      allow delete: if false;
+
+      // each person's name and look: readable by both, written only by its owner
+      match /members/{uid} {
+        allow read: if isMember(sid);
+        allow create, update: if uid == me() && isMemberAfter(sid);
+        allow delete: if false;
+      }
+
+      // one letter day; you can only ever write your own answers
+      match /letters/{day} {
+        allow read: if isMember(sid);
+        allow create: if isMember(sid)
+          && request.resource.data.get('by', {}).keys().hasOnly([me()]);
+        allow update: if isMember(sid)
+          && request.resource.data.get('by', {}).diff(resource.data.get('by', {})).affectedKeys().hasOnly([me()])
+          && request.resource.data.cardIds == resource.data.cardIds;
+        allow delete: if false;
+      }
+
+      match /meta/{doc} {
+        allow read, create, update: if isMember(sid);
+        allow delete: if false;
+      }
+
+      match /activities/{id} {
+        allow read: if isMember(sid);
+        allow create: if isMemberAfter(sid);
+        allow update, delete: if false;
+      }
+
+      // short-lived messages: play/pause, chat, call set-up, escape rooms
+      match /live/{topic}/events/{id} {
+        allow read: if isMember(sid);
+        allow create: if isMember(sid) && request.resource.data.by == me();
+        allow delete: if isMember(sid);
+        allow update: if false;
+      }
+    }
+  }
+}

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useApp } from '../context/AppContext';
+import { InvitePreview, useApp } from '../context/AppContext';
 import { AvatarConfig } from '../types';
 import { DEFAULT_AVATAR_A, DEFAULT_AVATAR_B } from '../pixel/character';
 import { CharacterStudio } from './CharacterStudio';
@@ -16,8 +16,12 @@ interface Props {
 const empty = (name = ''): Seat => ({ avatar: null, name, status: 'empty' });
 
 export const Welcome: React.FC<Props> = ({ initialJoinCode, onDraftSeats, onDone }) => {
-  const { createSpace, findInvite, joinWithCode, loadDemo, inviteLink, space } = useApp();
+  const { createSpace, lookupInvite, joinWithCode, loadDemo, inviteLink, space, cloudEnabled, cloudStatus, signIn, authError, signedInEmail } = useApp();
   const [step, setStep] = useState<Step>(initialJoinCode ? 'join' : 'welcome');
+  // online, you sign in with Google before building a place or taking a seat
+  const needSignIn = cloudEnabled && cloudStatus === 'signedOut';
+  const [signingIn, setSigningIn] = useState(false);
+  const [joining, setJoining] = useState(false);
 
   // create flow
   const [myName, setMyName] = useState('');
@@ -33,7 +37,35 @@ export const Welcome: React.FC<Props> = ({ initialJoinCode, onDraftSeats, onDone
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<'link' | 'code' | null>(null);
 
-  const invite = code ? findInvite(code) : null;
+  const [invite, setInvite] = useState<InvitePreview | null>(null);
+  useEffect(() => {
+    if (!code.trim() || needSignIn || cloudStatus === 'checking') {
+      setInvite(null);
+      return;
+    }
+    let alive = true;
+    const t = window.setTimeout(() => lookupInvite(code).then((i) => alive && setInvite(i)), 250);
+    return () => {
+      alive = false;
+      window.clearTimeout(t);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [code, needSignIn, cloudStatus]);
+
+  // signed in to an account that already has a place: go straight there
+  // (unless you opened an invite to a different place: then you can still take that seat)
+  useEffect(() => {
+    if (cloudStatus !== 'ready') return;
+    const otherInvite = step === 'join' && !!initialJoinCode && space?.inviteCode.toUpperCase() !== initialJoinCode.trim().toUpperCase();
+    if ((step === 'welcome' || step === 'details' || step === 'join') && !otherInvite) onDone();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cloudStatus, step]);
+
+  const doSignIn = async () => {
+    setSigningIn(true);
+    await signIn();
+    setSigningIn(false);
+  };
 
   // Keep the room behind the sheet in sync with what's being built
   useEffect(() => {
@@ -41,12 +73,12 @@ export const Welcome: React.FC<Props> = ({ initialJoinCode, onDraftSeats, onDone
     else if (step === 'invite' && space) onDraftSeats({ left: { avatar: look, name: myName, status: 'online' }, right: empty(partnerName) });
     else if ((step === 'join' || step === 'join-look') && invite)
       onDraftSeats({
-        left: { avatar: invite.host.avatar, name: invite.host.name, status: 'online' },
+        left: { avatar: invite.hostAvatar, name: invite.hostName, status: 'online' },
         right: step === 'join-look' ? { avatar: joinLook, name: joinName, status: 'online' } : empty(),
       });
     else onDraftSeats({ left: empty(), right: empty() });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, look, joinLook, myName, partnerName, joinName, invite?.space.id]);
+  }, [step, look, joinLook, myName, partnerName, joinName, invite?.hostName]);
 
   const copy = async (what: 'link' | 'code') => {
     const text = what === 'link' ? inviteLink : space?.inviteCode || '';
@@ -68,6 +100,31 @@ export const Welcome: React.FC<Props> = ({ initialJoinCode, onDraftSeats, onDone
   );
 
   const wide = step === 'look' || step === 'join-look';
+  const gate = needSignIn && (step === 'details' || step === 'join');
+
+  const signInCard = (
+    <div className="flex flex-col gap-5">
+      <div>
+        <div className="text-sm font-semibold tracking-[0.16em] uppercase text-[var(--terracotta-d)]">
+          {step === 'join' ? "You're invited" : 'One quick thing'}
+        </div>
+        <h2 className="text-3xl font-bold leading-tight mt-1">{step === 'join' ? 'Sign in to take your seat.' : 'Sign in to save your place.'}</h2>
+        <p className="text-[var(--muted)] mt-1">
+          {step === 'join'
+            ? 'Your seat is saved to your Google account, so you can come back from any phone or laptop.'
+            : 'Your place is saved to your Google account, so your person can join you from their own phone, and you can come back from anywhere.'}
+        </p>
+      </div>
+      <button className="px-btn text-lg" onClick={doSignIn} disabled={signingIn}>
+        {signingIn ? 'Opening Google…' : 'Continue with Google'}
+      </button>
+      {authError && <div className="px-inset text-sm p-3 text-[#7f3835]">{authError}</div>}
+      <p className="text-xs text-[var(--muted)]">We only use your Google account to sign you in. Your letters stay between the two of you.</p>
+      <button className="px-btn px-btn--paper self-start" onClick={() => setStep('welcome')}>
+        Back
+      </button>
+    </div>
+  );
 
   return (
     <div className="fixed inset-0 z-40 pointer-events-none px-ui flex items-end md:items-center p-3 md:p-6">
@@ -77,7 +134,16 @@ export const Welcome: React.FC<Props> = ({ initialJoinCode, onDraftSeats, onDone
         key={step}
       >
         <div className="px-scroll overflow-y-auto p-6 md:p-8 flex-1">
-          {step === 'welcome' && (
+          {gate && signInCard}
+
+          {step === 'welcome' && cloudStatus === 'checking' && (
+            <div className="flex flex-col items-center justify-center gap-3 py-10 text-center">
+              <span className="text-2xl font-bold">Opening the door…</span>
+              <span className="text-[var(--muted)]">Finding your place.</span>
+            </div>
+          )}
+
+          {step === 'welcome' && cloudStatus !== 'checking' && (
             <div className="flex flex-col gap-5 h-full">
               <div>
                 <div className="text-sm font-semibold tracking-[0.16em] uppercase text-[var(--terracotta-d)]">Welcome to</div>
@@ -111,7 +177,7 @@ export const Welcome: React.FC<Props> = ({ initialJoinCode, onDraftSeats, onDone
             </div>
           )}
 
-          {step === 'details' && (
+          {step === 'details' && !gate && (
             <form
               className="flex flex-col gap-5"
               onSubmit={(e) => {
@@ -178,6 +244,22 @@ export const Welcome: React.FC<Props> = ({ initialJoinCode, onDraftSeats, onDone
             </div>
           )}
 
+          {step === 'invite' && !space && (
+            <div className="flex flex-col gap-4">
+              <Dots n={3} />
+              {authError ? (
+                <>
+                  <p className="text-[var(--terracotta)]">{authError}</p>
+                  <button className="px-btn self-start" onClick={() => setStep('look')}>
+                    Try again
+                  </button>
+                </>
+              ) : (
+                <p className="text-xl text-[var(--muted)]">Saving your place…</p>
+              )}
+            </div>
+          )}
+
           {step === 'invite' && space && (
             <div className="flex flex-col gap-5">
               <Dots n={3} />
@@ -210,24 +292,32 @@ export const Welcome: React.FC<Props> = ({ initialJoinCode, onDraftSeats, onDone
               <button className="px-btn text-lg mt-1" onClick={onDone}>
                 Step inside →
               </button>
-              <p className="text-xs text-[var(--muted)]">
-                Preview build: invites work within this browser until the backend is connected.
-              </p>
+              {!cloudEnabled && (
+                <p className="text-xs text-[var(--muted)]">Preview build: invites work within this browser until the backend is connected.</p>
+              )}
             </div>
           )}
 
-          {step === 'join' && (
+          {step === 'join' && !gate && (
             <form
               className="flex flex-col gap-5"
               onSubmit={(e) => {
                 e.preventDefault();
                 setError(null);
                 if (!invite) {
-                  setError("We couldn't find that invite. Check the code, or ask for a fresh link. (In this preview, invites only work in the browser that created them.)");
+                  setError(
+                    cloudEnabled
+                      ? "We couldn't find that invite. Check the code, or ask for a fresh link."
+                      : "We couldn't find that invite. Check the code, or ask for a fresh link. (In this preview, invites only work in the browser that created them.)"
+                  );
                   return;
                 }
-                if (invite.space.partnerId) {
+                if (invite.taken) {
                   setError('That seat is already taken. This place already has two people.');
+                  return;
+                }
+                if (invite.expired) {
+                  setError('This invite has expired. Ask for a fresh one.');
                   return;
                 }
                 setStep('join-look');
@@ -236,11 +326,12 @@ export const Welcome: React.FC<Props> = ({ initialJoinCode, onDraftSeats, onDone
               <div>
                 <div className="text-sm font-semibold tracking-[0.16em] uppercase text-[var(--terracotta-d)]">You're invited</div>
                 <h2 className="text-3xl font-bold leading-tight mt-1">
-                  {invite ? `${invite.host.name} saved you a seat.` : 'Come on in.'}
+                  {invite ? `${invite.hostName} saved you a seat.` : 'Come on in.'}
                 </h2>
                 <p className="text-[var(--muted)] mt-1">
-                  {invite ? `Welcome to ${invite.space.name}.` : 'Paste the code from your invite.'}
+                  {invite ? `Welcome to ${invite.spaceName}.` : 'Paste the code from your invite.'}
                 </p>
+                {signedInEmail && <p className="text-xs text-[var(--muted)] mt-1">Signed in as {signedInEmail}</p>}
               </div>
               <label>
                 <span className="px-label">Invite code</span>
@@ -252,7 +343,7 @@ export const Welcome: React.FC<Props> = ({ initialJoinCode, onDraftSeats, onDone
                   className="px-input"
                   value={joinName}
                   onChange={(e) => setJoinName(e.target.value)}
-                  placeholder={invite?.space.partnerPlaceholderName || 'Your name'}
+                  placeholder={invite?.partnerPlaceholderName || 'Your name'}
                   required
                   maxLength={24}
                 />
@@ -273,7 +364,7 @@ export const Welcome: React.FC<Props> = ({ initialJoinCode, onDraftSeats, onDone
             <div className="flex flex-col gap-4">
               <div>
                 <h2 className="text-3xl font-bold leading-tight">Now make you.</h2>
-                <p className="text-[var(--muted)] mt-1">{invite.host.name} is already on the couch. Your seat's right there.</p>
+                <p className="text-[var(--muted)] mt-1">{invite.hostName} is already on the couch. Your seat's right there.</p>
               </div>
               <CharacterStudio value={joinLook} onChange={setJoinLook} compact />
               {error && <div className="px-inset text-sm p-3 text-[#7f3835]">{error}</div>}
@@ -283,13 +374,17 @@ export const Welcome: React.FC<Props> = ({ initialJoinCode, onDraftSeats, onDone
                 </button>
                 <button
                   className="px-btn"
-                  onClick={() => {
-                    const r = joinWithCode(code, joinName, joinLook);
+                  disabled={joining}
+                  onClick={async () => {
+                    setJoining(true);
+                    setError(null);
+                    const r = await joinWithCode(code, joinName, joinLook);
+                    setJoining(false);
                     if (r === 'ok') onDone();
                     else setError(r === 'expired' ? 'This invite has expired. Ask for a fresh one.' : r === 'full' ? 'That seat is already taken.' : "We couldn't find that invite.");
                   }}
                 >
-                  Take my seat →
+                  {joining ? 'Sitting down…' : 'Take my seat →'}
                 </button>
               </div>
             </div>

@@ -4,8 +4,10 @@ import { PixelAvatarRenderer } from './PixelAvatarRenderer';
 
 export const SpacePanel: React.FC = () => {
   const { space, currentUser, partnerUser, inviteLink, regenerateInvite, resetAll, switchActiveUser } = useApp();
+  const { cloudEnabled, cloudMode, demo, signedInEmail, signOut, moveOnline, authError } = useApp();
   const [copied, setCopied] = useState<string | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [moving, setMoving] = useState(false);
   if (!space) return null;
 
   const copy = async (key: string, text: string) => {
@@ -80,14 +82,17 @@ export const SpacePanel: React.FC = () => {
               </button>
             </div>
           </div>
-          <p className="text-xs text-[var(--muted)]">
-            Preview build: open the link in this same browser to try the partner's side. Real two-device pairing
-            arrives with the backend.
-          </p>
+          {!cloudMode && (
+            <p className="text-xs text-[var(--muted)]">
+              {cloudEnabled
+                ? 'This place only lives in this browser, so the invite only works here. Move it online (below) to invite someone on another device.'
+                : "Preview build: open the link in this same browser to try the partner's side."}
+            </p>
+          )}
         </div>
       )}
 
-      {partnerUser && (
+      {partnerUser && !cloudMode && (
         <div className="px-inset p-4 text-sm">
           Prototype helper: you're viewing as <strong>{currentUser.name}</strong>.{' '}
           <button className="px-link" onClick={() => switchActiveUser(partnerUser.id)}>
@@ -96,10 +101,41 @@ export const SpacePanel: React.FC = () => {
         </div>
       )}
 
+      {cloudEnabled && !cloudMode && !demo && (
+        <div className="px-inset p-4 flex items-center justify-between gap-3 flex-wrap text-sm">
+          <span>
+            <strong>Move this place online</strong> so it follows you to any device and your person can join from theirs.
+            {authError && <span className="block text-[var(--terracotta)] mt-1">{authError}</span>}
+          </span>
+          <button
+            className="px-btn px-btn--sage px-btn--small"
+            disabled={moving}
+            onClick={async () => {
+              setMoving(true);
+              await moveOnline().finally(() => setMoving(false));
+            }}
+          >
+            {moving ? 'Moving…' : 'Sign in with Google'}
+          </button>
+        </div>
+      )}
+
       <div className="px-divider" />
+      {cloudMode ? (
+        <div className="flex items-center justify-between gap-3 flex-wrap text-sm">
+          <span className="text-[var(--muted)]">Signed in{signedInEmail ? ` as ${signedInEmail}` : ''}. Everything here is saved online.</span>
+          <button className="px-btn px-btn--paper px-btn--small" onClick={() => void signOut()}>
+            Sign out
+          </button>
+        </div>
+      ) : (
       <div className="flex items-center justify-between gap-3 flex-wrap text-sm">
-        <span className="text-[var(--muted)]">Start over clears this browser's saved room.</span>
-        {confirmReset ? (
+        <span className="text-[var(--muted)]">{demo ? 'This is the demo room.' : "Start over clears this browser's saved room."}</span>
+        {demo ? (
+          <button className="px-btn px-btn--paper px-btn--small" onClick={resetAll}>
+            Leave the demo
+          </button>
+        ) : confirmReset ? (
           <span className="flex gap-3">
             <button className="px-btn px-btn--small" onClick={resetAll}>
               Yes, clear it
@@ -114,6 +150,7 @@ export const SpacePanel: React.FC = () => {
           </button>
         )}
       </div>
+      )}
     </div>
   );
 };
