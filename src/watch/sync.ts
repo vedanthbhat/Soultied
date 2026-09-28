@@ -18,7 +18,10 @@ export type WatchEvent =
   | { type: 'ping'; by: string; at: number }
   | { type: 'bye'; by: string; at: number }
   | { type: 'react'; kind: ReactionKind; by: string; at: number }
-  | { type: 'chat'; id: string; text: string; by: string; name: string; at: number };
+  | { type: 'chat'; id: string; text: string; by: string; name: string; at: number }
+  // the video call: WebRTC signalling, and what each person's camera / mic is doing
+  | { type: 'rtc'; to: string; by: string; at: number; description?: RTCSessionDescriptionInit; candidate?: RTCIceCandidateInit | null }
+  | { type: 'media'; cam: boolean; talking: boolean; by: string; at: number };
 
 export interface WatchTransport {
   kind: 'local' | 'online';

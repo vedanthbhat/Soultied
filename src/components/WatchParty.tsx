@@ -5,11 +5,13 @@ import { PixelBuffer } from '../pixel/buffer';
 import { AvatarThumb } from './PixelAvatarRenderer';
 import { localTransport, projectedPosition, WatchEvent, WatchTransport } from '../watch/sync';
 import { loadYouTubeApi, parseYouTubeId, parseYouTubeStart, describeYouTubeError, YTPlayer, YTState } from '../watch/youtube';
+import { CallButtons, CamFrame, PartnerAudio, usePushToTalkKey, useWatchCall } from './WatchCall';
 
 /**
  * Watch together (YouTube). The camera swings round behind the couch; the
  * YouTube player sits exactly inside the pixel TV. Nothing is ever drawn on
- * top of the player: the controls live beside or below it.
+ * top of the player: the controls live beside or below it. You can turn your
+ * cameras on (little framed pictures beside the TV) and hold to talk.
  */
 
 interface Fit {
@@ -131,6 +133,27 @@ export const WatchParty: React.FC<{ onExit: () => void }> = ({ onExit }) => {
   sceneRef.current.tv = videoId ? tv : 'idle';
 
   const send = useCallback((e: WatchEvent) => transportRef.current?.send(e), []);
+
+  /* ---------- cameras + push to talk ---------- */
+  const { call, view } = useWatchCall(me, partnerUser?.id || null, send);
+  const callRef = useRef(call);
+  callRef.current = call;
+  usePushToTalkKey(call);
+  const [audioBlocked, setAudioBlocked] = useState(false);
+  const duckRef = useRef<number | null>(null);
+  // turn the show down while one of you is talking, so you can hear each other
+  const ducking = !!view && (view.partnerTalking || view.talking);
+  useEffect(() => {
+    const p = playerRef.current;
+    if (!p?.setVolume || !p.getVolume) return;
+    if (ducking && duckRef.current === null) {
+      duckRef.current = p.getVolume();
+      p.setVolume(Math.min(duckRef.current, 20));
+    } else if (!ducking && duckRef.current !== null) {
+      p.setVolume(duckRef.current);
+      duckRef.current = null;
+    }
+  }, [ducking]);
   const suppress = (ms: number) => (suppressUntil.current = Date.now() + ms);
   const addReaction = (kind: ReactionKind, seat: 'left' | 'right') => {
     const now = Date.now();
@@ -206,8 +229,18 @@ export const WatchParty: React.FC<{ onExit: () => void }> = ({ onExit }) => {
       if (e.by === me) return;
       lastSeen.current = Date.now();
       setPartnerHere(e.type !== 'bye');
+      if (e.type === 'rtc' || e.type === 'media') {
+        void callRef.current?.handle(e);
+        return;
+      }
       switch (e.type) {
+        case 'bye':
+          callRef.current?.reset();
+          break;
         case 'hello': {
+          // they just walked in: start the call afresh and tell them if my camera's on
+          callRef.current?.reset();
+          callRef.current?.announce();
           const p = playerRef.current;
           send({
             type: 'state',
@@ -472,6 +505,39 @@ export const WatchParty: React.FC<{ onExit: () => void }> = ({ onExit }) => {
   const headerRoom = tvBox.left - BEZEL * fit.s - 32;
   const headerInRemote = stacked || headerRoom < 230;
 
+  const paused = tv !== 'playing';
+  const showCams = !!partnerUser && !!view && (view.camOn || view.partnerCam || view.talking || view.partnerTalking);
+  // where the camera frames go: beside the TV, in the corner beside the remote, or (phones) under the scene
+  const leftRoom = tvBox.left - BEZEL * fit.s - 32;
+  const cornerRoom = (W - Math.min(760, W - 32)) / 2 - 32;
+  const camPlace = stacked ? 'stack' : leftRoom >= 170 ? 'left' : cornerRoom >= 110 ? 'corner' : 'panel';
+  const bigW = Math.round(
+    camPlace === 'left'
+      ? Math.min(leftRoom, paused ? 300 : 230)
+      : camPlace === 'corner'
+        ? Math.min(cornerRoom, paused ? 190 : 150)
+        : camPlace === 'stack'
+          ? Math.min(W * 0.56, 280)
+          : paused
+            ? 150
+            : 120
+  );
+  const smallW = Math.round(bigW * 0.6);
+  const camTop = headerInRemote ? Math.max(16, tvBox.top) : Math.max(tvBox.top, 108);
+  const camFrames = showCams && view && (
+    <div className={`flex gap-4 ${camPlace === 'left' || camPlace === 'corner' ? 'flex-col items-start' : 'items-end justify-center'}`}>
+      <CamFrame
+        stream={view.remote}
+        on={view.partnerCam}
+        name={partnerName}
+        avatar={partnerUser?.avatar || null}
+        talking={view.partnerTalking}
+        width={bigW}
+      />
+      <CamFrame stream={view.local} on={view.camOn} mine name={currentUser.name} avatar={currentUser.avatar} talking={view.talking} width={smallW} />
+    </div>
+  );
+
   const watchingLine = partnerUser
     ? partnerHere
       ? `${partnerName} is watching with you`
@@ -534,6 +600,7 @@ export const WatchParty: React.FC<{ onExit: () => void }> = ({ onExit }) => {
   const remote = (
     <div className="px-box px-shadow flex flex-col gap-2 p-3" style={{ width: stacked ? '100%' : 'min(760px, calc(100vw - 32px))' }}>
       {headerInRemote && !stacked && header}
+      {camPlace === 'panel' && camFrames}
       <form onSubmit={putOn} className="flex gap-2 items-stretch">
         <input
           className="px-input text-sm"
@@ -552,6 +619,15 @@ export const WatchParty: React.FC<{ onExit: () => void }> = ({ onExit }) => {
             <ReactionIcon kind={r.kind} />
           </button>
         ))}
+        {partnerUser && <CallButtons call={call} view={view} partnerName={partnerName} />}
+        {audioBlocked && view?.remote && (
+          <button
+            className="px-btn px-btn--sage px-btn--small"
+            onClick={() => document.querySelectorAll('audio').forEach((a) => a.play().then(() => setAudioBlocked(false), () => undefined))}
+          >
+            Hear {partnerName}
+          </button>
+        )}
         {needsTap && (
           <button className="px-btn px-btn--sage px-btn--small" onClick={catchUp}>
             ▶ Catch up with {partnerName}
@@ -564,6 +640,14 @@ export const WatchParty: React.FC<{ onExit: () => void }> = ({ onExit }) => {
         )}
       </div>
       {notice && <p className="text-sm text-[#7f3835]">{notice}</p>}
+      {view?.error && (
+        <p className="text-sm text-[#7f3835] flex items-center gap-2">
+          {view.error}
+          <button className="px-link text-sm" onClick={() => call?.clearError()}>
+            OK
+          </button>
+        </p>
+      )}
     </div>
   );
 
@@ -574,7 +658,11 @@ export const WatchParty: React.FC<{ onExit: () => void }> = ({ onExit }) => {
         @keyframes watch-enter { from { opacity: 1; } to { opacity: 0; } }
         .watch-enter { animation: watch-enter 520ms steps(6) forwards; }
         @media (prefers-reduced-motion: reduce) { .watch-enter { animation-duration: 1ms; } }
+        @keyframes call-wave { 0%, 100% { transform: scaleY(.4); } 50% { transform: scaleY(1); } }
+        .call-wave-bar { transform-origin: bottom; animation: call-wave 480ms steps(3) infinite; }
+        @media (prefers-reduced-motion: reduce) { .call-wave-bar { animation: none; } }
       `}</style>
+      {view?.remote && <PartnerAudio stream={view.remote} onBlocked={setAudioBlocked} />}
       <canvas
         ref={canvasRef}
         width={WATCH_W}
@@ -611,6 +699,7 @@ export const WatchParty: React.FC<{ onExit: () => void }> = ({ onExit }) => {
       {stacked ? (
         <div className="absolute inset-x-0 bottom-0 flex flex-col gap-3 p-3 overflow-y-auto" style={{ top: sceneBottom + 8 }}>
           {header}
+          {camFrames}
           {remote}
           <div style={{ height: 260 }}>{chatPanel}</div>
         </div>
@@ -624,6 +713,11 @@ export const WatchParty: React.FC<{ onExit: () => void }> = ({ onExit }) => {
           <div className="absolute left-1/2 -translate-x-1/2" style={{ bottom: 16, zIndex: 20 }}>
             {remote}
           </div>
+          {camFrames && (camPlace === 'left' || camPlace === 'corner') && (
+            <div className="absolute" style={camPlace === 'left' ? { left: 16, top: camTop, zIndex: 20 } : { left: 16, bottom: 16, zIndex: 20 }}>
+              {camFrames}
+            </div>
+          )}
           {dockRight && (
             <div className="absolute" style={{ right: 16, top: tvBox.top, height: tvBox.height, width: chatWidth, zIndex: 20 }}>
               {chatPanel}
