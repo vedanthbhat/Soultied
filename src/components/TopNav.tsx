@@ -98,14 +98,11 @@ export const TopNav: React.FC<{ letterUnread: boolean }> = ({ letterUnread }) =>
                 Room
               </button>
               <button className="px-btn px-btn--paper px-btn--small" onClick={() => go('question')}>
-                Today’s letter
-                {letterUnread && <span aria-label="unread" className="inline-block w-2 h-2 bg-[var(--thread)]" />}
+                Letters
+                {letterUnread && <span aria-label="new" className="inline-block w-2 h-2 bg-[var(--thread)]" />}
               </button>
               <button className="px-btn px-btn--paper px-btn--small" onClick={() => go('watch')}>
                 Watch together
-              </button>
-              <button className="px-btn px-btn--paper px-btn--small" onClick={() => go('questions')}>
-                Questions
               </button>
               <button className="px-btn px-btn--paper px-btn--small" onClick={() => go('us')}>
                 Us

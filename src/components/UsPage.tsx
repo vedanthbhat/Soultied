@@ -1,238 +1,166 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { PixelAvatarRenderer } from './PixelAvatarRenderer';
-import { Heart, Sparkles, Calendar, Clock, Globe, Award, Edit3, Check } from 'lucide-react';
+import { PixelIcon, SpriteName } from './letters/PixelIcon';
+import { scoreDay } from '../letters/engine';
+
+const Stat: React.FC<{ icon: SpriteName; value: string; label: string }> = ({ icon, value, label }) => (
+  <div className="px-inset flex items-center gap-3 px-3.5 py-3">
+    <PixelIcon name={icon} scale={4} />
+    <div className="leading-tight">
+      <div className="text-xl font-bold">{value}</div>
+      <div className="text-sm text-[var(--muted)]">{label}</div>
+    </div>
+  </div>
+);
 
 export const UsPage: React.FC = () => {
-  const {
-    space,
-    currentUser,
-    partnerUser,
-    progression,
-    activities,
-    setIsWardrobeOpen,
-    updateSpaceDetails,
-  } = useApp();
+  const { space, currentUser, partnerUser, activities, streak, letters, updateSpaceDetails, openPanel } = useApp();
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(space?.name || '');
+  const [since, setSince] = useState(space?.togetherSince || '');
 
-  const [isEditingName, setIsEditingName] = useState(false);
-  const [spaceNameInput, setSpaceNameInput] = useState(space?.name || 'Our Little Place');
+  const sync = useMemo(() => {
+    if (!partnerUser) return null;
+    let same = 0;
+    let total = 0;
+    for (const d of Object.values(letters.daily)) {
+      if (!d.revealedAt) continue;
+      const s = scoreDay(d, currentUser.id, partnerUser.id);
+      same += s.same;
+      total += s.total;
+    }
+    return total ? Math.round((same / total) * 100) : null;
+  }, [letters.daily, currentUser.id, partnerUser]);
 
-  // Calculate days together
-  const calculateDaysTogether = () => {
-    if (!space?.togetherSince) return null;
-    const start = new Date(space.togetherSince);
-    const now = new Date();
-    const diffTime = Math.abs(now.getTime() - start.getTime());
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  };
+  if (!space) return null;
 
-  const daysTogether = calculateDaysTogether();
-
-  const handleSaveSpaceName = () => {
-    updateSpaceDetails(spaceNameInput);
-    setIsEditingName(false);
-  };
+  const days = space.togetherSince ? Math.floor((Date.now() - new Date(space.togetherSince).getTime()) / 86400000) : null;
+  const fmt = (d: string) =>
+    new Date(d).toLocaleDateString(undefined, {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    });
 
   return (
-    <div className="max-w-4xl mx-auto py-6 px-4 flex flex-col gap-6">
-      {/* Top Banner: Our Story & Days Together */}
-      <div className="bg-[#EFE2CC]/90 border-2 border-[#D8C4A7] rounded-2xl p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6 shadow-xs">
-        <div className="flex flex-col gap-2 text-center md:text-left">
-          <div className="flex items-center justify-center md:justify-start gap-2 text-[#A84F4B]">
-            <Heart className="w-5 h-5 fill-current" />
-            <span className="text-sm uppercase tracking-widest font-bold">
-              ABOUT OUR LITTLE SPACE
-            </span>
+    <div className="flex flex-col gap-6">
+      {/* the two of you */}
+      <div className="flex items-end gap-6 flex-wrap">
+        <div className="flex items-end gap-2">
+          <div className="flex flex-col items-center">
+            <PixelAvatarRenderer config={currentUser.avatar} size={120} />
+            <span className="text-sm font-semibold mt-1">{currentUser.name}</span>
           </div>
-
-          <div className="flex items-center justify-center md:justify-start gap-3">
-            {isEditingName ? (
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={spaceNameInput}
-                  onChange={(e) => setSpaceNameInput(e.target.value)}
-                  className="text-2xl md:text-3xl font-bold bg-[#F7EBD4] border-2 border-[#805847] rounded-xl px-3 py-1 text-[#483B36]"
-                />
-                <button
-                  onClick={handleSaveSpaceName}
-                  className="p-2 bg-[#8C9B75] text-[#F7EBD4] rounded-xl hover:bg-[#788961]"
-                >
-                  <Check className="w-5 h-5" />
-                </button>
-              </div>
+          <div className="flex flex-col items-center">
+            {partnerUser ? (
+              <>
+                <PixelAvatarRenderer config={partnerUser.avatar} size={120} flipped />
+                <span className="text-sm font-semibold mt-1">{partnerUser.name}</span>
+              </>
             ) : (
-              <div className="flex items-center gap-2">
-                <h1 className="text-3xl md:text-4xl font-bold text-[#483B36]">
-                  {space?.name}
-                </h1>
-                <button
-                  onClick={() => setIsEditingName(true)}
-                  className="p-1 rounded-md text-[#805847] hover:bg-[#DFCAAC] transition-colors"
-                  title="Edit space name"
+              <>
+                <div
+                  className="px-inset flex items-center justify-center text-3xl text-[var(--terracotta)]"
+                  style={{ width: 60, height: 120 }}
                 >
-                  <Edit3 className="w-4 h-4" />
-                </button>
-              </div>
+                  +
+                </div>
+                <span className="text-sm font-semibold mt-1 text-[var(--muted)]">{space.partnerPlaceholderName}</span>
+              </>
             )}
           </div>
-
-          {daysTogether !== null ? (
-            <p className="text-lg text-[#805847]">
-              Together for <strong>{daysTogether} days</strong> (since{' '}
-              {new Date(space?.togetherSince || '').toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric',
-              })}
-              )
-            </p>
-          ) : (
-            <p className="text-lg text-[#805847]">
-              {currentUser.name} &amp; {partnerUser ? partnerUser.name : 'Waiting for partner'}
-            </p>
-          )}
         </div>
 
-        {/* Side-by-side Avatars portrait */}
-        <div className="flex items-end gap-3 p-3 bg-[#F7EBD4] border-2 border-[#D8C4A7] rounded-2xl shadow-inner">
-          <div className="flex flex-col items-center">
-            <PixelAvatarRenderer config={currentUser.avatar} size={130} />
-            <span className="text-sm font-bold text-[#483B36] mt-1">{currentUser.name}</span>
-          </div>
-
-          {partnerUser ? (
-            <div className="flex flex-col items-center">
-              <PixelAvatarRenderer config={partnerUser.avatar} size={130} flipped={true} />
-              <span className="text-sm font-bold text-[#483B36] mt-1">{partnerUser.name}</span>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center w-[90px] h-[130px] border-2 border-dashed border-[#A84F4B] rounded-xl text-center p-2">
-              <span className="text-xs font-bold text-[#A84F4B]">Partner slot open</span>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Progression Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-[#EFE2CC]/80 border-2 border-[#D8C4A7] rounded-xl p-4 flex items-center gap-3">
-          <div className="p-2.5 rounded-lg bg-[#E4D5BE] text-[#A84F4B]">
-            <Sparkles className="w-6 h-6" />
-          </div>
-          <div>
-            <span className="text-xs uppercase font-bold text-[#805847] block">
-              Current Streak
-            </span>
-            <span className="text-2xl font-bold text-[#483B36]">
-              {progression.currentStreak} Days
-            </span>
-          </div>
-        </div>
-
-        <div className="bg-[#EFE2CC]/80 border-2 border-[#D8C4A7] rounded-xl p-4 flex items-center gap-3">
-          <div className="p-2.5 rounded-lg bg-[#E4D5BE] text-[#E4BB6B]">
-            <Award className="w-6 h-6" />
-          </div>
-          <div>
-            <span className="text-xs uppercase font-bold text-[#805847] block">
-              Best Streak
-            </span>
-            <span className="text-2xl font-bold text-[#483B36]">
-              {progression.bestStreak} Days
-            </span>
-          </div>
-        </div>
-
-        <div className="bg-[#EFE2CC]/80 border-2 border-[#D8C4A7] rounded-xl p-4 flex items-center gap-3">
-          <div className="p-2.5 rounded-lg bg-[#E4D5BE] text-[#8C9B75]">
-            <Calendar className="w-6 h-6" />
-          </div>
-          <div>
-            <span className="text-xs uppercase font-bold text-[#805847] block">
-              Connected Days
-            </span>
-            <span className="text-2xl font-bold text-[#483B36]">
-              {progression.lifetimeConnectedDays} Total
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Quick Settings & Wardrobe Access */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Space details card */}
-        <div className="bg-[#EFE2CC]/80 border-2 border-[#D8C4A7] rounded-xl p-5 flex flex-col gap-3">
-          <h2 className="text-xl font-bold text-[#483B36]">Connection Details</h2>
-          <div className="flex flex-col gap-2 text-sm text-[#483B36]">
-            <div className="flex items-center justify-between py-1 border-b border-[#D8C4A7]">
-              <span className="flex items-center gap-2 text-[#805847]">
-                <Globe className="w-4 h-4" /> Shared Timezone
-              </span>
-              <strong>{space?.timezone}</strong>
-            </div>
-
-            <div className="flex items-center justify-between py-1 border-b border-[#D8C4A7]">
-              <span className="flex items-center gap-2 text-[#805847]">
-                <Clock className="w-4 h-4" /> Space Created
-              </span>
-              <strong>
-                {new Date(space?.createdAt || '').toLocaleDateString('en-US', {
-                  month: 'short',
-                  day: 'numeric',
-                  year: 'numeric',
-                })}
-              </strong>
-            </div>
-
-            <div className="flex items-center justify-between py-1">
-              <span className="text-[#805847]">Partner Status</span>
-              <strong>{partnerUser ? 'Paired & Active' : 'Waiting for redemption'}</strong>
-            </div>
-          </div>
-        </div>
-
-        {/* Wardrobe launch card */}
-        <div className="bg-[#EFE2CC]/80 border-2 border-[#D8C4A7] rounded-xl p-5 flex flex-col justify-between gap-3">
-          <div>
-            <h2 className="text-xl font-bold text-[#483B36]">Your Appearance</h2>
-            <p className="text-sm text-[#805847] mt-1">
-              Change your clothes, hair, skin tone and little extras anytime.
-            </p>
-          </div>
-
-          <button
-            onClick={() => setIsWardrobeOpen(true)}
-            className="w-full py-2.5 px-4 bg-[#BD725D] hover:bg-[#A85F4C] text-[#F7EBD4] font-bold rounded-xl flex items-center justify-center gap-2 transition-colors shadow-xs"
-          >
-            <Sparkles className="w-4 h-4" />
-            <span>Open Wardrobe &amp; Styling</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Activity History */}
-      <div className="bg-[#EFE2CC]/80 border-2 border-[#D8C4A7] rounded-xl p-6 flex flex-col gap-4">
-        <h2 className="text-2xl font-bold text-[#483B36]">Activity Log</h2>
-        <div className="flex flex-col gap-3">
-          {activities.map((act) => (
-            <div
-              key={act.id}
-              className="flex items-start gap-3 p-3 bg-[#F7EBD4] border border-[#D8C4A7] rounded-xl"
+        <div className="flex-1 min-w-[240px] flex flex-col gap-2">
+          {editing ? (
+            <form
+              className="flex flex-col gap-3"
+              onSubmit={(e) => {
+                e.preventDefault();
+                updateSpaceDetails(name.trim() || space.name, since || undefined);
+                setEditing(false);
+              }}
             >
-              <div className="p-2 rounded-lg bg-[#EFE2CC] text-[#A84F4B] mt-0.5">
-                <Heart className="w-4 h-4" />
+              <label>
+                <span className="px-label">Name of your place</span>
+                <input className="px-input" value={name} onChange={(e) => setName(e.target.value)} maxLength={40} />
+              </label>
+              <label>
+                <span className="px-label">Together since</span>
+                <input className="px-input" type="date" value={since} onChange={(e) => setSince(e.target.value)} />
+              </label>
+              <div className="flex gap-3">
+                <button className="px-btn px-btn--small" type="submit">
+                  Save
+                </button>
+                <button className="px-btn px-btn--paper px-btn--small" type="button" onClick={() => setEditing(false)}>
+                  Cancel
+                </button>
               </div>
-              <div className="flex-1">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-[#483B36]">{act.title}</span>
-                  <span className="text-xs text-[#805847] font-semibold">{act.timestamp}</span>
-                </div>
-                <p className="text-sm text-[#805847] mt-0.5">{act.description}</p>
-              </div>
-            </div>
-          ))}
+            </form>
+          ) : (
+            <>
+              <div className="text-3xl font-bold leading-tight">{space.name}</div>
+              <p className="m-0 text-[var(--muted)]">
+                {days !== null
+                  ? `Together since ${fmt(space.togetherSince!)} · ${days.toLocaleString()} days`
+                  : partnerUser
+                    ? `${currentUser.name} & ${partnerUser.name}`
+                    : `Saving a seat for ${space.partnerPlaceholderName}`}
+              </p>
+              <button className="px-link self-start text-sm" onClick={() => setEditing(true)}>
+                {days === null ? 'Add the day you got together' : 'Edit'}
+              </button>
+            </>
+          )}
         </div>
+      </div>
+
+      {/* numbers */}
+      <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))' }}>
+        <Stat
+          icon={streak.current ? 'flame' : 'flameOut'}
+          value={`${streak.current} ${streak.current === 1 ? 'day' : 'days'}`}
+          label="Streak"
+        />
+        <Stat icon="seal" value={`${streak.best} ${streak.best === 1 ? 'day' : 'days'}`} label="Best streak" />
+        <Stat icon="envelope" value={String(streak.together)} label="Letters opened" />
+        <Stat icon="heart" value={sync === null ? '—' : `${sync}%`} label="In sync" />
+      </div>
+
+      <div className="flex gap-3 flex-wrap">
+        <button className="px-btn" onClick={() => openPanel('wardrobe')}>
+          Change my look
+        </button>
+        <button className="px-btn px-btn--paper" onClick={() => openPanel('questions')}>
+          Past letters
+        </button>
+        <button className="px-btn px-btn--paper" onClick={() => openPanel('space')}>
+          {partnerUser ? 'Our place' : 'Invite'}
+        </button>
+      </div>
+
+      {/* what's happened */}
+      <div className="flex flex-col gap-3">
+        <div className="px-divider" />
+        <h3 className="text-xl font-bold m-0">Little moments</h3>
+        {activities.length === 0 && <p className="m-0 text-[var(--muted)]">Things you do together will show up here.</p>}
+        <ol className="flex flex-col gap-2 list-none p-0 m-0">
+          {activities.slice(0, 12).map((a) => (
+            <li key={a.id} className="px-inset px-3.5 py-2.5 flex items-start gap-3">
+              <PixelIcon name="heart" scale={2} className="mt-1.5" />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="font-semibold">{a.title}</span>
+                  <span className="text-xs text-[var(--muted)] shrink-0">{a.timestamp}</span>
+                </div>
+                <div className="text-sm text-[var(--muted)] leading-snug">{a.description}</div>
+              </div>
+            </li>
+          ))}
+        </ol>
+        <p className="m-0 text-xs text-[var(--muted)]">Moved in {fmt(space.createdAt)}. Letters arrive at midnight, your time.</p>
       </div>
     </div>
   );

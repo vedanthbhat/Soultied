@@ -117,33 +117,3 @@ export const SpacePanel: React.FC = () => {
     </div>
   );
 };
-
-export const LetterPanel: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { partnerUser, space, progression, openPanel } = useApp();
-  if (!partnerUser) {
-    return (
-      <div className="flex flex-col gap-4 items-start">
-        <p className="text-xl leading-snug">
-          Letters arrive once {space?.partnerPlaceholderName || 'your person'} moves in. Each day you'll both answer
-          one little question in secret, then open the answers together.
-        </p>
-        <button className="px-btn px-btn--sage" onClick={() => openPanel('space')}>
-          Send the invite
-        </button>
-      </div>
-    );
-  }
-  return (
-    <div className="flex flex-col gap-5">
-      {children}
-      <div className="flex items-center gap-3 flex-wrap text-[var(--muted)]">
-        <span className="font-semibold text-[var(--ink-soft)]">{progression.currentStreak} days of little moments</span>
-        <span className="flex items-center gap-1.5" aria-label="This week">
-          {progression.weekDots.map((d, i) => (
-            <span key={i} className="inline-block w-3 h-3" style={{ background: d ? 'var(--thread)' : 'var(--paper-shade)' }} />
-          ))}
-        </span>
-      </div>
-    </div>
-  );
-};

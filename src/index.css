@@ -292,6 +292,80 @@ label {
   font: inherit;
 }
 
+/* Answer tiles for the daily letter */
+.px-option {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5em;
+  width: 100%;
+  min-height: 3.3em;
+  padding: 0.55em 0.8em 0.7em;
+  text-align: center;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--ink-soft);
+  background: var(--paper-hi);
+  border: 0;
+  cursor: pointer;
+  box-shadow:
+    0 calc(var(--px) * -1) 0 0 var(--ink),
+    0 var(--px) 0 0 var(--ink),
+    calc(var(--px) * -1) 0 0 0 var(--ink),
+    var(--px) 0 0 0 var(--ink),
+    inset 0 calc(var(--px) * -1.5) 0 0 var(--paper-shade);
+  transition: transform 60ms steps(2);
+}
+.px-option:hover {
+  background: #fffdf6;
+}
+.px-option:active {
+  transform: translateY(2px);
+}
+.px-option[aria-pressed='true'] {
+  color: #fff4e2;
+  background: var(--terracotta);
+  box-shadow:
+    0 calc(var(--px) * -1) 0 0 var(--ink),
+    0 var(--px) 0 0 var(--ink),
+    calc(var(--px) * -1) 0 0 0 var(--ink),
+    var(--px) 0 0 0 var(--ink),
+    inset 0 calc(var(--px) * -1.5) 0 0 var(--terracotta-d);
+}
+.px-option:disabled {
+  cursor: default;
+  transform: none;
+}
+.px-option--big {
+  min-height: 5.6em;
+  font-size: 1.15em;
+}
+.px-option:focus-visible {
+  outline: 3px solid var(--butter);
+  outline-offset: 5px;
+}
+
+.px-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  padding: 0.12em 0.5em 0.18em;
+  font-size: 0.72em;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--terracotta-d);
+  background: var(--paper-2);
+}
+.px-tag--sage {
+  color: #f4f1e4;
+  background: var(--sage-d);
+}
+.px-tag--night {
+  color: #efe3cb;
+  background: #3b3350;
+}
+
 .px-divider {
   height: 3px;
   background: repeating-linear-gradient(90deg, var(--paper-shade) 0 6px, transparent 6px 9px);

@@ -1,14 +1,21 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import {
-  UserProfile,
-  CoupleSpace,
-  DailySession,
-  ActivityItem,
-  ProgressionStats,
-  AvatarConfig,
-} from '../types';
+import { UserProfile, CoupleSpace, ActivityItem, AvatarConfig } from '../types';
 import { DEFAULT_AVATAR_A, DEFAULT_AVATAR_B, normalizeAvatar } from '../pixel/character';
-import { QUESTIONS_CATALOGUE } from '../data/questionsCatalogue';
+import {
+  CardAnswer,
+  LetterDay,
+  LetterKind,
+  LettersState,
+  StreakInfo,
+  cardsFor,
+  cardsOf,
+  demoLetters,
+  emptyLetters,
+  isAnswered,
+  scoreDay,
+  streakInfo,
+  todayKey,
+} from '../letters/engine';
 
 /**
  * Local-only prototype state. Everything lives in this browser's
@@ -18,15 +25,16 @@ import { QUESTIONS_CATALOGUE } from '../data/questionsCatalogue';
 export type Panel = 'question' | 'questions' | 'us' | 'wardrobe' | 'space' | 'watch' | null;
 export type JoinResult = 'ok' | 'not_found' | 'full' | 'expired';
 
+export type LetterBadge = 'answer' | 'reveal' | null;
+
 interface PersistedState {
-  version: 2;
+  version: 3;
   setupComplete: boolean;
   activeUserId: string;
   userA: UserProfile;
   userB: UserProfile | null;
   space: CoupleSpace | null;
-  dailySession: DailySession;
-  progression: ProgressionStats;
+  letters: LettersState;
   activities: ActivityItem[];
 }
 
@@ -35,8 +43,6 @@ interface AppContextType {
   currentUser: UserProfile;
   partnerUser: UserProfile | null;
   space: CoupleSpace | null;
-  dailySession: DailySession;
-  progression: ProgressionStats;
   activities: ActivityItem[];
   panel: Panel;
   openPanel: (p: Panel) => void;
@@ -45,7 +51,20 @@ interface AppContextType {
   setIsWardrobeOpen: (open: boolean) => void;
   setIsOnboardingOpen: (open: boolean) => void;
   updateAvatar: (newAvatar: AvatarConfig) => void;
-  submitAnswer: (optionId: string) => void;
+  // letters
+  today: string;
+  letters: LettersState;
+  /** the letter for a date (a fresh, unanswered one if nobody has opened it yet) */
+  getLetter: (kind: LetterKind, dateKey?: string) => LetterDay | null;
+  answerCard: (kind: LetterKind, dateKey: string, cardId: string, answer: CardAnswer) => void;
+  sealLetter: (kind: LetterKind, dateKey: string) => void;
+  markLetterSeen: (kind: LetterKind, dateKey: string) => void;
+  setAfterDark: (on: boolean) => void;
+  afterDarkOpen: boolean;
+  mendStreak: () => void;
+  streak: StreakInfo;
+  /** what the letter on the coffee table should say */
+  letterBadge: LetterBadge;
   switchActiveUser: (userId: string) => void;
   updateSpaceDetails: (name: string, togetherSince?: string) => void;
   regenerateInvite: () => void;
@@ -66,6 +85,7 @@ const AppContext = createContext<AppContextType | null>(null);
 
 const STORAGE_KEY = 'soultied_state_v2';
 const LEGACY_KEY = 'thread_and_bean_state_v1';
+const DAY = 24 * 60 * 60 * 1000;
 const WEEK = 7 * 24 * 60 * 60 * 1000;
 
 function makeCode() {
@@ -76,22 +96,12 @@ function makeCode() {
   return `ST-${s.slice(0, 4)}-${s.slice(4, 8)}-${s.slice(8, 12)}`;
 }
 
-const today = () => new Date().toISOString().split('T')[0];
-
-function freshSession(): DailySession {
-  return {
-    id: 'session-' + Date.now(),
-    dateKey: today(),
-    question: QUESTIONS_CATALOGUE[0],
-    submittedUserIds: [],
-    revealed: false,
-    answers: {},
-  };
-}
+/** The couple's first day, as a fixed calendar date both phones agree on. */
+export const startKeyOf = (space: CoupleSpace) => space.createdAt.slice(0, 10);
 
 function emptyState(): PersistedState {
   return {
-    version: 2,
+    version: 3,
     setupComplete: false,
     activeUserId: 'user-me',
     userA: {
@@ -103,21 +113,16 @@ function emptyState(): PersistedState {
     },
     userB: null,
     space: null,
-    dailySession: freshSession(),
-    progression: {
-      currentStreak: 0,
-      bestStreak: 0,
-      lifetimeConnectedDays: 0,
-      weekDots: [false, false, false, false, false, false, false],
-    },
+    letters: emptyLetters(),
     activities: [],
   };
 }
 
 function demoState(): PersistedState {
   const now = new Date().toISOString();
+  const createdAt = new Date(Date.now() - 21 * DAY).toISOString();
   return {
-    version: 2,
+    version: 3,
     setupComplete: true,
     activeUserId: 'user-aanya',
     userA: { id: 'user-aanya', name: 'Aanya', avatar: DEFAULT_AVATAR_A, status: 'online', lastActive: now },
@@ -132,21 +137,13 @@ function demoState(): PersistedState {
       partnerPlaceholderName: 'Rohan',
       togetherSince: '2025-06-14',
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
-      createdAt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
+      createdAt,
     },
-    dailySession: {
-      id: 'session-today',
-      dateKey: today(),
-      question: QUESTIONS_CATALOGUE[0],
-      submittedUserIds: ['user-rohan'],
-      revealed: false,
-      answers: { 'user-rohan': 'opt-3' },
-    },
-    progression: { currentStreak: 4, bestStreak: 7, lifetimeConnectedDays: 18, weekDots: [true, true, true, true, false, false, false] },
+    letters: demoLetters('space-demo', createdAt.slice(0, 10), 'user-aanya', 'user-rohan', todayKey()),
     activities: [
-      { id: 'act-1', type: 'question_revealed', title: 'Question answered together', description: 'You both shared your ideal evening.', timestamp: 'Yesterday' },
+      { id: 'act-1', type: 'question_revealed', title: 'Letter opened together', description: 'In sync on 4 of 5.', timestamp: 'Yesterday' },
       { id: 'act-2', type: 'avatar_updated', title: 'Wardrobe refresh', description: 'Rohan put on a terracotta cardigan and round glasses.', timestamp: '3 days ago' },
-      { id: 'act-3', type: 'partner_joined', title: 'Moved in', description: 'Rohan joined Our Little Place with the invite link.', timestamp: '14 days ago' },
+      { id: 'act-3', type: 'partner_joined', title: 'Moved in', description: 'Rohan joined Our Little Place with the invite link.', timestamp: '3 weeks ago' },
     ],
   };
 }
@@ -162,15 +159,20 @@ function load(): PersistedState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
-      const p = JSON.parse(raw) as PersistedState;
+      const p = JSON.parse(raw) as Partial<PersistedState> & { dailySession?: unknown; progression?: unknown };
       const base = emptyState();
       const userA = normalizeUser(p.userA, DEFAULT_AVATAR_A) || base.userA;
+      // v2 kept a single daily question; letters start fresh.
+      delete p.dailySession;
+      delete p.progression;
+      const letters = p.letters && p.letters.daily ? { ...emptyLetters(), ...p.letters } : emptyLetters();
       return {
         ...base,
-        ...p,
-        version: 2,
+        ...(p as Partial<PersistedState>),
+        version: 3,
         userA,
         userB: normalizeUser(p.userB, DEFAULT_AVATAR_B),
+        letters,
       };
     }
     // Carry over an older prototype save: keep the space + people, reset looks.
@@ -186,8 +188,6 @@ function load(): PersistedState {
           userA: normalizeUser(p.userA, DEFAULT_AVATAR_A) || base.userA,
           userB: normalizeUser(p.userB, DEFAULT_AVATAR_B),
           space: p.space,
-          dailySession: p.dailySession || base.dailySession,
-          progression: p.progression || base.progression,
           activities: p.activities || [],
         };
       }
@@ -201,6 +201,13 @@ function load(): PersistedState {
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [state, setState] = useState<PersistedState>(load);
   const [panel, setPanel] = useState<Panel>(null);
+  const [today, setToday] = useState(todayKey);
+
+  // Roll over to a new letter at (this person's) midnight.
+  useEffect(() => {
+    const t = window.setInterval(() => setToday(todayKey()), 30000);
+    return () => window.clearInterval(t);
+  }, []);
 
   useEffect(() => {
     try {
@@ -226,6 +233,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const { userA, userB, activeUserId } = state;
   const currentUser = activeUserId === userA.id || !userB ? userA : userB;
   const partnerUser = currentUser.id === userA.id ? userB : userA;
+
+  const afterDarkOpen = !!partnerUser && !!state.letters.afterDarkOn[currentUser.id] && !!state.letters.afterDarkOn[partnerUser.id];
+
+  const todays = state.letters.daily[today];
+  const letterBadge: LetterBadge = !partnerUser
+    ? null
+    : !todays?.by[currentUser.id]?.sealedAt
+      ? 'answer'
+      : todays.revealedAt && !todays.by[currentUser.id]?.seenAt
+        ? 'reveal'
+        : null;
 
   const inviteLink = useMemo(() => {
     if (!state.space) return '';
@@ -254,44 +272,87 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
-  const submitAnswer = (optionId: string) => {
+  /* ---------- letters ---------- */
+
+  const meId = (s: PersistedState) => (s.activeUserId === s.userA.id || !s.userB ? s.userA.id : s.userB.id);
+  const partnerOf = (s: PersistedState, id: string) => (id === s.userA.id ? s.userB : s.userA);
+  const bucket = (kind: LetterKind) => (kind === 'daily' ? 'daily' : 'afterDark') as 'daily' | 'afterDark';
+
+  const makeDay = (s: PersistedState, kind: LetterKind, dateKey: string): LetterDay | null =>
+    s.space ? { dateKey, cardIds: cardsFor(kind, s.space.id, dateKey, startKeyOf(s.space)), by: {} } : null;
+
+  const getLetter: AppContextType['getLetter'] = (kind, dateKey = today) =>
+    state.letters[bucket(kind)][dateKey] || makeDay(state, kind, dateKey);
+
+  /** Update one letter day; creates it (freezing its cards) the first time someone touches it. */
+  const withDay = (s: PersistedState, kind: LetterKind, dateKey: string, fn: (d: LetterDay, me: string) => LetterDay | null) => {
+    const b = bucket(kind);
+    const cur = s.letters[b][dateKey] || makeDay(s, kind, dateKey);
+    if (!cur) return s;
+    const next = fn(cur, meId(s));
+    if (!next || next === cur) return s;
+    return { ...s, letters: { ...s.letters, [b]: { ...s.letters[b], [dateKey]: next } } };
+  };
+
+  const answerCard: AppContextType['answerCard'] = (kind, dateKey, cardId, answer) =>
+    setState((s) =>
+      withDay(s, kind, dateKey, (d, me) => {
+        const mine = d.by[me] || { cards: {} };
+        if (mine.sealedAt || !d.cardIds.includes(cardId)) return null;
+        return { ...d, by: { ...d.by, [me]: { ...mine, cards: { ...mine.cards, [cardId]: answer } } } };
+      })
+    );
+
+  const sealLetter: AppContextType['sealLetter'] = (kind, dateKey) =>
     setState((s) => {
-      const me = s.activeUserId === s.userA.id || !s.userB ? s.userA : s.userB;
-      const partner = me.id === s.userA.id ? s.userB : s.userA;
-      const ds = s.dailySession;
-      if (!partner || ds.submittedUserIds.includes(me.id)) return s;
-      const submitted = [...ds.submittedUserIds, me.id];
-      const both = submitted.includes(partner.id);
-      const next: PersistedState = {
-        ...s,
-        dailySession: {
-          ...ds,
-          submittedUserIds: submitted,
-          answers: { ...ds.answers, [me.id]: optionId },
-          revealed: both,
-          revealedAt: both ? new Date().toISOString() : undefined,
-        },
-      };
-      if (both) {
-        const p = s.progression;
-        const dots = [...p.weekDots];
-        const idx = dots.findIndex((d) => !d);
-        if (idx !== -1) dots[idx] = true;
-        next.progression = {
-          currentStreak: p.currentStreak + 1,
-          bestStreak: Math.max(p.bestStreak, p.currentStreak + 1),
-          lifetimeConnectedDays: p.lifetimeConnectedDays + 1,
-          weekDots: dots,
-        };
+      let opened = null as LetterDay | null;
+      const me = meId(s);
+      const partner = partnerOf(s, me);
+      const next = withDay(s, kind, dateKey, (d) => {
+        const mine = d.by[me];
+        if (!mine || mine.sealedAt) return null;
+        if (!cardsOf(d.cardIds).every((c) => isAnswered(c, mine.cards[c.id]))) return null;
+        const now = new Date().toISOString();
+        const both = !!partner && !!d.by[partner.id]?.sealedAt;
+        const nd: LetterDay = { ...d, by: { ...d.by, [me]: { ...mine, sealedAt: now, seenAt: both ? now : undefined } } };
+        if (both) {
+          nd.revealedAt = now;
+          opened = nd;
+        }
+        return nd;
+      });
+      if (opened && partner && kind === 'daily') {
+        const sc = scoreDay(opened, me, partner.id);
         next.activities = pushActivity({
           type: 'question_revealed',
           title: 'Letter opened together',
-          description: `Both answers opened for “${ds.question.prompt}”`,
+          description: `In sync on ${sc.same} of ${sc.total}.`,
         })(s.activities);
       }
       return next;
     });
-  };
+
+  const markLetterSeen: AppContextType['markLetterSeen'] = (kind, dateKey) =>
+    setState((s) =>
+      withDay(s, kind, dateKey, (d, me) => {
+        const mine = d.by[me];
+        if (!d.revealedAt || !mine || mine.seenAt) return null;
+        return { ...d, by: { ...d.by, [me]: { ...mine, seenAt: new Date().toISOString() } } };
+      })
+    );
+
+  const setAfterDark = (on: boolean) =>
+    setState((s) => ({ ...s, letters: { ...s.letters, afterDarkOn: { ...s.letters.afterDarkOn, [meId(s)]: on } } }));
+
+  const sinceKey = state.space ? startKeyOf(state.space) : undefined;
+  const streak = useMemo(() => streakInfo(state.letters, today, sinceKey), [state.letters, today, sinceKey]);
+
+  const mendStreak = () =>
+    setState((s) => {
+      const info = streakInfo(s.letters, todayKey(), s.space ? startKeyOf(s.space) : undefined);
+      if (!info.mendable) return s;
+      return { ...s, letters: { ...s.letters, repairs: [...s.letters.repairs, info.mendable] } };
+    });
 
   const switchActiveUser = (id: string) => setState((s) => ({ ...s, activeUserId: id }));
 
@@ -356,7 +417,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       userB: partner,
       activeUserId: partner.id,
       space: s.space ? { ...s.space, partnerId: partner.id, partnerPlaceholderName: partner.name } : s.space,
-      dailySession: freshSession(),
       activities: pushActivity({ type: 'partner_joined', title: 'Moved in', description: `${partner.name} took the seat on the couch.` })(s.activities),
     }));
     return 'ok';
@@ -385,8 +445,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         currentUser,
         partnerUser,
         space: state.space,
-        dailySession: state.dailySession,
-        progression: state.progression,
         activities: state.activities,
         panel,
         openPanel: setPanel,
@@ -394,7 +452,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setIsWardrobeOpen: (o) => setPanel(o ? 'wardrobe' : null),
         setIsOnboardingOpen: (o) => setPanel(o ? 'space' : null),
         updateAvatar,
-        submitAnswer,
+        today,
+        letters: state.letters,
+        getLetter,
+        answerCard,
+        sealLetter,
+        markLetterSeen,
+        setAfterDark,
+        afterDarkOpen,
+        mendStreak,
+        streak,
+        letterBadge,
         switchActiveUser,
         updateSpaceDetails,
         regenerateInvite,

@@ -10,13 +10,13 @@ import { TopNav } from './components/TopNav';
 import { PixelPanel } from './components/PixelPanel';
 import { Welcome } from './components/Welcome';
 import { CharacterStudio } from './components/CharacterStudio';
-import { SpacePanel, LetterPanel } from './components/SpacePanel';
-import { DailyQuestionCard } from './components/DailyQuestionCard';
-import { QuestionsPage } from './components/QuestionsPage';
+import { SpacePanel } from './components/SpacePanel';
+import { LettersPanel } from './components/letters/LettersPanel';
 import { UsPage } from './components/UsPage';
 import { WatchParty } from './components/WatchParty';
 import type { Seat, HotspotId } from './pixel/room';
 import type { UserProfile } from './types';
+import { prettyDate } from './letters/engine';
 
 const seatOf = (u: UserProfile | null | undefined, placeholder = ''): Seat =>
   u ? { avatar: u.avatar, name: u.name, status: u.status } : { avatar: null, name: placeholder, status: 'empty' };
@@ -66,7 +66,7 @@ const WardrobePanel: React.FC = () => {
 };
 
 const Home: React.FC = () => {
-  const { setupComplete, currentUser, partnerUser, space, dailySession, panel, openPanel } = useApp();
+  const { setupComplete, currentUser, partnerUser, space, panel, openPanel, letterBadge, getLetter, today } = useApp();
   const [joinCode] = useState(readJoinCode);
   const [welcomeOpen, setWelcomeOpen] = useState(() => !setupComplete || !!joinCode);
   const [draftSeats, setDraftSeats] = useState<{ left: Seat; right: Seat } | null>(null);
@@ -83,13 +83,20 @@ const Home: React.FC = () => {
   const liveLeft = seatOf(host);
   const liveRight = seatOf(guest, space?.partnerPlaceholderName);
 
-  const letterUnread =
-    !!partnerUser && !dailySession.revealed && !dailySession.submittedUserIds.includes(currentUser.id);
+  const letterUnread = letterBadge !== null;
+  const partnerSealed = !!partnerUser && !!getLetter('daily')?.by[partnerUser.id]?.sealedAt;
 
   const labels = useMemo(() => {
     if (welcomeOpen) return {};
     const l: Partial<Record<HotspotId, string>> = {
-      letter: letterUnread ? 'A letter for you two ✉' : 'Today’s letter',
+      letter:
+        letterBadge === 'reveal'
+          ? 'Your letter is open ✉'
+          : letterBadge === 'answer'
+            ? partnerSealed
+              ? `${partnerUser?.name} is waiting on today’s letter ✉`
+              : 'Today’s letter ✉'
+            : 'Letters',
       fire: 'Poke the fire',
       photo: 'Us',
       remote: 'Watch something together',
@@ -99,7 +106,7 @@ const Home: React.FC = () => {
     if (guest) l.right = guest.id === currentUser.id ? meLabel : guest.name;
     else l.right = `Invite ${space?.partnerPlaceholderName || 'your person'}`;
     return l;
-  }, [welcomeOpen, letterUnread, currentUser, host, guest, space]);
+  }, [welcomeOpen, letterBadge, partnerSealed, partnerUser, currentUser, host, guest, space]);
 
   const onHotspot = (id: HotspotId) => {
     if (id === 'letter') openPanel('question');
@@ -148,20 +155,13 @@ const Home: React.FC = () => {
         <>
           <TopNav letterUnread={letterUnread} />
 
-          {panel === 'question' && (
-            <PixelPanel title="Today’s letter" kicker={dailySession.question.category} onClose={() => openPanel(null)} width={620}>
-              <LetterPanel>
-                <DailyQuestionCard />
-              </LetterPanel>
-            </PixelPanel>
-          )}
-          {panel === 'questions' && (
-            <PixelPanel title="Questions" kicker="Little things to ask each other" onClose={() => openPanel(null)} width={900}>
-              <QuestionsPage />
+          {(panel === 'question' || panel === 'questions') && (
+            <PixelPanel title="Letters" kicker={prettyDate(today, true)} onClose={() => openPanel(null)} width={680}>
+              <LettersPanel initialTab={panel === 'questions' ? 'past' : 'today'} />
             </PixelPanel>
           )}
           {panel === 'us' && (
-            <PixelPanel title="Us" kicker={space?.name} onClose={() => openPanel(null)} width={900}>
+            <PixelPanel title="Us" kicker={space?.name} onClose={() => openPanel(null)} width={820}>
               <UsPage />
             </PixelPanel>
           )}
