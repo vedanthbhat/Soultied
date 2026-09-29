@@ -32,7 +32,7 @@ import type { Firestore } from 'firebase/firestore';
  * Either way the rest of the app sees the same shape.
  */
 
-export type Panel = 'question' | 'questions' | 'us' | 'wardrobe' | 'space' | 'watch' | 'escape' | null;
+export type Panel = 'question' | 'questions' | 'us' | 'wardrobe' | 'space' | 'watch' | 'escape' | 'games' | null;
 export type JoinResult = 'ok' | 'not_found' | 'full' | 'expired';
 
 export type LetterBadge = 'answer' | 'reveal' | null;

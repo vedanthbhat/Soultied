@@ -19,6 +19,7 @@ import type { ActivityItem, AvatarConfig, CoupleSpace } from '../types';
 import type { CardAnswer, LetterDay, LetterKind } from '../letters/engine';
 import type { CouchState } from '../couch';
 import type { TitleInfo, TogetherLog } from '../stream/protocol';
+import type { GameKind, Match } from '../games/types';
 
 /**
  * Where a couple's things live in Firestore:
@@ -28,6 +29,7 @@ import type { TitleInfo, TogetherLog } from '../stream/protocol';
  *   spaces/{spaceId}/letters/{kind_date} one letter day (each person writes only their own answers)
  *   spaces/{spaceId}/meta/letters        After dark switches, streak mends
  *   spaces/{spaceId}/meta/couch          who showed up when
+ *   spaces/{spaceId}/meta/game-{kind}    the current game of Fireflies, Paper Boats… and the win tally
  *   spaces/{spaceId}/activities/{id}     the little "what happened" feed
  *   spaces/{spaceId}/live/{topic}/events play/pause, chat, calls, escape rooms (short-lived)
  *   invites/{code}                       lets a partner find the place from an invite code
@@ -318,3 +320,17 @@ export const writeActivity = (db: Firestore, sid: string, a: Omit<ActivityItem, 
   const id = newId('act');
   return setDoc(activityRef(db, sid, id), { ...a, id, timestamp: '', at: new Date().toISOString() });
 };
+
+/* ---------- games ---------- */
+
+const gameRef = (db: Firestore, sid: string, kind: GameKind) => doc(db, 'spaces', sid, 'meta', `game-${kind}`);
+
+export const subscribeGame = (db: Firestore, sid: string, kind: GameKind, fn: (m: Match | null) => void) =>
+  onSnapshot(
+    gameRef(db, sid, kind),
+    (s) => fn(s.exists() ? (s.data() as Match) : null),
+    () => undefined
+  );
+
+/** The whole match is written each move (Firestore doesn't take `undefined`, so it's dropped first). */
+export const writeGame = (db: Firestore, sid: string, m: Match) => setDoc(gameRef(db, sid, m.kind), JSON.parse(JSON.stringify(m)));

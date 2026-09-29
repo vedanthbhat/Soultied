@@ -5,6 +5,8 @@ interface Props {
   left: Seat;
   right: Seat;
   letterUnread: boolean;
+  /** a game is waiting on you */
+  gamesWaiting?: boolean;
   /** Labels shown above a hotspot on hover. Omit a key to disable that hotspot. */
   labels: Partial<Record<HotspotId, string>>;
   onHotspot?: (id: HotspotId) => void;
@@ -43,7 +45,7 @@ function computeFit(w: number, h: number): Fit {
  * The whole screen is the room. The canvas is 320x180 real pixels, scaled
  * to cover the viewport with nearest-neighbour upscaling.
  */
-export const RoomCanvas: React.FC<Props> = ({ left, right, letterUnread, labels, onHotspot, dim = 0, closeness = 0, scoot = false, onScooted }) => {
+export const RoomCanvas: React.FC<Props> = ({ left, right, letterUnread, gamesWaiting = false, labels, onHotspot, dim = 0, closeness = 0, scoot = false, onScooted }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [fit, setFit] = useState<Fit>(() => computeFit(window.innerWidth, window.innerHeight));
   const [hover, setHover] = useState<HotspotId | null>(null);
@@ -59,6 +61,7 @@ export const RoomCanvas: React.FC<Props> = ({ left, right, letterUnread, labels,
   stateRef.current.left = left;
   stateRef.current.right = right;
   stateRef.current.letterUnread = letterUnread;
+  stateRef.current.gamesWaiting = gamesWaiting;
   stateRef.current.hover = hover;
 
   useEffect(() => {

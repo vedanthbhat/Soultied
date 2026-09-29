@@ -17,9 +17,13 @@ import { WatchParty } from './components/WatchParty';
 import { EscapeGame } from './components/escape/EscapeGame';
 import type { Seat, HotspotId } from './pixel/room';
 import type { UserProfile } from './types';
+import type { GameKind } from './games/types';
 import { prettyDate } from './letters/engine';
 import { COUCH_STEPS } from './couch';
 import { StreamChip, StreamHubProvider } from './stream/StreamHub';
+import { GamesProvider, useGames } from './games/GamesContext';
+import { GAMES, otherSeat } from './games/types';
+import { GameShelf } from './components/games/GameShelf';
 
 const seatOf = (u: UserProfile | null | undefined, placeholder = ''): Seat =>
   u ? { avatar: u.avatar, name: u.name, status: u.status } : { avatar: null, name: placeholder, status: 'empty' };
@@ -71,6 +75,7 @@ const WardrobePanel: React.FC = () => {
 const Home: React.FC = () => {
   const { setupComplete, currentUser, partnerUser, space, panel, openPanel, letterBadge, getLetter, today } = useApp();
   const { couchLevel, couchShown, markCouchShown, cloudStatus, demo } = useApp();
+  const games = useGames();
   const [joinCode] = useState(readJoinCode);
   const [welcomeOpen, setWelcomeOpen] = useState(() => !setupComplete || !!joinCode);
   const [draftSeats, setDraftSeats] = useState<{ left: Seat; right: Seat } | null>(null);
@@ -105,19 +110,21 @@ const Home: React.FC = () => {
       photo: 'Us',
       remote: 'Watch something together',
       door: 'The dark door',
+      games: games.waiting.length ? `Your turn in ${games.waiting.map((k) => GAMES[k].name).join(' and ')}` : 'Games',
     };
     const meLabel = `${currentUser.name} · change my look`;
     if (host) l.left = host.id === currentUser.id ? meLabel : host.name;
     if (guest) l.right = guest.id === currentUser.id ? meLabel : guest.name;
     else l.right = `Invite ${space?.partnerPlaceholderName || 'your person'}`;
     return l;
-  }, [welcomeOpen, letterBadge, partnerSealed, partnerUser, currentUser, host, guest, space]);
+  }, [welcomeOpen, letterBadge, partnerSealed, partnerUser, currentUser, host, guest, space, games.waiting]);
 
   const onHotspot = (id: HotspotId) => {
     if (id === 'letter') openPanel('question');
     else if (id === 'photo') openPanel('us');
     else if (id === 'remote') openPanel('watch');
     else if (id === 'door') openPanel('escape');
+    else if (id === 'games') openPanel('games');
     else if (id === 'left' || id === 'right') {
       const who = id === 'left' ? host : guest;
       if (!who) openPanel('space');
@@ -150,6 +157,31 @@ const Home: React.FC = () => {
     return () => window.clearTimeout(t);
   }, [couchNote]);
   const closeness = (scootPending && !scootGo ? couchShown : couchLevel) / COUCH_STEPS;
+
+  // "Rohan dropped a firefly. Your move." once for each move they make
+  const [gameToOpen, setGameToOpen] = useState<GameKind | null>(null);
+  useEffect(() => {
+    if (panel !== 'games') setGameToOpen(null);
+  }, [panel]);
+  const [seenNotes, setSeenNotes] = useState<Set<string>>(() => new Set());
+  const gameNote = useMemo(() => {
+    for (const kind of games.waiting) {
+      const m = games.matches[kind];
+      if (!m || m.updatedBy === games.mySeat) continue;
+      const key = `${kind}:${m.id}:${m.seq}`;
+      if (seenNotes.has(key)) continue;
+      const who = games.seatName(otherSeat(games.mySeat));
+      const text =
+        m.status === 'setup'
+          ? `${who} started Paper Boats. Hide your boats!`
+          : m.seq === 0
+            ? `${who} started a game of ${GAMES[kind].name}. Your move.`
+            : `${who} ${m.last} in ${GAMES[kind].name}. Your move.`;
+      return { key, kind, text };
+    }
+    return null;
+  }, [games, seenNotes]);
+  const dismissGameNote = () => gameNote && setSeenNotes((s) => new Set(s).add(gameNote.key));
   // signed in and still fetching your place: don't flash a room that isn't yours yet
   const veil = cloudStatus === 'checking' && !welcomeOpen && !demo;
 
@@ -157,6 +189,14 @@ const Home: React.FC = () => {
     return (
       <div className="font-['Pixelify_Sans',sans-serif]">
         <EscapeGame onExit={() => openPanel(null)} />
+      </div>
+    );
+  }
+
+  if (panel === 'games' && !welcomeOpen) {
+    return (
+      <div className="font-['Pixelify_Sans',sans-serif]">
+        <GameShelf onExit={() => openPanel(null)} onOpenDoor={() => openPanel('escape')} initial={gameToOpen} />
       </div>
     );
   }
@@ -175,6 +215,7 @@ const Home: React.FC = () => {
         left={seats.left}
         right={seats.right}
         letterUnread={welcomeOpen ? false : letterUnread}
+        gamesWaiting={!welcomeOpen && games.waiting.length > 0}
         labels={labels}
         onHotspot={onHotspot}
         dim={panel ? 0.25 : 0}
@@ -189,6 +230,27 @@ const Home: React.FC = () => {
       />
 
       {!welcomeOpen && !veil && <StreamChip />}
+
+      {gameNote && !welcomeOpen && !veil && !couchNote && (
+        <div className="fixed right-4 bottom-4 z-30 px-ui max-w-[92vw]" role="status">
+          <div className="px-box px-shadow px-fade px-3 py-2 flex items-center gap-3 flex-wrap">
+            <span className="text-sm">{gameNote.text}</span>
+            <button
+              className="px-btn px-btn--sage px-btn--small"
+              onClick={() => {
+                setGameToOpen(gameNote.kind);
+                dismissGameNote();
+                openPanel('games');
+              }}
+            >
+              Play
+            </button>
+            <button className="px-btn px-btn--paper px-btn--small" aria-label="Not now" onClick={dismissGameNote}>
+              Later
+            </button>
+          </div>
+        </div>
+      )}
 
       {couchNote && !welcomeOpen && (
         <div className="fixed left-1/2 bottom-5 z-30 -translate-x-1/2 px-ui w-[min(92vw,460px)]" role="status">
@@ -244,7 +306,9 @@ export default function App() {
   return (
     <AppProvider>
       <StreamHubProvider>
-        <Home />
+        <GamesProvider>
+          <Home />
+        </GamesProvider>
       </StreamHubProvider>
     </AppProvider>
   );

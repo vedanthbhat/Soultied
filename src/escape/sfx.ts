@@ -26,7 +26,7 @@ function audio() {
   }
 }
 
-function tone(freq: number, dur: number, when = 0, type: OscillatorType = 'square', vol = 0.04) {
+export function tone(freq: number, dur: number, when = 0, type: OscillatorType = 'square', vol = 0.04) {
   const a = audio();
   if (!a) return;
   const t0 = a.currentTime + when;

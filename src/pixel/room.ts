@@ -31,9 +31,11 @@ export interface RoomState {
   scooting?: boolean;
   /** scene time a little heart started floating up between them (-1 for none) */
   heartAt?: number;
+  /** a game is waiting on you: the stack of board games twinkles */
+  gamesWaiting?: boolean;
 }
 
-export type HotspotId = 'left' | 'right' | 'letter' | 'fire' | 'photo' | 'remote' | 'door';
+export type HotspotId = 'left' | 'right' | 'letter' | 'fire' | 'photo' | 'remote' | 'door' | 'games';
 
 export interface Hotspot {
   id: HotspotId;
@@ -60,6 +62,8 @@ export function seatXs(closeness = 0) {
 const FIRE = { x: 128, cx: 128, openX: 114, openW: 29, openY: 78, openB: 116 };
 const TABLE = { x: 205, y: 163, w: 54 };
 const DOOR = { x: 160, y: 64, w: 24 };
+/** the stack of board games on the floor beside the couch */
+const GAMES_STACK = { x: 168, y: 133, w: 14, h: 17 };
 
 const HOTSPOTS: Hotspot[] = [
   { id: 'letter', x: TABLE.x + 19, y: TABLE.y - 9, w: 18, h: 12 },
@@ -67,6 +71,7 @@ const HOTSPOTS: Hotspot[] = [
   { id: 'photo', x: 138, y: 43, w: 12, h: 12 },
   { id: 'remote', x: TABLE.x + 36, y: TABLE.y - 4, w: 10, h: 6 },
   { id: 'door', x: DOOR.x - 1, y: DOOR.y - 2, w: DOOR.w + 2, h: FLOOR_Y - DOOR.y + 2 },
+  { id: 'games', x: GAMES_STACK.x - 1, y: GAMES_STACK.y - 2, w: GAMES_STACK.w + 2, h: GAMES_STACK.h + 2 },
 ];
 
 /* ------------------------------------------------------------------------ */
@@ -814,6 +819,48 @@ function drawLetter(L: Layer, t: number, unread: boolean, hover: boolean) {
   }
 }
 
+/** Board games stacked on the floor beside the couch, with a die on top. */
+function drawGameStack(L: Layer, t: number, waiting: boolean, hover: boolean) {
+  const box = (x: number, y: number, w: number, h: number, c: string, stripe?: string) => {
+    L.rect(x - 1, y - 1, w + 2, h + 2, '#2b1e1c');
+    L.rect(x, y, w, h, c);
+    L.hline(x, y, w, mix(c, '#fff8ea', 0.35));
+    L.vline(x + w - 1, y + 1, h - 1, mix(c, '#2b1e1c', 0.3));
+    if (stripe) L.hline(x + 1, y + Math.floor(h / 2), w - 3, stripe);
+  };
+  const { x, y } = GAMES_STACK;
+  box(x + 1, y + 13, 12, 3, '#d4775b', '#f4e3c0');
+  box(x + 2, y + 9, 10, 3, '#9fb087');
+  L.set(x + 4, y + 10, '#f0b84d');
+  L.set(x + 6, y + 10, '#f0b84d');
+  box(x + 1, y + 5, 12, 3, '#6a86ad', '#f0b84d');
+  // a die on top
+  L.rect(x + 5, y + 1, 4, 3, '#2b1e1c');
+  L.rect(x + 5, y + 1, 3, 3, '#f7eedb');
+  L.set(x + 6, y + 2, '#3a2a26');
+  if (waiting) {
+    // a firefly hovering over the stack: something's waiting for you
+    const bob = Math.floor(t * 2) % 2;
+    const fx = x + 11;
+    const fy = y - 3 - bob;
+    L.glow(fx, fy, '#fff4c2');
+    L.glow(fx - 1, fy, '#ffcf5a');
+    L.glow(fx + 1, fy, '#ffcf5a');
+    L.glow(fx, fy - 1, '#ffcf5a');
+    L.glow(fx, fy + 1, '#e2a33a');
+  }
+  if (hover) {
+    for (let i = -1; i <= GAMES_STACK.w; i++) {
+      L.glow(x + i, y - 2, '#fff4c2');
+      L.glow(x + i, y + GAMES_STACK.h, '#fff4c2');
+    }
+    for (let j = -1; j < GAMES_STACK.h; j += 2) {
+      L.glow(x - 2, y + j, '#fff4c2');
+      L.glow(x + GAMES_STACK.w + 1, y + j, '#fff4c2');
+    }
+  }
+}
+
 function drawCat(L: Layer, t: number) {
   // sleeping ginger cat on a cushion by the hearth
   const x = 118;
@@ -1125,6 +1172,7 @@ export function renderRoom(state: RoomState, t: number): PixelBuffer {
   drawSnow(L, t);
   drawPhotoPortrait(L, state);
   drawCat(L, t);
+  drawGameStack(L, t, !!state.gamesWaiting, state.hover === 'games');
 
   // characters on the couch (left seat first so the right one overlaps on lean)
   const closeness = state.closeness ?? 0;

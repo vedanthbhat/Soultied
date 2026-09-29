@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { AvatarThumb } from './PixelAvatarRenderer';
+import { useGames } from '../games/GamesContext';
 
 /**
  * The menu hides above the screen and slides down when the cursor touches
@@ -9,6 +10,7 @@ import { AvatarThumb } from './PixelAvatarRenderer';
  */
 export const TopNav: React.FC<{ letterUnread: boolean }> = ({ letterUnread }) => {
   const { space, currentUser, partnerUser, panel, openPanel, switchActiveUser, cloudMode } = useApp();
+  const { waiting } = useGames();
   const [open, setOpen] = useState(false);
   const [hint, setHint] = useState(true);
   const closeTimer = useRef<number | null>(null);
@@ -93,7 +95,7 @@ export const TopNav: React.FC<{ letterUnread: boolean }> = ({ letterUnread }) =>
               <span className="hidden md:inline text-sm text-[var(--muted)]">· {space?.name}</span>
             </button>
 
-            <div className="flex items-center gap-2 order-3 md:order-none w-full md:w-auto md:mx-auto">
+            <div className="flex flex-wrap items-center gap-2 order-3 md:order-none w-full md:w-auto md:mx-auto">
               <button className="px-btn px-btn--paper px-btn--small" aria-current={!panel ? 'page' : undefined} onClick={() => go(null)}>
                 Room
               </button>
@@ -103,6 +105,10 @@ export const TopNav: React.FC<{ letterUnread: boolean }> = ({ letterUnread }) =>
               </button>
               <button className="px-btn px-btn--paper px-btn--small" onClick={() => go('watch')}>
                 Watch together
+              </button>
+              <button className="px-btn px-btn--paper px-btn--small" onClick={() => go('games')}>
+                Games
+                {waiting.length > 0 && <span aria-label="your turn" className="inline-block w-2 h-2 bg-[var(--thread)]" />}
               </button>
               <button className="px-btn px-btn--paper px-btn--small" onClick={() => go('escape')}>
                 Dark door
