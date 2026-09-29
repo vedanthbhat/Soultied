@@ -4,7 +4,7 @@
  * that document, so you can take your turn hours after your person took theirs.
  */
 
-export type GameKind = 'fireflies' | 'boats';
+export type GameKind = 'fireflies' | 'boats' | 'doodle';
 
 /** 'a' is whoever built the place, 'b' is the person who joined (same as the couch). */
 export type Seat = 'a' | 'b';
@@ -56,5 +56,11 @@ export const GAMES: Record<GameKind, GameInfo> = {
     name: 'Paper Boats',
     tagline: 'Hide four paper boats on your pond, then take turns guessing where theirs are.',
     style: 'Take turns',
+  },
+  doodle: {
+    kind: 'doodle',
+    name: 'Doodle Guess',
+    tagline: 'One draws on a little pixel canvas, the other guesses. Then swap. Six drawings, scored together.',
+    style: 'Live, together',
   },
 };

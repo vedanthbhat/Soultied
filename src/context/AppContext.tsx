@@ -127,7 +127,7 @@ interface AppContextType {
   addActivity: (a: Omit<ActivityItem, 'id' | 'timestamp'>) => void;
 }
 
-export type LiveTopic = 'watch' | 'escape' | 'stream';
+export type LiveTopic = 'watch' | 'escape' | 'stream' | 'doodle';
 
 const AppContext = createContext<AppContextType | null>(null);
 

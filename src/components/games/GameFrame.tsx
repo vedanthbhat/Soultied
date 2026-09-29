@@ -19,11 +19,17 @@ export const GameShell: React.FC<{ children: React.ReactNode }> = ({ children })
   </div>
 );
 
-const PlayerChip: React.FC<{ seat: Seat; match: Match | null; marker?: (s: Seat) => React.ReactNode }> = ({ seat, match, marker }) => {
+/** For games played on the same side: who's doing what, instead of wins and turns. */
+export interface CoopChips {
+  active: Seat | null;
+  note: (s: Seat) => string;
+}
+
+const PlayerChip: React.FC<{ seat: Seat; match: Match | null; marker?: (s: Seat) => React.ReactNode; coop?: CoopChips }> = ({ seat, match, marker, coop }) => {
   const { seatUser, seatName, mySeat } = useGames();
   const user = seatUser(seat);
-  const turn = match?.status === 'playing' && match.turn === seat;
-  const won = match?.status === 'over' && match.winner === seat;
+  const turn = coop ? coop.active === seat : match?.status === 'playing' && match.turn === seat;
+  const won = !coop && match?.status === 'over' && match.winner === seat;
   return (
     <div
       className={`px-box flex items-center gap-3 px-3 py-2 min-w-0 ${turn ? 'game-turn' : ''}`}
@@ -36,8 +42,14 @@ const PlayerChip: React.FC<{ seat: Seat; match: Match | null; marker?: (s: Seat)
           {seat === mySeat && <span className="font-normal text-[var(--muted)]"> (you)</span>}
         </span>
         <span className="text-sm text-[var(--muted)] leading-tight">
-          {match?.wins?.[seat] ?? 0} {(match?.wins?.[seat] ?? 0) === 1 ? 'win' : 'wins'}
-          {turn ? (seat === mySeat ? ' · your move' : ' · their move') : won ? ' · won this one' : ''}
+          {coop ? (
+            coop.note(seat) || '\u00a0'
+          ) : (
+            <>
+              {match?.wins?.[seat] ?? 0} {(match?.wins?.[seat] ?? 0) === 1 ? 'win' : 'wins'}
+              {turn ? (seat === mySeat ? ' · your move' : ' · their move') : won ? ' · won this one' : ''}
+            </>
+          )}
         </span>
       </span>
       {marker && <span className="ml-auto shrink-0">{marker(seat)}</span>}
@@ -54,7 +66,8 @@ export const GameFrame: React.FC<{
   children: React.ReactNode;
   actions?: React.ReactNode;
   width?: number;
-}> = ({ title, onBack, match, marker, status, children, actions, width = 980 }) => {
+  coop?: CoopChips;
+}> = ({ title, onBack, match, marker, status, children, actions, width = 980, coop }) => {
   const { mySeat } = useGames();
   const them: Seat = mySeat === 'a' ? 'b' : 'a';
   return (
@@ -67,8 +80,8 @@ export const GameFrame: React.FC<{
           <h1 className="text-3xl font-bold m-0">{title}</h1>
         </div>
         <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
-          <PlayerChip seat={mySeat} match={match} marker={marker} />
-          <PlayerChip seat={them} match={match} marker={marker} />
+          <PlayerChip seat={mySeat} match={match} marker={marker} coop={coop} />
+          <PlayerChip seat={them} match={match} marker={marker} coop={coop} />
         </div>
         <div className="px-box px-4 py-2.5 leading-snug" style={{ color: 'var(--ink-soft)' }} role="status" aria-live="polite">
           {status}

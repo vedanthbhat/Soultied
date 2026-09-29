@@ -20,6 +20,7 @@ import type { CardAnswer, LetterDay, LetterKind } from '../letters/engine';
 import type { CouchState } from '../couch';
 import type { TitleInfo, TogetherLog } from '../stream/protocol';
 import type { GameKind, Match } from '../games/types';
+import type { DoodleCanvas } from '../games/doodle';
 
 /**
  * Where a couple's things live in Firestore:
@@ -30,8 +31,9 @@ import type { GameKind, Match } from '../games/types';
  *   spaces/{spaceId}/meta/letters        After dark switches, streak mends
  *   spaces/{spaceId}/meta/couch          who showed up when
  *   spaces/{spaceId}/meta/game-{kind}    the current game of Fireflies, Paper Boats… and the win tally
+ *   spaces/{spaceId}/meta/doodle-canvas  the Doodle Guess drawing in progress, saved every few seconds
  *   spaces/{spaceId}/activities/{id}     the little "what happened" feed
- *   spaces/{spaceId}/live/{topic}/events play/pause, chat, calls, escape rooms (short-lived)
+ *   spaces/{spaceId}/live/{topic}/events play/pause, chat, calls, escape rooms, doodle ink (short-lived)
  *   invites/{code}                       lets a partner find the place from an invite code
  */
 
@@ -334,3 +336,16 @@ export const subscribeGame = (db: Firestore, sid: string, kind: GameKind, fn: (m
 
 /** The whole match is written each move (Firestore doesn't take `undefined`, so it's dropped first). */
 export const writeGame = (db: Firestore, sid: string, m: Match) => setDoc(gameRef(db, sid, m.kind), JSON.parse(JSON.stringify(m)));
+
+/* ---------- Doodle Guess: the drawing in progress ---------- */
+
+const canvasRef = (db: Firestore, sid: string) => doc(db, 'spaces', sid, 'meta', 'doodle-canvas');
+
+export const subscribeDoodleCanvas = (db: Firestore, sid: string, fn: (c: DoodleCanvas | null) => void) =>
+  onSnapshot(
+    canvasRef(db, sid),
+    (s) => fn(s.exists() ? (s.data() as DoodleCanvas) : null),
+    () => undefined
+  );
+
+export const writeDoodleCanvas = (db: Firestore, sid: string, c: DoodleCanvas) => setDoc(canvasRef(db, sid), c);

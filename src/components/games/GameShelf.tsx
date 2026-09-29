@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { useGames } from '../../games/GamesContext';
-import { needsMe } from '../../games/registry';
-import type { GameKind, Seat } from '../../games/types';
+import { doodleStale, needsMe } from '../../games/registry';
+import type { DoodleState } from '../../games/doodle';
+import type { GameKind, Match, Seat } from '../../games/types';
 import { GAMES, otherSeat } from '../../games/types';
 import { BoxArt, BoxId } from './BoxArt';
 import { GameShell } from './GameFrame';
 import { FirefliesGame } from './FirefliesGame';
 import { PaperBoatsGame } from './PaperBoatsGame';
+import { DoodleGame } from './DoodleGame';
 
 interface Shelf {
   id: BoxId;
@@ -21,7 +23,7 @@ const SHELF: Shelf[] = [
   { id: 'fireflies', ...GAMES.fireflies },
   { id: 'boats', ...GAMES.boats },
   { id: 'door', name: 'The dark door', tagline: 'Four escape rooms. Each of you gets half the room and half the clues.', style: 'Together, live' },
-  { id: 'doodle', name: 'Doodle Guess', tagline: 'One draws on a little pixel canvas, the other guesses. Then swap.', style: 'Live', soon: true },
+  { id: 'doodle', ...GAMES.doodle },
   { id: 'coasters', name: 'Coasters', tagline: 'Air hockey on the coffee table with two drink coasters. First to 7.', style: 'Live', soon: true },
   { id: 'kitchen', name: 'Kitchen Rush', tagline: 'One of you chops, the other cooks, and the orders keep coming.', style: 'Together, live', soon: true },
 ];
@@ -35,9 +37,18 @@ export const GameShelf: React.FC<{ onExit: () => void; onOpenDoor: () => void; i
 
   if (open === 'fireflies') return <FirefliesGame onBack={() => setOpen(null)} />;
   if (open === 'boats') return <PaperBoatsGame onBack={() => setOpen(null)} />;
+  if (open === 'doodle') return <DoodleGame onBack={() => setOpen(null)} />;
 
   const line = (kind: GameKind): { text: string; hot: boolean } => {
     const m = matches[kind];
+    if (kind === 'doodle') {
+      const d = m as Match<DoodleState> | undefined;
+      if (!d || d.status === 'over' || doodleStale(d)) return { text: d?.state.best ? `Your best: ${d.state.best} of 6` : 'Start a game', hot: false };
+      const phase = d.state.phase;
+      if (needsMe(d, mySeat))
+        return { text: phase === 'lobby' ? `${partner} is waiting for you` : phase === 'drawing' ? `${partner} is drawing: guess!` : 'Your turn to draw', hot: true };
+      return { text: phase === 'lobby' ? `Waiting for ${partner}` : 'Playing now', hot: false };
+    }
     if (!m) return { text: 'Start a game', hot: false };
     if (needsMe(m, mySeat)) return { text: m.status === 'setup' ? 'Hide your boats' : 'Your move', hot: true };
     if (m.status === 'setup') return { text: `${partner} is hiding boats`, hot: false };

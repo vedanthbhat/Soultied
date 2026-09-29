@@ -17,13 +17,14 @@ import { WatchParty } from './components/WatchParty';
 import { EscapeGame } from './components/escape/EscapeGame';
 import type { Seat, HotspotId } from './pixel/room';
 import type { UserProfile } from './types';
-import type { GameKind } from './games/types';
+import type { GameKind, Match } from './games/types';
 import { prettyDate } from './letters/engine';
 import { COUCH_STEPS } from './couch';
 import { StreamChip, StreamHubProvider } from './stream/StreamHub';
 import { GamesProvider, useGames } from './games/GamesContext';
 import { GAMES, otherSeat } from './games/types';
 import { GameShelf } from './components/games/GameShelf';
+import { noteFor, waitingLabel } from './games/registry';
 
 const seatOf = (u: UserProfile | null | undefined, placeholder = ''): Seat =>
   u ? { avatar: u.avatar, name: u.name, status: u.status } : { avatar: null, name: placeholder, status: 'empty' };
@@ -110,7 +111,11 @@ const Home: React.FC = () => {
       photo: 'Us',
       remote: 'Watch something together',
       door: 'The dark door',
-      games: games.waiting.length ? `Your turn in ${games.waiting.map((k) => GAMES[k].name).join(' and ')}` : 'Games',
+      games: games.waiting.length
+        ? games.waiting
+            .map((k) => waitingLabel(games.matches[k] as Match, games.seatName(otherSeat(games.mySeat)), GAMES[k].name))
+            .join(' · ')
+        : 'Games',
     };
     const meLabel = `${currentUser.name} · change my look`;
     if (host) l.left = host.id === currentUser.id ? meLabel : host.name;
@@ -170,13 +175,7 @@ const Home: React.FC = () => {
       if (!m || m.updatedBy === games.mySeat) continue;
       const key = `${kind}:${m.id}:${m.seq}`;
       if (seenNotes.has(key)) continue;
-      const who = games.seatName(otherSeat(games.mySeat));
-      const text =
-        m.status === 'setup'
-          ? `${who} started Paper Boats. Hide your boats!`
-          : m.seq === 0
-            ? `${who} started a game of ${GAMES[kind].name}. Your move.`
-            : `${who} ${m.last} in ${GAMES[kind].name}. Your move.`;
+      const text = noteFor(m, games.seatName(otherSeat(games.mySeat)), GAMES[kind].name);
       return { key, kind, text };
     }
     return null;

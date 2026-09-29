@@ -4,9 +4,9 @@ import * as store from '../cloud/store';
 import type { UserProfile } from '../types';
 import type { GameKind, Match, Seat } from './types';
 import { GAMES, otherSeat } from './types';
-import { botAct, needsMe } from './registry';
+import { botAct, botDelay, botTurn, endLine, needsMe } from './registry';
 
-export const GAME_KINDS: GameKind[] = ['fireflies', 'boats'];
+export const GAME_KINDS: GameKind[] = ['fireflies', 'boats', 'doodle'];
 
 type Matches = Partial<Record<GameKind, Match>>;
 
@@ -18,7 +18,7 @@ interface GamesValue {
   seatName: (s: Seat) => string;
   matches: Matches;
   save: (m: Match) => void;
-  /** games waiting on you: your move, or boats to hide */
+  /** games waiting on you: your move, boats to hide, or a drawing to guess */
   waiting: GameKind[];
 }
 
@@ -112,11 +112,7 @@ export const GamesProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
       if (justEnded) {
         const game = GAMES[m.kind].name;
-        addActivity({
-          type: 'played_game',
-          title: game,
-          description: m.winner === 'draw' ? `A draw at ${game}.` : `${seatName(m.winner as Seat)} won at ${game}.`,
-        });
+        addActivity({ type: 'played_game', title: game, description: endLine(m, seatName, game) });
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -131,7 +127,7 @@ export const GamesProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const bot = otherSeat(mySeat);
     for (const kind of GAME_KINDS) {
       const m = matches[kind];
-      if (!m || !needsMe(m, bot)) continue;
+      if (!m || !botTurn(m, bot)) continue;
       const key = `${kind}:${m.id}:${m.seq}`;
       if (botTimers.current.has(key)) continue;
       const t = window.setTimeout(
@@ -142,7 +138,7 @@ export const GamesProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           const next = botAct(cur, bot);
           if (next) commit(next, bot);
         },
-        kind === 'boats' && m.status === 'setup' ? 900 : 1100 + Math.random() * 900
+        botDelay(m, bot)
       );
       botTimers.current.set(key, t);
     }
