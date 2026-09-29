@@ -13,23 +13,20 @@ Watch Netflix or Prime Video in sync with your person, from your Soultied place.
 
 You each need your own Netflix or Prime Video account. No video passes between you.
 
-## Install (for now, before the Chrome Web Store)
+## Install
 
-Works in Chrome, Edge and Brave on a computer.
+Works in Chrome, Edge and Brave on a computer. Install it from the Chrome Web Store, then open (or refresh) your Soultied tab, go to Watch together, then **Netflix / Prime**.
 
-1. Unzip `soultied-extension.zip` (or build it, below).
+To try a build of your own instead:
+
+1. `npm install`, then `npm run build:extension`. The extension is written to `extension/dist/`.
 2. Open `chrome://extensions` (Edge: `edge://extensions`) and switch on **Developer mode**.
-3. Click **Load unpacked** and pick the unzipped folder.
-4. Open (or refresh) your Soultied tab, go to Watch together, then **Netflix / Prime**.
+3. Click **Load unpacked** and pick `extension/dist`.
 
-## Build from source
+## Two builds
 
-```
-npm install
-npm run build:extension
-```
-
-The extension is written to `extension/dist/`.
+- `npm run build:extension` → `extension/dist/`, for development. Also works inside Google AI Studio previews (`*.run.app`) and on `localhost`.
+- `npm run build:extension:store` → `extension/dist-store/` and `extension/soultied-extension-<version>.zip`, the package for the Chrome Web Store. It only talks to Soultied's real addresses. Bump `version` in `manifest.json` before each upload. The listing text and privacy answers are in [STORE.md](STORE.md).
 
 ## How it fits together
 
@@ -42,8 +39,8 @@ The extension is written to `extension/dist/`.
 
 ## Where Soultied lives
 
-The extension talks to Soultied pages on `soultied.app`, `soultied-c1543.web.app`, `soultied-c1543.firebaseapp.com`, `*.run.app` (Google AI Studio previews) and `localhost`. On any of those it stays silent until the page says it's Soultied. To use another address, add it to the last `content_scripts` entry in `manifest.json`.
+The extension talks to Soultied pages on the addresses in the last `content_scripts` entry of `manifest.json`: Soultied's own domain, `soultied-c1543.web.app` and `soultied-c1543.firebaseapp.com` (plus `*.run.app` and `localhost` in the development build). On any of those it stays silent until the page says it's Soultied. The first address is where the toolbar button takes you if no Soultied tab is open.
 
-## Permissions
+## Permissions and privacy
 
-Only `storage` (to remember your chat panel setting and what you've watched together, on this computer). It reads nothing on Netflix or Prime beyond the video player and the title on screen.
+Only `storage` (to remember your chat panel setting and what you've watched together, on this computer). It reads nothing on Netflix or Prime beyond the video player and the title on screen. See [PRIVACY.md](../PRIVACY.md).

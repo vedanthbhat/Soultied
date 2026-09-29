@@ -399,7 +399,10 @@ export class Overlay implements EngineUI {
         bs.push(b);
       }
     }
+    // a banner coming or going changes the chat's height: stay at the newest line if you were there
+    const stick = this.logEl.scrollHeight - this.logEl.scrollTop - this.logEl.clientHeight < 40;
     this.banners.replaceChildren(...bs);
+    if (stick) this.logEl.scrollTop = this.logEl.scrollHeight;
 
     // countdown + remote
     this.readyBtn.disabled = !e.partnerHere;

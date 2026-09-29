@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "build:extension": "node extension/build.mjs"
+    "build:extension": "node extension/build.mjs",
+    "build:extension:store": "node extension/build.mjs --store"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

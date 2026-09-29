@@ -7,7 +7,21 @@ import type { ExtMsg, HubMsg, Session } from '../../src/stream/protocol';
  * to every player.
  */
 
-const DEFAULT_HUB = 'https://soultied.app/';
+/** Soultied's home: the first address the bridge runs on (see manifest.json). */
+const DEFAULT_HUB = (() => {
+  const bridge = chrome.runtime.getManifest().content_scripts?.find((c) => c.js?.includes('bridge.js'));
+  return (bridge?.matches[0] || 'https://soultied.app/*').replace(/\*$/, '');
+})();
+
+/** Where a Soultied tab lives, as Chrome reports it (not as the page claims). */
+function pageUrl(port: chrome.runtime.Port) {
+  try {
+    const u = new URL(port.sender?.url || '');
+    return u.protocol === 'https:' || u.hostname === 'localhost' || u.hostname === '127.0.0.1' ? u.origin + u.pathname : null;
+  } catch {
+    return null;
+  }
+}
 
 type PlayerMsg = ExtMsg | { kind: 'openHub' };
 type ToPlayer = HubMsg | { kind: 'nohub' };
@@ -60,7 +74,8 @@ chrome.runtime.onConnect.addListener((port) => {
       if (port !== hub()) return;
       if (msg.kind === 'session') {
         session = msg.session;
-        if (msg.session) void chrome.storage.local.set({ lastSession: msg.session, hubUrl: msg.session.hubUrl });
+        const hubUrl = pageUrl(port);
+        if (msg.session) void chrome.storage.local.set({ lastSession: msg.session, ...(hubUrl ? { hubUrl } : {}) });
       }
       if (msg.kind === 'voice') voice = msg;
       toPlayers(msg);
