@@ -59,7 +59,7 @@ Soultied isn't affiliated with, endorsed by or sponsored by Netflix or Amazon. N
 - Small promo tile 440×280: `promo-small.png`
 - Marquee 1400×560 (optional): `promo-marquee.png`
 
-**Official URL:** none. **Homepage URL:** https://soultied.app/ **Support URL:** https://github.com/vedanthbhat/Soultied/issues
+**Official URL:** none. **Homepage URL:** https://soultied.app/ **Support URL:** leave empty (the contact email, hello@soultied.app, is on the developer account)
 
 ## Privacy practices
 
@@ -101,7 +101,7 @@ Certify all three:
 - I do not use or transfer user data for purposes that are unrelated to my item's single purpose
 - I do not use or transfer user data to determine creditworthiness or for lending purposes
 
-**Privacy policy URL:** https://github.com/vedanthbhat/Soultied/blob/main/PRIVACY.md
+**Privacy policy URL:** https://soultied.app/privacy/ (source: `public/privacy/index.html`)
 
 ## Distribution
 
