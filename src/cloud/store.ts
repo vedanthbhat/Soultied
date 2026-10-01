@@ -21,6 +21,7 @@ import type { CouchState } from '../couch';
 import type { TitleInfo, TogetherLog } from '../stream/protocol';
 import type { GameKind, Match } from '../games/types';
 import type { DoodleCanvas } from '../games/doodle';
+import type { TurntableState } from '../music/records';
 
 /**
  * Where a couple's things live in Firestore:
@@ -32,6 +33,7 @@ import type { DoodleCanvas } from '../games/doodle';
  *   spaces/{spaceId}/meta/couch          who showed up when
  *   spaces/{spaceId}/meta/game-{kind}    the current game of Fireflies, Paper Boats… and the win tally
  *   spaces/{spaceId}/meta/doodle-canvas  the Doodle Guess drawing in progress, saved every few seconds
+ *   spaces/{spaceId}/meta/turntable      the record player in the living room: on or off, and since when
  *   spaces/{spaceId}/activities/{id}     the little "what happened" feed
  *   spaces/{spaceId}/live/{topic}/events play/pause, chat, calls, escape rooms, doodle ink (short-lived)
  *   invites/{code}                       lets a partner find the place from an invite code
@@ -349,3 +351,16 @@ export const subscribeDoodleCanvas = (db: Firestore, sid: string, fn: (c: Doodle
   );
 
 export const writeDoodleCanvas = (db: Firestore, sid: string, c: DoodleCanvas) => setDoc(canvasRef(db, sid), c);
+
+/* ---------- the record player ---------- */
+
+const turntableRef = (db: Firestore, sid: string) => doc(db, 'spaces', sid, 'meta', 'turntable');
+
+export const subscribeTurntable = (db: Firestore, sid: string, fn: (t: TurntableState | null) => void) =>
+  onSnapshot(
+    turntableRef(db, sid),
+    (s) => fn(s.exists() ? (s.data() as TurntableState) : null),
+    () => undefined
+  );
+
+export const writeTurntable = (db: Firestore, sid: string, t: TurntableState) => setDoc(turntableRef(db, sid), t);

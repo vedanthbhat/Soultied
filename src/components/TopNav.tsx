@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { AvatarThumb } from './PixelAvatarRenderer';
 import { useGames } from '../games/GamesContext';
+import { useTurntable } from '../music/TurntableContext';
 
 /**
  * The menu hides above the screen and slides down when the cursor touches
@@ -11,6 +12,7 @@ import { useGames } from '../games/GamesContext';
 export const TopNav: React.FC<{ letterUnread: boolean }> = ({ letterUnread }) => {
   const { space, currentUser, partnerUser, panel, openPanel, switchActiveUser, cloudMode } = useApp();
   const { waiting } = useGames();
+  const turntable = useTurntable();
   const [open, setOpen] = useState(false);
   const [hint, setHint] = useState(true);
   const closeTimer = useRef<number | null>(null);
@@ -112,6 +114,17 @@ export const TopNav: React.FC<{ letterUnread: boolean }> = ({ letterUnread }) =>
               </button>
               <button className="px-btn px-btn--paper px-btn--small" onClick={() => go('escape')}>
                 Dark door
+              </button>
+              <button
+                className="px-btn px-btn--paper px-btn--small"
+                aria-pressed={turntable.on}
+                title={turntable.on ? 'Lift the needle' : 'Put a record on'}
+                onClick={() => {
+                  turntable.toggle();
+                  setOpen(false);
+                }}
+              >
+                {turntable.on ? 'Music ♪' : 'Music'}
               </button>
               <button className="px-btn px-btn--paper px-btn--small" onClick={() => go('us')}>
                 Us

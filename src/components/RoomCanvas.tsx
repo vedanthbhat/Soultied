@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { renderRoom, ROOM_W, ROOM_H, ROOM_FOCUS_X, hitTest, hotspotRect, HotspotId, RoomState, Seat } from '../pixel/room';
 
 interface Props {
@@ -7,6 +7,8 @@ interface Props {
   letterUnread: boolean;
   /** a game is waiting on you */
   gamesWaiting?: boolean;
+  /** a record is playing */
+  music?: boolean;
   /** Labels shown above a hotspot on hover. Omit a key to disable that hotspot. */
   labels: Partial<Record<HotspotId, string>>;
   onHotspot?: (id: HotspotId) => void;
@@ -41,11 +43,42 @@ function computeFit(w: number, h: number): Fit {
   return { scale, left, top };
 }
 
+/** The little label over whatever you're pointing at, kept inside the window near the edges. */
+const HoverTag: React.FC<{ x: number; y: number; text: string }> = ({ x, y, text }) => {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const [shift, setShift] = useState(0);
+  useLayoutEffect(() => {
+    const w = ref.current?.offsetWidth || 0;
+    const room = window.innerWidth;
+    const left = x - w / 2;
+    setShift(left < 8 ? 8 - left : left + w > room - 8 ? room - 8 - (left + w) : 0);
+  }, [x, text]);
+  return (
+    <div className="absolute pointer-events-none px-ui" style={{ left: x + shift, top: y, transform: 'translate(-50%, -100%)' }}>
+      <div ref={ref} className="px-box px-shadow px-fade text-sm font-semibold whitespace-nowrap px-2.5 py-1">
+        {text}
+      </div>
+    </div>
+  );
+};
+
 /**
  * The whole screen is the room. The canvas is 320x180 real pixels, scaled
  * to cover the viewport with nearest-neighbour upscaling.
  */
-export const RoomCanvas: React.FC<Props> = ({ left, right, letterUnread, gamesWaiting = false, labels, onHotspot, dim = 0, closeness = 0, scoot = false, onScooted }) => {
+export const RoomCanvas: React.FC<Props> = ({
+  left,
+  right,
+  letterUnread,
+  gamesWaiting = false,
+  music = false,
+  labels,
+  onHotspot,
+  dim = 0,
+  closeness = 0,
+  scoot = false,
+  onScooted,
+}) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [fit, setFit] = useState<Fit>(() => computeFit(window.innerWidth, window.innerHeight));
   const [hover, setHover] = useState<HotspotId | null>(null);
@@ -62,6 +95,7 @@ export const RoomCanvas: React.FC<Props> = ({ left, right, letterUnread, gamesWa
   stateRef.current.right = right;
   stateRef.current.letterUnread = letterUnread;
   stateRef.current.gamesWaiting = gamesWaiting;
+  stateRef.current.music = music;
   stateRef.current.hover = hover;
 
   useEffect(() => {
@@ -167,16 +201,7 @@ export const RoomCanvas: React.FC<Props> = ({ left, right, letterUnread, gamesWa
 
       {/* hover label, pinned above the hotspot */}
       {tag && labels[hover!] && (
-        <div
-          className="absolute pointer-events-none px-ui"
-          style={{
-            left: fit.left + (tag.x + tag.w / 2) * fit.scale,
-            top: fit.top + tag.y * fit.scale - 10,
-            transform: 'translate(-50%, -100%)',
-          }}
-        >
-          <div className="px-box px-shadow px-fade text-sm font-semibold whitespace-nowrap px-2.5 py-1">{labels[hover!]}</div>
-        </div>
+        <HoverTag x={fit.left + (tag.x + tag.w / 2) * fit.scale} y={fit.top + tag.y * fit.scale - 10} text={labels[hover!]!} />
       )}
 
       {/* Keyboard access to the room's hotspots (visually hidden until focused) */}

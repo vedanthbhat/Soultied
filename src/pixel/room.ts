@@ -33,9 +33,11 @@ export interface RoomState {
   heartAt?: number;
   /** a game is waiting on you: the stack of board games twinkles */
   gamesWaiting?: boolean;
+  /** a record is going round on the turntable */
+  music?: boolean;
 }
 
-export type HotspotId = 'left' | 'right' | 'letter' | 'fire' | 'photo' | 'remote' | 'door' | 'games';
+export type HotspotId = 'left' | 'right' | 'letter' | 'fire' | 'photo' | 'remote' | 'door' | 'games' | 'music';
 
 export interface Hotspot {
   id: HotspotId;
@@ -64,12 +66,16 @@ const TABLE = { x: 205, y: 163, w: 54 };
 const DOOR = { x: 160, y: 64, w: 24 };
 /** the stack of board games on the floor beside the couch */
 const GAMES_STACK = { x: 168, y: 133, w: 14, h: 17 };
+/** the little side table at the couch's right arm, in front of the lamp, with the record player on it */
+const SIDE_TABLE = { x: 279, y: 130, w: 20 };
+const DECK = { x: 280, y: 125, w: 18 };
 
 const HOTSPOTS: Hotspot[] = [
   { id: 'letter', x: TABLE.x + 19, y: TABLE.y - 9, w: 18, h: 12 },
   { id: 'fire', x: FIRE.openX, y: FIRE.openY, w: FIRE.openW, h: FIRE.openB - FIRE.openY },
   { id: 'photo', x: 138, y: 43, w: 12, h: 12 },
   { id: 'remote', x: TABLE.x + 36, y: TABLE.y - 4, w: 10, h: 6 },
+  { id: 'music', x: SIDE_TABLE.x - 1, y: DECK.y - 10, w: SIDE_TABLE.w + 2, h: 151 - (DECK.y - 10) },
   { id: 'door', x: DOOR.x - 1, y: DOOR.y - 2, w: DOOR.w + 2, h: FLOOR_Y - DOOR.y + 2 },
   { id: 'games', x: GAMES_STACK.x - 1, y: GAMES_STACK.y - 2, w: GAMES_STACK.w + 2, h: GAMES_STACK.h + 2 },
 ];
@@ -705,6 +711,7 @@ function staticLayer(): Layer {
   drawBookshelf(L);
   drawLamp(L);
   drawRug(L);
+  drawSideTable(L);
   drawCouch(L);
   STATIC = L;
   return L;
@@ -857,6 +864,124 @@ function drawGameStack(L: Layer, t: number, waiting: boolean, hover: boolean) {
     for (let j = -1; j < GAMES_STACK.h; j += 2) {
       L.glow(x - 2, y + j, '#fff4c2');
       L.glow(x + GAMES_STACK.w + 1, y + j, '#fff4c2');
+    }
+  }
+}
+
+/** A little side table by the couch's right arm, with records on its shelf. */
+function drawSideTable(L: Layer) {
+  const { x, y, w } = SIDE_TABLE;
+  // shadow on the rug
+  for (let i = 0; i < w; i++) L.set(x + i, 150, mix(P.rugA, '#3a2418', 0.35));
+  // legs
+  for (const lx of [x + 1, x + w - 3]) {
+    L.rect(lx, y + 3, 2, 17, P.woodD);
+    L.vline(lx, y + 3, 17, P.wood);
+  }
+  // a shelf of records: sleeves standing on end, and one leaning
+  const spines = [P.cream, P.rugB, P.sage, P.mustard, '#5a79a3', P.creamD, '#3a2a26', P.rugB, P.cream];
+  spines.forEach((c, i) => {
+    const h = 7 - (i % 3 === 1 ? 1 : 0);
+    L.rect(x + 3 + i * 1.6, y + 11 - h + 7, 2, h, c);
+  });
+  L.rect(x + 3, y + 18, w - 6, 2, P.wood);
+  L.hline(x + 3, y + 18, w - 6, P.woodL);
+  // table top
+  L.rect(x, y, w, 3, P.wood);
+  L.hline(x, y, w, P.woodL);
+  L.hline(x + 1, y + 2, w - 2, P.woodD);
+}
+
+/** The record player on the side table; the record turns and notes drift up while it plays. */
+function drawTurntable(L: Layer, t: number, playing: boolean, hover: boolean) {
+  const { x, y, w } = DECK;
+  // the lid, propped open behind (clear plastic catching the lamp light)
+  for (let i = 1; i < w - 1; i++) {
+    L.set(x + i, y - 9, '#e6d6b8', 150);
+    L.set(x + i, y - 8, '#e6d6b8', 40);
+  }
+  for (let j = y - 8; j < y - 2; j++) {
+    L.set(x + 1, j, '#e6d6b8', 120);
+    L.set(x + w - 2, j, '#e6d6b8', 120);
+    for (let i = 2; i < w - 2; i++) L.set(x + i, j, '#e6d6b8', 22);
+  }
+  // plinth: a pale top plate on a wooden box
+  L.rect(x, y, w, 2, '#b9a98f');
+  L.hline(x, y, w, '#d8c7a4');
+  L.rect(x, y + 2, w, 3, '#7a5540');
+  L.hline(x, y + 2, w, '#8f6649');
+  L.hline(x, y + 4, w, '#4d3224');
+  // a brass knob, and a little light that's on while it plays
+  L.set(x + w - 3, y + 3, P.brassL);
+  if (playing) L.glow(x + 2, y + 3, '#ffb347');
+  else L.set(x + 2, y + 3, '#3a2a26');
+  // the record (seen from a little above)
+  const cx = x + 7;
+  const rows: Array<[number, number]> = [
+    [y - 2, 3],
+    [y - 1, 5],
+    [y, 6],
+    [y + 1, 5],
+  ];
+  for (const [ry, half] of rows) {
+    L.hline(cx - half, ry, half * 2 + 1, '#1f1718');
+    L.set(cx - half, ry, '#3a3035');
+    L.set(cx + half, ry, '#3a3035');
+  }
+  // grooves catch the lamp light
+  L.hline(cx - 4, y - 1, 2, '#3a3035');
+  L.hline(cx + 3, y + 1, 2, '#3a3035');
+  // the label
+  L.set(cx, y - 1, P.rugB);
+  L.set(cx + 1, y - 1, P.cream);
+  L.set(cx, y, P.cream);
+  if (playing) {
+    // a glint going round
+    const a = t * 3.5;
+    const gx = Math.round(cx + Math.cos(a) * 5);
+    const gy = Math.round(y - 0.5 + Math.sin(a) * 1.4);
+    L.set(gx, gy, '#8a7f86');
+  }
+  // tonearm: resting at the side, or across the record
+  const px = x + w - 4;
+  const py = y - 1;
+  L.set(px, py, P.brassL);
+  L.set(px + 1, py, P.brass);
+  if (playing) {
+    L.set(px - 1, py, '#cfc3b0');
+    L.set(px - 2, py, '#cfc3b0');
+    L.set(px - 3, py + 1, '#cfc3b0');
+    L.set(px - 4, py + 1, '#e6d6b8');
+  } else {
+    L.set(px, py + 1, '#cfc3b0');
+    L.set(px + 1, py + 2, '#cfc3b0');
+    L.set(px + 1, py + 3, '#e6d6b8');
+  }
+  if (playing) {
+    // notes drifting up and fading
+    for (let k = 0; k < 3; k++) {
+      const life = (t * 0.45 + k / 3) % 1;
+      const nx = Math.round(cx - 2 + k * 4 + Math.sin((t + k) * 2) * 1.5 + life * 3);
+      const ny = Math.round(y - 5 - life * 16);
+      const alpha = Math.round(255 * (life < 0.2 ? life / 0.2 : 1 - (life - 0.2) / 0.8));
+      const c = k === 1 ? '#fff4c2' : '#f4d9a8';
+      L.set(nx, ny, c, alpha);
+      L.set(nx + 1, ny, c, alpha);
+      L.set(nx + 1, ny - 1, c, alpha);
+      L.set(nx + 1, ny - 2, c, alpha);
+      L.set(nx + 2, ny - 2, c, alpha);
+    }
+  }
+  if (hover) {
+    const hx = SIDE_TABLE.x - 2;
+    const hw = SIDE_TABLE.w + 3;
+    for (let i = 0; i <= hw; i++) {
+      L.glow(hx + i, y - 11, '#fff4c2');
+      L.glow(hx + i, 151, '#fff4c2');
+    }
+    for (let j = y - 11; j <= 151; j += 2) {
+      L.glow(hx, j, '#fff4c2');
+      L.glow(hx + hw, j, '#fff4c2');
     }
   }
 }
@@ -1173,6 +1298,7 @@ export function renderRoom(state: RoomState, t: number): PixelBuffer {
   drawPhotoPortrait(L, state);
   drawCat(L, t);
   drawGameStack(L, t, !!state.gamesWaiting, state.hover === 'games');
+  drawTurntable(L, t, !!state.music, state.hover === 'music');
 
   // characters on the couch (left seat first so the right one overlaps on lean)
   const closeness = state.closeness ?? 0;

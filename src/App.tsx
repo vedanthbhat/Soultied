@@ -25,6 +25,8 @@ import { GamesProvider, useGames } from './games/GamesContext';
 import { GAMES, otherSeat } from './games/types';
 import { GameShelf } from './components/games/GameShelf';
 import { noteFor, waitingLabel } from './games/registry';
+import { TurntableProvider, useTurntable } from './music/TurntableContext';
+import { NowPlaying } from './components/NowPlaying';
 
 const seatOf = (u: UserProfile | null | undefined, placeholder = ''): Seat =>
   u ? { avatar: u.avatar, name: u.name, status: u.status } : { avatar: null, name: placeholder, status: 'empty' };
@@ -77,6 +79,7 @@ const Home: React.FC = () => {
   const { setupComplete, currentUser, partnerUser, space, panel, openPanel, letterBadge, getLetter, today } = useApp();
   const { couchLevel, couchShown, markCouchShown, cloudStatus, demo } = useApp();
   const games = useGames();
+  const turntable = useTurntable();
   const [joinCode] = useState(readJoinCode);
   const [welcomeOpen, setWelcomeOpen] = useState(() => !setupComplete || !!joinCode);
   const [draftSeats, setDraftSeats] = useState<{ left: Seat; right: Seat } | null>(null);
@@ -116,13 +119,14 @@ const Home: React.FC = () => {
             .map((k) => waitingLabel(games.matches[k] as Match, games.seatName(otherSeat(games.mySeat)), GAMES[k].name))
             .join(' · ')
         : 'Games',
+      music: turntable.on ? `Lift the needle${turntable.track ? ` · ${turntable.track.title}` : ''}` : 'Put a record on',
     };
     const meLabel = `${currentUser.name} · change my look`;
     if (host) l.left = host.id === currentUser.id ? meLabel : host.name;
     if (guest) l.right = guest.id === currentUser.id ? meLabel : guest.name;
     else l.right = `Invite ${space?.partnerPlaceholderName || 'your person'}`;
     return l;
-  }, [welcomeOpen, letterBadge, partnerSealed, partnerUser, currentUser, host, guest, space, games.waiting]);
+  }, [welcomeOpen, letterBadge, partnerSealed, partnerUser, currentUser, host, guest, space, games.waiting, turntable.on, turntable.track]);
 
   const onHotspot = (id: HotspotId) => {
     if (id === 'letter') openPanel('question');
@@ -130,6 +134,7 @@ const Home: React.FC = () => {
     else if (id === 'remote') openPanel('watch');
     else if (id === 'door') openPanel('escape');
     else if (id === 'games') openPanel('games');
+    else if (id === 'music') turntable.toggle();
     else if (id === 'left' || id === 'right') {
       const who = id === 'left' ? host : guest;
       if (!who) openPanel('space');
@@ -215,6 +220,7 @@ const Home: React.FC = () => {
         right={seats.right}
         letterUnread={welcomeOpen ? false : letterUnread}
         gamesWaiting={!welcomeOpen && games.waiting.length > 0}
+        music={turntable.on}
         labels={labels}
         onHotspot={onHotspot}
         dim={panel ? 0.25 : 0}
@@ -229,6 +235,7 @@ const Home: React.FC = () => {
       />
 
       {!welcomeOpen && !veil && <StreamChip />}
+      {!welcomeOpen && !veil && <NowPlaying />}
 
       {gameNote && !welcomeOpen && !veil && !couchNote && (
         <div className="fixed right-4 bottom-4 z-30 px-ui max-w-[92vw]" role="status">
@@ -305,9 +312,11 @@ export default function App() {
   return (
     <AppProvider>
       <StreamHubProvider>
-        <GamesProvider>
-          <Home />
-        </GamesProvider>
+        <TurntableProvider>
+          <GamesProvider>
+            <Home />
+          </GamesProvider>
+        </TurntableProvider>
       </StreamHubProvider>
     </AppProvider>
   );
