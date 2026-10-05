@@ -44,6 +44,7 @@ HOW TO USE IT
 1. Open your Soultied place and sign in.
 2. Go to Watch together, then Netflix / Prime.
 3. Open the same show. Keep your Soultied tab open while you watch.
+4. Click the Soultied button in your toolbar any time to check you're connected and that your person is watching with you.
 
 You each need your own Netflix or Prime Video account. No video is shared between you, only play/pause and your chat.
 
@@ -80,7 +81,7 @@ Remembers on this computer the user's last Soultied session (their names, pixel 
 Host permissions (content scripts on netflix.com, primevideo.com and amazon.* /gp/video, plus Soultied's own site):
 
 ```
-Netflix and Prime Video pages: reads the video player's state (playing or paused, the time, ads and buffering) and the title on screen to keep two people's playback in sync, and draws the chat sidebar and couch over the player. On netflix.com a small script runs in the page only to seek with Netflix's own player controls, because setting the video's time directly makes Netflix show an error. Nothing else on these sites is read.
+Netflix and Prime Video pages: reads the video player's state (playing or paused, the time, ads and buffering) and which title is playing (on Prime Video, from the title id in the player's own requests to Amazon, whose name it then asks Amazon for the same way the player does) to keep two people's playback in sync, and draws the chat sidebar and couch over the player. On netflix.com a small script runs in the page only to seek with Netflix's own player controls, because setting the video's time directly makes Netflix show an error. Nothing else on these sites is read.
 
 Soultied pages (the Soultied website and soultied-c1543.web.app / firebaseapp.com): connects the extension to the user's signed-in Soultied tab, which carries sync and chat messages to their partner. On these pages the script does nothing until the page identifies itself as Soultied.
 ```

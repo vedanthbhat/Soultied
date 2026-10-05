@@ -28,6 +28,10 @@ jobs:
       - run: npm install --no-audit --no-fund
       - run: npm run lint
       - run: npm run build
+        env:
+          # Optional: a relay for video calls on networks that block direct ones (see src/watch/ice.ts).
+          # Set it under Settings > Secrets and variables > Actions > Variables. Empty means no relay.
+          VITE_TURN_CREDENTIALS_URL: ${{ vars.TURN_CREDENTIALS_URL }}
       # any unknown address still opens the app (it reads ?join=... itself)
       - run: cp dist/index.html dist/404.html
       - uses: actions/upload-pages-artifact@v5

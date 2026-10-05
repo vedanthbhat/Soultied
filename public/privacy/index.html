@@ -31,7 +31,7 @@ code { background: var(--paper-2); padding: 1px 5px; font-size: 0.92em; }
 <a class="home" href="/">← Soultied</a>
 <article class="card">
 <h1>Soultied privacy policy</h1>
-<p class="date">Last updated: 29 September 2026</p>
+<p class="date">Last updated: 5 October 2026</p>
 <p>Soultied is a small shared place online for two people in a long-distance relationship, plus a browser extension for watching Netflix and Prime Video together. This page explains what each part handles, where it goes, and how to delete it. It is written by the person who builds Soultied, Vedanth Bhat. Questions or requests: <a href="mailto:hello@soultied.app">hello@soultied.app</a>.</p>
 <p>The short version: what you put in Soultied is shared with your person and nobody else. There are no ads, no analytics or tracking, and nothing is sold.</p>
 <h2>The Soultied website (soultied.app)</h2>
@@ -45,7 +45,7 @@ code { background: var(--paper-2); padding: 1px 5px; font-size: 0.92em; }
 </ul>
 <p>Only the two members of a place can read it. The database rules enforce this. Invite codes expire and can only be used to join.</p>
 <p><strong>Live messages.</strong> Chat, reactions, play/pause/skip and video-call setup messages travel between you as small records in the same database. They're kept there, readable only by the two of you, until your place is deleted.</p>
-<p><strong>Video and voice calls.</strong> Cameras and microphones are only switched on when you press the button, and your browser asks for permission first. Calls go directly between your two browsers (WebRTC). They are not recorded or stored. Google's public STUN servers are used only to help your two browsers find each other.</p>
+<p><strong>Video and voice calls.</strong> Cameras and microphones are only switched on when you press the button, and your browser asks for permission first. Calls go directly between your two browsers (WebRTC) whenever your networks allow it. When a network blocks that (some mobile, college and office networks do), the call is passed along by a relay server (TURN). Calls are encrypted from one browser to the other either way, so a relay can't see or hear them. They are not recorded or stored. Public STUN servers (Google's and Cloudflare's) are used only to help your two browsers find each other.</p>
 <p><strong>On this device.</strong> The site keeps a copy of your place in your browser's local storage, so it opens quickly.</p>
 <h2>The Soultied browser extension</h2>
 <p>The extension only runs on:</p>
@@ -53,7 +53,7 @@ code { background: var(--paper-2); padding: 1px 5px; font-size: 0.92em; }
   <li>Netflix and Prime Video pages, to keep your video in sync, and</li>
   <li>Soultied's own pages (soultied.app and soultied-c1543.web.app / .firebaseapp.com), to connect to your signed-in Soultied tab.</li>
 </ul>
-<p><strong>What it reads on Netflix or Prime Video:</strong> the video player's state (playing or paused, the time, whether an ad or buffering is happening) and the title and episode name on screen. It does not read your account, profile, payment details, viewing history or anything else on those sites. No video or audio from the show is ever copied or sent anywhere. You each watch on your own account.</p>
+<p><strong>What it reads on Netflix or Prime Video:</strong> the video player's state (playing or paused, the time, whether an ad or buffering is happening) and which title and episode is playing. On Prime Video that comes from the title id in the player's own requests to Amazon, and the extension asks Amazon for that title's name the same way the player does. It does not read your account, profile, payment details, viewing history or anything else on those sites. No video or audio from the show is ever copied or sent anywhere. You each watch on your own account.</p>
 <p><strong>What it sends:</strong> play, pause and skip events with the time and title, your chat messages and reactions. These go to your open Soultied tab, which passes them to your person as live messages (above). When you've watched an episode together, the title and where you stopped are added to your place's "watched together" list.</p>
 <p><strong>What it keeps on your computer</strong> (Chrome's extension storage, never uploaded by the extension itself): your last Soultied session (your name, your person's name, both pixel characters, your place's name and the watched-together list, used for the "no watching ahead" check), the address of your Soultied tab, and whether the chat panel is open.</p>
 <p><strong>Permissions:</strong> <code>storage</code> (the items above), plus access to the Netflix, Prime Video and Soultied pages listed. The extension doesn't use remote code, and it doesn't see other tabs or your browsing history.</p>

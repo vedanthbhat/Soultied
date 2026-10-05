@@ -23,11 +23,22 @@ function pageUrl(port: chrome.runtime.Port) {
   }
 }
 
-type PlayerMsg = ExtMsg | { kind: 'openHub' };
+/** what a Netflix / Prime tab tells us about itself, for the toolbar window */
+interface PlayerStatus {
+  platform: 'netflix' | 'prime';
+  video: boolean;
+  connected: boolean;
+  watching: string | null;
+  partnerHere: boolean;
+  partnerWatching: string | null;
+}
+
+type PlayerMsg = ExtMsg | { kind: 'openHub' } | { kind: 'status'; status: PlayerStatus };
 type ToPlayer = HubMsg | { kind: 'nohub' };
 
 const hubs: chrome.runtime.Port[] = [];
 const players = new Set<chrome.runtime.Port>();
+const statuses = new Map<chrome.runtime.Port, PlayerStatus>();
 let session: Session | null = null;
 let voice: HubMsg | null = null;
 
@@ -99,10 +110,15 @@ chrome.runtime.onConnect.addListener((port) => {
         void openHub();
         return;
       }
+      if (msg.kind === 'status') {
+        statuses.set(port, msg.status);
+        return;
+      }
       if (!toHub(msg) && msg.kind === 'hello') port.postMessage({ kind: 'nohub' } satisfies ToPlayer);
     });
     port.onDisconnect.addListener(() => {
       players.delete(port);
+      statuses.delete(port);
       if (!players.size) toHub({ kind: 'bye' });
     });
     if (session && hub()) {
@@ -112,4 +128,26 @@ chrome.runtime.onConnect.addListener((port) => {
   }
 });
 
+// the toolbar window asks how things stand (or to open Soultied)
+chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
+  if (msg?.kind === 'openHub') {
+    void openHub();
+    return;
+  }
+  if (msg?.kind !== 'popup') return;
+  void chrome.storage.local.get('lastSession').then((r) => {
+    // after Chrome has put this worker to sleep and woken it, the names come from the last session we saw
+    const s = session || (r.lastSession as Session | undefined) || null;
+    reply({
+      hub: !!hub(),
+      me: s?.me.name || null,
+      partner: s?.partner?.name || null,
+      place: s?.place || null,
+      players: [...statuses.values()],
+    });
+  });
+  return true; // answering in a moment
+});
+
+// older builds had no toolbar window: the button opened Soultied
 chrome.action.onClicked.addListener(() => void openHub());

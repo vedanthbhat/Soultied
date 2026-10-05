@@ -34,13 +34,15 @@ To try a build of your own instead:
 - `src/netflix-main.ts`: runs inside the Netflix page to use Netflix's own player controls (setting the video's time directly makes Netflix show an error).
 - `src/bridge.ts`: runs on the Soultied page and passes messages between it and the extension.
 - `src/background.ts`: the switchboard between Soultied tabs and Netflix / Prime tabs.
+- `src/popup.ts`: the window under the toolbar button. It shows whether your Soultied tab is open, what you're watching and whether your person is watching with you, with buttons to open Soultied, Netflix or Prime Video.
+- Prime Video's player doesn't show its title in a way the extension can read, so `adapters.ts` recognises what's playing by the title id in the player's own requests to Amazon (`amzn1.dv.gti.…`, the same for both of you), seen through the page's resource timing. That id also makes the "Go there" link.
 - The Soultied tab (`src/stream/StreamHub.tsx` in the web app) is already signed in, so it carries everything to and from your person over the online live channel, keeps the "watched together" list in Firestore, and runs the cameras. Keep it open while you watch.
 - Messages are defined once, in `src/stream/protocol.ts`, and shared by both.
 
 ## Where Soultied lives
 
-The extension talks to Soultied pages on the addresses in the last `content_scripts` entry of `manifest.json`: Soultied's own domain, `soultied-c1543.web.app` and `soultied-c1543.firebaseapp.com` (plus `*.run.app` and `localhost` in the development build). On any of those it stays silent until the page says it's Soultied. The first address is where the toolbar button takes you if no Soultied tab is open.
+The extension talks to Soultied pages on the addresses in the last `content_scripts` entry of `manifest.json`: Soultied's own domain, `soultied-c1543.web.app` and `soultied-c1543.firebaseapp.com` (plus `*.run.app` and `localhost` in the development build). On any of those it stays silent until the page says it's Soultied. The first address is where "Open Soultied" (in the toolbar window, and on the show) takes you if no Soultied tab is open.
 
 ## Permissions and privacy
 
-Only `storage` (to remember your chat panel setting and what you've watched together, on this computer). It reads nothing on Netflix or Prime beyond the video player and the title on screen. See the [privacy policy](https://soultied.app/privacy/).
+Only `storage` (to remember your chat panel setting and what you've watched together, on this computer). It reads nothing on Netflix or Prime beyond the video player and which title is playing. See the [privacy policy](https://soultied.app/privacy/).

@@ -1,4 +1,5 @@
 import type { WatchEvent } from './sync';
+import { hasRelay, iceNow, loadIce } from './ice';
 
 /**
  * A two-person video call for the watch room, over WebRTC.
@@ -10,7 +11,8 @@ import type { WatchEvent } from './sync';
  *   two tabs today, and between two devices once the backend replaces it.
  *
  * Uses the "perfect negotiation" pattern, so either side can add a camera at
- * any moment without the two offers colliding.
+ * any moment without the two offers colliding. When a direct line between the
+ * two of you is blocked, it goes through a relay (see ice.ts) if the site has one.
  */
 
 export type CallLink = 'idle' | 'connecting' | 'connected' | 'lost';
@@ -27,11 +29,20 @@ export interface CallView {
   partnerCam: boolean;
   partnerTalking: boolean;
   link: CallLink;
+  /** we've tried for a while and can't reach the other person (their picture and voice won't come through) */
+  stuck: boolean;
   busy: 'cam' | 'mic' | null;
   error: string | null;
 }
 
-const ICE: RTCIceServer[] = [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }];
+/** how long a connection may take before we say it isn't getting through */
+const STUCK_MS = 20_000;
+
+/** what to tell you when the two of you can't reach each other */
+export const stuckMessage = (partnerName: string) =>
+  hasRelay()
+    ? `Can't reach ${partnerName}'s camera and mic right now. Check your connection, or try again in a minute.`
+    : `Can't reach ${partnerName}'s camera and mic. One of your networks (often mobile data, or college or office Wi-Fi) blocks direct calls. Try another network, like home Wi-Fi.`;
 
 function describeMediaError(err: unknown, what: 'camera' | 'microphone') {
   const name = (err as { name?: string })?.name || '';
@@ -52,6 +63,7 @@ export class WatchCall {
     partnerCam: false,
     partnerTalking: false,
     link: 'idle',
+    stuck: false,
     busy: null,
     error: null,
   };
@@ -69,11 +81,74 @@ export class WatchCall {
   private outStream = new MediaStream();
   private holding = false;
   private closed = false;
+  private ice: RTCIceServer[] = iceNow();
+  private restarts = 0;
+  private stuckTimer = 0;
+  private dropTimer = 0;
 
   constructor(
     private me: string,
     private send: (e: WatchEvent) => void,
   ) {}
+
+  /** The relay arrived (or its logins were renewed): use it for this connection too, if it hasn't connected yet. */
+  private useIce(servers: RTCIceServer[]) {
+    this.ice = servers;
+    const pc = this.pc;
+    if (!pc || this.closed || pc.connectionState === 'connected') return;
+    try {
+      pc.setConfiguration({ ...pc.getConfiguration(), iceServers: servers });
+      if (pc.iceGatheringState !== 'new') pc.restartIce?.();
+    } catch {
+      // an older browser: the next connection picks it up
+    }
+  }
+
+  private clearTimers() {
+    window.clearTimeout(this.stuckTimer);
+    window.clearTimeout(this.dropTimer);
+    this.stuckTimer = 0;
+    this.dropTimer = 0;
+  }
+
+  /** If this connection isn't through in a while, say so and try again. */
+  private arm(pc: RTCPeerConnection) {
+    window.clearTimeout(this.stuckTimer);
+    this.stuckTimer = window.setTimeout(() => {
+      if (pc !== this.pc || this.closed || pc.connectionState === 'connected') return;
+      // nothing to send and nothing offered to us: there's no call to make yet
+      if (!this.cam && !this.mic && !pc.remoteDescription) return;
+      this.set({ stuck: true });
+      this.retry(pc);
+    }, STUCK_MS);
+  }
+
+  /** Try the network path again, with fresh relay logins. Gives up (and says so) after a few goes. */
+  private retry(pc: RTCPeerConnection) {
+    if (pc !== this.pc || this.closed) return;
+    if (this.restarts >= 3) {
+      window.clearTimeout(this.stuckTimer);
+      this.set({ link: 'lost', stuck: true });
+      return;
+    }
+    this.restarts++;
+    if (pc.signalingState !== 'stable') {
+      // our offer was never answered (it went missing on the way): start over with a fresh one
+      this.rebuild();
+      return;
+    }
+    void loadIce().then((servers) => {
+      if (pc !== this.pc || this.closed) return;
+      this.ice = servers;
+      try {
+        pc.setConfiguration({ ...pc.getConfiguration(), iceServers: servers });
+      } catch {
+        // keep what it has
+      }
+      pc.restartIce?.();
+      this.arm(pc);
+    });
+  }
 
   /* ---------- state for the UI ---------- */
 
@@ -104,11 +179,26 @@ export class WatchCall {
   setPartner(id: string | null) {
     if (id === this.partner) return;
     this.partner = id;
+    // someone to call: fetch the relay's logins now, so they're ready before either of you turns a camera on
+    if (id) void loadIce().then((servers) => this.useIce(servers));
     this.reset();
   }
 
   /** The other person (re)joined or left: start a fresh connection. */
   reset() {
+    this.teardown(true);
+    this.restarts = 0;
+    if (this.partner && !this.closed && (this.cam || this.mic)) this.ensurePc();
+  }
+
+  /** A broken connection: start a new one, still remembering what the other person has on. */
+  private rebuild() {
+    this.teardown(false);
+    if (this.partner && !this.closed && (this.cam || this.mic)) this.ensurePc();
+  }
+
+  /** Close the connection. `fresh`: the other person came or went, so forget what they had on too. */
+  private teardown(fresh: boolean) {
     if (this.pc) {
       this.pc.onicecandidate = null;
       this.pc.ontrack = null;
@@ -122,15 +212,17 @@ export class WatchCall {
     this.pendingIce = [];
     this.makingOffer = false;
     this.ignoreOffer = false;
-    this.set({ remote: null, link: 'idle', partnerCam: false, partnerTalking: false });
-    if (this.partner && !this.closed && (this.cam || this.mic)) this.ensurePc();
+    this.clearTimers();
+    this.set(fresh ? { remote: null, link: 'idle', stuck: false, partnerCam: false, partnerTalking: false } : { remote: null, link: 'idle' });
   }
 
   private ensurePc() {
     if (this.pc || !this.partner || this.closed || typeof RTCPeerConnection === 'undefined') return this.pc;
-    const pc = new RTCPeerConnection({ iceServers: ICE });
+    const pc = new RTCPeerConnection({ iceServers: this.ice });
     this.pc = pc;
     this.set({ link: 'connecting' });
+    this.clearTimers();
+    this.arm(pc);
     pc.onicecandidate = ({ candidate }) => this.signal({ candidate: candidate ? candidate.toJSON() : null });
     pc.onnegotiationneeded = async () => {
       try {
@@ -149,9 +241,23 @@ export class WatchCall {
       this.set({ remote: new MediaStream([...tracks, e.track]) });
     };
     pc.onconnectionstatechange = () => {
+      if (pc !== this.pc) return;
       const s = pc.connectionState;
-      this.set({ link: s === 'connected' ? 'connected' : s === 'failed' || s === 'disconnected' ? 'lost' : 'connecting' });
-      if (s === 'failed') pc.restartIce?.();
+      if (s === 'connected') {
+        this.restarts = 0;
+        this.clearTimers();
+        this.set({ link: 'connected', stuck: false });
+        return;
+      }
+      this.set({ link: s === 'failed' || s === 'disconnected' ? 'lost' : 'connecting' });
+      if (s === 'failed') this.retry(pc);
+      else if (s === 'disconnected') {
+        // often a blip (switching networks): give it a few seconds to come back by itself
+        window.clearTimeout(this.dropTimer);
+        this.dropTimer = window.setTimeout(() => {
+          if (pc === this.pc && pc.connectionState === 'disconnected') this.retry(pc);
+        }, 5000);
+      }
     };
     if (this.cam) this.camSender = pc.addTrack(this.cam, this.outStream);
     if (this.mic) this.micSender = pc.addTrack(this.mic, this.outStream);
@@ -194,8 +300,8 @@ export class WatchCall {
           });
       }
     } catch {
-      // a broken negotiation: start over cleanly
-      this.reset();
+      // a broken negotiation: start over cleanly (their camera is still on, so keep showing it when it comes back)
+      this.rebuild();
     }
   }
 
@@ -297,6 +403,7 @@ export class WatchCall {
 
   destroy() {
     this.closed = true;
+    this.clearTimers();
     this.cam?.stop();
     this.mic?.stop();
     this.cam = null;

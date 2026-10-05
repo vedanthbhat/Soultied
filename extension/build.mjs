@@ -24,6 +24,7 @@ await build({
     bridge: path.join(here, 'src/bridge.ts'),
     player: path.join(here, 'src/player/main.ts'),
     'netflix-main': path.join(here, 'src/netflix-main.ts'),
+    popup: path.join(here, 'src/popup.ts'),
   },
   bundle: true,
   format: 'iife',
@@ -44,6 +45,11 @@ if (STORE) {
 }
 await writeFile(path.join(out, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
 await copyFile(path.join(root, 'public/fonts/PixelifySans-Variable.ttf'), path.join(out, 'fonts/PixelifySans-Variable.ttf'));
+// the toolbar window (popup.js draws everything in it)
+await writeFile(
+  path.join(out, 'popup.html'),
+  '<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><title>Soultied</title></head><body><script src="popup.js"></script></body></html>\n',
+);
 await copyFile(path.join(root, 'public/fonts/OFL.txt'), path.join(out, 'fonts/OFL.txt'));
 
 /* ---------- the icon: a pixel heart, drawn here so no image files live in the repo ---------- */

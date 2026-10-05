@@ -227,9 +227,11 @@ export class Engine {
   private apply(to: { pos: number; playing: boolean }) {
     const v = this.v;
     if (!v) return;
-    this.suppressUntil = Date.now() + 1600;
+    const jump = Math.abs(v.currentTime - to.pos) > 1;
+    // after a jump the new spot has to load before it plays, which can take a few seconds
+    this.suppressUntil = Date.now() + (jump ? 4500 : 1600);
     this.expected = { pos: to.pos, at: Date.now(), playing: to.playing };
-    if (Math.abs(v.currentTime - to.pos) > 1) this.a.seek(to.pos);
+    if (jump) this.a.seek(to.pos);
     if (to.playing && v.paused) this.a.play();
     else if (!to.playing && !v.paused) this.a.pause();
   }

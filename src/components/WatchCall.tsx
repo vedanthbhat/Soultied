@@ -93,7 +93,9 @@ export const CamFrame: React.FC<{
   avatar: AvatarConfig | null;
   talking: boolean;
   width: number;
-}> = ({ stream, on, mine, name, avatar, talking, width }) => {
+  /** their picture isn't getting through */
+  stuck?: boolean;
+}> = ({ stream, on, mine, name, avatar, talking, width, stuck }) => {
   const ref = useRef<HTMLVideoElement | null>(null);
   const [frames, setFrames] = useState(false);
   useEffect(() => {
@@ -101,7 +103,16 @@ export const CamFrame: React.FC<{
     if (!v) return;
     if (v.srcObject !== stream) v.srcObject = stream;
     setFrames(false);
-    if (stream && on) v.play().catch(() => undefined);
+    if (!stream || !on) return;
+    v.play().catch(() => undefined);
+    // a camera switched back on sends the same size of picture, so no resize event says it's back: wait for a real frame
+    let live = true;
+    const rvfc = (v as HTMLVideoElement & { requestVideoFrameCallback?: (cb: () => void) => number }).requestVideoFrameCallback;
+    if (rvfc) rvfc.call(v, () => live && setFrames(v.videoWidth > 0));
+    else if (v.videoWidth > 0) setFrames(true);
+    return () => {
+      live = false;
+    };
   }, [stream, on]);
   const live = on && !!stream;
   return (
@@ -132,7 +143,7 @@ export const CamFrame: React.FC<{
         {!(live && frames) && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5" style={{ color: '#cdb9a0' }}>
             {avatar && <AvatarThumb config={avatar} region="head" size={Math.round(width * 0.34)} />}
-            <span className="text-xs">{live ? 'Connecting…' : 'Camera off'}</span>
+            <span className="text-xs text-center px-1">{!on ? 'Camera off' : stuck ? 'Can’t connect' : 'Connecting…'}</span>
           </div>
         )}
         {talking && (

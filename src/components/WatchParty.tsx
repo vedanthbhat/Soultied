@@ -6,6 +6,7 @@ import { AvatarThumb } from './PixelAvatarRenderer';
 import { projectedPosition, WatchEvent, WatchTransport } from '../watch/sync';
 import { loadYouTubeApi, parseYouTubeId, parseYouTubeStart, describeYouTubeError, YTPlayer, YTState } from '../watch/youtube';
 import { CallButtons, CamFrame, PartnerAudio, usePushToTalkKey, useWatchCall } from './WatchCall';
+import { stuckMessage } from '../watch/call';
 import { PixelPanel } from './PixelPanel';
 import { StreamPanel } from './StreamPanel';
 
@@ -541,6 +542,7 @@ export const WatchParty: React.FC<{ onExit: () => void }> = ({ onExit }) => {
         avatar={partnerUser?.avatar || null}
         talking={view.partnerTalking}
         width={bigW}
+        stuck={view.stuck}
       />
       <CamFrame stream={view.local} on={view.camOn} mine name={currentUser.name} avatar={currentUser.avatar} talking={view.talking} width={smallW} />
     </div>
@@ -651,6 +653,7 @@ export const WatchParty: React.FC<{ onExit: () => void }> = ({ onExit }) => {
         )}
       </div>
       {notice && <p className="text-sm text-[#7f3835]">{notice}</p>}
+      {view?.stuck && partnerHere && showCams && <p className="text-sm text-[#7f3835]">{stuckMessage(partnerName)}</p>}
       {view?.error && (
         <p className="text-sm text-[#7f3835] flex items-center gap-2">
           {view.error}

@@ -5,7 +5,7 @@ import { COUCH_STEPS } from '../couch';
 import * as store from '../cloud/store';
 import type { LiveChannel } from '../cloud/live';
 import type { WatchEvent } from '../watch/sync';
-import type { CallView, WatchCall } from '../watch/call';
+import { stuckMessage, type CallView, type WatchCall } from '../watch/call';
 import { CallButtons, CamFrame, PartnerAudio, useWatchCall } from '../components/WatchCall';
 import {
   EXT_SOURCE,
@@ -294,7 +294,7 @@ const CamsWindow: React.FC<{
       @keyframes call-wave { 0%, 100% { transform: scaleY(.4); } 50% { transform: scaleY(1); } }
       .call-wave-bar { transform-origin: bottom; animation: call-wave 480ms steps(3) infinite; }
     `}</style>
-    <CamFrame stream={view.remote} on={view.partnerCam} name={partnerName} avatar={partnerAvatar} talking={view.partnerTalking} width={250} />
+    <CamFrame stream={view.remote} on={view.partnerCam} name={partnerName} avatar={partnerAvatar} talking={view.partnerTalking} width={250} stuck={view.stuck} />
     <CamFrame stream={view.local} on={view.camOn} mine name={me.name} avatar={me.avatar} talking={view.talking} width={140} />
     <div className="flex gap-2 flex-wrap justify-center">
       <CallButtons call={call} view={view} partnerName={partnerName} />
@@ -302,6 +302,11 @@ const CamsWindow: React.FC<{
     <p className="text-xs text-center m-0" style={{ color: '#cdb9a0' }}>
       On Netflix or Prime, hold T to talk. The show turns down while either of you talks.
     </p>
+    {view.stuck && (view.camOn || view.partnerCam || view.talking || view.partnerTalking) && (
+      <p className="text-xs text-center m-0" style={{ color: '#f3a19c' }}>
+        {stuckMessage(partnerName)}
+      </p>
+    )}
     {view.error && (
       <p className="text-xs text-center m-0" style={{ color: '#f3a19c' }}>
         {view.error}

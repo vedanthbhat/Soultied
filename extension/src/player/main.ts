@@ -1,4 +1,4 @@
-import type { ExtMsg, HubMsg, Session } from '../../../src/stream/protocol';
+import { titleLabel, type ExtMsg, type HubMsg, type Session } from '../../../src/stream/protocol';
 import { adapterFor } from './adapters';
 import { Engine } from './engine';
 import { Overlay } from './overlay';
@@ -6,7 +6,13 @@ import { Overlay } from './overlay';
 /** Runs on Netflix and Prime Video pages. */
 
 type FromBackground = HubMsg | { kind: 'nohub' };
-type ToBackground = ExtMsg | { kind: 'openHub' };
+type ToBackground =
+  | ExtMsg
+  | { kind: 'openHub' }
+  | {
+      kind: 'status';
+      status: { platform: 'netflix' | 'prime'; video: boolean; connected: boolean; watching: string | null; partnerHere: boolean; partnerWatching: string | null };
+    };
 
 const adapter = adapterFor(location.hostname);
 const w = window as unknown as { __soultiedPlayer?: boolean };
@@ -26,7 +32,27 @@ if (adapter && !w.__soultiedPlayer) {
   const engine = new Engine(adapter, (m) => send(m), overlay);
   overlay.engine = engine;
 
+  // how things stand here, for the toolbar window (sent when it changes)
+  let lastStatus = '';
+  const reportStatus = () => {
+    const pw = engine.partnerWhere?.title;
+    const status = {
+      platform: adapter.platform,
+      video: engine.hasVideo,
+      connected: !!engine.session,
+      watching: engine.title ? titleLabel(engine.title) : null,
+      partnerHere: engine.partnerHere,
+      partnerWatching: pw ? titleLabel(pw) : null,
+    };
+    const json = JSON.stringify(status);
+    if (json === lastStatus || !port) return;
+    lastStatus = json;
+    send({ kind: 'status', status });
+  };
+  window.setInterval(reportStatus, 1500);
+
   const connect = () => {
+    lastStatus = '';
     try {
       port = chrome.runtime.connect({ name: 'player' });
     } catch {

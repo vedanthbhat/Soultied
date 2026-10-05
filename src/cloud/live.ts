@@ -28,16 +28,17 @@ export function firestoreChannel<E extends { by: string; at: number }>(db: Fires
   const unsub = onSnapshot(
     query(col, where('ts', '>', since)),
     (snap) => {
-      // the first delivery is recent history: skip it, we only want what happens from now on
-      if (first) {
-        first = false;
-        return;
-      }
+      // The first delivery is mostly recent history, which we skip: we only want what happens from now on.
+      // But on a slow connection it can also hold the first replies to our own "hello" (and the start of a
+      // video call), which arrive while we're still waiting for it. Those are newer than the moment we opened.
+      const history = first;
+      first = false;
       snap.docChanges().forEach((ch) => {
         if (ch.type !== 'added') return;
         const data = ch.doc.data() as E & { ts?: Timestamp | null; expireAt?: unknown };
         const { ts, expireAt: _exp, ...rest } = data;
         void _exp;
+        if (history && (!ts || ts.toMillis() < openedAt - 1500)) return;
         // anything from before we opened the channel is history too (e.g. served late from a cache)
         if (ts && ts.toMillis() < openedAt - 5000) return;
         // clocks on two devices disagree; "when it arrived" is a better "when it happened" than their clock
