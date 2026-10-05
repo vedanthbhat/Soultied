@@ -1,4 +1,4 @@
-import { Firestore, Timestamp, addDoc, collection, onSnapshot, query, serverTimestamp, where } from 'firebase/firestore';
+import { type CollectionReference, Firestore, Timestamp, addDoc, collection, onSnapshot, query, serverTimestamp, where } from 'firebase/firestore';
 
 /**
  * A live channel between the two of you (play/pause, chat, video-call
@@ -20,7 +20,11 @@ export interface LiveChannel<E> {
 const KEEP_MS = 24 * 60 * 60 * 1000;
 
 export function firestoreChannel<E extends { by: string; at: number }>(db: Firestore, spaceId: string, topic: 'watch' | 'escape' | 'stream' | 'doodle'): LiveChannel<E> {
-  const col = collection(db, 'spaces', spaceId, 'live', topic, 'events');
+  return channelAt<E>(collection(db, 'spaces', spaceId, 'live', topic, 'events'));
+}
+
+/** The same, on any collection (the extension's watch parties keep theirs under parties/{id}/events). */
+export function channelAt<E extends { by: string; at: number }>(col: CollectionReference): LiveChannel<E> {
   const listeners = new Set<(e: E) => void>();
   let first = true;
   const openedAt = Date.now();

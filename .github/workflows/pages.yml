@@ -34,6 +34,8 @@ jobs:
           VITE_TURN_CREDENTIALS_URL: ${{ vars.TURN_CREDENTIALS_URL }}
       # any unknown address still opens the app (it reads ?join=... itself)
       - run: cp dist/index.html dist/404.html
+      # the browser extension, for people who open a watch-party link without it (until it's on the Chrome Web Store)
+      - run: npm run build:extension:store && cp extension/soultied-extension-*.zip dist/soultied-extension.zip
       - uses: actions/upload-pages-artifact@v5
         with:
           path: dist

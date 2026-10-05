@@ -71,8 +71,9 @@ export class Engine {
   get me() {
     return this.session?.me.id || '';
   }
+  /** (with no connection, the person from your Soultied place, for the "no watching ahead" check) */
   get partner(): Person | null {
-    return this.session?.partner || this.cached?.partner || null;
+    return this.session ? this.session.partner : this.cached?.partner || null;
   }
   get partnerName() {
     return this.partner?.name || 'your person';
@@ -81,7 +82,11 @@ export class Engine {
     return !!this.session?.partner && Date.now() - this.partnerSeen < PRESENT_MS;
   }
   get log(): TogetherLog | null {
-    return this.session?.log || this.cached?.log || null;
+    return this.session ? this.session.log : this.cached?.log || null;
+  }
+  /** in a watch party from a link (rather than your Soultied place) */
+  get party() {
+    return this.session?.party || null;
   }
   get hasVideo() {
     return !!this.v;
@@ -91,18 +96,36 @@ export class Engine {
   }
 
   setSession(s: Session | null) {
-    const had = !!this.session;
+    const before = this.session;
+    // a different line to a different person: your place, a watch party, someone new joining the party
+    const who = (x: Session | null) => (x ? `${x.me.id}|${x.party?.id || ''}|${x.partner?.id || ''}` : '');
+    const changed = who(before) !== who(s);
     this.session = s;
-    if (s) this.cached = s;
-    if (!s) {
+    // only your Soultied place is remembered (for the "no watching ahead" check)
+    if (s && !s.party) this.cached = s;
+    if (!s || changed) {
       this.partnerSeen = 0;
       this.partnerWhere = null;
+      this.partnerBuffering = false;
+      this.lock = { on: false, by: '' };
+      this.ready = { me: false, partner: false };
       this.clearHold();
     }
     // say we're here as soon as we're connected, before anything's playing, so you each see the other arrive
-    if (s && !had) {
+    if (s && changed) {
       this.sayHello();
-      if (!this.v && !this.key) this.ui.note(s.partner ? `Soultied is on. Start something; when ${s.partner.name} opens the same thing, you're in sync.` : 'Soultied is on.');
+      const p = s.partner;
+      const samePlace = !!before && before.me.id === s.me.id && (before.party?.id || '') === (s.party?.id || '');
+      if (s.party && p && samePlace) this.ui.note(`${p.name} joined your watch party.`);
+      else if (s.party && !p) this.ui.note('Your watch party is ready. Send the link to your person; when they open it, they land on this show.');
+      else if (!this.v && !this.key)
+        this.ui.note(
+          p
+            ? s.party
+              ? `You're in a watch party with ${p.name}. Start something; when ${p.name} opens the same thing, you're in sync.`
+              : `Soultied is on. Start something; when ${p.name} opens the same thing, you're in sync.`
+            : 'Soultied is on.',
+        );
     }
     this.ui.update();
   }

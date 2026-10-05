@@ -12,7 +12,9 @@ declare namespace chrome {
     const id: string;
     function connect(info: { name: string }): Port;
     function sendMessage(msg: unknown): Promise<any>;
-    const onMessage: { addListener(fn: (msg: any, sender: unknown, reply: (r: unknown) => void) => boolean | void): void };
+    const onMessage: {
+      addListener(fn: (msg: any, sender: { tab?: { id?: number }; url?: string; id?: string }, reply: (r: unknown) => void) => boolean | void): void;
+    };
     function getURL(path: string): string;
     function getManifest(): { version: string; content_scripts?: { matches: string[]; js?: string[]; all_frames?: boolean; world?: string }[] };
     const onInstalled: { addListener(fn: (details: { reason: string }) => void): void };
@@ -27,7 +29,7 @@ declare namespace chrome {
     }
     function query(q: { url?: string | string[]; active?: boolean; currentWindow?: boolean }): Promise<Tab[]>;
     function create(p: { url: string; active?: boolean }): Promise<unknown>;
-    function update(id: number, p: { active?: boolean }): Promise<unknown>;
+    function update(id: number, p: { active?: boolean; url?: string }): Promise<unknown>;
   }
   namespace windows {
     function update(id: number, p: { focused?: boolean }): Promise<unknown>;
@@ -36,6 +38,7 @@ declare namespace chrome {
     const local: {
       get(keys: string | string[]): Promise<Record<string, any>>;
       set(items: Record<string, unknown>): Promise<void>;
+      remove(keys: string | string[]): Promise<void>;
     };
   }
   namespace scripting {
@@ -44,4 +47,22 @@ declare namespace chrome {
   namespace action {
     const onClicked: { addListener(fn: () => void): void };
   }
+  namespace offscreen {
+    function createDocument(p: { url: string; reasons: string[]; justification: string }): Promise<void>;
+    function closeDocument(): Promise<void>;
+    function hasDocument(): Promise<boolean>;
+  }
 }
+
+/** Filled in by build.mjs: Soultied's Firebase settings (the same public ones the website uses), for watch parties. */
+declare const __FIREBASE__: {
+  apiKey: string;
+  authDomain: string;
+  projectId: string;
+  appId?: string;
+  storageBucket?: string;
+  messagingSenderId?: string;
+  firestoreDatabaseId?: string;
+} | null;
+/** Filled in by build.mjs: the address of local test emulators, or '' (always '' in a real build). */
+declare const __EMULATOR__: string;

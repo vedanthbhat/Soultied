@@ -98,5 +98,60 @@ service cloud.firestore {
         allow update: if false;
       }
     }
+
+    // A watch party from the browser extension: two people, no Soultied place
+    // needed (each is signed in anonymously by the extension). Whoever has the
+    // link can see who started it and take the one empty seat; only the two
+    // people in it can send or see play/pause and chat.
+    match /parties/{pid} {
+      function partyMember() {
+        return signedIn() && me() in get(/databases/$(database)/documents/parties/$(pid)).data.members;
+      }
+      function personOk(p) {
+        return p is map && p.keys().hasOnly(['name', 'avatar'])
+          && p.name is string && p.name.size() > 0 && p.name.size() <= 40
+          && p.avatar is map;
+      }
+      function mineOk() {
+        return me() in request.resource.data.people && personOk(request.resource.data.people[me()]);
+      }
+
+      allow get: if signedIn();
+      allow list: if false;
+
+      allow create: if signedIn()
+        && request.resource.data.id == pid
+        && request.resource.data.host == me()
+        && request.resource.data.members == [me()]
+        && request.resource.data.people.keys().hasOnly([me()])
+        && mineOk();
+
+      allow update: if signedIn()
+        && request.resource.data.id == resource.data.id
+        && request.resource.data.host == resource.data.host
+        && request.resource.data.people.diff(resource.data.people).affectedKeys().hasOnly([me()])
+        && mineOk()
+        && (
+          // in the party: what's on, and your own name and look
+          (me() in resource.data.members
+            && request.resource.data.members == resource.data.members
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'people', 'updatedAt']))
+          ||
+          // taking the second seat
+          (!(me() in resource.data.members)
+            && resource.data.members.size() == 1
+            && request.resource.data.members == resource.data.members.concat([me()])
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members', 'people', 'updatedAt']))
+        );
+
+      allow delete: if false;
+
+      // play/pause, chat and reactions between the two of you
+      match /events/{id} {
+        allow read: if partyMember();
+        allow create: if partyMember() && request.resource.data.by == me();
+        allow update, delete: if false;
+      }
+    }
   }
 }

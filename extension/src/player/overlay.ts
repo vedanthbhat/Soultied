@@ -20,7 +20,7 @@ const REACTIONS: Array<{ kind: ReactionKind; label: string }> = [
 const CSS = `
 :host { all: initial; }
 * { box-sizing: border-box; }
-.root { position: fixed; inset: 0; pointer-events: none; z-index: 2147483600; font-family: 'Soultied Pixel', ui-sans-serif, system-ui, sans-serif; color: #3a2a26; font-size: 15px; line-height: 1.3; }
+.root { position: fixed; inset: 0; pointer-events: none; z-index: 2147483600; font-family: 'Soultied Pixel', ui-sans-serif, system-ui, sans-serif; color: #3a2a26; font-size: 15px; line-height: 1.3; font-variant-ligatures: none; -webkit-font-smoothing: antialiased; }
 button { font: inherit; cursor: pointer; }
 .box { background: #f4e8d0; box-shadow: 0 -3px 0 0 #2b1e1c, 0 3px 0 0 #2b1e1c, -3px 0 0 0 #2b1e1c, 3px 0 0 0 #2b1e1c, 6px 6px 0 3px rgba(0,0,0,.35); }
 .btn { pointer-events: auto; border: 0; background: #b8674f; color: #fff4e2; padding: 6px 10px; box-shadow: 0 -3px 0 0 #2b1e1c, 0 3px 0 0 #2b1e1c, -3px 0 0 0 #2b1e1c, 3px 0 0 0 #2b1e1c, inset 0 -3px 0 0 #8f4b3a; }
@@ -39,7 +39,7 @@ button { font: inherit; cursor: pointer; }
 .side { position: absolute; right: 14px; top: 9%; bottom: 13%; width: 300px; display: flex; flex-direction: column; pointer-events: auto; }
 .side.hide { display: none; }
 .head { padding: 10px 12px 8px; border-bottom: 3px dashed #d6c29c; position: relative; }
-.kicker { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: #8f4b3a; }
+.kicker { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: #8f4b3a; }
 .who { display: flex; align-items: center; gap: 7px; font-weight: 700; font-size: 17px; margin-top: 2px; }
 .dot { width: 9px; height: 9px; background: #b9a98f; flex: none; }
 .dot.on { background: #8a9a72; }
@@ -49,7 +49,7 @@ button { font: inherit; cursor: pointer; }
 .banner .btn { align-self: flex-start; }
 .controls { display: flex; gap: 8px; padding: 10px 12px 4px; flex-wrap: wrap; }
 .log { list-style: none; margin: 8px 0 0; padding: 4px 12px; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; scrollbar-width: thin; }
-.note { font-size: 12px; color: #7a5a48; text-align: center; font-style: italic; }
+.note { font-size: 13px; color: #7a5a48; text-align: center; }
 .msg { display: flex; gap: 6px; align-items: flex-start; }
 .msg.mine { flex-direction: row-reverse; }
 .msg img { width: 24px; height: 24px; image-rendering: pixelated; flex: none; background: #eadbbd; }
@@ -61,7 +61,7 @@ button { font: inherit; cursor: pointer; }
 .reacts img { width: 21px; height: 21px; image-rendering: pixelated; display: block; object-fit: contain; }
 .compose { display: flex; gap: 8px; padding: 6px 12px 8px; }
 .compose input { flex: 1; min-width: 0; font: inherit; font-size: 14px; border: 0; padding: 6px 8px; background: #fff8ea; color: #2b1e1c; box-shadow: inset 0 0 0 2px #2b1e1c; outline: none; }
-.hint { font-size: 11px; color: #7a5a48; padding: 0 12px 10px; }
+.hint { font-size: 12px; color: #7a5a48; padding: 0 12px 10px; }
 
 .couch { position: absolute; left: 22px; bottom: 96px; pointer-events: none; filter: drop-shadow(3px 3px 0 rgba(0,0,0,.35)); }
 .couch.hide { display: none; }
@@ -78,9 +78,18 @@ button { font: inherit; cursor: pointer; }
 .big { font-size: 120px; font-weight: 700; color: #fff4e2; text-shadow: 6px 6px 0 #2b1e1c, -3px -3px 0 #2b1e1c, 3px -3px 0 #2b1e1c, -3px 3px 0 #2b1e1c; }
 .pill { padding: 8px 14px; font-size: 16px; }
 
-.connect { position: absolute; left: 22px; bottom: 96px; pointer-events: auto; padding: 10px 12px; display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; max-width: 380px; font-size: 14px; }
+.connect { position: absolute; left: 22px; bottom: 96px; pointer-events: auto; padding: 10px 12px; display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; max-width: 430px; font-size: 14px; }
+.connect > span { flex-basis: 100%; }
 .connect.hide { display: none; }
+.connect form { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.connect input, .banner input { font: inherit; font-size: 14px; border: 0; padding: 4px 7px; background: #fff8ea; color: #2b1e1c; box-shadow: inset 0 0 0 2px #2b1e1c; outline: none; min-width: 0; }
+.connect input { width: 130px; }
+.banner input { width: 100%; font-size: 12px; }
+.banner .row { display: flex; gap: 6px; align-items: center; }
 `;
+
+const HINT_PLACE = 'Hold T to talk. Cameras live in your Soultied tab (“Pop out cameras”).';
+const HINT_PARTY = 'Voice and cameras are coming with Soultied Plus.';
 
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', text = '') => {
   const e = document.createElement(tag);
@@ -107,6 +116,7 @@ export class Overlay implements EngineUI {
   private toasts: HTMLElement;
   private center: HTMLElement;
   private connect: HTMLElement;
+  private hint: HTMLElement;
   private couch = new CouchCorner(2);
   private unread = 0;
   private open = true;
@@ -115,9 +125,21 @@ export class Overlay implements EngineUI {
   /** "Not now" on the little card: don't ask again on this page */
   private cardDismissed = false;
   private countTimer = 0;
+  /** your name for a watch party (from last time) */
+  myName = '';
+  private starting = false;
+  private plusSaid = false;
+  private copied = false;
+  private openHub: () => void;
+  private startParty: (name: string) => void;
 
-  constructor(private openHub: () => void) {
+  constructor(actions: { openHub: () => void; startParty: (name: string) => void }) {
+    this.openHub = actions.openHub;
+    this.startParty = actions.startParty;
     this.host = document.createElement('soultied-overlay');
+    // hidden until Soultied's pixel font has loaded, so nothing shows up in the site's font first
+    this.host.style.visibility = 'hidden';
+    window.setTimeout(() => this.fontReady(), 2500);
     this.shadow = this.host.attachShadow({ mode: 'open' });
     const style = el('style');
     style.textContent = CSS;
@@ -184,8 +206,8 @@ export class Overlay implements EngineUI {
       this.submit();
     };
 
-    const hint = el('div', 'hint', 'Hold T to talk. Cameras live in your Soultied tab (“Pop out cameras”).');
-    this.side.append(head, this.banners, controls, this.logEl, reacts, compose, hint);
+    this.hint = el('div', 'hint', HINT_PLACE);
+    this.side.append(head, this.banners, controls, this.logEl, reacts, compose, this.hint);
 
     this.couch.canvas.className = 'couch hide';
     this.toasts = el('div', 'toasts');
@@ -202,6 +224,10 @@ export class Overlay implements EngineUI {
     const fs = document.fullscreenElement;
     const parent = fs && fs !== document.documentElement && fs !== document.body ? fs : document.documentElement;
     if (this.host.parentNode !== parent) parent.appendChild(this.host);
+  }
+
+  fontReady() {
+    this.host.style.visibility = '';
   }
 
   typing() {
@@ -266,6 +292,42 @@ export class Overlay implements EngineUI {
     const side = mine === meLeft ? 'left' : 'right';
     this.couch.float(kind, side);
     if (!this.visible) this.toast(`${mine ? 'You' : this.engine.partnerName} sent ${kind === 'heart' ? 'a heart' : `a ${kind}`}`);
+  }
+
+  /* ---------------- watch parties ---------------- */
+
+  /** The party's ready: copy the link straight away if the browser lets us. */
+  partyStarted(link: string) {
+    this.starting = false;
+    this.cardDismissed = false;
+    void this.copy(link).then((ok) => {
+      this.copied = ok;
+      this.toast(ok ? 'Watch party started. Link copied: send it to your person.' : 'Watch party started. Copy the link in the chat panel and send it to your person.');
+      this.update();
+    });
+  }
+
+  partyFailed(error: string) {
+    this.starting = false;
+    this.cardShown = null; // draw the card again, with its button back
+    this.toast(error === 'offline' ? 'Couldn’t reach Soultied. Check your connection and try again.' : 'Couldn’t start a watch party. Try again in a moment.');
+    this.update();
+  }
+
+  /** Pressing T in a watch party. */
+  plusNote() {
+    if (this.plusSaid) return;
+    this.plusSaid = true;
+    this.note('Talking out loud and cameras are coming with Soultied Plus. For now, there’s the chat.');
+  }
+
+  private async copy(text: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   countdown(startAt: number | null) {
@@ -338,6 +400,81 @@ export class Overlay implements EngineUI {
     window.setTimeout(() => t.remove(), 4200);
   }
 
+  private cardShown: 'offline' | 'start' | 'join' | null = null;
+  private invite: { link: string; copied: boolean; el: HTMLElement } | null = null;
+
+  private inviteBanner(link: string) {
+    const b = el('div', 'banner');
+    b.append(el('span', '', this.copied ? 'Link copied. Send it to your person; it brings them to this show.' : 'Send this link to your person; it brings them to this show.'));
+    const row = el('div', 'row');
+    const field = el('input');
+    field.readOnly = true;
+    field.value = link;
+    field.setAttribute('aria-label', 'Watch party link');
+    field.onfocus = () => field.select();
+    const copy = el('button', 'btn small', 'Copy');
+    copy.onclick = () =>
+      void this.copy(link).then((ok) => {
+        if (!ok) field.select();
+        copy.textContent = ok ? 'Copied' : `Press ${/Mac/i.test(navigator.platform) ? '⌘C' : 'Ctrl+C'}`;
+      });
+    row.append(field, copy);
+    b.append(row);
+    return b;
+  }
+
+  private drawCard(card: 'offline' | 'start' | 'join' | null) {
+    this.cardShown = card;
+    const e = this.engine;
+    if (!card) {
+      this.connect.replaceChildren();
+      return;
+    }
+    const later = el('button', 'btn paper small', 'Not now');
+    later.onclick = () => {
+      this.cardDismissed = true;
+      this.update();
+    };
+    if (card === 'start') {
+      // no Soultied place: start a watch party right here
+      const form = el('form');
+      const name = el('input');
+      name.placeholder = 'Your name';
+      name.maxLength = 40;
+      name.value = this.myName;
+      name.setAttribute('aria-label', 'Your name');
+      const go = el('button', 'btn small', this.starting ? 'Starting…' : 'Start a watch party');
+      go.type = 'submit';
+      go.disabled = this.starting;
+      form.append(name, go);
+      form.onsubmit = (ev) => {
+        ev.preventDefault();
+        const n = name.value.trim();
+        if (!n) {
+          name.focus();
+          return;
+        }
+        this.myName = n;
+        this.starting = true;
+        go.textContent = 'Starting…';
+        go.disabled = true;
+        this.startParty(n);
+      };
+      this.connect.replaceChildren(el('span', '', 'Watching with someone far away? Start a watch party and send them the link.'), form, later);
+      return;
+    }
+    const who = e.partner?.name;
+    const text =
+      card === 'offline'
+        ? who
+          ? `Open Soultied to watch with ${who}. Keep that tab open while you watch.`
+          : 'Open your Soultied place to watch together.'
+        : `${e.partnerName} is watching ${titleLabel(e.partnerWhere!.title)}.`;
+    const go = el('button', 'btn small', card === 'offline' ? 'Open Soultied' : 'Join them');
+    go.onclick = () => (card === 'offline' ? this.openHub() : e.goToPartner());
+    this.connect.replaceChildren(el('span', '', text), go, later);
+  }
+
   update() {
     const e = this.engine;
     if (!e) return;
@@ -346,35 +483,23 @@ export class Overlay implements EngineUI {
     const partner = s?.partner || null;
 
     // One small card when there's something to do and nothing's playing yet (or you're not connected):
-    // open Soultied, or join your person, who's already watching something.
+    // open Soultied (you have a place), start a watch party (you don't), or join your person, who's
+    // already watching something.
     const pwNow = e.partnerWhere;
-    const card: 'offline' | 'join' | null = this.cardDismissed
+    const card: 'offline' | 'start' | 'join' | null = this.cardDismissed
       ? null
-      : !s && (video || !!e.partner)
+      : !s && e.partner
         ? 'offline'
-        : s && !video && e.partnerHere && pwNow?.title
-          ? 'join'
-          : null;
+        : !s && video
+          ? 'start'
+          : s && !video && e.partnerHere && pwNow?.title
+            ? 'join'
+            : null;
     this.connect.classList.toggle('hide', !card);
-    if (card) {
-      const who = e.partner?.name;
-      const text =
-        card === 'offline'
-          ? who
-            ? `Open Soultied to watch with ${who}. Keep that tab open while you watch.`
-            : 'Open your Soultied place to watch together.'
-          : `${e.partnerName} is watching ${titleLabel(pwNow!.title)}.`;
-      const go = el('button', 'btn small', card === 'offline' ? 'Open Soultied' : 'Join them');
-      go.onclick = () => (card === 'offline' ? this.openHub() : e.goToPartner());
-      const later = el('button', 'btn paper small', 'Not now');
-      later.onclick = () => {
-        this.cardDismissed = true;
-        this.update();
-      };
-      this.connect.replaceChildren(el('span', '', text), go, later);
-    }
+    if (card !== this.cardShown || card === 'join') this.drawCard(card);
 
     const on = video && !!s;
+
     this.side.classList.toggle('hide', !on || !this.open);
     this.tab.classList.toggle('hide', !on || this.open);
     this.badge.hidden = this.unread === 0;
@@ -393,15 +518,28 @@ export class Overlay implements EngineUI {
     this.couch.run(on);
     if (!on) return;
 
-    this.kicker.textContent = `Soultied · ${s!.place}`;
+    const party = s!.party || null;
+    this.kicker.textContent = party ? 'Soultied · Watch party' : `Soultied · ${s!.place}`;
     const name = e.partnerName;
     this.dot.classList.toggle('on', e.partnerHere);
-    this.whoText.textContent = !partner ? 'Invite your person in Soultied first' : e.partnerHere ? `${name} is on the couch` : `${name} isn’t here yet`;
+    this.whoText.textContent = !partner
+      ? party
+        ? 'Waiting for your person to join'
+        : 'Invite your person in Soultied first'
+      : e.partnerHere
+        ? `${name} is on the couch`
+        : `${name} isn’t here yet`;
+    this.hint.textContent = party ? HINT_PARTY : HINT_PLACE;
 
     // banners
     const bs: HTMLElement[] = [];
     const pw = e.partnerWhere;
-    if (e.partnerHere && pw?.title && e.title && pw.title.key !== e.title.key) {
+    if (party && !partner) {
+      // the link to send (until someone's taken the other seat), kept as it is between updates
+      if (this.invite?.link !== party.link || this.invite.copied !== this.copied)
+        this.invite = { link: party.link, copied: this.copied, el: this.inviteBanner(party.link) };
+      bs.push(this.invite.el);
+    } else if (e.partnerHere && pw?.title && e.title && pw.title.key !== e.title.key) {
       const b = el('div', 'banner');
       b.append(el('span', '', `${name} is watching ${titleLabel(pw.title)}.`));
       const go = el('button', 'btn small', 'Go there');

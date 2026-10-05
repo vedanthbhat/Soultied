@@ -1,9 +1,10 @@
-import { EXT_SOURCE, HUB_SOURCE, type BridgeBody, type ExtMsg, type PageToBridge } from '../../src/stream/protocol';
+import { EXT_SOURCE, HUB_SOURCE, type BridgeBody, type ExtMsg, type PageToBridge, type PartyReply } from '../../src/stream/protocol';
 
 /**
  * Runs on the Soultied page. It stays silent until the page says it's
  * Soultied (so it does nothing on any other site it happens to match), then
- * passes messages between the page and the extension.
+ * passes messages between the page and the extension. The watch-party join
+ * page uses it too, to hand a party link to the extension.
  */
 
 const w = window as unknown as { __soultiedBridge?: () => boolean };
@@ -58,6 +59,14 @@ function start() {
         connect();
       }
     } else if (d.kind === 'msg') port?.postMessage(d.msg);
+    else if (d.kind === 'party') {
+      const rid = d.rid;
+      const failed: PartyReply = { ok: false, error: 'failed' };
+      chrome.runtime.sendMessage({ kind: 'party', req: d.req }).then(
+        (res: PartyReply | undefined) => post({ kind: 'party', rid, res: res || failed }),
+        () => post({ kind: 'party', rid, res: failed }),
+      );
+    }
   });
 
   // say hello even if the page asked before we got here (we're put into pages that were already open)

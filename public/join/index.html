@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Join the watch party · Soultied</title>
+<meta name="description" content="You're invited to watch Netflix or Prime Video together, in sync, with Soultied.">
+<meta name="robots" content="noindex">
+<style>
+@font-face { font-family: 'Pixelify Sans'; src: url('/fonts/PixelifySans-Variable.ttf') format('truetype'); font-weight: 400 700; font-display: block; }
+:root { --ink: #2b1e1c; --ink-soft: #3a2a26; --muted: #7a5a48; --paper: #f4e8d0; --paper-2: #eadbbd; --paper-hi: #fff8ea; --paper-shade: #d6c29c; --link: #8f4b3a; --bg: #f7ebd4; --terracotta: #b8674f; --terracotta-dark: #8f4b3a; --sage: #8a9a72; --sage-dark: #6a7856; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink-soft); font: 18px/1.5 'Pixelify Sans', ui-sans-serif, system-ui, sans-serif; font-variant-ligatures: none; }
+main { max-width: 560px; margin: 0 auto; padding: 32px 16px 64px; display: flex; flex-direction: column; gap: 22px; }
+.home { font-family: 'Pixelify Sans', system-ui, sans-serif; color: var(--ink); text-decoration: none; font-size: 18px; }
+.home:hover { text-decoration: underline; }
+.card { background: var(--paper); border: 3px solid var(--ink); box-shadow: 6px 6px 0 rgba(43, 30, 28, 0.22); padding: 26px 26px 22px; display: flex; flex-direction: column; gap: 14px; }
+.card > div { display: flex; flex-direction: column; gap: 14px; }
+.kicker { font-family: 'Pixelify Sans', system-ui, sans-serif; font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: var(--terracotta-dark); margin: 0; }
+h1, h2 { font-family: 'Pixelify Sans', system-ui, sans-serif; color: var(--ink); line-height: 1.2; margin: 0; font-variant-ligatures: none; font-feature-settings: 'liga' 0, 'clig' 0; }
+h1 { font-size: 30px; }
+h2 { font-size: 21px; }
+p, ol { margin: 0; }
+ol { padding-left: 22px; }
+li { margin: 4px 0; }
+a { color: var(--link); }
+code { font: inherit; background: var(--paper-2); padding: 1px 5px; }
+.muted { color: var(--muted); font-size: 16px; }
+.err { color: #a84f4b; font-size: 16px; }
+form { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin: 0; }
+input { font: inherit; flex: 1 1 180px; min-width: 0; border: 0; padding: 8px 10px; background: var(--paper-hi); color: var(--ink); box-shadow: inset 0 0 0 3px var(--ink); outline: none; }
+input:focus { box-shadow: inset 0 0 0 3px var(--ink), 0 0 0 3px var(--paper-shade); }
+.btn { font: 18px 'Pixelify Sans', system-ui, sans-serif; cursor: pointer; border: 0; background: var(--terracotta); color: #fff4e2; padding: 9px 16px; text-decoration: none; display: inline-block; margin: 3px;
+  box-shadow: 0 -3px 0 0 var(--ink), 0 3px 0 0 var(--ink), -3px 0 0 0 var(--ink), 3px 0 0 0 var(--ink), inset 0 -4px 0 0 var(--terracotta-dark); }
+.btn:hover { filter: brightness(1.06); }
+.btn:active { transform: translateY(2px); }
+.btn[disabled] { opacity: .6; cursor: default; }
+.btn.sage { background: var(--sage); box-shadow: 0 -3px 0 0 var(--ink), 0 3px 0 0 var(--ink), -3px 0 0 0 var(--ink), 3px 0 0 0 var(--ink), inset 0 -4px 0 0 var(--sage-dark); }
+.btn.paper { background: var(--paper-2); color: var(--ink); box-shadow: 0 -3px 0 0 var(--ink), 0 3px 0 0 var(--ink), -3px 0 0 0 var(--ink), 3px 0 0 0 var(--ink), inset 0 -4px 0 0 var(--paper-shade); }
+.row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+.about { background: var(--paper-2); border: 3px dashed var(--paper-shade); padding: 18px 20px; display: flex; flex-direction: column; gap: 10px; }
+[hidden] { display: none !important; }
+@media (max-width: 520px) { .card { padding: 20px 16px 18px; } h1 { font-size: 26px; } }
+</style>
+</head>
+<body>
+<main>
+<a class="home" href="/">← Soultied</a>
+
+<section class="card" aria-live="polite">
+  <p class="kicker">Soultied · Watch party</p>
+
+  <div id="checking">
+    <h1>Opening your watch party…</h1>
+  </div>
+
+  <div id="nolink" hidden>
+    <h1>Watch together, from far away</h1>
+    <p>This page opens Soultied watch party links. Ask your person to send you theirs: they start one from the Soultied button in their browser while watching Netflix or Prime Video.</p>
+  </div>
+
+  <div id="phone" hidden>
+    <h1>Open this on a computer</h1>
+    <p>Watch parties work in Chrome, Edge or Brave on a laptop or desktop. Send this link to yourself and open it there.</p>
+  </div>
+
+  <div id="install" hidden>
+    <h1 id="install-title">You're invited to a watch party</h1>
+    <p id="install-text">Someone sent you a Soultied watch party link: you'll watch Netflix or Prime Video in sync, with a chat and a little pixel couch on the show. To join, add the free Soultied extension to Chrome, Edge or Brave.</p>
+    <div class="row"><a class="btn" id="get" href="/soultied-extension.zip">Get the Soultied extension</a></div>
+    <ol id="steps">
+      <li>Unzip the file you just downloaded.</li>
+      <li>Open <code>chrome://extensions</code> and switch on <strong>Developer mode</strong> (top right).</li>
+      <li>Click <strong>Load unpacked</strong> and pick the unzipped folder.</li>
+    </ol>
+    <p class="muted">Then come back to this tab. It notices the extension by itself.</p>
+  </div>
+
+  <div id="invite" hidden>
+    <h1 id="invite-title">You're invited</h1>
+    <p id="invite-text"></p>
+    <form id="join-form">
+      <input id="name" maxlength="40" placeholder="Your name" aria-label="Your name" autocomplete="given-name" required>
+      <button class="btn sage" id="join-btn" type="submit">Join the party</button>
+    </form>
+    <p class="muted" id="invite-note">You'll each watch on your own account. Soultied keeps play, pause and skipping in sync, and nothing else.</p>
+    <p class="err" id="join-err" hidden></p>
+  </div>
+
+  <div id="pick" hidden>
+    <h1>You're in</h1>
+    <p id="pick-text"></p>
+    <div class="row">
+      <a class="btn" href="https://www.netflix.com/browse">Open Netflix</a>
+      <a class="btn" href="https://www.primevideo.com/">Open Prime Video</a>
+    </div>
+  </div>
+
+  <div id="problem" hidden>
+    <h1 id="problem-title">That didn't work</h1>
+    <p id="problem-text"></p>
+  </div>
+</section>
+
+<section class="about">
+  <h2>New to Soultied?</h2>
+  <p>It's a little home online for two people who live apart: a shared pixel room with a fire and a couch, a letter to open together every day, games, and movie nights like this one.</p>
+  <div class="row"><a class="btn paper" href="/">Build your place</a></div>
+</section>
+</main>
+
+<script>
+(() => {
+  // When the Chrome Web Store listing is live, put its address here and the button goes there instead of the download.
+  const STORE_URL = '';
+  const NEEDS = [1, 3, 0];
+  const HUB = 'soultied-hub';
+  const EXT = 'soultied-ext';
+  const $ = (id) => document.getElementById(id);
+  const views = ['checking', 'nolink', 'phone', 'install', 'invite', 'pick', 'problem'];
+  const show = (id) => views.forEach((v) => ($(v).hidden = v !== id));
+  const say = (id, text) => ($(id).textContent = text);
+  const post = (body) => window.postMessage({ source: HUB, ...body }, location.origin);
+
+  const m = /^#?([A-Za-z0-9]{16,40})$/.exec(location.hash);
+  const party = m ? m[1] : null;
+  if (!party) return show('nolink');
+
+  if (STORE_URL) {
+    $('get').href = STORE_URL;
+    $('get').textContent = 'Add Soultied to Chrome';
+    $('steps').hidden = true;
+  } else $('get').setAttribute('download', '');
+
+  const service = (t) => (t && t.platform === 'prime' ? 'Prime Video' : 'Netflix');
+  const what = (t) => (!t ? null : t.episode ? `${t.show} ${t.episode.split(' · ')[0]}` : t.show);
+  const newEnough = (v) => {
+    const p = String(v || '0').split('.').map(Number);
+    for (let i = 0; i < 3; i++) if ((p[i] || 0) !== NEEDS[i]) return (p[i] || 0) > NEEDS[i];
+    return true;
+  };
+
+  // asking the extension (through its bridge on this page)
+  let rid = 0;
+  const waiting = new Map();
+  const ask = (req, ms = 25000) =>
+    new Promise((res) => {
+      const id = ++rid;
+      const t = setTimeout(() => {
+        waiting.delete(id);
+        res({ ok: false, error: 'offline' });
+      }, ms);
+      waiting.set(id, (r) => {
+        clearTimeout(t);
+        res(r);
+      });
+      post({ kind: 'party', rid: id, req });
+    });
+
+  let host = 'Someone';
+  let title = null;
+  let started = false;
+
+  const problems = {
+    missing: ['This link has expired', 'This watch party doesn’t exist any more. Ask for a new link.'],
+    full: ['This party is full', 'Two people are already in this watch party. Ask for a new link.'],
+    offline: ['Couldn’t reach Soultied', 'Check your connection, then refresh this page.'],
+    failed: ['That didn’t work', 'Something went wrong. Refresh this page to try again.'],
+  };
+  const problem = (code) => {
+    const [h, p] = problems[code] || problems.failed;
+    say('problem-title', h);
+    say('problem-text', code === 'full' ? `${host} already has someone in this watch party. Ask them for a new link.` : p);
+    show('problem');
+  };
+
+  function go(url) {
+    if (url) {
+      say('invite-title', 'Taking you to the show…');
+      location.assign(url);
+      return;
+    }
+    say('pick-text', `${host} hasn’t picked anything yet. Open the same service; when they press play, you’ll see what they’re watching and can jump straight there.`);
+    show('pick');
+  }
+
+  async function begin() {
+    if (started) return;
+    started = true;
+    show('checking');
+    const r = await ask({ op: 'peek', id: party });
+    if (!r.ok) return problem(r.error);
+    host = r.host || 'Someone';
+    title = r.title;
+    if (r.full) return problem('full');
+    const w = what(title);
+    if (r.member) {
+      say('invite-title', `Welcome back to ${host === r.name ? 'your' : `${host}’s`} watch party`);
+      say('invite-text', w ? `What’s on: ${w} on ${service(title)}.` : 'Nothing’s playing yet.');
+      $('join-btn').textContent = w ? 'Open the show' : 'Continue';
+    } else {
+      say('invite-title', `${host} invited you to watch together`);
+      say('invite-text', w ? `${w} on ${service(title)}, in sync, with a chat and a little couch on the show.` : `On Netflix or Prime Video, in sync, with a chat and a little couch on the show.`);
+      say('invite-note', `You’ll need your own ${title ? service(title) : 'Netflix or Prime Video'} account. Soultied keeps play, pause and skipping in sync for the two of you.`);
+    }
+    $('name').value = r.name || '';
+    show('invite');
+    if (!$('name').value) $('name').focus();
+  }
+
+  $('join-form').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const name = $('name').value.trim();
+    if (!name) return $('name').focus();
+    $('join-btn').disabled = true;
+    $('join-err').hidden = true;
+    const r = await ask({ op: 'join', id: party, name });
+    $('join-btn').disabled = false;
+    if (!r.ok) {
+      if (r.error === 'full' || r.error === 'missing') return problem(r.error);
+      $('join-err').textContent = (problems[r.error] || problems.failed)[1];
+      $('join-err').hidden = false;
+      return;
+    }
+    go(r.url);
+  });
+
+  let found = false;
+  window.addEventListener('message', (ev) => {
+    if (ev.source !== window || !ev.data || ev.data.source !== EXT) return;
+    const d = ev.data;
+    if (d.kind === 'present') {
+      found = true;
+      if (newEnough(d.version)) return void begin();
+      say('install-title', 'Update the Soultied extension');
+      say('install-text', `Watch party links need a newer Soultied extension than the one you have (${d.version}). Get the new one, then come back to this tab.`);
+      show('install');
+    } else if (d.kind === 'party') {
+      const done = waiting.get(d.rid);
+      waiting.delete(d.rid);
+      if (done) done(d.res);
+    }
+  });
+  post({ kind: 'probe' });
+  setTimeout(() => {
+    if (found) return;
+    const phone = /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
+    show(phone ? 'phone' : 'install');
+  }, 1500);
+})();
+</script>
+</body>
+</html>

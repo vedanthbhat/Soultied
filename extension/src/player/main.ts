@@ -1,17 +1,26 @@
-import { titleLabel, type ExtMsg, type HubMsg, type Session } from '../../../src/stream/protocol';
+import { titleLabel, type ExtMsg, type HubMsg, type Session, type TitleInfo } from '../../../src/stream/protocol';
 import { adapterFor } from './adapters';
 import { Engine } from './engine';
 import { Overlay } from './overlay';
 
 /** Runs on Netflix and Prime Video pages. */
 
-type FromBackground = HubMsg | { kind: 'nohub' };
+type FromBackground = HubMsg | { kind: 'nohub' } | { kind: 'partyStarted'; link: string } | { kind: 'partyError'; error: string };
 type ToBackground =
   | ExtMsg
   | { kind: 'openHub' }
+  | { kind: 'startParty'; name: string }
   | {
       kind: 'status';
-      status: { platform: 'netflix' | 'prime'; video: boolean; connected: boolean; watching: string | null; partnerHere: boolean; partnerWatching: string | null };
+      status: {
+        platform: 'netflix' | 'prime';
+        video: boolean;
+        connected: boolean;
+        watching: string | null;
+        partnerHere: boolean;
+        partnerWatching: string | null;
+        title: TitleInfo | null;
+      };
     };
 
 const adapter = adapterFor(location.hostname);
@@ -44,7 +53,10 @@ if (adapter && !running) {
     }
   };
 
-  const overlay = new Overlay(() => send({ kind: 'openHub' }));
+  const overlay = new Overlay({
+    openHub: () => send({ kind: 'openHub' }),
+    startParty: (name) => send({ kind: 'startParty', name }),
+  });
   const engine = new Engine(adapter, (m) => send(m), overlay);
   overlay.engine = engine;
 
@@ -59,6 +71,7 @@ if (adapter && !running) {
       watching: engine.title ? titleLabel(engine.title) : null,
       partnerHere: engine.partnerHere,
       partnerWatching: pw ? titleLabel(pw) : null,
+      title: engine.title,
     };
     const json = JSON.stringify(status);
     if (json === lastStatus || !port) return;
@@ -82,6 +95,8 @@ if (adapter && !running) {
       else if (msg.kind === 'nohub') engine.setSession(null);
       else if (msg.kind === 'event') engine.handle(msg.e);
       else if (msg.kind === 'voice') engine.setTalking(msg.mine || msg.partner);
+      else if (msg.kind === 'partyStarted') overlay.partyStarted(msg.link);
+      else if (msg.kind === 'partyError') overlay.partyFailed(msg.error);
     });
     port.onDisconnect.addListener(() => {
       port = null;
@@ -91,9 +106,10 @@ if (adapter && !running) {
   };
 
   // what we knew last time (for the no-watching-ahead check when Soultied isn't open)
-  void chrome.storage.local.get(['lastSession', 'chatOpen']).then((r) => {
+  void chrome.storage.local.get(['lastSession', 'chatOpen', 'me']).then((r) => {
     if (r.lastSession) engine.cached = r.lastSession as Session;
     if (r.chatOpen === false) overlay.restoreOpen(false);
+    overlay.myName = (r.me as { name?: string } | undefined)?.name || (r.lastSession as Session | undefined)?.me.name || '';
     overlay.update();
   });
 
@@ -104,7 +120,8 @@ if (adapter && !running) {
       const f = new FontFace('Soultied Pixel', buf, { weight: '400 700' });
       return f.load().then(() => document.fonts.add(f));
     })
-    .catch(() => undefined);
+    .catch(() => undefined)
+    .finally(() => overlay.fontReady());
 
   // Keys typed into our chat box stay ours (Netflix would pause on the space bar).
   // Anywhere else, hold T to talk.
@@ -130,6 +147,11 @@ if (adapter && !running) {
           return;
         }
         if (e.code !== 'KeyT' || editable(e.target) || e.ctrlKey || e.metaKey || e.altKey) return;
+        // talking out loud isn't part of a watch party (it's coming with Soultied Plus)
+        if (engine.party) {
+          if (type === 'keydown' && !e.repeat) overlay.plusNote();
+          return;
+        }
         if (type === 'keydown' && !e.repeat && !talking && engine.session) {
           talking = true;
           send({ kind: 'ptt', down: true });

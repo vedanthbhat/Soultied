@@ -29,7 +29,12 @@ export const StreamPanel: React.FC = () => {
           <strong className="text-base">First, add the Soultied extension</strong>
           <span>It works in Chrome, Edge or Brave on a computer, and you both need it.</span>
           <ol className="m-0 pl-5 flex flex-col gap-1">
-            <li>Unzip the Soultied extension file.</li>
+            <li>
+              <a href="/soultied-extension.zip" download className="underline">
+                Download the Soultied extension
+              </a>{' '}
+              and unzip it.
+            </li>
             <li>
               Open <code>chrome://extensions</code> and switch on <strong>Developer mode</strong> (top right).
             </li>

@@ -12,6 +12,10 @@ import type { ReactionKind } from '../pixel/watchRoom';
  *   the cameras and push-to-talk;
  * - your person's Soultied tab and extension, doing the same on their side.
  *
+ * Or, without a Soultied place: a watch party. One of you starts it from the
+ * extension and sends the link; the extension itself (signed in anonymously)
+ * carries everything between the two of you instead of a Soultied tab.
+ *
  * This file is shared by the web app and the extension.
  */
 
@@ -84,7 +88,36 @@ export interface Session {
   log: TogetherLog;
   /** the Soultied page to come back to */
   hubUrl: string;
+  /** a watch party from a link, rather than your Soultied place */
+  party?: PartyInfo;
 }
+
+/** A watch party: two people, no Soultied place needed. Voice and cameras aren't part of it (they're for Soultied Plus). */
+export interface PartyInfo {
+  id: string;
+  /** the link to send your person */
+  link: string;
+}
+
+/** Soultied's website, where watch-party links open. */
+export const SITE = 'https://soultied.app/';
+export const partyLink = (id: string, site = SITE) => `${site.replace(/\/?$/, '/')}join/#${id}`;
+/** the party id in a link (or a bare id) */
+export function partyIdFrom(text: string) {
+  const m = /(?:join\/?#|^)([A-Za-z0-9]{16,40})\s*$/.exec(text.trim());
+  return m ? m[1] : null;
+}
+
+/** Where to send someone to watch a title (Prime Video's title pages need asking to play). */
+export const watchUrl = (t: TitleInfo) => (t.platform === 'prime' ? `${t.url}${t.url.includes('?') ? '&' : '?'}autoplay=1` : t.url);
+
+/** The join page asks the extension about a party link (through the bridge). */
+export type PartyRequest = { op: 'peek'; id: string } | { op: 'join'; id: string; name: string };
+export type PartyReply =
+  | { ok: true; op: 'peek'; host: string; title: TitleInfo | null; member: boolean; full: boolean; name: string }
+  /** where to go: what's on in the party (or nothing yet) */
+  | { ok: true; op: 'join'; url: string | null }
+  | { ok: false; error: 'missing' | 'full' | 'offline' | 'failed' };
 
 /** Soultied tab -> extension */
 export type HubMsg =
@@ -105,8 +138,8 @@ export type ExtMsg =
 export const HUB_SOURCE = 'soultied-hub';
 export const EXT_SOURCE = 'soultied-ext';
 
-export type PageBody = { kind: 'probe' } | { kind: 'hub' } | { kind: 'msg'; msg: HubMsg };
-export type BridgeBody = { kind: 'present'; version: string } | { kind: 'msg'; msg: ExtMsg };
+export type PageBody = { kind: 'probe' } | { kind: 'hub' } | { kind: 'msg'; msg: HubMsg } | { kind: 'party'; rid: number; req: PartyRequest };
+export type BridgeBody = { kind: 'present'; version: string } | { kind: 'msg'; msg: ExtMsg } | { kind: 'party'; rid: number; res: PartyReply };
 export type PageToBridge = { source: typeof HUB_SOURCE } & PageBody;
 export type BridgeToPage = { source: typeof EXT_SOURCE } & BridgeBody;
 

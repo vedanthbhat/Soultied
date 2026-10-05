@@ -18,6 +18,12 @@ await rm(out, { recursive: true, force: true });
 await mkdir(path.join(out, 'icons'), { recursive: true });
 await mkdir(path.join(out, 'fonts'), { recursive: true });
 
+// Watch parties sign in to Soultied's Firebase project: the same public settings the website uses.
+const firebase = await readFile(path.join(root, 'firebase-applet-config.json'), 'utf8')
+  .then((t) => JSON.parse(t))
+  .catch(() => null);
+if (!firebase?.apiKey) console.warn('No firebase-applet-config.json: watch parties won’t work in this build.');
+
 await build({
   entryPoints: {
     background: path.join(here, 'src/background.ts'),
@@ -25,6 +31,7 @@ await build({
     player: path.join(here, 'src/player/main.ts'),
     'netflix-main': path.join(here, 'src/netflix-main.ts'),
     popup: path.join(here, 'src/popup.ts'),
+    offscreen: path.join(here, 'src/offscreen.ts'),
   },
   bundle: true,
   format: 'iife',
@@ -33,6 +40,7 @@ await build({
   charset: 'utf8',
   legalComments: 'none',
   logLevel: 'info',
+  define: { __FIREBASE__: JSON.stringify(firebase?.apiKey ? firebase : null), __EMULATOR__: '""' },
 });
 
 const manifest = JSON.parse(await readFile(path.join(here, 'manifest.json'), 'utf8'));
@@ -50,6 +58,11 @@ await copyFile(path.join(root, 'public/fonts/PixelifySans-Variable.ttf'), path.j
 await writeFile(
   path.join(out, 'popup.html'),
   '<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><title>Soultied</title></head><body><script src="popup.js"></script></body></html>\n',
+);
+// the hidden page that keeps a watch party connected (offscreen.js does the work)
+await writeFile(
+  path.join(out, 'offscreen.html'),
+  '<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><title>Soultied watch party</title></head><body><script src="offscreen.js"></script></body></html>\n',
 );
 await copyFile(path.join(root, 'public/fonts/OFL.txt'), path.join(out, 'fonts/OFL.txt'));
 
