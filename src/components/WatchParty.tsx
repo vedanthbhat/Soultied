@@ -228,6 +228,30 @@ export const WatchParty: React.FC<{ onExit: () => void }> = ({ onExit }) => {
     []
   );
 
+  /** Take the video off the TV (stop it, empty the screen, forget it here). */
+  const clearTv = useCallback(() => {
+    const p = playerRef.current;
+    suppress(2500);
+    expected.current = { pos: 0, at: Date.now(), playing: false };
+    pendingRef.current = null;
+    try {
+      if (p?.stopVideo) p.stopVideo();
+      else p?.pauseVideo();
+    } catch {
+      // the player is going away anyway
+    }
+    videoIdRef.current = null;
+    setVideoId(null);
+    setTv('idle');
+    setNeedsTap(false);
+    setNotice(null);
+    try {
+      localStorage.removeItem(saveKey);
+    } catch {
+      // ignore
+    }
+  }, [saveKey]);
+
   const onRemote = useCallback(
     (e: WatchEvent) => {
       if (e.by === me) return;
@@ -268,6 +292,10 @@ export const WatchParty: React.FC<{ onExit: () => void }> = ({ onExit }) => {
           setNotice(null);
           applyRemote({ videoId: e.videoId, pos: e.pos, at: e.at, playing: true }, 0);
           break;
+        case 'clear':
+          leaderRef.current = e.by;
+          clearTv();
+          break;
         case 'play':
           leaderRef.current = e.by;
           applyRemote({ pos: e.pos, at: e.at, playing: true }, 0.6);
@@ -295,7 +323,7 @@ export const WatchParty: React.FC<{ onExit: () => void }> = ({ onExit }) => {
           break;
       }
     },
-    [me, send, applyRemote, theirSeat]
+    [me, send, applyRemote, clearTv, theirSeat]
   );
 
   /* ---------- transport lifecycle ---------- */
@@ -355,6 +383,11 @@ export const WatchParty: React.FC<{ onExit: () => void }> = ({ onExit }) => {
             onReady: (ev) => {
               playerRef.current = ev.target;
               setStatus('ready');
+              // taken off the TV while it was still loading
+              if (!videoIdRef.current) {
+                ev.target.stopVideo?.();
+                return;
+              }
               suppress(1500);
               if (first && Math.abs(ev.target.getCurrentTime() - startPos) > 1) ev.target.seekTo(startPos, true);
               const pend = pendingRef.current;
@@ -398,7 +431,7 @@ export const WatchParty: React.FC<{ onExit: () => void }> = ({ onExit }) => {
   useEffect(() => {
     const poll = window.setInterval(() => {
       const p = playerRef.current;
-      if (!p) return;
+      if (!p || !videoIdRef.current) return; // nothing on the TV
       const now = Date.now();
       if (now < suppressUntil.current) return; // still settling after the other person's action
       const cur = p.getCurrentTime();
@@ -469,6 +502,12 @@ export const WatchParty: React.FC<{ onExit: () => void }> = ({ onExit }) => {
     } else pendingRef.current = { videoId: id, pos: start, at: Date.now(), playing: true };
     setVideoId(id);
     send({ type: 'load', videoId: id, pos: start, by: me, at: Date.now() });
+  };
+
+  const takeOff = () => {
+    leaderRef.current = me;
+    clearTv();
+    send({ type: 'clear', by: me, at: Date.now() });
   };
 
   const react = (kind: ReactionKind) => {
@@ -622,8 +661,19 @@ export const WatchParty: React.FC<{ onExit: () => void }> = ({ onExit }) => {
         <button className="px-btn shrink-0" type="submit">
           Put it on
         </button>
+        {videoId && !stacked && (
+          <button className="px-btn px-btn--paper shrink-0" type="button" onClick={takeOff} title={`Take it off the TV for you and ${partnerName}`}>
+            Take it off
+          </button>
+        )}
       </form>
       <div className="flex items-center gap-2 flex-wrap">
+        {/* on a phone there's no room beside the link box */}
+        {videoId && stacked && (
+          <button className="px-btn px-btn--paper px-btn--small" type="button" onClick={takeOff} title={`Take it off the TV for you and ${partnerName}`}>
+            Take it off
+          </button>
+        )}
         {REACTIONS.map((r) => (
           <button key={r.kind} className="px-btn px-btn--paper px-btn--small" onClick={() => react(r.kind)} aria-label={r.label} title={r.label}>
             <ReactionIcon kind={r.kind} />

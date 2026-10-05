@@ -10,6 +10,8 @@ import type { ReactionKind } from '../pixel/watchRoom';
 
 export type WatchEvent =
   | { type: 'load'; videoId: string; pos: number; by: string; at: number }
+  /** the TV goes back to empty */
+  | { type: 'clear'; by: string; at: number }
   | { type: 'play'; pos: number; by: string; at: number }
   | { type: 'pause'; pos: number; by: string; at: number }
   | { type: 'seek'; pos: number; playing: boolean; by: string; at: number }
