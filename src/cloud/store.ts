@@ -28,8 +28,9 @@ import type { TurntableState } from '../music/records';
  *
  *   spaces/{spaceId}                     the place: name, both members, invite
  *   spaces/{spaceId}/members/{uid}       each person's name + look
- *   spaces/{spaceId}/letters/{kind_date} one letter day (each person writes only their own answers)
- *   spaces/{spaceId}/meta/letters        After dark switches, streak mends
+ *   spaces/{spaceId}/letters/{kind_date} one letter day (each person writes only their own answers);
+ *                                        the 30 days are journey_j01 … journey_j30
+ *   spaces/{spaceId}/meta/letters        After dark switches, streak mends, when the 30 days started
  *   spaces/{spaceId}/meta/couch          who showed up when
  *   spaces/{spaceId}/meta/game-{kind}    the current game of Fireflies, Paper Boats… and the win tally
  *   spaces/{spaceId}/meta/doodle-canvas  the Doodle Guess drawing in progress, saved every few seconds
@@ -67,8 +68,10 @@ export interface CloudData {
   members: Record<string, MemberDoc>;
   daily: Record<string, LetterDay>;
   afterDark: Record<string, LetterDay>;
+  journey: Record<string, LetterDay>;
   afterDarkOn: Record<string, boolean>;
   repairs: string[];
+  journeyStart: string | null;
   couch: CouchState;
   activities: ActivityItem[];
   /** which listeners have delivered at least once */
@@ -80,8 +83,10 @@ export const emptyCloudData = (): CloudData => ({
   members: {},
   daily: {},
   afterDark: {},
+  journey: {},
   afterDarkOn: {},
   repairs: [],
+  journeyStart: null,
   couch: { seen: {}, together: [], shown: {} },
   activities: [],
   loaded: { space: false, members: false, letters: false },
@@ -210,20 +215,21 @@ export function subscribeSpace(db: Firestore, sid: string, sinceKey: string, onP
       (s) => {
         const daily: Record<string, LetterDay> = {};
         const afterDark: Record<string, LetterDay> = {};
+        const journey: Record<string, LetterDay> = {};
         s.forEach((x) => {
           const v = x.data() as LetterDay & { kind: LetterKind };
           const day: LetterDay = { dateKey: v.dateKey, cardIds: v.cardIds || [], by: v.by || {}, revealedAt: v.revealedAt };
-          (v.kind === 'afterDark' ? afterDark : daily)[v.dateKey] = day;
+          (v.kind === 'afterDark' ? afterDark : v.kind === 'journey' ? journey : daily)[v.dateKey] = day;
         });
-        onPatch((d) => ({ ...d, daily, afterDark, loaded: { ...d.loaded, letters: true } }));
+        onPatch((d) => ({ ...d, daily, afterDark, journey, loaded: { ...d.loaded, letters: true } }));
       },
       onError
     ),
     onSnapshot(
       metaRef(db, sid, 'letters'),
       (s) => {
-        const v = (s.data() || {}) as { afterDarkOn?: Record<string, boolean>; repairs?: string[] };
-        onPatch((d) => ({ ...d, afterDarkOn: v.afterDarkOn || {}, repairs: v.repairs || [] }));
+        const v = (s.data() || {}) as { afterDarkOn?: Record<string, boolean>; repairs?: string[]; journeyStart?: string };
+        onPatch((d) => ({ ...d, afterDarkOn: v.afterDarkOn || {}, repairs: v.repairs || [], journeyStart: v.journeyStart || null }));
       },
       onError
     ),
@@ -283,6 +289,10 @@ export const writeMyLetter = (
     { kind, dateKey: day.dateKey, cardIds: day.cardIds, ...(Object.keys(mine).length ? { by: { [uid]: mine } } : {}), ...(revealedAt ? { revealedAt } : {}) },
     { merge: true }
   );
+
+/** The two of you start the 30 days (the first of you to press start sets the date). */
+export const writeJourneyStart = (db: Firestore, sid: string, dateKey: string) =>
+  setDoc(metaRef(db, sid, 'letters'), { journeyStart: dateKey }, { merge: true });
 
 export const writeAfterDark = (db: Firestore, sid: string, uid: string, on: boolean) =>
   setDoc(metaRef(db, sid, 'letters'), { afterDarkOn: { [uid]: on } }, { merge: true });

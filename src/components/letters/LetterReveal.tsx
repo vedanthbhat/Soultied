@@ -11,6 +11,8 @@ interface Props {
   night?: boolean;
   /** smaller version for the list of past letters */
   compact?: boolean;
+  /** one 30-day question: its own label, and no "in sync on 1 of 1" */
+  tag?: string;
 }
 
 const Head: React.FC<{ who: UserProfile }> = ({ who }) => (
@@ -20,7 +22,7 @@ const Head: React.FC<{ who: UserProfile }> = ({ who }) => (
 );
 
 /** Both answers side by side, with how in sync you were. */
-export const LetterReveal: React.FC<Props> = ({ day, me, partner, night, compact }) => {
+export const LetterReveal: React.FC<Props> = ({ day, me, partner, night, compact, tag }) => {
   const cards = useMemo(() => cardsOf(day.cardIds), [day.cardIds]);
   const score = useMemo(() => scoreDay(day, me.id, partner.id), [day, me.id, partner.id]);
   const mine = day.by[me.id]?.cards || {};
@@ -36,7 +38,25 @@ export const LetterReveal: React.FC<Props> = ({ day, me, partner, night, compact
   return (
     <div ref={rootRef} className={`flex flex-col ${compact ? 'gap-3' : 'gap-5 px-pop'}`}>
       {/* score */}
-      {compact ? (
+      {tag ? (
+        !compact &&
+        cards[0] &&
+        mine[cards[0].id] &&
+        theirs[cards[0].id] && (
+          <div className="px-inset p-3.5 flex items-center gap-3">
+            <PixelIcon name={score.same ? 'heart' : 'heartEmpty'} scale={3} />
+            <span className="font-semibold leading-snug">
+              {score.same ? 'Same answer. You two are in sync.' : `Different answers. Ask ${partner.name} why tonight.`}
+              {score.myGuesses.total > 0 && (
+                <span className="block text-sm font-normal text-[var(--muted)]">
+                  {score.myGuesses.right ? 'You read their mind' : 'Your guess was off'} ·{' '}
+                  {score.theirGuesses.right ? `${partner.name} read yours` : `${partner.name}’s guess was off`}
+                </span>
+              )}
+            </span>
+          </div>
+        )
+      ) : compact ? (
         score.myGuesses.total > 0 && (
           <div className="text-sm text-[var(--muted)]">
             Mind reading: you {score.myGuesses.right}/{score.myGuesses.total} · {partner.name} {score.theirGuesses.right}/
@@ -64,7 +84,7 @@ export const LetterReveal: React.FC<Props> = ({ day, me, partner, night, compact
         </div>
       )}
 
-      {!compact && talk && (
+      {!compact && !tag && talk && (
         <div className="px-inset p-3.5 flex flex-col gap-1">
           <span className={`px-tag self-start ${night ? 'px-tag--night' : ''}`}>Talk about it tonight</span>
           <span className="font-semibold leading-snug">{cardTitle(talk)}</span>
@@ -74,7 +94,7 @@ export const LetterReveal: React.FC<Props> = ({ day, me, partner, night, compact
           </span>
         </div>
       )}
-      {!compact && !talk && <div className="px-inset p-3.5 font-semibold">Same answer on every card. Very in sync today.</div>}
+      {!compact && !tag && !talk && <div className="px-inset p-3.5 font-semibold">Same answer on every card. Very in sync today.</div>}
 
       {/* cards */}
       <ol className="flex flex-col gap-3 list-none p-0 m-0">
@@ -86,7 +106,7 @@ export const LetterReveal: React.FC<Props> = ({ day, me, partner, night, compact
           return (
             <li key={c.id} className="flex flex-col gap-1.5">
               <div className="flex items-baseline gap-2 flex-wrap">
-                <span className={`px-tag ${night ? 'px-tag--night' : ''}`}>{KIND_LABEL[c.kind]}</span>
+                <span className={`px-tag ${night ? 'px-tag--night' : ''}`}>{tag || KIND_LABEL[c.kind]}</span>
                 <span className="font-semibold leading-snug">{cardTitle(c)}</span>
               </div>
               {same ? (
@@ -133,7 +153,7 @@ export const LetterReveal: React.FC<Props> = ({ day, me, partner, night, compact
                     .map((n) => (
                       <div key={n.who.id} className="px-inset px-3 py-2 flex items-start gap-2 text-sm">
                         <Head who={n.who} />
-                        <span className="italic leading-snug">“{n.text}”</span>
+                        <span className="italic leading-snug whitespace-pre-line">“{n.text}”</span>
                       </div>
                     ))}
                 </div>

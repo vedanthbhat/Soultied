@@ -76,7 +76,7 @@ const WardrobePanel: React.FC = () => {
 };
 
 const Home: React.FC = () => {
-  const { setupComplete, currentUser, partnerUser, space, panel, openPanel, letterBadge, getLetter, today } = useApp();
+  const { setupComplete, currentUser, partnerUser, space, panel, openPanel, letterBadge, getLetter, today, journey } = useApp();
   const { couchLevel, couchShown, markCouchShown, cloudStatus, demo } = useApp();
   const games = useGames();
   const turntable = useTurntable();
@@ -96,7 +96,9 @@ const Home: React.FC = () => {
   const liveLeft = seatOf(host);
   const liveRight = seatOf(guest, space?.partnerPlaceholderName);
 
-  const letterUnread = letterBadge !== null;
+  // the 30 days: a day waiting for you, or one that's just opened
+  const journeyWaiting = !!partnerUser && journey.started && (journey.next !== null || journey.unseen !== null);
+  const letterUnread = letterBadge !== null || journeyWaiting;
   const partnerSealed = !!partnerUser && !!getLetter('daily')?.by[partnerUser.id]?.sealedAt;
 
   const labels = useMemo(() => {
@@ -109,7 +111,11 @@ const Home: React.FC = () => {
             ? partnerSealed
               ? `${partnerUser?.name} is waiting on today’s letter ✉`
               : 'Today’s letter ✉'
-            : 'Letters',
+            : journeyWaiting
+              ? journey.unseen !== null
+                ? `Day ${journey.unseen} of your 30 days is open ✉`
+                : `Day ${journey.next} of your 30 days ✉`
+              : 'Letters',
       fire: 'Poke the fire',
       photo: 'Us',
       remote: 'Watch something together',
@@ -126,7 +132,7 @@ const Home: React.FC = () => {
     if (guest) l.right = guest.id === currentUser.id ? meLabel : guest.name;
     else l.right = `Invite ${space?.partnerPlaceholderName || 'your person'}`;
     return l;
-  }, [welcomeOpen, letterBadge, partnerSealed, partnerUser, currentUser, host, guest, space, games.waiting, turntable.on, turntable.track]);
+  }, [welcomeOpen, letterBadge, partnerSealed, partnerUser, currentUser, host, guest, space, games.waiting, turntable.on, turntable.track, journeyWaiting, journey.next, journey.unseen]);
 
   const onHotspot = (id: HotspotId) => {
     if (id === 'letter') openPanel('question');
@@ -284,7 +290,7 @@ const Home: React.FC = () => {
 
           {(panel === 'question' || panel === 'questions') && (
             <PixelPanel title="Letters" kicker={prettyDate(today, true)} onClose={() => openPanel(null)} width={680}>
-              <LettersPanel initialTab={panel === 'questions' ? 'past' : 'today'} />
+              <LettersPanel initialTab={panel === 'questions' ? 'past' : letterBadge === null && journeyWaiting ? 'journey' : 'today'} />
             </PixelPanel>
           )}
           {panel === 'us' && (

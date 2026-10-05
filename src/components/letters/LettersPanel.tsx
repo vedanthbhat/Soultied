@@ -3,10 +3,11 @@ import { useApp } from '../../context/AppContext';
 import type { UserProfile } from '../../types';
 import { LetterFlow } from './LetterFlow';
 import { LetterReveal } from './LetterReveal';
+import { JourneyPanel } from './JourneyPanel';
 import { PixelIcon } from './PixelIcon';
 import { LetterKind, LetterDay, prettyDate, scoreDay } from '../../letters/engine';
 
-export type LettersTab = 'today' | 'afterdark' | 'past';
+export type LettersTab = 'today' | 'journey' | 'afterdark' | 'past';
 
 /* ---------- streak ---------- */
 
@@ -242,8 +243,30 @@ const Past: React.FC<{ me: UserProfile; partner: UserProfile }> = ({ me, partner
 
 /* ---------- the panel ---------- */
 
+/** On the Today tab: the 30 days, when there's something there for you. */
+const JourneyNudge: React.FC<{ onOpen: () => void }> = ({ onOpen }) => {
+  const { journey } = useApp();
+  if (journey.started && journey.next === null && journey.unseen === null) return null;
+  const text = !journey.started
+    ? 'New: 30 days of knowing each other. One question a day, getting a little deeper each week.'
+    : journey.unseen !== null
+      ? `Day ${journey.unseen} of your 30 days just opened.`
+      : `Day ${journey.next} of your 30 days is waiting for you.`;
+  return (
+    <div className="px-inset p-3 flex items-center gap-3 flex-wrap justify-between">
+      <span className="flex items-center gap-2.5 text-sm leading-snug">
+        <PixelIcon name="book" scale={3} />
+        {text}
+      </span>
+      <button className="px-btn px-btn--small px-btn--sage" onClick={onOpen}>
+        {journey.started ? 'Open' : 'Take a look'}
+      </button>
+    </div>
+  );
+};
+
 export const LettersPanel: React.FC<{ initialTab?: LettersTab }> = ({ initialTab = 'today' }) => {
-  const { currentUser, partnerUser, space, openPanel, afterDarkOpen } = useApp();
+  const { currentUser, partnerUser, space, openPanel, afterDarkOpen, journey } = useApp();
   const [tab, setTab] = useState<LettersTab>(initialTab);
 
   if (!partnerUser) {
@@ -263,6 +286,7 @@ export const LettersPanel: React.FC<{ initialTab?: LettersTab }> = ({ initialTab
 
   const tabs: Array<{ id: LettersTab; label: string }> = [
     { id: 'today', label: 'Today' },
+    { id: 'journey', label: journey.started && (journey.next !== null || journey.unseen !== null) ? '30 days •' : '30 days' },
     { id: 'afterdark', label: afterDarkOpen ? 'After dark ☾' : 'After dark' },
     { id: 'past', label: 'Past' },
   ];
@@ -276,10 +300,16 @@ export const LettersPanel: React.FC<{ initialTab?: LettersTab }> = ({ initialTab
           </button>
         ))}
       </div>
-      {tab === 'today' && <LetterView kind="daily" me={currentUser} partner={partnerUser} />}
+      {tab === 'today' && (
+        <>
+          <LetterView kind="daily" me={currentUser} partner={partnerUser} />
+          <JourneyNudge onOpen={() => setTab('journey')} />
+        </>
+      )}
+      {tab === 'journey' && <JourneyPanel me={currentUser} partner={partnerUser} />}
       {tab === 'afterdark' && <AfterDark me={currentUser} partner={partnerUser} />}
       {tab === 'past' && <Past me={currentUser} partner={partnerUser} />}
-      {tab !== 'afterdark' && <StreakStrip />}
+      {(tab === 'today' || tab === 'past') && <StreakStrip />}
     </div>
   );
 };

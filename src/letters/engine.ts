@@ -2,6 +2,7 @@ import { THIS_OR_THAT } from './deckThisOrThat';
 import { KNOW_ME } from './deckKnowMe';
 import { CONNECT } from './deckConnect';
 import { AFTER_DARK } from './deckAfterDark';
+import { JOURNEY, JOURNEY_DAYS } from './deckJourney';
 
 /**
  * Daily letters: five quick cards a day (This or That ×2, Know Me ×2,
@@ -12,10 +13,16 @@ import { AFTER_DARK } from './deckAfterDark';
  * "today" is their own local date, so partners in different time zones each
  * get the letter at their own midnight; a letter opens once both have sealed
  * that date's letter.
+ *
+ * 30 days of knowing each other: one question a day for a couple's first
+ * month (or whenever they start it), a little deeper each week. Its "days"
+ * are keyed j01 to j30 instead of by date, and they work like letters: each of
+ * you answers in secret, guesses the other's answer, and it opens when you've
+ * both sealed.
  */
 
-export type CardKind = 'tot' | 'know' | 'connect' | 'spicy';
-export type LetterKind = 'daily' | 'afterDark';
+export type CardKind = 'tot' | 'know' | 'connect' | 'spicy' | 'journey';
+export type LetterKind = 'daily' | 'afterDark' | 'journey';
 
 export interface Card {
   id: string;
@@ -26,6 +33,9 @@ export interface Card {
   guess: boolean;
   /** optional one-line note to your partner */
   note: boolean;
+  /** a different label (and length) for the note */
+  noteLabel?: string;
+  noteMax?: number;
 }
 
 export interface CardAnswer {
@@ -51,6 +61,10 @@ export interface LetterDay {
 export interface LettersState {
   daily: Record<string, LetterDay>;
   afterDark: Record<string, LetterDay>;
+  /** the 30 days, keyed j01 … j30 */
+  journey: Record<string, LetterDay>;
+  /** the date (YYYY-MM-DD) the two of you started the 30 days */
+  journeyStart?: string;
   /** each person's own switch; After dark opens only when both are on */
   afterDarkOn: Record<string, boolean>;
   /** dates saved by the once-a-week streak mend */
@@ -60,6 +74,7 @@ export interface LettersState {
 export const emptyLetters = (): LettersState => ({
   daily: {},
   afterDark: {},
+  journey: {},
   afterDarkOn: {},
   repairs: [],
 });
@@ -72,6 +87,7 @@ const IDS: Record<CardKind, string[]> = {
   know: [],
   connect: [],
   spicy: [],
+  journey: [],
 };
 const add = (c: Card) => {
   CARDS.set(c.id, c);
@@ -130,6 +146,19 @@ AFTER_DARK.forEach((x, i) =>
   ),
 );
 
+JOURNEY.flatMap((ch) => ch.questions).forEach(([p, a, b, c, d], i) =>
+  add({
+    id: `jr-${i}`,
+    kind: 'journey',
+    prompt: p,
+    options: [a, b, c, d],
+    guess: true,
+    note: true,
+    // the last day: a letter to each other
+    ...(i === JOURNEY_DAYS - 1 ? { noteLabel: 'Write them a letter about this month', noteMax: 600 } : {}),
+  }),
+);
+
 export const cardById = (id: string) => CARDS.get(id);
 export const cardsOf = (ids: string[]) => ids.map((id) => CARDS.get(id)).filter((c): c is Card => !!c);
 
@@ -142,6 +171,7 @@ export const KIND_LABEL: Record<CardKind, string> = {
   know: 'Know me',
   connect: 'Daily connect',
   spicy: 'After dark',
+  journey: '30 days',
 };
 
 /* ---------- dates (YYYY-MM-DD, each person's local calendar) ---------- */
@@ -235,6 +265,10 @@ function pick(ids: string[], perDay: number, seed: string, day: number) {
  * Counting from it means a couple's first two months never repeat a card.
  */
 export function cardsFor(kind: LetterKind, coupleId: string, dateKey: string, startKey: string) {
+  if (kind === 'journey') {
+    const n = journeyDayOf(dateKey);
+    return n ? [`jr-${n - 1}`] : [];
+  }
   const day = dayNumber(dateKey) - dayNumber(startKey);
   if (kind === 'afterDark') return pick(IDS.spicy, 3, `${coupleId}:ad`, day);
   return [
@@ -287,6 +321,7 @@ export function scoreDay(day: LetterDay, me: string, them: string): Score {
     }
   }
   const depth: Record<CardKind, number> = {
+    journey: -1,
     connect: 0,
     spicy: 1,
     know: 2,
@@ -295,6 +330,68 @@ export function scoreDay(day: LetterDay, me: string, them: string): Score {
   splits.sort((x, y) => depth[x.kind] - depth[y.kind] || y.options.length - x.options.length);
   s.talkAbout = splits[0]?.id || null;
   return s;
+}
+
+/* ---------- 30 days of knowing each other ---------- */
+
+export { JOURNEY, JOURNEY_DAYS };
+
+/** j01 … j30 */
+export const journeyKey = (n: number) => `j${pad(n)}`;
+export const journeyDayOf = (key: string) => {
+  const m = /^j(\d{2})$/.exec(key);
+  const n = m ? Number(m[1]) : 0;
+  return n >= 1 && n <= JOURNEY_DAYS ? n : 0;
+};
+
+/** How many days are open: one a day from the day you started (by your own calendar). */
+export function journeyUnlocked(start: string | undefined, today: string) {
+  if (!start) return 0;
+  return Math.max(1, Math.min(JOURNEY_DAYS, dayNumber(today) - dayNumber(start) + 1));
+}
+
+/** Which chapter a day is in (0-based), and its place in the chapter (1-based). */
+export function journeyChapter(n: number) {
+  let left = n;
+  for (let i = 0; i < JOURNEY.length; i++) {
+    const len = JOURNEY[i].questions.length;
+    if (left <= len) return { index: i, chapter: JOURNEY[i], dayInChapter: left, last: left === len };
+    left -= len;
+  }
+  const i = JOURNEY.length - 1;
+  return { index: i, chapter: JOURNEY[i], dayInChapter: JOURNEY[i].questions.length, last: true };
+}
+
+export interface JourneyInfo {
+  started: boolean;
+  start?: string;
+  /** days open so far */
+  unlocked: number;
+  /** the first open day you haven't answered yet */
+  next: number | null;
+  /** a day that's opened since you last looked */
+  unseen: number | null;
+  /** days you've both answered */
+  done: number;
+  /** all 30 opened together */
+  finished: boolean;
+}
+
+export function journeyInfo(state: LettersState, me: string, today: string): JourneyInfo {
+  const start = state.journeyStart;
+  const unlocked = journeyUnlocked(start, today);
+  let next: number | null = null;
+  let unseen: number | null = null;
+  let done = 0;
+  for (let n = 1; n <= JOURNEY_DAYS; n++) {
+    const d = state.journey[journeyKey(n)];
+    if (d?.revealedAt) {
+      done++;
+      if (unseen === null && !d.by[me]?.seenAt) unseen = n;
+    }
+    if (next === null && n <= unlocked && !d?.by[me]?.sealedAt) next = n;
+  }
+  return { started: !!start, start, unlocked, next, unseen, done, finished: done >= JOURNEY_DAYS };
 }
 
 /* ---------- streaks ---------- */
@@ -410,5 +507,25 @@ export function demoLetters(coupleId: string, startKey: string, a: string, b: st
   build(addDays(today, -5), 'a');
   build(today, 'b', 'Miss your laugh. Call tonight?');
   st.afterDarkOn[b] = true;
+
+  // three days into the 30 days; Rohan has already answered day 4
+  st.journeyStart = addDays(today, -3);
+  const JNOTES = ['Same, always.', 'Okay this one made me smile.', 'Tell you the story on our call.'];
+  for (let n = 1; n <= 4; n++) {
+    const key = journeyKey(n);
+    const card = cardById(`jr-${n - 1}`)!;
+    const x = answer(card);
+    const y = answer(card, x);
+    x.guess = r() < 0.6 ? y.pick : Math.floor(r() * 4);
+    y.guess = r() < 0.6 ? x.pick : Math.floor(r() * 4);
+    if (n % 2) y.note = JNOTES[(n - 1) / 2];
+    const at = `${addDays(today, n - 4)}T22:${pad(10 + n)}:00`;
+    const day: LetterDay = { dateKey: key, cardIds: [card.id], by: { [b]: { cards: { [card.id]: y }, sealedAt: at, seenAt: n < 4 ? at : undefined } } };
+    if (n < 4) {
+      day.by[a] = { cards: { [card.id]: x }, sealedAt: at, seenAt: at };
+      day.revealedAt = at;
+    }
+    st.journey[key] = day;
+  }
   return st;
 }

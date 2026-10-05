@@ -70,6 +70,10 @@ export const SPRITES = {
     rows: ['y.y.y.y', '.y.y.y.', 'y.y.y.y'],
     pal: { y: '#b48c4a' },
   },
+  book: {
+    rows: ['#########.', '#ccccccc#p', '#cyyyyyc#p', '#ccccccc#p', '#cyyyyyc#p', '#ccccccc#p', '#cccchcc#p', '#########p', '.pppppppp.'],
+    pal: { '#': INK, c: '#b8674f', y: '#efdcb8', h: '#f3a19c', p: '#f4e8d0' },
+  },
 } satisfies Record<string, Sprite>;
 
 export type SpriteName = keyof typeof SPRITES;

@@ -7,6 +7,11 @@ import {
   LetterKind,
   LettersState,
   StreakInfo,
+  JourneyInfo,
+  JOURNEY_DAYS,
+  journeyChapter,
+  journeyDayOf,
+  journeyInfo,
   cardsFor,
   cardsOf,
   demoLetters,
@@ -85,6 +90,10 @@ interface AppContextType {
   afterDarkOpen: boolean;
   mendStreak: () => void;
   streak: StreakInfo;
+  /** 30 days of knowing each other: where the two of you are */
+  journey: JourneyInfo;
+  /** start the 30 days (for both of you) */
+  startJourney: () => void;
   /** how close you sit on the couch: 0 (the two ends) to COUCH_STEPS (side by side) */
   couchLevel: number;
   /** days you've both shown up, all time */
@@ -148,6 +157,16 @@ function makeCode() {
 
 /** The couple's first day, as a fixed calendar date both phones agree on. */
 export const startKeyOf = (space: CoupleSpace) => space.createdAt.slice(0, 10);
+
+/** A line in your shared history when you finish a chapter of the 30 days (and all of them). */
+function journeyMilestone(key: string): Omit<ActivityItem, 'id' | 'timestamp'> | null {
+  const n = journeyDayOf(key);
+  if (!n) return null;
+  if (n === JOURNEY_DAYS) return { type: 'question_revealed', title: '30 days, together', description: 'You finished 30 days of knowing each other.' };
+  const ch = journeyChapter(n);
+  if (!ch.last) return null;
+  return { type: 'question_revealed', title: `Chapter ${ch.index + 1} of 5`, description: `You finished “${ch.chapter.title}” in your 30 days.` };
+}
 
 function emptyState(): PersistedState {
   return {
@@ -398,7 +417,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       userA: profile(sp.creatorId, 'You', DEFAULT_AVATAR_A),
       userB: sp.partnerId ? profile(sp.partnerId, sp.partnerPlaceholderName, DEFAULT_AVATAR_B) : null,
       space: space as CoupleSpace,
-      letters: { daily: cloudData.daily, afterDark: cloudData.afterDark, afterDarkOn: cloudData.afterDarkOn, repairs: cloudData.repairs },
+      letters: {
+        daily: cloudData.daily,
+        afterDark: cloudData.afterDark,
+        journey: cloudData.journey,
+        journeyStart: cloudData.journeyStart || undefined,
+        afterDarkOn: cloudData.afterDarkOn,
+        repairs: cloudData.repairs,
+      },
       activities: cloudData.activities,
       couch: cloudData.couch,
     };
@@ -535,7 +561,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const meId = (s: PersistedState) => (s.activeUserId === s.userA.id || !s.userB ? s.userA.id : s.userB.id);
   const partnerOf = (s: PersistedState, id: string) => (id === s.userA.id ? s.userB : s.userA);
-  const bucket = (kind: LetterKind) => (kind === 'daily' ? 'daily' : 'afterDark') as 'daily' | 'afterDark';
+  const bucket = (kind: LetterKind) => kind;
 
   const makeDay = (s: PersistedState, kind: LetterKind, dateKey: string): LetterDay | null =>
     s.space ? { dateKey, cardIds: cardsFor(kind, s.space.id, dateKey, startKeyOf(s.space)), by: {} } : null;
@@ -586,6 +612,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           .writeActivity(o.db, o.sid, { type: 'question_revealed', title: 'Letter opened together', description: `In sync on ${sc.same} of ${sc.total}.` })
           .catch(warn('activity'));
       }
+      const milestone = both && kind === 'journey' ? journeyMilestone(dateKey) : null;
+      if (milestone) store.writeActivity(o.db, o.sid, milestone).catch(warn('activity'));
       return;
     }
     setState((s) => {
@@ -613,6 +641,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           description: `In sync on ${sc.same} of ${sc.total}.`,
         })(s.activities);
       }
+      const milestone = opened && kind === 'journey' ? journeyMilestone(dateKey) : null;
+      if (milestone) next.activities = pushActivity(milestone)(next.activities);
       return next;
     });
   };
@@ -622,7 +652,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     const o = online();
     if (!o || !cloudReady || !partnerId) return;
-    (['daily', 'afterDark'] as LetterKind[]).forEach((kind) =>
+    (['daily', 'afterDark', 'journey'] as LetterKind[]).forEach((kind) =>
       Object.values(eff.letters[bucket(kind)]).forEach((d) => {
         if (!d.revealedAt && d.by[o.uid]?.sealedAt && d.by[partnerId]?.sealedAt)
           store.writeMyLetter(o.db, o.sid, o.uid, kind, d, {}, new Date().toISOString()).catch(warn('open letter'));
@@ -656,6 +686,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
     setState((s) => ({ ...s, letters: { ...s.letters, afterDarkOn: { ...s.letters.afterDarkOn, [meId(s)]: on } } }));
+  };
+
+  /* ---------- 30 days of knowing each other ---------- */
+
+  const journey = useMemo(() => journeyInfo(eff.letters, currentUser.id, today), [eff.letters, currentUser.id, today]);
+
+  const startJourney = () => {
+    if (eff.letters.journeyStart) return;
+    const o = online();
+    if (o) {
+      store.writeJourneyStart(o.db, o.sid, today).catch(warn('start the 30 days'));
+      return;
+    }
+    setState((s) => (s.letters.journeyStart ? s : { ...s, letters: { ...s.letters, journeyStart: todayKey() } }));
   };
 
   const sinceKey = eff.space ? startKeyOf(eff.space) : undefined;
@@ -929,6 +973,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         afterDarkOpen,
         mendStreak,
         streak,
+        journey,
+        startJourney,
         couchLevel: couchLevel(eff.couch),
         couchDays: eff.couch.together.length,
         couchShown: eff.couch.shown[currentUser.id] ?? 0,
