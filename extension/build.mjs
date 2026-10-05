@@ -42,6 +42,7 @@ if (STORE) {
     cs.matches = cs.matches.filter((m) => !/run\.app|localhost|127\.0\.0\.1/.test(m));
     delete cs.all_frames; // only needed inside the AI Studio preview frame
   }
+  manifest.host_permissions = manifest.host_permissions.filter((m) => !/run\.app|localhost|127\.0\.0\.1/.test(m));
 }
 await writeFile(path.join(out, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
 await copyFile(path.join(root, 'public/fonts/PixelifySans-Variable.ttf'), path.join(out, 'fonts/PixelifySans-Variable.ttf'));

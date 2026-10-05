@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Soultied: watch together",
   "short_name": "Soultied",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Watch Netflix and Prime Video in sync with your person: chat, reactions, a little couch, and push-to-talk, from your Soultied place.",
   "icons": {
     "16": "icons/16.png",
@@ -18,7 +18,29 @@
     "service_worker": "background.js"
   },
   "permissions": [
-    "storage"
+    "storage",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://www.netflix.com/*",
+    "https://*.primevideo.com/*",
+    "https://www.amazon.com/gp/video/*",
+    "https://www.amazon.in/gp/video/*",
+    "https://www.amazon.co.uk/gp/video/*",
+    "https://www.amazon.de/gp/video/*",
+    "https://www.amazon.ca/gp/video/*",
+    "https://www.amazon.com.au/gp/video/*",
+    "https://www.amazon.co.jp/gp/video/*",
+    "https://www.amazon.fr/gp/video/*",
+    "https://www.amazon.it/gp/video/*",
+    "https://www.amazon.es/gp/video/*",
+    "https://soultied.app/*",
+    "https://www.soultied.app/*",
+    "https://soultied-c1543.web.app/*",
+    "https://soultied-c1543.firebaseapp.com/*",
+    "https://*.run.app/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*"
   ],
   "content_scripts": [
     {

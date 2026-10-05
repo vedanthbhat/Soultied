@@ -38,7 +38,7 @@ type ToPlayer = HubMsg | { kind: 'nohub' };
 
 const hubs: chrome.runtime.Port[] = [];
 const players = new Set<chrome.runtime.Port>();
-const statuses = new Map<chrome.runtime.Port, PlayerStatus>();
+const statuses = new Map<chrome.runtime.Port, PlayerStatus & { tabId: number | null }>();
 let session: Session | null = null;
 let voice: HubMsg | null = null;
 
@@ -111,7 +111,7 @@ chrome.runtime.onConnect.addListener((port) => {
         return;
       }
       if (msg.kind === 'status') {
-        statuses.set(port, msg.status);
+        statuses.set(port, { ...msg.status, tabId: port.sender?.tab?.id ?? null });
         return;
       }
       if (!toHub(msg) && msg.kind === 'hello') port.postMessage({ kind: 'nohub' } satisfies ToPlayer);
@@ -135,18 +135,55 @@ chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
     return;
   }
   if (msg?.kind !== 'popup') return;
-  void chrome.storage.local.get('lastSession').then((r) => {
+  void Promise.all([chrome.storage.local.get('lastSession'), chrome.tabs.query({ active: true, currentWindow: true }).catch(() => [])]).then(([r, tabs]) => {
     // after Chrome has put this worker to sleep and woken it, the names come from the last session we saw
     const s = session || (r.lastSession as Session | undefined) || null;
+    const tab = tabs[0];
+    const list = [...statuses.values()];
+    // the tab you're looking at first, so the window talks about the show in front of you
+    list.sort((a, b) => Number(b.tabId === tab?.id) - Number(a.tabId === tab?.id));
     reply({
       hub: !!hub(),
       me: s?.me.name || null,
       partner: s?.partner?.name || null,
       place: s?.place || null,
-      players: [...statuses.values()],
+      players: list,
+      // a Netflix / Prime tab the extension isn't running in (opened before it was installed)
+      stale: !!tab?.id && !!tab.url && isShowPage(tab.url) && !list.some((p) => p.tabId === tab.id),
     });
   });
   return true; // answering in a moment
+});
+
+const isShowPage = (url: string) => {
+  try {
+    const h = new URL(url).hostname;
+    return h.endsWith('netflix.com') || h.endsWith('primevideo.com') || (/(^|\.)amazon\./.test(h) && url.includes('/gp/video'));
+  } catch {
+    return false;
+  }
+};
+
+/*
+ * Chrome only runs an extension's scripts in pages opened after it's installed
+ * or updated. So that an open Netflix, Prime or Soultied tab works straight
+ * away (without a refresh), put the scripts into those tabs now. Each script
+ * checks whether a working copy is already there.
+ */
+chrome.runtime.onInstalled.addListener(() => {
+  for (const cs of chrome.runtime.getManifest().content_scripts || []) {
+    void chrome.tabs
+      .query({ url: cs.matches })
+      .then((tabs) => {
+        for (const t of tabs) {
+          if (t.id == null || t.discarded) continue;
+          void chrome.scripting
+            .executeScript({ target: { tabId: t.id, allFrames: !!cs.all_frames }, files: cs.js || [], world: cs.world === 'MAIN' ? 'MAIN' : 'ISOLATED' })
+            .catch(() => undefined);
+        }
+      })
+      .catch(() => undefined);
+  }
 });
 
 // older builds had no toolbar window: the button opened Soultied

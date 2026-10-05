@@ -78,7 +78,13 @@ Lets two people who share a Soultied place watch Netflix or Prime Video in sync,
 Remembers on this computer the user's last Soultied session (their names, pixel characters and the list of episodes they've watched together, used for the "no watching ahead" check), the address of their Soultied tab, and whether the chat panel is open.
 ```
 
-Host permissions (content scripts on netflix.com, primevideo.com and amazon.* /gp/video, plus Soultied's own site):
+`scripting`:
+
+```
+When the extension is installed or updated, Chrome doesn't run its scripts in tabs that are already open. The extension uses scripting only at that moment, to put its own packaged scripts into already-open Netflix, Prime Video and Soultied tabs, so they work without a refresh. It never runs code from anywhere else.
+```
+
+Host permissions (the same sites as the content scripts: netflix.com, primevideo.com and amazon.* /gp/video, plus Soultied's own site):
 
 ```
 Netflix and Prime Video pages: reads the video player's state (playing or paused, the time, ads and buffering) and which title is playing (on Prime Video, from the title id in the player's own requests to Amazon, whose name it then asks Amazon for the same way the player does) to keep two people's playback in sync, and draws the chat sidebar and couch over the player. On netflix.com a small script runs in the page only to seek with Netflix's own player controls, because setting the video's time directly makes Netflix show an error. Nothing else on these sites is read.

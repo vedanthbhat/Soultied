@@ -18,6 +18,8 @@ interface Snapshot {
   partner: string | null;
   place: string | null;
   players: PlayerStatus[];
+  /** the Netflix / Prime tab in front of you was opened before the extension was, so it can't see it */
+  stale?: boolean;
 }
 
 const CSS = `
@@ -94,19 +96,24 @@ function render(s: Snapshot) {
     wrap.append(line('warn', 'Open your Soultied place and keep that tab open while you watch. It carries everything between you two.', b));
   }
 
-  // 2. the show
-  const p = s.players.find((x) => x.video) || s.players[0];
-  if (!p) {
+  // 2. the show (the tab in front of you comes first)
+  const p = s.players[0];
+  if (s.stale) {
+    wrap.append(line('warn', 'Refresh this tab so Soultied can see the show (it was open before the extension was).'));
+  } else if (!p) {
     wrap.append(line('off', 'Now open Netflix or Prime Video and start something.'));
-  } else if (!p.video) {
-    wrap.append(line('off', `${site(p.platform)} is open. Start something to watch.`));
   } else {
-    wrap.append(line('on', p.watching ? `You're watching ${p.watching} on ${site(p.platform)}.` : `You're watching ${site(p.platform)}.`));
+    wrap.append(
+      line(
+        p.video ? 'on' : 'off',
+        !p.video ? `${site(p.platform)} is open. Start something to watch.` : p.watching ? `You're watching ${p.watching} on ${site(p.platform)}.` : `You're watching ${site(p.platform)}.`,
+      ),
+    );
     if (!p.connected) wrap.append(line('warn', 'Not connected to Soultied yet: open it (above), then this page connects by itself.'));
-    else if (!p.partnerHere)
-      wrap.append(line('off', `${partner} isn't watching yet. When they open the same thing, you snap into sync.`));
-    else if (p.partnerWatching && p.watching && p.partnerWatching !== p.watching)
-      wrap.append(line('warn', `${partner} is on ${p.partnerWatching}. Press "Go there" in the sidebar on the show to join them.`));
+    else if (!p.partnerHere) wrap.append(line('off', `${partner} isn't here yet. They need their Soultied tab and ${site(p.platform)} open too.`));
+    else if (!p.partnerWatching) wrap.append(line('on', `${partner} is here, picking something. When you're both on the same thing, you're in sync.`));
+    else if (!p.watching || p.partnerWatching !== p.watching)
+      wrap.append(line('warn', `${partner} is watching ${p.partnerWatching}. Press "Join them" (or "Go there") on the show to catch up.`));
     else wrap.append(line('on', `${partner} is watching with you. Play, pause and skipping stay in sync.`));
   }
 

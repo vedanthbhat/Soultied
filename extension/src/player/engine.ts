@@ -99,7 +99,11 @@ export class Engine {
       this.partnerWhere = null;
       this.clearHold();
     }
-    if (s && !had && this.v) this.sayHello();
+    // say we're here as soon as we're connected, before anything's playing, so you each see the other arrive
+    if (s && !had) {
+      this.sayHello();
+      if (!this.v && !this.key) this.ui.note(s.partner ? `Soultied is on. Start something; when ${s.partner.name} opens the same thing, you're in sync.` : 'Soultied is on.');
+    }
     this.ui.update();
   }
 
@@ -143,7 +147,9 @@ export class Engine {
     }
     this.v = v;
     if (!v) {
-      this.send({ type: 'bye' });
+      // the player closed, but you're still here (picking the next thing)
+      this.lastPing = Date.now();
+      this.send({ type: 'ping', ...this.where(), buffering: false });
       this.ui.update();
       return;
     }
@@ -260,6 +266,21 @@ export class Engine {
     if (key !== this.key) this.changedTitle(key);
     const v = key ? this.a.video() : null;
     if (v !== this.v) this.attach(v);
+
+    if (this.session) {
+      // still here (with or without something playing)
+      if (now - this.lastPing > PING_MS) {
+        this.lastPing = now;
+        this.send({ type: 'ping', ...this.where(), buffering: this.bufferingSent });
+      }
+      // your person's tab went quiet
+      if (this.partnerSeen && now - this.partnerSeen > PRESENT_MS) {
+        this.partnerSeen = 0;
+        this.partnerWhere = null;
+        this.clearHold();
+        this.ui.update();
+      }
+    }
     if (!this.v) return;
     if (this.title && !this.title.episode && this.title.show.match(/^(Netflix|Prime Video)$/)) this.refreshTitle();
 
@@ -279,22 +300,9 @@ export class Engine {
       else this.expected = { pos: cur, at: now, playing: !this.v.paused };
     }
 
-    if (this.session) {
-      if (now - this.lastPing > PING_MS) {
-        this.lastPing = now;
-        this.send({ type: 'ping', ...this.where(), buffering: this.bufferingSent });
-      }
-      if (this.leader && !this.v.paused && this.partnerHere && now - this.lastState > STATE_MS) {
-        this.lastState = now;
-        this.send({ type: 'state', ...this.where() });
-      }
-      // your person's tab went quiet
-      if (this.partnerSeen && now - this.partnerSeen > PRESENT_MS) {
-        this.partnerSeen = 0;
-        this.partnerWhere = null;
-        this.clearHold();
-        this.ui.update();
-      }
+    if (this.session && this.leader && !this.v.paused && this.partnerHere && now - this.lastState > STATE_MS) {
+      this.lastState = now;
+      this.send({ type: 'state', ...this.where() });
     }
 
     // time watched together

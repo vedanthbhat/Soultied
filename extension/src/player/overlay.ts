@@ -78,7 +78,7 @@ button { font: inherit; cursor: pointer; }
 .big { font-size: 120px; font-weight: 700; color: #fff4e2; text-shadow: 6px 6px 0 #2b1e1c, -3px -3px 0 #2b1e1c, 3px -3px 0 #2b1e1c, -3px 3px 0 #2b1e1c; }
 .pill { padding: 8px 14px; font-size: 16px; }
 
-.connect { position: absolute; left: 22px; bottom: 96px; pointer-events: auto; padding: 10px 12px; display: flex; gap: 10px; align-items: center; max-width: 360px; font-size: 14px; }
+.connect { position: absolute; left: 22px; bottom: 96px; pointer-events: auto; padding: 10px 12px; display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; max-width: 380px; font-size: 14px; }
 .connect.hide { display: none; }
 `;
 
@@ -112,6 +112,8 @@ export class Overlay implements EngineUI {
   private open = true;
   private seen = new Set<string>();
   private overlayCard: 'waiting' | 'countdown' | 'guard' | null = null;
+  /** "Not now" on the little card: don't ask again on this page */
+  private cardDismissed = false;
   private countTimer = 0;
 
   constructor(private openHub: () => void) {
@@ -343,15 +345,33 @@ export class Overlay implements EngineUI {
     const video = e.hasVideo;
     const partner = s?.partner || null;
 
-    // not connected to Soultied: one small card, nothing else
-    const offline = video && !s;
-    this.connect.classList.toggle('hide', !offline);
-    if (offline) {
+    // One small card when there's something to do and nothing's playing yet (or you're not connected):
+    // open Soultied, or join your person, who's already watching something.
+    const pwNow = e.partnerWhere;
+    const card: 'offline' | 'join' | null = this.cardDismissed
+      ? null
+      : !s && (video || !!e.partner)
+        ? 'offline'
+        : s && !video && e.partnerHere && pwNow?.title
+          ? 'join'
+          : null;
+    this.connect.classList.toggle('hide', !card);
+    if (card) {
       const who = e.partner?.name;
-      this.connect.replaceChildren(el('span', '', who ? `Open Soultied to watch this with ${who}.` : 'Open your Soultied place to watch together.'));
-      const b = el('button', 'btn small', 'Open Soultied');
-      b.onclick = () => this.openHub();
-      this.connect.append(b);
+      const text =
+        card === 'offline'
+          ? who
+            ? `Open Soultied to watch with ${who}. Keep that tab open while you watch.`
+            : 'Open your Soultied place to watch together.'
+          : `${e.partnerName} is watching ${titleLabel(pwNow!.title)}.`;
+      const go = el('button', 'btn small', card === 'offline' ? 'Open Soultied' : 'Join them');
+      go.onclick = () => (card === 'offline' ? this.openHub() : e.goToPartner());
+      const later = el('button', 'btn paper small', 'Not now');
+      later.onclick = () => {
+        this.cardDismissed = true;
+        this.update();
+      };
+      this.connect.replaceChildren(el('span', '', text), go, later);
     }
 
     const on = video && !!s;

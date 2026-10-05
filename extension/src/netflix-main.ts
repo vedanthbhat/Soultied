@@ -58,7 +58,21 @@ function meta(): { show: string; episode: string; showId: string } | null {
   }
 }
 
-window.addEventListener('message', (ev) => {
+/** the film or episode in Netflix's watch player (not a trailer playing on the browse page) */
+function playingId(): string | null {
+  const vp = api();
+  if (!vp) return null;
+  try {
+    const ids: string[] = vp.getAllPlayerSessionIds?.() || [];
+    const watch = ids.find((s) => s.startsWith('watch'));
+    const id = watch ? (vp.getVideoPlayerBySessionId(watch) as NfPlayer).getMovieId?.() : null;
+    return id ? String(id) : null;
+  } catch {
+    return null;
+  }
+}
+
+function onAsk(ev: MessageEvent) {
   if (ev.source !== window) return;
   const d = ev.data as { source?: string; id?: number; cmd?: string; arg?: number } | undefined;
   if (!d || d.source !== 'soultied-nf') return;
@@ -81,9 +95,19 @@ window.addEventListener('message', (ev) => {
     } else if (d.cmd === 'meta') {
       out = meta();
       ok = !!out;
+    } else if (d.cmd === 'id') {
+      out = playingId();
+      ok = !!out;
     }
   } catch {
     ok = false;
   }
   window.postMessage({ source: 'soultied-nf-reply', id: d.id, ok, out }, location.origin);
-});
+}
+
+// The extension puts this in again after it updates; the copy that's already here keeps answering.
+const w = window as unknown as { __soultiedNf?: boolean };
+if (!w.__soultiedNf) {
+  w.__soultiedNf = true;
+  window.addEventListener('message', onAsk);
+}

@@ -45,4 +45,4 @@ The extension talks to Soultied pages on the addresses in the last `content_scri
 
 ## Permissions and privacy
 
-Only `storage` (to remember your chat panel setting and what you've watched together, on this computer). It reads nothing on Netflix or Prime beyond the video player and which title is playing. See the [privacy policy](https://soultied.app/privacy/).
+`storage` (to remember your chat panel setting and what you've watched together, on this computer), and `scripting` with access to the same sites as its content scripts (only so that, right after you install or update it, it can start in Netflix, Prime and Soultied tabs that were already open, without a refresh). It reads nothing on Netflix or Prime beyond the video player and which title is playing. See the [privacy policy](https://soultied.app/privacy/).

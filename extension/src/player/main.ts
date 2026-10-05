@@ -15,10 +15,26 @@ type ToBackground =
     };
 
 const adapter = adapterFor(location.hostname);
-const w = window as unknown as { __soultiedPlayer?: boolean };
+const w = window as unknown as { __soultiedPlayer?: () => boolean };
+const alive = () => {
+  try {
+    return !!chrome.runtime?.id;
+  } catch {
+    return false;
+  }
+};
+// After the extension updates, it puts this script into pages that were already open. Chrome has cut the
+// old copy off from the extension by then, so the new one takes over (and clears away the old one's overlay).
+let running = false;
+try {
+  running = !!w.__soultiedPlayer?.();
+} catch {
+  running = false;
+}
 
-if (adapter && !w.__soultiedPlayer) {
-  w.__soultiedPlayer = true;
+if (adapter && !running) {
+  w.__soultiedPlayer = alive;
+  document.querySelectorAll('soultied-overlay').forEach((n) => n.remove());
   let port: chrome.runtime.Port | null = null;
   const send = (m: ToBackground) => {
     try {

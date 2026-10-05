@@ -42,6 +42,14 @@ function biggestVideo(root: ParentNode = document): HTMLVideoElement | null {
   return best;
 }
 
+/** The one big picture on the page, whatever the site's markup: a film that's playing fills most of the window. */
+function mainVideo(): HTMLVideoElement | null {
+  const v = biggestVideo();
+  if (!v) return null;
+  const r = v.getBoundingClientRect();
+  return r.width >= window.innerWidth * 0.5 && r.height >= window.innerHeight * 0.35 && v.duration > 0 ? v : null;
+}
+
 /* ---------------- Netflix ---------------- */
 
 let nfSeq = 0;
@@ -63,7 +71,24 @@ function nf<T = unknown>(cmd: string, arg?: number): Promise<{ ok: boolean; out:
   });
 }
 
-const nfId = () => location.pathname.match(/^\/watch\/(\d+)/)?.[1] || null;
+/** what Netflix's own player says is playing (in case the address doesn't say), asked for every few seconds */
+let nfPlaying: string | null = null;
+let nfAsked = 0;
+function askNetflix() {
+  if (Date.now() - nfAsked < 2000) return;
+  nfAsked = Date.now();
+  void nf<string>('id').then((r) => {
+    nfPlaying = r.ok && r.out ? String(r.out) : null;
+  });
+}
+// the watch page is /watch/<id>; allow for a country prefix (/in/watch/<id>) too
+const nfUrlId = () => location.pathname.match(/^\/(?:[a-z]{2}(?:-[a-z]{2})?\/)?watch\/(\d+)/i)?.[1] || null;
+const nfId = () => {
+  const fromUrl = nfUrlId();
+  if (fromUrl) return fromUrl;
+  askNetflix();
+  return nfPlaying;
+};
 const titleCache = new Map<string, TitleInfo>();
 
 export const netflix: Adapter = {
@@ -72,7 +97,7 @@ export const netflix: Adapter = {
     const id = nfId();
     return id ? `netflix:${id}` : null;
   },
-  video: () => (nfId() ? biggestVideo() : null),
+  video: () => (nfUrlId() ? biggestVideo() : nfId() ? mainVideo() : null),
   async title() {
     const id = nfId();
     if (!id) return null;
