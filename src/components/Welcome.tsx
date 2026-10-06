@@ -174,6 +174,13 @@ export const Welcome: React.FC<Props> = ({ initialJoinCode, onDraftSeats, onDone
                   Peek inside a demo room
                 </button>
               </div>
+              <nav className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--muted)]" aria-label="About Soultied">
+                <a className="px-link" href="/plus/">Soultied Plus</a>
+                <a className="px-link" href="/terms/">Terms</a>
+                <a className="px-link" href="/privacy/">Privacy</a>
+                <a className="px-link" href="/refunds/">Refunds</a>
+                <a className="px-link" href="/contact/">Contact</a>
+              </nav>
             </div>
           )}
 

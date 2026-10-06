@@ -1,19 +1,24 @@
 /**
  * Soultied's small server (Firebase Cloud Functions, in Mumbai).
  *
- *   plusOrder   GET:  Plus's prices          POST {plan: 'month'|'year'}: a Razorpay order to pay
- *   plusCode    POST {orderId, paymentId?, signature?} (or just {paymentId}): the code for a paid order
+ *   plusOrder   GET:  Plus's prices (in rupees, and from anywhere else)
+ *               POST {plan: 'month'|'year'}: a Razorpay order to pay (India, in rupees)
+ *               POST {plan, provider: 'dodo'}: a Dodo Payments checkout page (anywhere else)
+ *   plusCode    POST {orderId, paymentId?, signature?} (or just {paymentId}),
+ *               or {provider: 'dodo', paymentId}: the code for a paid order
  *
- * Razorpay's keys are kept in Google's Secret Manager (RAZORPAY_KEY_ID and
- * RAZORPAY_KEY_SECRET); the GitHub Action that deploys this puts them there.
- * Prices are in paise (PLUS_MONTH_PAISE, PLUS_YEAR_PAISE).
+ * Keys live in Google's Secret Manager (RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET and
+ * DODO_API_KEY); the GitHub Action that deploys this puts them there ("unset" for a
+ * way to pay that isn't set up yet). Rupee prices are in paise (PLUS_MONTH_PAISE,
+ * PLUS_YEAR_PAISE); Dodo's prices are the ones on its products (DODO_PRODUCT_MONTH,
+ * DODO_PRODUCT_YEAR), in DODO_MODE 'test' or 'live'.
  */
 import { initializeApp } from 'firebase-admin/app';
 import { FieldValue, getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { logger } from 'firebase-functions';
-import { defineInt, defineSecret } from 'firebase-functions/params';
+import { defineInt, defineSecret, defineString } from 'firebase-functions/params';
 import { onRequest } from 'firebase-functions/v2/https';
-import { PlusError, plusService, razorpayApi } from './plus.js';
+import { dodoApi, PlusError, plusService, razorpayApi } from './plus.js';
 
 initializeApp();
 
@@ -21,11 +26,22 @@ const KEY_ID = defineSecret('RAZORPAY_KEY_ID');
 const KEY_SECRET = defineSecret('RAZORPAY_KEY_SECRET');
 const MONTH = defineInt('PLUS_MONTH_PAISE', { default: 14900, description: 'Soultied Plus for a month, in paise' });
 const YEAR = defineInt('PLUS_YEAR_PAISE', { default: 119900, description: 'Soultied Plus for a year, in paise' });
+const DODO_KEY = defineSecret('DODO_API_KEY');
+const DODO_MODE = defineString('DODO_MODE', { default: 'test', description: "Dodo Payments: 'test' or 'live'" });
+const DODO_MONTH = defineString('DODO_PRODUCT_MONTH', { default: 'unset', description: 'Dodo product id (pdt_…) for a month of Plus' });
+const DODO_YEAR = defineString('DODO_PRODUCT_YEAR', { default: 'unset', description: 'Dodo product id (pdt_…) for a year of Plus' });
 
 /** Only Soultied's own pages (and previews of them) can ask. */
 const ORIGINS = ['https://soultied.app', 'https://www.soultied.app', /\.run\.app$/, /^http:\/\/localhost(:\d+)?$/, /^http:\/\/127\.0\.0\.1(:\d+)?$/];
 
-const OPTS = { region: 'asia-south1', cors: ORIGINS, secrets: [KEY_ID, KEY_SECRET], maxInstances: 5, memory: '256MiB', timeoutSeconds: 30 };
+const OPTS = { region: 'asia-south1', cors: ORIGINS, secrets: [KEY_ID, KEY_SECRET, DODO_KEY], maxInstances: 5, memory: '256MiB', timeoutSeconds: 30 };
+
+/** where Dodo's checkout sends you back to: the Plus page you came from (only Soultied's own) */
+const PLUS_PAGE = 'https://soultied.app/plus/';
+function plusPage(req) {
+  const o = String(req.get('origin') || '');
+  return ORIGINS.some((x) => (typeof x === 'string' ? x === o : x.test(o))) && /^https?:\/\/[^/]+$/.test(o) ? `${o}/plus/` : PLUS_PAGE;
+}
 
 /** Makes each order's code once, in one go: the order's record and the code in Soultied's list. */
 const store = {
@@ -67,16 +83,35 @@ function paise(param, usual) {
   return Number.isInteger(v) && v >= 100 ? v : usual;
 }
 
+/** a key that's really there (the deploy puts "unset" for a way to pay that isn't set up yet) */
+const real = (v) => {
+  const t = String(v || '').trim();
+  return t && t.toLowerCase() !== 'unset' ? t : '';
+};
+
+/** Dodo's product prices change rarely: ask again every ten minutes. */
+let pricesCache = { at: 0, value: null };
+
 function service() {
-  const keyId = KEY_ID.value();
-  const keySecret = KEY_SECRET.value();
+  const keyId = real(KEY_ID.value());
+  const keySecret = real(KEY_SECRET.value());
+  const dodoKey = real(DODO_KEY.value());
   return plusService({
-    razorpay: razorpayApi(keyId, keySecret),
+    razorpay: keyId && keySecret ? razorpayApi(keyId, keySecret) : null,
+    dodo: dodoKey ? dodoApi(dodoKey, DODO_MODE.value() === 'live' ? 'live' : 'test') : null,
+    dodoProducts: { month: real(DODO_MONTH.value()), year: real(DODO_YEAR.value()) },
     store,
     prices: { month: paise(MONTH, 14900), year: paise(YEAR, 119900) },
     keyId,
     keySecret,
   });
+}
+
+async function prices() {
+  if (pricesCache.value && Date.now() - pricesCache.at < 10 * 60 * 1000) return pricesCache.value;
+  const value = await service().prices();
+  pricesCache = { at: Date.now(), value };
+  return value;
 }
 
 function reply(res, work) {
@@ -91,13 +126,22 @@ function reply(res, work) {
 }
 
 export const plusOrder = onRequest(OPTS, (req, res) => {
-  if (req.method === 'GET') return reply(res, async () => service().prices());
+  if (req.method === 'GET') return reply(res, prices);
   if (req.method !== 'POST') return res.status(405).json({ error: 'method' });
-  return reply(res, () => service().order(String(req.body?.plan || '')));
+  const plan = String(req.body?.plan || '');
+  if (req.body?.provider === 'dodo') return reply(res, () => service().dodoCheckout(plan, plusPage(req)));
+  return reply(res, () => service().order(plan));
 });
 
 export const plusCode = onRequest(OPTS, (req, res) => {
   if (req.method !== 'POST') return res.status(405).json({ error: 'method' });
   const b = req.body || {};
-  return reply(res, () => service().code({ orderId: String(b.orderId || ''), paymentId: String(b.paymentId || ''), signature: String(b.signature || '') }));
+  return reply(res, () =>
+    service().code({
+      provider: b.provider === 'dodo' ? 'dodo' : 'razorpay',
+      orderId: String(b.orderId || ''),
+      paymentId: String(b.paymentId || ''),
+      signature: String(b.signature || ''),
+    }),
+  );
 });

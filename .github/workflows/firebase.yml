@@ -3,10 +3,14 @@
 #
 # Needs, under Settings > Secrets and variables > Actions (see functions/README.md):
 #   secrets   FIREBASE_SERVICE_ACCOUNT  a Google Cloud service account key (JSON) that's allowed to deploy
-#             RAZORPAY_KEY_ID           Razorpay > Account & Settings > API Keys
+#             RAZORPAY_KEY_ID           Razorpay > Account & Settings > API Keys (paying in India)
 #             RAZORPAY_KEY_SECRET       the same place
-#   variables PLUS_MONTH_PAISE, PLUS_YEAR_PAISE   (optional) Plus's prices in paise; 14900 = ₹149
-# Until the deploy key is there, this does nothing (and says so).
+#             DODO_API_KEY              Dodo Payments > Developer > API Keys (paying from anywhere else)
+#   variables PLUS_MONTH_PAISE, PLUS_YEAR_PAISE   (optional) the rupee prices in paise; 14900 = ₹149
+#             DODO_MODE                 test or live (the key and products must be from that mode)
+#             DODO_PRODUCT_MONTH, DODO_PRODUCT_YEAR   Dodo's product ids (pdt_…) for a month and a year
+# Until the deploy key is there, this does nothing (and says so). With only one of Razorpay or Dodo,
+# the other way to pay stays closed on the Plus page.
 name: Deploy to Firebase
 
 on:
@@ -29,6 +33,7 @@ jobs:
       PROJECT: soultied-c1543
       HAS_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT != '' }}
       HAS_RAZORPAY: ${{ secrets.RAZORPAY_KEY_ID != '' && secrets.RAZORPAY_KEY_SECRET != '' }}
+      HAS_DODO: ${{ secrets.DODO_API_KEY != '' }}
     steps:
       - name: Waiting for the deploy key
         if: env.HAS_KEY != 'true'
@@ -53,26 +58,32 @@ jobs:
           printf '%s' "$SA" > "$RUNNER_TEMP/deploy-key.json"
           echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/deploy-key.json" >> "$GITHUB_ENV"
 
-      - name: Razorpay's keys into Secret Manager
-        if: env.HAS_KEY == 'true' && env.HAS_RAZORPAY == 'true'
+      - name: Payment keys into Secret Manager
+        if: env.HAS_KEY == 'true' && (env.HAS_RAZORPAY == 'true' || env.HAS_DODO == 'true')
         env:
           KEY_ID: ${{ secrets.RAZORPAY_KEY_ID }}
           KEY_SECRET: ${{ secrets.RAZORPAY_KEY_SECRET }}
+          DODO_KEY: ${{ secrets.DODO_API_KEY }}
         run: |
-          printf '%s' "$KEY_ID" | npx -y firebase-tools@15 functions:secrets:set RAZORPAY_KEY_ID --data-file=- --project "$PROJECT" --non-interactive
-          printf '%s' "$KEY_SECRET" | npx -y firebase-tools@15 functions:secrets:set RAZORPAY_KEY_SECRET --data-file=- --project "$PROJECT" --non-interactive
+          # "unset" for a way to pay that isn't set up yet (the functions treat it as closed)
+          printf '%s' "${KEY_ID:-unset}" | npx -y firebase-tools@15 functions:secrets:set RAZORPAY_KEY_ID --data-file=- --project "$PROJECT" --non-interactive
+          printf '%s' "${KEY_SECRET:-unset}" | npx -y firebase-tools@15 functions:secrets:set RAZORPAY_KEY_SECRET --data-file=- --project "$PROJECT" --non-interactive
+          printf '%s' "${DODO_KEY:-unset}" | npx -y firebase-tools@15 functions:secrets:set DODO_API_KEY --data-file=- --project "$PROJECT" --non-interactive
 
       - name: Prices
         if: env.HAS_KEY == 'true'
         run: |
-          printf 'PLUS_MONTH_PAISE=%s\nPLUS_YEAR_PAISE=%s\n' "${{ vars.PLUS_MONTH_PAISE || '14900' }}" "${{ vars.PLUS_YEAR_PAISE || '119900' }}" > "functions/.env.$PROJECT"
+          {
+            printf 'PLUS_MONTH_PAISE=%s\nPLUS_YEAR_PAISE=%s\n' "${{ vars.PLUS_MONTH_PAISE || '14900' }}" "${{ vars.PLUS_YEAR_PAISE || '119900' }}"
+            printf 'DODO_MODE=%s\nDODO_PRODUCT_MONTH=%s\nDODO_PRODUCT_YEAR=%s\n' "${{ vars.DODO_MODE || 'test' }}" "${{ vars.DODO_PRODUCT_MONTH || 'unset' }}" "${{ vars.DODO_PRODUCT_YEAR || 'unset' }}"
+          } > "functions/.env.$PROJECT"
 
       - name: Deploy
         if: env.HAS_KEY == 'true'
         run: |
-          # without Razorpay's keys yet, only the rules go out (the checkout needs them)
+          # without any payment keys yet, only the rules go out (the checkout needs them)
           ONLY=firestore:rules
-          if [ "$HAS_RAZORPAY" = "true" ]; then ONLY=functions,firestore:rules; fi
+          if [ "$HAS_RAZORPAY" = "true" ] || [ "$HAS_DODO" = "true" ]; then ONLY=functions,firestore:rules; fi
           npx -y firebase-tools@15 deploy --only "$ONLY" --project "$PROJECT" --non-interactive --force
 
       - name: Forget the key

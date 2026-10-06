@@ -27,6 +27,7 @@ li { margin: 4px 0; }
 a { color: var(--link); }
 code { background: var(--paper-2); padding: 1px 5px; font-size: 0.92em; }
 @media (max-width: 520px) { .card { padding: 20px 16px 8px; } h1 { font-size: 28px; } }
+footer { display: flex; gap: 8px 18px; flex-wrap: wrap; justify-content: center; margin-top: 22px; font-size: 15px; color: var(--muted); }
 </style>
 </head>
 <body>
@@ -34,7 +35,7 @@ code { background: var(--paper-2); padding: 1px 5px; font-size: 0.92em; }
 <a class="home" href="/">← Soultied</a>
 <article class="card">
 <h1>Soultied privacy policy</h1>
-<p class="date">Last updated: 5 October 2026</p>
+<p class="date">Last updated: 6 October 2026</p>
 <p>Soultied is a small shared place online for two people in a long-distance relationship, plus a browser extension for watching Netflix and Prime Video together. This page explains what each part handles, where it goes, and how to delete it. It is written by the person who builds Soultied, Vedanth Bhat. Questions or requests: <a href="mailto:hello@soultied.app">hello@soultied.app</a>.</p>
 <p>The short version: what you put in Soultied is shared with your person and nobody else. There are no ads, no analytics or tracking, and nothing is sold.</p>
 <h2>The Soultied website (soultied.app)</h2>
@@ -58,13 +59,18 @@ code { background: var(--paper-2); padding: 1px 5px; font-size: 0.92em; }
 </ul>
 <p><strong>What it reads on Netflix or Prime Video:</strong> the video player's state (playing or paused, the time, whether an ad or buffering is happening) and which title and episode is playing. On Prime Video that comes from the title id in the player's own requests to Amazon, and the extension asks Amazon for that title's name the same way the player does. It does not read your account, profile, payment details, viewing history or anything else on those sites. No video or audio from the show is ever copied or sent anywhere. You each watch on your own account.</p>
 <p><strong>What it sends:</strong> play, pause and skip events with the time and title, your chat messages and reactions. With a Soultied place, these go to your open Soultied tab, which passes them to your person as live messages (above), and when you've watched an episode together, the title and where you stopped are added to your place's "watched together" list. In a watch party, they go as described next.</p>
-<p><strong>Watch parties.</strong> You can also watch with someone without a Soultied place: one of you starts a watch party and sends the link (it opens a page on soultied.app). For a watch party, the extension signs in to Soultied's Firebase project anonymously: Firebase gives this browser a random ID, with no name, email or Google account attached. In the same Cloud Firestore database it stores the party: its ID, the name each of you typed and a pixel character picked for you, which of you started it, and the title being watched (show, episode and its Netflix or Prime Video link, so the link takes your person to the same show). Play, pause, skip, chat and reactions travel between the two of you as live messages in that party. Anyone with the link can see who started the party and what's on, and take the one empty seat; only the two people in the party can see or send its live messages. Voice and cameras aren't part of a watch party.</p>
+<p><strong>Watch parties.</strong> You can also watch with someone without a Soultied place: one of you starts a watch party and sends the link (it opens a page on soultied.app). For a watch party, the extension signs in to Soultied's Firebase project anonymously: Firebase gives this browser a random ID, with no name, email or Google account attached. In the same Cloud Firestore database it stores the party: its ID, the name each of you typed and a pixel character picked for you, which of you started it, and the title being watched (show, episode and its Netflix or Prime Video link, so the link takes your person to the same show). Play, pause, skip, chat and reactions travel between the two of you as live messages in that party. Anyone with the link can see who started the party and what's on, and take the one empty seat; only the two people in the party can see or send its live messages. With Soultied Plus, cameras and voice work in a watch party too: the extension asks your browser for your camera or microphone on the Netflix or Prime Video page only when you press the camera or talk button, and the call works as described under “Video and voice calls” above, with its setup messages travelling through the party like its other live messages.</p>
 <p><strong>What it keeps on your computer</strong> (Chrome's extension storage, never uploaded by the extension itself): your last Soultied session (your name, your person's name, both pixel characters, your place's name and the watched-together list, used for the "no watching ahead" check), the address of your Soultied tab, whether the chat panel is open, and for watch parties the name you typed, your pixel character, the party you're in and the anonymous sign-in.</p>
 <p><strong>Permissions:</strong> <code>storage</code> (the items above), <code>offscreen</code> (a hidden page of the extension's own that keeps a watch party connected while you're in one, and closes itself when no show has been open for a few minutes), <code>scripting</code> (used only right after the extension is installed or updated, to start its own scripts in Netflix, Prime Video and Soultied tabs that were already open), plus access to the Netflix, Prime Video and Soultied pages listed. The extension doesn't use remote code, and it doesn't see other tabs or your browsing history.</p>
+<h2>Soultied Plus (paying)</h2>
+<p><strong>The payment.</strong> In India, Plus is paid through Razorpay; everywhere else, through Dodo Payments, which is the merchant of record for those sales. They collect what they need to take the payment (such as your email, your card or UPI details and, for Dodo, your billing country) under their own privacy policies. Soultied never receives your card or bank details.</p>
+<p><strong>What Soultied keeps.</strong> Soultied's server (Firebase Cloud Functions, Google Cloud, Mumbai region) asks Razorpay or Dodo whether your payment went through, then stores, in the same Cloud Firestore database: the payment and order numbers, the plan, when it ends, a fingerprint (SHA-256) of your code rather than the code itself, and the anonymous ID of each browser (up to three) that added the code. A separate record, which only Soultied's server can read, keeps the code with its order number so it can show it to you again if you lose it.</p>
+<p><strong>On your computer.</strong> The extension keeps your code and its end date in its storage, and the Plus page remembers codes bought in that browser in its local storage.</p>
 <h2>Who else sees your data</h2>
 <ul>
   <li><strong>Your person</strong>, who shares your place or your watch party. A watch party's link shows whoever opens it who started it and what's on.</li>
   <li><strong>Google</strong>, as the provider of Firebase Authentication and Cloud Firestore, processes the data to run the service, under <a href="https://firebase.google.com/support/privacy">Google's Firebase terms and privacy commitments</a>.</li>
+  <li><strong>Razorpay</strong> (in India) and <strong>Dodo Payments</strong> (everywhere else) process Plus payments, as described above.</li>
   <li><strong>GitHub</strong> hosts the website (GitHub Pages), and <strong>Google Fonts</strong> serves its font. Like any web host, they receive your IP address and browser details when the page loads.</li>
   <li><strong>No one else.</strong> Soultied does not sell, rent or share your data, does not use it for advertising, and does not use it to decide on credit or lending.</li>
 </ul>
@@ -80,6 +86,13 @@ code { background: var(--paper-2); padding: 1px 5px; font-size: 0.92em; }
 <h2>Changes</h2>
 <p>If this policy changes, the new version will be posted on this page with a new date.</p>
 </article>
+<footer>
+  <a href="/terms/">Terms</a>
+  <a href="/privacy/">Privacy</a>
+  <a href="/refunds/">Refunds</a>
+  <a href="/contact/">Contact</a>
+  <a href="/plus/">Soultied Plus</a>
+</footer>
 </main>
 </body>
 </html>

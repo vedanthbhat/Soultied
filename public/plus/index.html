@@ -55,6 +55,10 @@ input:focus { box-shadow: inset 0 0 0 3px var(--ink), 0 0 0 3px var(--paper-shad
 .perks li::before { content: ''; flex: none; width: 10px; height: 10px; background: var(--terracotta); transform: translateY(-2px); box-shadow: 2px 2px 0 var(--ink); }
 .code { font-size: 34px; letter-spacing: .08em; color: var(--ink); background: var(--paper-hi); box-shadow: inset 0 0 0 3px var(--ink); padding: 12px 16px; text-align: center; user-select: all; word-break: break-all; }
 .ok { color: var(--sage-dark); font-size: 16px; }
+.where { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-size: 16px; color: var(--muted); }
+.where .btn { font-size: 16px; padding: 6px 12px; }
+.where .btn[aria-pressed="false"] { background: var(--paper-hi); color: var(--ink); box-shadow: 0 -3px 0 0 var(--ink), 0 3px 0 0 var(--ink), -3px 0 0 0 var(--ink), 3px 0 0 0 var(--ink), inset 0 -4px 0 0 var(--paper-shade); }
+footer { display: flex; gap: 8px 18px; flex-wrap: wrap; justify-content: center; font-size: 15px; color: var(--muted); }
 @media (max-width: 520px) { .plans { grid-template-columns: 1fr; } .code { font-size: 26px; } }
 </style>
 <script src="https://checkout.razorpay.com/v1/checkout.js" async></script>
@@ -74,6 +78,11 @@ input:focus { box-shadow: inset 0 0 0 3px var(--ink), 0 0 0 3px var(--paper-shad
       <li>One of you having Plus covers you both.</li>
       <li>Your picture and voice go straight to your person, never to Soultied.</li>
     </ul>
+    <div class="where" role="group" aria-label="Where you're paying from">
+      <span>Paying from</span>
+      <button class="btn" type="button" id="where-in" aria-pressed="true">India (₹)</button>
+      <button class="btn" type="button" id="where-world" aria-pressed="false">Anywhere else</button>
+    </div>
     <div class="plans">
       <div class="plan">
         <div class="per">A month</div>
@@ -88,7 +97,8 @@ input:focus { box-shadow: inset 0 0 0 3px var(--ink), 0 0 0 3px var(--paper-shad
         <button class="btn sage" id="buy-year" type="button">Get a year</button>
       </div>
     </div>
-    <p class="muted">You pay once with UPI, a card or netbanking (through Razorpay), and get a code to add to the Soultied extension. When its time is up, get another one; nothing renews by itself.</p>
+    <p class="muted" id="how-pay">You pay once with UPI, a card or netbanking (through Razorpay), and get a code to add to the Soultied extension. When its time is up, get another one; nothing renews by itself.</p>
+    <p class="muted">Changed your mind? You get your money back in full if you ask within 7 days (<a href="/refunds/">refunds</a>).</p>
     <p class="err" id="buy-err" hidden></p>
   </div>
 
@@ -134,13 +144,20 @@ input:focus { box-shadow: inset 0 0 0 3px var(--ink), 0 0 0 3px var(--paper-shad
 <section class="about">
   <h2>How it works</h2>
   <p>Soultied’s watch parties keep Netflix or Prime Video in sync between you and your person, with a chat and a little pixel couch on the show. They’re free. Plus adds cameras and voice.</p>
-  <p class="muted">Razorpay emails you a receipt for every payment. Lost your code? Put the payment or order number from it (it starts with <code>pay_</code> or <code>order_</code>) here:</p>
+  <p class="muted">Every payment gets an email receipt (from Razorpay in India, or Dodo Payments anywhere else). Lost your code? Put the payment or order number from it (it starts with <code>pay_</code> or <code>order_</code>) here:</p>
   <form id="lost">
     <input id="lost-id" placeholder="pay_… or order_…" aria-label="Payment or order number" autocomplete="off" spellcheck="false">
     <button class="btn paper" type="submit">Get my code</button>
   </form>
   <p class="err" id="lost-err" hidden>That doesn’t look like a payment or order number. It starts with pay_ or order_.</p>
 </section>
+
+<footer>
+  <a href="/terms/">Terms</a>
+  <a href="/privacy/">Privacy</a>
+  <a href="/refunds/">Refunds</a>
+  <a href="/contact/">Contact</a>
+</footer>
 </main>
 
 <script>
@@ -155,6 +172,13 @@ input:focus { box-shadow: inset 0 0 0 3px var(--ink), 0 0 0 3px var(--paper-shad
   const views = ['pitch', 'paying', 'done', 'wait', 'closed'];
   const show = (id) => views.forEach((v) => ($(v).hidden = v !== id));
   const rupees = (paise) => '₹' + (paise / 100).toLocaleString('en-IN', { maximumFractionDigits: 2 });
+  const money = (amount, currency) => {
+    try {
+      return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(amount / 100);
+    } catch {
+      return `${(amount / 100).toFixed(2)} ${currency}`;
+    }
+  };
   const day = (ms) => new Date(ms).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' });
   const read = (k, d) => {
     try {
@@ -178,13 +202,53 @@ input:focus { box-shadow: inset 0 0 0 3px var(--ink), 0 0 0 3px var(--paper-shad
     return j;
   };
 
-  /* ---------- prices ---------- */
+  /* ---------- where you're paying from, and the prices there ---------- */
+  // India: rupees through Razorpay (UPI, Indian cards). Anywhere else: Dodo Payments, in your own currency.
+  let prices = { inr: { currency: 'INR', month: 14900, year: 119900 }, intl: { currency: 'USD', month: 399, year: 2999 } };
+  const tz = (() => {
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+    } catch {
+      return '';
+    }
+  })();
+  let inIndia = /^Asia\/(Kolkata|Calcutta)$/.test(tz);
+  /** who takes the payment where you are (null: not open there yet) */
+  const provider = () => (inIndia ? (prices.inr ? 'razorpay' : prices.intl ? 'dodo' : null) : prices.intl ? 'dodo' : null);
+  function drawPrices() {
+    $('where-in').setAttribute('aria-pressed', String(inIndia));
+    $('where-world').setAttribute('aria-pressed', String(!inIndia));
+    const via = provider();
+    const p = via === 'razorpay' ? prices.inr : prices.intl;
+    if (p) {
+      const fmt = (v) => (p.currency === 'INR' ? rupees(v) : money(v, p.currency));
+      $('price-month').textContent = fmt(p.month);
+      $('price-year').textContent = fmt(p.year);
+      const off = Math.round((1 - p.year / (p.month * 12)) * 100);
+      $('save-year').textContent = off >= 5 ? `${off}% less than paying monthly` : '';
+    }
+    $('how-pay').textContent =
+      via === 'razorpay'
+        ? 'You pay once with UPI, a card or netbanking (through Razorpay), and get a code to add to the Soultied extension. When its time is up, get another one; nothing renews by itself.'
+        : via === 'dodo'
+          ? 'You pay once with a card or your usual way to pay, in your own currency where it’s available (through Dodo Payments), and get a code to add to the Soultied extension. When its time is up, get another one; nothing renews by itself.'
+          : 'Paying from here opens soon. Check back in a little while.';
+    for (const id of ['buy-month', 'buy-year']) $(id).disabled = !via;
+  }
+  $('where-in').addEventListener('click', () => {
+    inIndia = true;
+    drawPrices();
+  });
+  $('where-world').addEventListener('click', () => {
+    inIndia = false;
+    drawPrices();
+  });
+  drawPrices();
   call('/plusOrder')
     .then((p) => {
-      $('price-month').textContent = rupees(p.month);
-      $('price-year').textContent = rupees(p.year);
-      const off = Math.round((1 - p.year / (p.month * 12)) * 100);
-      if (off >= 5) $('save-year').textContent = `${off}% less than paying monthly`;
+      // from a server before Dodo: rupees only
+      prices = 'inr' in p ? { inr: p.inr, intl: p.intl } : { inr: { currency: 'INR', month: p.month, year: p.year }, intl: null };
+      drawPrices();
     })
     .catch(() => undefined);
 
@@ -303,10 +367,11 @@ input:focus { box-shadow: inset 0 0 0 3px var(--ink), 0 0 0 3px var(--paper-shad
         if (tries < 24) retry = setTimeout(() => fetchCode(ids(p), tries + 1), 5000);
         return;
       }
-      if (err.status === 404 || err.status === 400) {
+      if (err.status === 404 || err.status === 400 || err.status === 409) {
         write(PENDING, null);
         show('pitch');
-        $('buy-err').textContent = 'We couldn’t find a Soultied Plus payment with that number. Check it against your receipt.';
+        $('buy-err').textContent =
+          err.status === 409 ? err.message : 'We couldn’t find a Soultied Plus payment with that number. Check it against your receipt.';
         $('buy-err').hidden = false;
         return;
       }
@@ -316,7 +381,7 @@ input:focus { box-shadow: inset 0 0 0 3px var(--ink), 0 0 0 3px var(--paper-shad
     }
   }
   /** an order or payment number, without checkout's signature (asking again later) */
-  const ids = (p) => (p.orderId ? { orderId: p.orderId } : { paymentId: p.paymentId });
+  const ids = (p) => (p.provider === 'dodo' ? { provider: 'dodo', paymentId: p.paymentId } : p.orderId ? { orderId: p.orderId } : { paymentId: p.paymentId });
   $('lost').addEventListener('submit', (ev) => {
     ev.preventDefault();
     const id = $('lost-id').value.trim();
@@ -336,10 +401,27 @@ input:focus { box-shadow: inset 0 0 0 3px var(--ink), 0 0 0 3px var(--paper-shad
     if (p) fetchCode(ids(p));
   });
 
+  /** From outside India: Dodo's checkout page, which comes back here with ?payment_id=…&status=… */
+  async function buyDodo(plan, btn) {
+    try {
+      const o = await call('/plusOrder', { plan, provider: 'dodo' });
+      write(PENDING, { provider: 'dodo', plan, at: Date.now() });
+      location.href = o.url;
+    } catch (err) {
+      btn.disabled = false;
+      if (!err.status || err.status === 404 || err.status >= 500) show('closed');
+      else {
+        $('buy-err').textContent = err.message || 'That didn’t work. Try again in a moment.';
+        $('buy-err').hidden = false;
+      }
+    }
+  }
+
   async function buy(plan) {
     const btn = $(plan === 'year' ? 'buy-year' : 'buy-month');
     $('buy-err').hidden = true;
     btn.disabled = true;
+    if (provider() === 'dodo') return buyDodo(plan, btn);
     try {
       if (!window.Razorpay) throw Object.assign(new Error('checkout'), { code: 'checkout' });
       const o = await call('/plusOrder', { plan });
@@ -380,9 +462,25 @@ input:focus { box-shadow: inset 0 0 0 3px var(--ink), 0 0 0 3px var(--paper-shad
   $('buy-month').addEventListener('click', () => buy('month'));
   $('buy-year').addEventListener('click', () => buy('year'));
 
-  // paid, then the tab closed or reloaded before the code showed up: get it now
-  const pending = read(PENDING, null);
-  if (pending && (pending.orderId || pending.paymentId) && Date.now() - (pending.at || 0) < 7 * 24 * 3600 * 1000) fetchCode(ids(pending), 0, true);
+  // back from Dodo's checkout: ?payment_id=…&status=…
+  const back = new URLSearchParams(location.search);
+  const backId = back.get('payment_id');
+  if (backId) {
+    history.replaceState(null, '', location.pathname);
+    const status = back.get('status') || '';
+    if (status === 'failed' || status === 'cancelled') {
+      write(PENDING, null);
+      $('buy-err').textContent = 'That payment didn’t go through, so you haven’t been charged. Try again.';
+      $('buy-err').hidden = false;
+    } else {
+      write(PENDING, { provider: 'dodo', paymentId: backId, at: Date.now() });
+      fetchCode({ provider: 'dodo', paymentId: backId });
+    }
+  } else {
+    // paid, then the tab closed or reloaded before the code showed up: get it now
+    const pending = read(PENDING, null);
+    if (pending && (pending.orderId || pending.paymentId) && Date.now() - (pending.at || 0) < 7 * 24 * 3600 * 1000) fetchCode(ids(pending), 0, true);
+  }
 })();
 </script>
 </body>
