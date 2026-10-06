@@ -27,6 +27,21 @@ import { GameShelf } from './components/games/GameShelf';
 import { noteFor, waitingLabel } from './games/registry';
 import { TurntableProvider, useTurntable } from './music/TurntableContext';
 import { NowPlaying } from './components/NowPlaying';
+import { DecorProvider, useDecor } from './decor/DecorContext';
+import { DecorDrawer } from './components/DecorDrawer';
+import type { SlotId } from './decor/catalogue';
+import { PixelIcon } from './components/letters/PixelIcon';
+
+/** On a narrow screen, what to turn and look at while choosing each spot (room pixels). */
+const DECOR_FOCUS: Record<SlotId, number | undefined> = {
+  wall: undefined,
+  couch: undefined,
+  rug: 200,
+  pet: 128,
+  view: 46,
+  painting: 128,
+  plant: 24,
+};
 
 const seatOf = (u: UserProfile | null | undefined, placeholder = ''): Seat =>
   u ? { avatar: u.avatar, name: u.name, status: u.status } : { avatar: null, name: placeholder, status: 'empty' };
@@ -75,11 +90,38 @@ const WardrobePanel: React.FC = () => {
   );
 };
 
+/** "+20 stitches: you showed up, and you're both here today." Shown once, then it tucks itself away. */
+const EarnNote: React.FC = () => {
+  const { note, dismissNote, openCatalogue } = useDecor();
+  useEffect(() => {
+    if (!note) return;
+    const t = window.setTimeout(dismissNote, 9000);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [note?.key]);
+  if (!note) return null;
+  return (
+    <div className="fixed left-1/2 bottom-5 z-30 -translate-x-1/2 px-ui w-[min(92vw,520px)]" role="status">
+      <div className="px-box px-shadow px-fade px-3 py-2 flex items-center gap-3 flex-wrap justify-center">
+        <PixelIcon name="spool" scale={3} />
+        <span className="text-sm leading-snug flex-1 min-w-[180px]">{note.text}</span>
+        <button className="px-btn px-btn--sage px-btn--small" onClick={() => openCatalogue()}>
+          Decorate
+        </button>
+        <button className="px-btn px-btn--paper px-btn--small" aria-label="Not now" onClick={dismissNote}>
+          Later
+        </button>
+      </div>
+    </div>
+  );
+};
+
 const Home: React.FC = () => {
   const { setupComplete, currentUser, partnerUser, space, panel, openPanel, letterBadge, getLetter, today, journey } = useApp();
   const { couchLevel, couchShown, markCouchShown, cloudStatus, demo } = useApp();
   const games = useGames();
   const turntable = useTurntable();
+  const decor = useDecor();
   const [joinCode] = useState(readJoinCode);
   const [welcomeOpen, setWelcomeOpen] = useState(() => !setupComplete || !!joinCode);
   const [draftSeats, setDraftSeats] = useState<{ left: Seat; right: Seat } | null>(null);
@@ -126,13 +168,14 @@ const Home: React.FC = () => {
             .join(' · ')
         : 'Games',
       music: turntable.on ? `Lift the needle${turntable.track ? ` · ${turntable.track.title}` : ''}` : 'Put a record on',
+      decor: panel === 'decor' ? 'Choose a painting' : 'Decorate the room',
     };
     const meLabel = `${currentUser.name} · change my look`;
     if (host) l.left = host.id === currentUser.id ? meLabel : host.name;
     if (guest) l.right = guest.id === currentUser.id ? meLabel : guest.name;
     else l.right = `Invite ${space?.partnerPlaceholderName || 'your person'}`;
     return l;
-  }, [welcomeOpen, letterBadge, partnerSealed, partnerUser, currentUser, host, guest, space, games.waiting, turntable.on, turntable.track, journeyWaiting, journey.next, journey.unseen]);
+  }, [welcomeOpen, letterBadge, partnerSealed, partnerUser, currentUser, host, guest, space, games.waiting, turntable.on, turntable.track, journeyWaiting, journey.next, journey.unseen, panel]);
 
   const onHotspot = (id: HotspotId) => {
     if (id === 'letter') openPanel('question');
@@ -141,6 +184,7 @@ const Home: React.FC = () => {
     else if (id === 'door') openPanel('escape');
     else if (id === 'games') openPanel('games');
     else if (id === 'music') turntable.toggle();
+    else if (id === 'decor') decor.openCatalogue('painting');
     else if (id === 'left' || id === 'right') {
       const who = id === 'left' ? host : guest;
       if (!who) openPanel('space');
@@ -229,7 +273,9 @@ const Home: React.FC = () => {
         music={turntable.on}
         labels={labels}
         onHotspot={onHotspot}
-        dim={panel ? 0.25 : 0}
+        dim={panel && panel !== 'decor' ? 0.25 : 0}
+        decor={decor.shown}
+        focusX={panel === 'decor' ? DECOR_FOCUS[decor.slot] : undefined}
         closeness={closeness}
         scoot={scootGo}
         onScooted={(c) => {
@@ -240,8 +286,8 @@ const Home: React.FC = () => {
         }}
       />
 
-      {!welcomeOpen && !veil && <StreamChip />}
-      {!welcomeOpen && !veil && <NowPlaying />}
+      {!welcomeOpen && !veil && panel !== 'decor' && <StreamChip />}
+      {!welcomeOpen && !veil && panel !== 'decor' && <NowPlaying />}
 
       {gameNote && !welcomeOpen && !veil && !couchNote && (
         <div className="fixed right-4 bottom-4 z-30 px-ui max-w-[92vw]" role="status">
@@ -269,6 +315,8 @@ const Home: React.FC = () => {
           <div className="px-box px-shadow px-fade px-4 py-2.5 text-center leading-snug">{couchNote}</div>
         </div>
       )}
+
+      {decor.note && !couchNote && !gameNote && !welcomeOpen && !veil && !panel && <EarnNote />}
 
       {welcomeOpen ? (
         <Welcome
@@ -303,6 +351,7 @@ const Home: React.FC = () => {
               <WardrobePanel />
             </PixelPanel>
           )}
+          {panel === 'decor' && <DecorDrawer left={seats.left} right={seats.right} />}
           {panel === 'space' && (
             <PixelPanel title={partnerUser ? 'Our place' : 'Invite your person'} kicker={space?.name} onClose={() => openPanel(null)} width={640}>
               <SpacePanel />
@@ -320,7 +369,9 @@ export default function App() {
       <StreamHubProvider>
         <TurntableProvider>
           <GamesProvider>
-            <Home />
+            <DecorProvider>
+              <Home />
+            </DecorProvider>
           </GamesProvider>
         </TurntableProvider>
       </StreamHubProvider>

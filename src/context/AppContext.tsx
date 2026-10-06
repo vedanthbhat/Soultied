@@ -37,7 +37,7 @@ import type { Firestore } from 'firebase/firestore';
  * Either way the rest of the app sees the same shape.
  */
 
-export type Panel = 'question' | 'questions' | 'us' | 'wardrobe' | 'space' | 'watch' | 'escape' | 'games' | null;
+export type Panel = 'question' | 'questions' | 'us' | 'wardrobe' | 'space' | 'watch' | 'escape' | 'games' | 'decor' | null;
 export type JoinResult = 'ok' | 'not_found' | 'full' | 'expired';
 
 export type LetterBadge = 'answer' | 'reveal' | null;
@@ -98,6 +98,8 @@ interface AppContextType {
   couchLevel: number;
   /** days you've both shown up, all time */
   couchDays: number;
+  /** you've both been here today */
+  togetherToday: boolean;
   /** the closeness I last watched happen; below couchLevel means there's a scoot to show me */
   couchShown: number;
   markCouchShown: (level: number) => void;
@@ -977,6 +979,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         startJourney,
         couchLevel: couchLevel(eff.couch),
         couchDays: eff.couch.together.length,
+        togetherToday: eff.couch.together.includes(today),
         couchShown: eff.couch.shown[currentUser.id] ?? 0,
         markCouchShown,
         letterBadge,

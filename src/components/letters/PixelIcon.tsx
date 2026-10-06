@@ -70,6 +70,10 @@ export const SPRITES = {
     rows: ['y.y.y.y', '.y.y.y.', 'y.y.y.y'],
     pal: { y: '#b48c4a' },
   },
+  spool: {
+    rows: ['wwwwwww', '.ttttt.', '.tTtTt.', '.ttttt.', '.tTtTt.', '.ttttt.', 'wwwwwww'],
+    pal: { w: '#9a6a43', t: '#a84f4b', T: '#d07a70' },
+  },
   book: {
     rows: ['#########.', '#ccccccc#p', '#cyyyyyc#p', '#ccccccc#p', '#cyyyyyc#p', '#ccccccc#p', '#cccchcc#p', '#########p', '.pppppppp.'],
     pal: { '#': INK, c: '#b8674f', y: '#efdcb8', h: '#f3a19c', p: '#f4e8d0' },

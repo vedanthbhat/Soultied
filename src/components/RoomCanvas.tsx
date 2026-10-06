@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { renderRoom, ROOM_W, ROOM_H, ROOM_FOCUS_X, hitTest, hotspotRect, HotspotId, RoomState, Seat } from '../pixel/room';
+import type { Decor } from '../decor/catalogue';
 
 interface Props {
   left: Seat;
@@ -20,6 +21,10 @@ interface Props {
   scoot?: boolean;
   /** called when a scoot finishes, with the closeness they ended up at */
   onScooted?: (closeness: number) => void;
+  /** what's out in the room (or being tried on) */
+  decor?: Decor;
+  /** on a narrow screen, keep this x (room pixels) in view instead of the couch */
+  focusX?: number;
 }
 
 /** one step along the couch (1/7) takes about a second and a half */
@@ -31,12 +36,12 @@ interface Fit {
   top: number;
 }
 
-function computeFit(w: number, h: number): Fit {
+function computeFit(w: number, h: number, focusX = ROOM_FOCUS_X): Fit {
   const scale = Math.max(w / ROOM_W, h / ROOM_H);
   const cw = ROOM_W * scale;
   const ch = ROOM_H * scale;
   // centre on the couch/fireplace area; clamp so we never show past the edges
-  let left = w / 2 - ROOM_FOCUS_X * scale;
+  let left = w / 2 - focusX * scale;
   if (cw <= w * 1.25) left = (w - cw) / 2; // near 16:9: just centre
   left = Math.min(0, Math.max(w - cw, left));
   const top = Math.min(0, Math.max(h - ch, (h - ch) * 0.6));
@@ -78,9 +83,11 @@ export const RoomCanvas: React.FC<Props> = ({
   closeness = 0,
   scoot = false,
   onScooted,
+  decor,
+  focusX = ROOM_FOCUS_X,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [fit, setFit] = useState<Fit>(() => computeFit(window.innerWidth, window.innerHeight));
+  const [fit, setFit] = useState<Fit>(() => computeFit(window.innerWidth, window.innerHeight, focusX));
   const [hover, setHover] = useState<HotspotId | null>(null);
   const stateRef = useRef<RoomState>({ left, right, letterUnread, fire: 0.6, hover: null, closeness, heartAt: -1 });
   const fireBoost = useRef(0);
@@ -97,12 +104,26 @@ export const RoomCanvas: React.FC<Props> = ({
   stateRef.current.gamesWaiting = gamesWaiting;
   stateRef.current.music = music;
   stateRef.current.hover = hover;
+  stateRef.current.decor = decor;
 
+  const [panning, setPanning] = useState(false);
   useEffect(() => {
-    const onResize = () => setFit(computeFit(window.innerWidth, window.innerHeight));
+    const onResize = () => setFit(computeFit(window.innerWidth, window.innerHeight, focusX));
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
-  }, []);
+  }, [focusX]);
+  // turning to look at something else in the room (the catalogue, on a phone)
+  const firstFocus = useRef(true);
+  useEffect(() => {
+    if (firstFocus.current) {
+      firstFocus.current = false;
+      return;
+    }
+    setPanning(true);
+    setFit(computeFit(window.innerWidth, window.innerHeight, focusX));
+    const t = window.setTimeout(() => setPanning(false), 450);
+    return () => window.clearTimeout(t);
+  }, [focusX]);
 
   // render loop (~12 fps is plenty for pixel animation and easy on laptops)
   useEffect(() => {
@@ -185,6 +206,7 @@ export const RoomCanvas: React.FC<Props> = ({
           width: ROOM_W * fit.scale,
           height: ROOM_H * fit.scale,
           cursor: hover ? 'pointer' : 'default',
+          transition: panning ? 'left 400ms steps(8)' : undefined,
         }}
         onPointerMove={(e) => setHover(pick(e.clientX, e.clientY))}
         onPointerLeave={() => setHover(null)}

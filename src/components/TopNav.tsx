@@ -3,6 +3,8 @@ import { useApp } from '../context/AppContext';
 import { AvatarThumb } from './PixelAvatarRenderer';
 import { useGames } from '../games/GamesContext';
 import { useTurntable } from '../music/TurntableContext';
+import { useDecor } from '../decor/DecorContext';
+import { PixelIcon } from './letters/PixelIcon';
 
 /**
  * The menu hides above the screen and slides down when the cursor touches
@@ -13,6 +15,7 @@ export const TopNav: React.FC<{ letterUnread: boolean }> = ({ letterUnread }) =>
   const { space, currentUser, partnerUser, panel, openPanel, switchActiveUser, cloudMode } = useApp();
   const { waiting } = useGames();
   const turntable = useTurntable();
+  const decor = useDecor();
   const [open, setOpen] = useState(false);
   const [hint, setHint] = useState(true);
   const closeTimer = useRef<number | null>(null);
@@ -125,6 +128,20 @@ export const TopNav: React.FC<{ letterUnread: boolean }> = ({ letterUnread }) =>
                 }}
               >
                 {turntable.on ? 'Music ♪' : 'Music'}
+              </button>
+              <button
+                className="px-btn px-btn--paper px-btn--small"
+                title={`Decorate the room · ${decor.stitches} stitches to spend`}
+                onClick={() => {
+                  decor.openCatalogue();
+                  setOpen(false);
+                }}
+              >
+                Decorate
+                <span className="inline-flex items-center gap-1 text-[var(--muted)]">
+                  <PixelIcon name="spool" scale={2} />
+                  {decor.stitches}
+                </span>
               </button>
               <button className="px-btn px-btn--paper px-btn--small" onClick={() => go('us')}>
                 Us

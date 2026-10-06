@@ -22,6 +22,7 @@ import type { TitleInfo, TogetherLog } from '../stream/protocol';
 import type { GameKind, Match } from '../games/types';
 import type { DoodleCanvas } from '../games/doodle';
 import type { TurntableState } from '../music/records';
+import { normalizeDecorDoc, type DecorDoc } from '../decor/catalogue';
 
 /**
  * Where a couple's things live in Firestore:
@@ -35,6 +36,7 @@ import type { TurntableState } from '../music/records';
  *   spaces/{spaceId}/meta/game-{kind}    the current game of Fireflies, Paper Boats… and the win tally
  *   spaces/{spaceId}/meta/doodle-canvas  the Doodle Guess drawing in progress, saved every few seconds
  *   spaces/{spaceId}/meta/turntable      the record player in the living room: on or off, and since when
+ *   spaces/{spaceId}/meta/decor          stitches earned, pieces bought, and what's out in the room
  *   spaces/{spaceId}/activities/{id}     the little "what happened" feed
  *   spaces/{spaceId}/live/{topic}/events play/pause, chat, calls, escape rooms, doodle ink (short-lived)
  *   invites/{code}                       lets a partner find the place from an invite code
@@ -374,3 +376,17 @@ export const subscribeTurntable = (db: Firestore, sid: string, fn: (t: Turntable
   );
 
 export const writeTurntable = (db: Firestore, sid: string, t: TurntableState) => setDoc(turntableRef(db, sid), t);
+
+/* ---------- decorating ---------- */
+
+const decorRef = (db: Firestore, sid: string) => doc(db, 'spaces', sid, 'meta', 'decor');
+
+export const subscribeDecor = (db: Firestore, sid: string, fn: (d: DecorDoc) => void) =>
+  onSnapshot(
+    decorRef(db, sid),
+    (s) => fn(normalizeDecorDoc(s.exists() ? s.data() : null)),
+    () => undefined
+  );
+
+/** Merged in, so the two of you earning or buying at once never undo each other. */
+export const writeDecor = (db: Firestore, sid: string, patch: Partial<DecorDoc>) => setDoc(decorRef(db, sid), patch, { merge: true });

@@ -40,7 +40,7 @@ export interface CoupleSpace {
 
 export interface ActivityItem {
   id: string;
-  type: 'question_revealed' | 'partner_joined' | 'space_created' | 'avatar_updated' | 'watched_together' | 'played_game';
+  type: 'question_revealed' | 'partner_joined' | 'space_created' | 'avatar_updated' | 'watched_together' | 'played_game' | 'room_decorated';
   title: string;
   description: string;
   timestamp: string;
