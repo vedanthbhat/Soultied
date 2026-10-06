@@ -126,16 +126,34 @@ service cloud.firestore {
         && request.resource.data.people.keys().hasOnly([me()])
         && mineOk();
 
+      // Soultied Plus for the party: a code you've added (it's real, still valid, and yours), with its end date
+      function plusCodeAt(code) {
+        return get(/databases/$(database)/documents/plusCodes/$(code)).data;
+      }
+      function plusOk() {
+        let p = request.resource.data.get('plus', null);
+        return p == null
+          || (p is map
+            && p.keys().hasOnly(['by', 'code', 'until'])
+            && p.by == me()
+            && p.code is string
+            && exists(/databases/$(database)/documents/plusCodes/$(p.code))
+            && me() in plusCodeAt(p.code).activations
+            && p.until == plusCodeAt(p.code).validUntil
+            && request.time < p.until);
+      }
+
       allow update: if signedIn()
         && request.resource.data.id == resource.data.id
         && request.resource.data.host == resource.data.host
         && request.resource.data.people.diff(resource.data.people).affectedKeys().hasOnly([me()])
         && mineOk()
         && (
-          // in the party: what's on, and your own name and look
+          // in the party: what's on, your own name and look, and Plus
           (me() in resource.data.members
             && request.resource.data.members == resource.data.members
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'people', 'updatedAt']))
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'people', 'updatedAt', 'plus'])
+            && (!('plus' in request.resource.data.diff(resource.data).affectedKeys()) || plusOk()))
           ||
           // taking the second seat
           (!(me() in resource.data.members)
@@ -146,12 +164,31 @@ service cloud.firestore {
 
       allow delete: if false;
 
-      // play/pause, chat and reactions between the two of you
+      // play/pause, chat and reactions between the two of you (and setting up the call, with Plus)
       match /events/{id} {
         allow read: if partyMember();
         allow create: if partyMember() && request.resource.data.by == me();
         allow update, delete: if false;
       }
+    }
+
+    // Soultied Plus codes, made by Soultied's server when a payment goes through (the id is the
+    // code's SHA-256, so the list never holds a code you could read off it). Whoever has a code can
+    // look it up and add their browser to it (up to three) while it's valid. Nobody can list them.
+    match /plusCodes/{hash} {
+      allow get: if signedIn();
+      allow list, create, delete: if false;
+      allow update: if signedIn()
+        && request.time < resource.data.validUntil
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['activations'])
+        && !(me() in resource.data.activations)
+        && request.resource.data.activations == resource.data.activations.concat([me()])
+        && request.resource.data.activations.size() <= 3;
+    }
+
+    // the server's own record of each paid order (only the server touches it)
+    match /plusOrders/{id} {
+      allow read, write: if false;
     }
   }
 }

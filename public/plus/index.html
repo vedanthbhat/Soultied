@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Soultied Plus</title>
+<link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAvUlEQVR42mNgGOmAEZeElZbaf2zix67dYqSGehhgGugQYMHlk/mamlg1JDIw/Ef2GanqB10IMOLyuZSfL4rCZ5s2o/rs+nUGfD7HCAmoevSQGPgQINXn5ILzf/4wMDAwMEy6fRslJAZfLqC2zwmBwRcC9PL54C8HqAVwpf7BFwLUDglCPh+8IUBpSBDr88EfAqSGBKk+HzohQCgkyPX50AsB9JDIU1WlyOeDJgTIBlZaav9x9QVGRgiMgmEDALGpb3r9Lc6EAAAAAElFTkSuQmCC" type="image/png" sizes="32x32">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAALQAAAC0CAYAAAA9zQYyAAACNUlEQVR42u3dsWlyYRTH4RicIr2FU1hYxyIbuIDDZIFskEJrCydIE7CwT5MBbASzgMKBHO97eO/z1PIl9+PH4cIf4uT8+319gk48+y9A0CBoEDQIGkGDoEHQIGgQNIIGQYOgQdAgaAQNggZBg6Dhnmn1X3C5eGvyc/eHT8/rQoOgQdAgaAQNggZBg6BB0PSr2VIYXcQ+5vPSv190YRvb87rQIGgQNIIGQYOgQdAgaAQNxU2yv6cwexF7Wb2mPvDPdpf6762Px9TnrS76vK0WRRcarxwgaBA0CBpBg6BB0CBoCAovhWNbALnt63IJfe79dAp9LntRdKHxygGCBkGDoBE0CBoEDYKGoPLfU2gBxIVG0CBoEDQIGgSNoEHQIGh4gGZLoQUQFxoEjaBB0CBoEDQIGkGDoKGh8t9TyDCq/1VRFxqvHCBoEDQIGgSNoEHQIGhIlr4URlkUh9HLAuhC45UDBA2CBkGDoBE0CBoEDcmaLYVRFsXbxrYAutB45QBBg6BB0CBoBA2CBkFDsvJLYVQvi6IF0IUGQSNoEDQIGgQNgkbQIGgYRDdLYVSrRdEC6EKDoBE0CBoEDYIGQSNoEDSUMrqlMCq6KG5ms9DnLIAuNAgaQYOgQdAgaBA0ggZBQymWwn+KLooWQBcaBI2gQdAgaBA0CBpBg6ChFEshLjQIGgQNgkbQIGgQNAgaBI2gQdAgaBA0CBpBg6BB0CBoEDSCBkGDoEHQIGgEDYIGQYOgQdD06g+4xIxN7ocCigAAAABJRU5ErkJggg==">
+<meta name="description" content="Soultied Plus: see and hear each other while you watch Netflix or Prime Video together. One subscription covers you both.">
+<style>
+@font-face { font-family: 'Pixelify Sans'; src: url('/fonts/PixelifySans-Variable.ttf') format('truetype'); font-weight: 400 700; font-display: block; }
+:root { --ink: #2b1e1c; --ink-soft: #3a2a26; --muted: #7a5a48; --paper: #f4e8d0; --paper-2: #eadbbd; --paper-hi: #fff8ea; --paper-shade: #d6c29c; --link: #8f4b3a; --bg: #f7ebd4; --terracotta: #b8674f; --terracotta-dark: #8f4b3a; --sage: #8a9a72; --sage-dark: #6a7856; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink-soft); font: 18px/1.5 'Pixelify Sans', ui-sans-serif, system-ui, sans-serif; font-variant-ligatures: none; }
+main { max-width: 560px; margin: 0 auto; padding: 32px 16px 64px; display: flex; flex-direction: column; gap: 22px; }
+.home { font-family: 'Pixelify Sans', system-ui, sans-serif; color: var(--ink); text-decoration: none; font-size: 18px; }
+.home:hover { text-decoration: underline; }
+.card { background: var(--paper); border: 3px solid var(--ink); box-shadow: 6px 6px 0 rgba(43, 30, 28, 0.22); padding: 26px 26px 22px; display: flex; flex-direction: column; gap: 14px; }
+.card > div { display: flex; flex-direction: column; gap: 14px; }
+.kicker { font-family: 'Pixelify Sans', system-ui, sans-serif; font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: var(--terracotta-dark); margin: 0; }
+h1, h2 { font-family: 'Pixelify Sans', system-ui, sans-serif; color: var(--ink); line-height: 1.2; margin: 0; font-variant-ligatures: none; font-feature-settings: 'liga' 0, 'clig' 0; }
+h1 { font-size: 30px; }
+h2 { font-size: 21px; }
+p, ol { margin: 0; }
+ol { padding-left: 22px; }
+li { margin: 4px 0; }
+a { color: var(--link); }
+code { font: inherit; background: var(--paper-2); padding: 1px 5px; }
+.muted { color: var(--muted); font-size: 16px; }
+.err { color: #a84f4b; font-size: 16px; }
+form { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin: 0; }
+input { font: inherit; flex: 1 1 180px; min-width: 0; border: 0; padding: 8px 10px; background: var(--paper-hi); color: var(--ink); box-shadow: inset 0 0 0 3px var(--ink); outline: none; }
+input:focus { box-shadow: inset 0 0 0 3px var(--ink), 0 0 0 3px var(--paper-shade); }
+.btn { font: 18px 'Pixelify Sans', system-ui, sans-serif; cursor: pointer; border: 0; background: var(--terracotta); color: #fff4e2; padding: 9px 16px; text-decoration: none; display: inline-block; margin: 3px;
+  box-shadow: 0 -3px 0 0 var(--ink), 0 3px 0 0 var(--ink), -3px 0 0 0 var(--ink), 3px 0 0 0 var(--ink), inset 0 -4px 0 0 var(--terracotta-dark); }
+.btn:hover { filter: brightness(1.06); }
+.btn:active { transform: translateY(2px); }
+.btn[disabled] { opacity: .6; cursor: default; }
+.btn.sage { background: var(--sage); box-shadow: 0 -3px 0 0 var(--ink), 0 3px 0 0 var(--ink), -3px 0 0 0 var(--ink), 3px 0 0 0 var(--ink), inset 0 -4px 0 0 var(--sage-dark); }
+.btn.paper { background: var(--paper-2); color: var(--ink); box-shadow: 0 -3px 0 0 var(--ink), 0 3px 0 0 var(--ink), -3px 0 0 0 var(--ink), 3px 0 0 0 var(--ink), inset 0 -4px 0 0 var(--paper-shade); }
+.row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+.about { background: var(--paper-2); border: 3px dashed var(--paper-shade); padding: 18px 20px; display: flex; flex-direction: column; gap: 10px; }
+[hidden] { display: none !important; }
+@media (max-width: 520px) { .card { padding: 20px 16px 18px; } h1 { font-size: 26px; } }
+
+.plans { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.plan { background: var(--paper-hi); box-shadow: inset 0 0 0 3px var(--ink); padding: 16px 16px 14px; display: flex; flex-direction: column; gap: 6px; }
+.plan .price { font-size: 30px; color: var(--ink); line-height: 1.1; }
+.plan .per { font-size: 16px; color: var(--muted); }
+.plan .save { font-size: 14px; color: var(--sage-dark); min-height: 21px; }
+.plan .btn { align-self: flex-start; margin-top: 6px; }
+.perks { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.perks li { display: flex; gap: 10px; align-items: baseline; margin: 0; }
+.perks li::before { content: ''; flex: none; width: 10px; height: 10px; background: var(--terracotta); transform: translateY(-2px); box-shadow: 2px 2px 0 var(--ink); }
+.code { font-size: 34px; letter-spacing: .08em; color: var(--ink); background: var(--paper-hi); box-shadow: inset 0 0 0 3px var(--ink); padding: 12px 16px; text-align: center; user-select: all; word-break: break-all; }
+.ok { color: var(--sage-dark); font-size: 16px; }
+@media (max-width: 520px) { .plans { grid-template-columns: 1fr; } .code { font-size: 26px; } }
+</style>
+<script src="https://checkout.razorpay.com/v1/checkout.js" async></script>
+</head>
+<body>
+<main>
+<a class="home" href="/">← Soultied</a>
+
+<section class="card" aria-live="polite">
+  <p class="kicker">Soultied Plus</p>
+
+  <div id="pitch">
+    <h1>See each other while you watch</h1>
+    <ul class="perks">
+      <li>Your cameras, side by side on the show, in your Soultied watch parties on Netflix and Prime Video.</li>
+      <li>Talk out loud: hold T (or the Talk button) and the show turns itself down while you speak.</li>
+      <li>One of you having Plus covers you both.</li>
+      <li>Your picture and voice go straight to your person, never to Soultied.</li>
+    </ul>
+    <div class="plans">
+      <div class="plan">
+        <div class="per">A month</div>
+        <div class="price" id="price-month">₹149</div>
+        <div class="save"></div>
+        <button class="btn" id="buy-month" type="button">Get a month</button>
+      </div>
+      <div class="plan">
+        <div class="per">A year</div>
+        <div class="price" id="price-year">₹1,199</div>
+        <div class="save" id="save-year"></div>
+        <button class="btn sage" id="buy-year" type="button">Get a year</button>
+      </div>
+    </div>
+    <p class="muted">You pay once with UPI, a card or netbanking (through Razorpay), and get a code to add to the Soultied extension. When its time is up, get another one; nothing renews by itself.</p>
+    <p class="err" id="buy-err" hidden></p>
+  </div>
+
+  <div id="paying" hidden>
+    <h1>Getting your code…</h1>
+    <p>Hold on a moment, and keep this tab open.</p>
+  </div>
+
+  <div id="done" hidden>
+    <h1>You have Soultied Plus</h1>
+    <p id="done-text">Here’s your code. It’s yours until <span id="done-until"></span>.</p>
+    <div class="code" id="code"></div>
+    <div class="row">
+      <button class="btn" id="use" type="button" hidden>Use it in my Soultied extension</button>
+      <button class="btn paper" id="copy" type="button">Copy the code</button>
+    </div>
+    <p class="ok" id="used" hidden></p>
+    <p class="err" id="use-err" hidden></p>
+    <ol id="how">
+      <li>Open Netflix or Prime Video and start (or join) a Soultied watch party.</li>
+      <li>In the Soultied chat on the show, press <strong>I have a code</strong> and paste it. (Or paste it into the Soultied button in your browser’s toolbar.)</li>
+    </ol>
+    <p class="muted">Keep the code somewhere safe: it works on up to three browsers. This page remembers it on this computer too.</p>
+  </div>
+
+  <div id="wait" hidden>
+    <h1>Your payment is still going through</h1>
+    <p>That can take a minute with some banks. Keep this tab open; it checks again by itself.</p>
+    <div class="row"><button class="btn paper" id="again" type="button">Check now</button></div>
+  </div>
+
+  <div id="closed" hidden>
+    <h1>Plus isn’t open just yet</h1>
+    <p>We’re putting the finishing touches on payments. Check back soon.</p>
+  </div>
+</section>
+
+<section class="about" id="mine" hidden>
+  <h2>Your codes</h2>
+  <div id="mine-list"></div>
+</section>
+
+<section class="about">
+  <h2>How it works</h2>
+  <p>Soultied’s watch parties keep Netflix or Prime Video in sync between you and your person, with a chat and a little pixel couch on the show. They’re free. Plus adds cameras and voice.</p>
+  <p class="muted">Razorpay emails you a receipt for every payment. Lost your code? Put the payment or order number from it (it starts with <code>pay_</code> or <code>order_</code>) here:</p>
+  <form id="lost">
+    <input id="lost-id" placeholder="pay_… or order_…" aria-label="Payment or order number" autocomplete="off" spellcheck="false">
+    <button class="btn paper" type="submit">Get my code</button>
+  </form>
+  <p class="err" id="lost-err" hidden>That doesn’t look like a payment or order number. It starts with pay_ or order_.</p>
+</section>
+</main>
+
+<script>
+(() => {
+  /** Soultied's server (Firebase Cloud Functions in Mumbai). */
+  const API = window.SOULTIED_API || 'https://asia-south1-soultied-c1543.cloudfunctions.net';
+  const HUB = 'soultied-hub';
+  const EXT = 'soultied-ext';
+  const PENDING = 'soultied_plus_pending';
+  const CODES = 'soultied_plus_codes';
+  const $ = (id) => document.getElementById(id);
+  const views = ['pitch', 'paying', 'done', 'wait', 'closed'];
+  const show = (id) => views.forEach((v) => ($(v).hidden = v !== id));
+  const rupees = (paise) => '₹' + (paise / 100).toLocaleString('en-IN', { maximumFractionDigits: 2 });
+  const day = (ms) => new Date(ms).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' });
+  const read = (k, d) => {
+    try {
+      return JSON.parse(localStorage.getItem(k) || 'null') ?? d;
+    } catch {
+      return d;
+    }
+  };
+  const write = (k, v) => {
+    try {
+      if (v === null) localStorage.removeItem(k);
+      else localStorage.setItem(k, JSON.stringify(v));
+    } catch {
+      // private window: the code is still on screen
+    }
+  };
+  const call = async (path, body) => {
+    const r = await fetch(API + path, body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {});
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw Object.assign(new Error(j.message || 'failed'), { status: r.status, code: j.error });
+    return j;
+  };
+
+  /* ---------- prices ---------- */
+  call('/plusOrder')
+    .then((p) => {
+      $('price-month').textContent = rupees(p.month);
+      $('price-year').textContent = rupees(p.year);
+      const off = Math.round((1 - p.year / (p.month * 12)) * 100);
+      if (off >= 5) $('save-year').textContent = `${off}% less than paying monthly`;
+    })
+    .catch(() => undefined);
+
+  /* ---------- codes you've bought on this computer ---------- */
+  function drawMine() {
+    const list = read(CODES, []).filter((c) => c && c.code);
+    $('mine').hidden = !list.length;
+    $('mine-list').replaceChildren(
+      ...list.map((c) => {
+        const p = document.createElement('p');
+        p.textContent = `${c.code} · ${c.plan === 'year' ? 'a year' : 'a month'} · ${c.validUntil > Date.now() ? 'until' : 'ended'} ${day(c.validUntil)}`;
+        return p;
+      }),
+    );
+  }
+  function keep(c) {
+    const list = read(CODES, []).filter((x) => x && x.code !== c.code);
+    write(CODES, [c, ...list].slice(0, 10));
+    drawMine();
+  }
+  drawMine();
+
+  /* ---------- the extension (through its bridge on this page) ---------- */
+  let ext = null;
+  let rid = 0;
+  const waiting = new Map();
+  window.addEventListener('message', (ev) => {
+    if (ev.source !== window || !ev.data || ev.data.source !== EXT) return;
+    const d = ev.data;
+    if (d.kind === 'present') {
+      ext = d.version;
+      if (current) $('use').hidden = !newEnough(ext);
+    } else if (d.kind === 'plus') {
+      const done = waiting.get(d.rid);
+      waiting.delete(d.rid);
+      if (done) done(d.res);
+    }
+  });
+  window.postMessage({ source: HUB, kind: 'probe' }, location.origin);
+  const newEnough = (v) => {
+    const p = String(v || '0').split('.').map(Number);
+    const need = [1, 4, 0];
+    for (let i = 0; i < 3; i++) if ((p[i] || 0) !== need[i]) return (p[i] || 0) > need[i];
+    return true;
+  };
+  const toExtension = (code) =>
+    new Promise((res) => {
+      const id = ++rid;
+      const t = setTimeout(() => {
+        waiting.delete(id);
+        res({ ok: false, error: 'offline' });
+      }, 25000);
+      waiting.set(id, (r) => {
+        clearTimeout(t);
+        res(r);
+      });
+      window.postMessage({ source: HUB, kind: 'plus', rid: id, code }, location.origin);
+    });
+
+  /* ---------- your code ---------- */
+  let current = null;
+  function done(c) {
+    current = c;
+    keep(c);
+    write(PENDING, null);
+    $('code').textContent = c.code;
+    $('done-until').textContent = day(c.validUntil);
+    $('use').hidden = !(ext && newEnough(ext));
+    $('used').hidden = true;
+    $('use-err').hidden = true;
+    show('done');
+  }
+  $('copy').addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(current.code);
+      $('copy').textContent = 'Copied ✓';
+    } catch {
+      getSelection().selectAllChildren($('code'));
+      $('copy').textContent = /Mac/i.test(navigator.platform) ? 'Press ⌘C' : 'Press Ctrl+C';
+    }
+  });
+  const USE_ERRORS = {
+    invalid: 'The extension couldn’t find that code yet. Wait a moment and try again.',
+    expired: 'That code’s time is up.',
+    full: 'That code is already in use on three browsers.',
+    offline: 'Couldn’t reach the extension or Soultied. Check your connection and try again, or paste the code in yourself.',
+  };
+  $('use').addEventListener('click', async () => {
+    $('use').disabled = true;
+    $('use-err').hidden = true;
+    const r = await toExtension(current.code);
+    $('use').disabled = false;
+    if (r && r.ok) {
+      $('used').textContent = `Done: Soultied Plus is on in this browser until ${day(r.until)}. Start a watch party and turn your camera on.`;
+      $('used').hidden = false;
+      $('use').hidden = true;
+    } else {
+      $('use-err').textContent = USE_ERRORS[(r && r.error) || ''] || 'That didn’t work. Paste the code in yourself (steps below).';
+      $('use-err').hidden = false;
+    }
+  });
+
+  /* ---------- paying ---------- */
+  let retry = 0;
+  /** quiet: checking for an earlier payment when the page opens (say nothing unless there's a code) */
+  async function fetchCode(p, tries = 0, quiet = false) {
+    if (!quiet) show('paying');
+    try {
+      done(await call('/plusCode', p));
+    } catch (err) {
+      if (quiet) return;
+      if (err.status === 402) {
+        // not through yet: check again for a couple of minutes
+        show('wait');
+        clearTimeout(retry);
+        if (tries < 24) retry = setTimeout(() => fetchCode(ids(p), tries + 1), 5000);
+        return;
+      }
+      if (err.status === 404 || err.status === 400) {
+        write(PENDING, null);
+        show('pitch');
+        $('buy-err').textContent = 'We couldn’t find a Soultied Plus payment with that number. Check it against your receipt.';
+        $('buy-err').hidden = false;
+        return;
+      }
+      show('wait');
+      clearTimeout(retry);
+      if (tries < 24) retry = setTimeout(() => fetchCode(ids(p), tries + 1), 5000);
+    }
+  }
+  /** an order or payment number, without checkout's signature (asking again later) */
+  const ids = (p) => (p.orderId ? { orderId: p.orderId } : { paymentId: p.paymentId });
+  $('lost').addEventListener('submit', (ev) => {
+    ev.preventDefault();
+    const id = $('lost-id').value.trim();
+    const m = /^(order|pay)_[A-Za-z0-9]{6,40}$/.exec(id);
+    if (!m) {
+      $('lost-err').hidden = false;
+      return $('lost-id').focus();
+    }
+    $('lost-err').hidden = true;
+    const p = m[1] === 'pay' ? { paymentId: id } : { orderId: id };
+    write(PENDING, { ...p, plan: 'month', at: Date.now() });
+    scrollTo({ top: 0 });
+    fetchCode(p);
+  });
+  $('again').addEventListener('click', () => {
+    const p = read(PENDING, null);
+    if (p) fetchCode(ids(p));
+  });
+
+  async function buy(plan) {
+    const btn = $(plan === 'year' ? 'buy-year' : 'buy-month');
+    $('buy-err').hidden = true;
+    btn.disabled = true;
+    try {
+      if (!window.Razorpay) throw Object.assign(new Error('checkout'), { code: 'checkout' });
+      const o = await call('/plusOrder', { plan });
+      write(PENDING, { orderId: o.orderId, plan, at: Date.now() });
+      const rz = new window.Razorpay({
+        key: o.keyId,
+        order_id: o.orderId,
+        amount: o.amount,
+        currency: o.currency,
+        name: 'Soultied',
+        description: `Soultied Plus · ${o.label}`,
+        theme: { color: '#b8674f' },
+        handler: (r) => fetchCode({ orderId: r.razorpay_order_id || o.orderId, paymentId: r.razorpay_payment_id, signature: r.razorpay_signature }),
+        modal: {
+          ondismiss: () => {
+            btn.disabled = false;
+          },
+        },
+      });
+      rz.on('payment.failed', (r) => {
+        btn.disabled = false;
+        $('buy-err').textContent = (r && r.error && r.error.description) || 'That payment didn’t go through. You haven’t been charged; try again.';
+        $('buy-err').hidden = false;
+      });
+      rz.open();
+    } catch (err) {
+      btn.disabled = false;
+      if (err.code === 'checkout') {
+        $('buy-err').textContent = 'The payment window didn’t load. Check your connection (or any blocker) and refresh the page.';
+        $('buy-err').hidden = false;
+      } else if (!err.status || err.status === 404 || err.status >= 500) show('closed');
+      else {
+        $('buy-err').textContent = err.message || 'That didn’t work. Try again in a moment.';
+        $('buy-err').hidden = false;
+      }
+    }
+  }
+  $('buy-month').addEventListener('click', () => buy('month'));
+  $('buy-year').addEventListener('click', () => buy('year'));
+
+  // paid, then the tab closed or reloaded before the code showed up: get it now
+  const pending = read(PENDING, null);
+  if (pending && (pending.orderId || pending.paymentId) && Date.now() - (pending.at || 0) < 7 * 24 * 3600 * 1000) fetchCode(ids(pending), 0, true);
+})();
+</script>
+</body>
+</html>

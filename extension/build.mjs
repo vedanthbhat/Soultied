@@ -40,7 +40,15 @@ await build({
   charset: 'utf8',
   legalComments: 'none',
   logLevel: 'info',
-  define: { __FIREBASE__: JSON.stringify(firebase?.apiKey ? firebase : null), __EMULATOR__: '""' },
+  define: {
+    __FIREBASE__: JSON.stringify(firebase?.apiKey ? firebase : null),
+    __EMULATOR__: '""',
+    // the call's relay (TURN), the same build settings as the website's (see src/watch/ice.ts)
+    'import.meta.env': JSON.stringify({
+      VITE_TURN_CREDENTIALS_URL: process.env.VITE_TURN_CREDENTIALS_URL || '',
+      VITE_ICE_SERVERS: process.env.VITE_ICE_SERVERS || '',
+    }),
+  },
 });
 
 const manifest = JSON.parse(await readFile(path.join(here, 'manifest.json'), 'utf8'));

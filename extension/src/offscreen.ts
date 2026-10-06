@@ -2,6 +2,7 @@ import { initializeApp } from 'firebase/app';
 import { type Auth, connectAuthEmulator, getAuth, signInAnonymously } from 'firebase/auth/web-extension';
 import {
   type Firestore,
+  type Timestamp,
   arrayUnion,
   collection,
   connectFirestoreEmulator,
@@ -14,7 +15,18 @@ import {
   updateDoc,
 } from 'firebase/firestore';
 import { channelAt, type LiveChannel } from '../../src/cloud/live';
-import { emptyLog, partyLink, SITE, type ExtMsg, type HubMsg, type PartyReply, type Session, type StreamEvent, type TitleInfo } from '../../src/stream/protocol';
+import {
+  emptyLog,
+  partyLink,
+  SITE,
+  type ExtMsg,
+  type HubMsg,
+  type PartyReply,
+  type PlusReply,
+  type Session,
+  type StreamEvent,
+  type TitleInfo,
+} from '../../src/stream/protocol';
 import type { AvatarConfig } from '../../src/types';
 
 /**
@@ -41,6 +53,20 @@ interface PartyDoc {
   members: string[];
   people: Record<string, PartyMe>;
   title: TitleInfo | null;
+  /** Soultied Plus for this party: whose code, and until when (cameras and voice for both of you) */
+  plus?: { by: string; code: string; until: Timestamp } | null;
+}
+
+/** A Soultied Plus code, as Soultied keeps it (plusCodes/{sha-256 of the code}). */
+interface PlusCodeDoc {
+  validUntil: Timestamp | number;
+  activations: string[];
+}
+
+/** what the background knows about this browser's Plus code */
+export interface PlusMine {
+  hash: string;
+  until: number;
 }
 
 /** background -> here */
@@ -52,6 +78,10 @@ export type ToOffscreen = { to: 'offscreen' } & (
   | { op: 'leave' }
   | { op: 'ext'; msg: ExtMsg }
   | { op: 'players'; count: number }
+  /** add a Plus code (the letters that matter, already tidied) */
+  | { op: 'redeem'; key: string }
+  /** this browser's Plus code, for the party you're in */
+  | { op: 'plus'; plus: PlusMine | null }
 );
 
 /** here -> background */
@@ -112,6 +142,8 @@ const hub = (msg: HubMsg) => void toBackground({ msg });
 
 const DEFAULT_LOOK = (people: Record<string, PartyMe>) => Object.values(people)[0]?.avatar;
 
+const ms = (t: Timestamp | number | null | undefined) => (typeof t === 'number' ? t : t?.toMillis?.() ?? 0);
+
 function session(): Session | null {
   const d = current?.doc;
   if (!d || !uid || !d.members.includes(uid)) return null;
@@ -126,7 +158,7 @@ function session(): Session | null {
     closeness: 0.5,
     log: emptyLog(),
     hubUrl: SITE,
-    party: { id: d.id, link: partyLink(d.id) },
+    party: { id: d.id, link: partyLink(d.id), plusUntil: d.plus ? ms(d.plus.until) || null : null },
   };
 }
 
@@ -204,6 +236,7 @@ async function open(id: string): Promise<OpenReply> {
       here.doc = s.exists() ? (s.data() as PartyDoc) : null;
       syncChannel();
       pushSession();
+      void sharePlus();
     },
     () => undefined,
   );
@@ -259,6 +292,59 @@ async function join(id: string, me: PartyMe): Promise<OpenReply> {
     await updateDoc(ref, { [`people.${mine}`]: { ...me, avatar: d.people[mine]?.avatar || me.avatar }, updatedAt: serverTimestamp() });
   }
   return open(id);
+}
+
+/* ---------------- Soultied Plus ---------------- */
+
+let myPlus: PlusMine | null = null;
+let sharing = false;
+
+async function sha256(text: string) {
+  const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, '0')).join('');
+}
+
+/** Check a code against Soultied's list and add this browser to it (up to three browsers per code). */
+async function redeem(key: string): Promise<PlusReply> {
+  const me = await signedIn();
+  const hash = await sha256(key);
+  const ref = doc(cloud().db, 'plusCodes', hash);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) return { ok: false, error: 'invalid' };
+  const d = snap.data() as PlusCodeDoc;
+  const until = ms(d.validUntil);
+  if (until <= Date.now()) return { ok: false, error: 'expired' };
+  const acts = Array.isArray(d.activations) ? d.activations : [];
+  if (!acts.includes(me)) {
+    if (acts.length >= 3) return { ok: false, error: 'full' };
+    await updateDoc(ref, { activations: [...acts, me] });
+  }
+  myPlus = { hash, until };
+  void sharePlus();
+  return { ok: true, until };
+}
+
+/**
+ * One of you having Plus covers you both: put your code on the party you're in (the security rules
+ * check it's real, still valid, and yours), unless it already has one that lasts as long.
+ */
+async function sharePlus() {
+  const d = current?.doc;
+  const mine = myPlus;
+  if (!d || !uid || !mine || sharing || mine.until <= Date.now() || !d.members.includes(uid)) return;
+  if (d.plus && ms(d.plus.until) >= mine.until) return;
+  sharing = true;
+  try {
+    const code = await getDoc(doc(cloud().db, 'plusCodes', mine.hash));
+    if (!code.exists()) return;
+    const c = code.data() as PlusCodeDoc;
+    if (!c.activations?.includes(uid) || ms(c.validUntil) <= Date.now()) return;
+    await updateDoc(doc(cloud().db, 'parties', d.id), { plus: { by: uid, code: mine.hash, until: c.validUntil }, updatedAt: serverTimestamp() });
+  } catch (err) {
+    console.warn('Soultied Plus:', err);
+  } finally {
+    sharing = false;
+  }
 }
 
 function leave() {
@@ -334,6 +420,13 @@ chrome.runtime.onMessage.addListener((m: ToOffscreen, _sender, reply) => {
       return;
     case 'players':
       players(m.count);
+      reply({ ok: true });
+      return;
+    case 'redeem':
+      return answer(redeem(m.key));
+    case 'plus':
+      myPlus = m.plus;
+      void sharePlus();
       reply({ ok: true });
       return;
   }

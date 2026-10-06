@@ -1,0 +1,80 @@
+# Deploys Soultied's server side to Firebase whenever it changes: the Soultied Plus checkout
+# (functions/) and the Firestore security rules (firestore.rules).
+#
+# Needs, under Settings > Secrets and variables > Actions (see functions/README.md):
+#   secrets   FIREBASE_SERVICE_ACCOUNT  a Google Cloud service account key (JSON) that's allowed to deploy
+#             RAZORPAY_KEY_ID           Razorpay > Account & Settings > API Keys
+#             RAZORPAY_KEY_SECRET       the same place
+#   variables PLUS_MONTH_PAISE, PLUS_YEAR_PAISE   (optional) Plus's prices in paise; 14900 = ₹149
+# Until the deploy key is there, this does nothing (and says so).
+name: Deploy to Firebase
+
+on:
+  push:
+    branches: [main]
+    paths: ['functions/**', 'firestore.rules', 'firebase.json', '.github/workflows/firebase.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: firebase
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    env:
+      PROJECT: soultied-c1543
+      HAS_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT != '' }}
+      HAS_RAZORPAY: ${{ secrets.RAZORPAY_KEY_ID != '' && secrets.RAZORPAY_KEY_SECRET != '' }}
+    steps:
+      - name: Waiting for the deploy key
+        if: env.HAS_KEY != 'true'
+        run: echo "::notice::Add the FIREBASE_SERVICE_ACCOUNT secret (see functions/README.md) to deploy Soultied's functions and rules."
+
+      - uses: actions/checkout@v5
+        if: env.HAS_KEY == 'true'
+      - uses: actions/setup-node@v5
+        if: env.HAS_KEY == 'true'
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - name: Install the functions' packages
+        if: env.HAS_KEY == 'true'
+        run: npm install --prefix functions --no-audit --no-fund
+
+      - name: Sign in to Google Cloud
+        if: env.HAS_KEY == 'true'
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          printf '%s' "$SA" > "$RUNNER_TEMP/deploy-key.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/deploy-key.json" >> "$GITHUB_ENV"
+
+      - name: Razorpay's keys into Secret Manager
+        if: env.HAS_KEY == 'true' && env.HAS_RAZORPAY == 'true'
+        env:
+          KEY_ID: ${{ secrets.RAZORPAY_KEY_ID }}
+          KEY_SECRET: ${{ secrets.RAZORPAY_KEY_SECRET }}
+        run: |
+          printf '%s' "$KEY_ID" | npx -y firebase-tools@15 functions:secrets:set RAZORPAY_KEY_ID --data-file=- --project "$PROJECT" --non-interactive
+          printf '%s' "$KEY_SECRET" | npx -y firebase-tools@15 functions:secrets:set RAZORPAY_KEY_SECRET --data-file=- --project "$PROJECT" --non-interactive
+
+      - name: Prices
+        if: env.HAS_KEY == 'true'
+        run: |
+          printf 'PLUS_MONTH_PAISE=%s\nPLUS_YEAR_PAISE=%s\n' "${{ vars.PLUS_MONTH_PAISE || '14900' }}" "${{ vars.PLUS_YEAR_PAISE || '119900' }}" > "functions/.env.$PROJECT"
+
+      - name: Deploy
+        if: env.HAS_KEY == 'true'
+        run: |
+          # without Razorpay's keys yet, only the rules go out (the checkout needs them)
+          ONLY=firestore:rules
+          if [ "$HAS_RAZORPAY" = "true" ]; then ONLY=functions,firestore:rules; fi
+          npx -y firebase-tools@15 deploy --only "$ONLY" --project "$PROJECT" --non-interactive --force
+
+      - name: Forget the key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/deploy-key.json"

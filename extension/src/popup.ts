@@ -28,6 +28,10 @@ interface Snapshot {
   /** your name from last time */
   name?: string;
   site?: string;
+  /** the Soultied Plus code added in this browser (the letters, and until when) */
+  plus?: { until: number; code: string } | null;
+  /** Plus is on for the watch party you're in (yours or your person's), until then */
+  partyPlus?: number | null;
 }
 
 const CSS = `
@@ -92,7 +96,56 @@ const ERRORS: Record<string, string> = {
   full: 'That watch party already has two people in it.',
   link: 'That doesn’t look like a Soultied watch party link.',
 };
+const PLUS_ERRORS: Record<string, string> = {
+  invalid: 'That code isn’t right. Check it and try again.',
+  expired: 'That code’s time is up. Get a new one to keep Plus.',
+  full: 'That code is already in use on three browsers.',
+  offline: 'Couldn’t reach Soultied. Check your connection and try again.',
+};
 const errorText = (e?: string) => ERRORS[e || ''] || 'That didn’t work. Try again in a moment.';
+const day = (ms: number) => new Date(ms).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' });
+
+/** Soultied Plus: on (until when), or get it / add the code you got. */
+function plusBox(s: Snapshot, refresh: () => void) {
+  const box = el('div', 'plus');
+  if (s.plus) {
+    box.append(el('div', '', `Soultied Plus is on until ${day(s.plus.until)}: cameras and voice in your watch parties, for both of you.`));
+    const code = s.plus.code;
+    box.append(el('div', 'muted', `Code ${code.slice(0, 4)}-${code.slice(4, 8)}-${code.slice(8)}`));
+    return box;
+  }
+  if (s.partyPlus && s.partyPlus > Date.now()) {
+    box.append(el('div', '', `Your person has Soultied Plus: cameras and voice are on for this party (until ${day(s.partyPlus)}).`));
+    return box;
+  }
+  box.append(el('div', '', 'Soultied Plus: cameras and voice while you watch. One of you having it covers you both.'));
+  const btns = el('div', 'btns');
+  btns.append(button('Get Plus', () => void ask({ kind: 'openPlus' }), ''));
+  box.append(btns);
+  const form = el('form');
+  const input = el('input');
+  input.placeholder = 'Got a code? XXXX-XXXX-XXXX';
+  input.setAttribute('aria-label', 'Soultied Plus code');
+  input.autocomplete = 'off';
+  input.spellcheck = false;
+  const add = el('button', 'paper', 'Add');
+  add.type = 'submit';
+  form.append(input, add);
+  const err = el('div', 'err');
+  form.onsubmit = (ev) => {
+    ev.preventDefault();
+    if (input.value.replace(/[^a-z0-9]/gi, '').length < 8) return input.focus();
+    add.disabled = true;
+    err.textContent = '';
+    void ask<{ ok: boolean; error?: string }>({ kind: 'plusCode', code: input.value }).then((r) => {
+      add.disabled = false;
+      if (r?.ok) refresh();
+      else err.textContent = PLUS_ERRORS[r?.error || ''] || 'That didn’t work. Try again in a moment.';
+    });
+  };
+  box.append(form, err);
+  return box;
+}
 
 async function copy(text: string) {
   try {
@@ -211,7 +264,7 @@ function render(s: Snapshot, opts: { copied?: boolean } = {}) {
     );
     wrap.append(linkBox(party.link, !!opts.copied));
     showLines(s, wrap, party.partner || 'Your person');
-    wrap.append(el('div', 'plus', 'Voice and cameras are coming with Soultied Plus. For now, there’s the chat on the show.'));
+    wrap.append(plusBox(s, () => refresh()));
     const leave = el('div', 'btns');
     leave.append(
       button(
@@ -272,6 +325,7 @@ function render(s: Snapshot, opts: { copied?: boolean } = {}) {
         }),
       ),
     );
+    wrap.append(plusBox(s, () => refresh()));
   }
 
   const opens = el('div', 'btns');

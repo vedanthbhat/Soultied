@@ -1,4 +1,4 @@
-import { EXT_SOURCE, HUB_SOURCE, type BridgeBody, type ExtMsg, type PageToBridge, type PartyReply } from '../../src/stream/protocol';
+import { EXT_SOURCE, HUB_SOURCE, type BridgeBody, type ExtMsg, type PageToBridge, type PartyReply, type PlusReply } from '../../src/stream/protocol';
 
 /**
  * Runs on the Soultied page. It stays silent until the page says it's
@@ -65,6 +65,14 @@ function start() {
       chrome.runtime.sendMessage({ kind: 'party', req: d.req }).then(
         (res: PartyReply | undefined) => post({ kind: 'party', rid, res: res || failed }),
         () => post({ kind: 'party', rid, res: failed }),
+      );
+    } else if (d.kind === 'plus') {
+      // the Plus page, handing over the code you just bought
+      const rid = d.rid;
+      const failed: PlusReply = { ok: false, error: 'failed' };
+      chrome.runtime.sendMessage({ kind: 'plusCode', code: String(d.code || '').slice(0, 40) }).then(
+        (res: PlusReply | undefined) => post({ kind: 'plus', rid, res: res || failed }),
+        () => post({ kind: 'plus', rid, res: failed }),
       );
     }
   });

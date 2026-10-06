@@ -1,5 +1,18 @@
 import { randomAvatar } from '../../src/pixel/character';
-import { partyIdFrom, partyLink, watchUrl, type ExtMsg, type HubMsg, type PartyReply, type PartyRequest, type Session, type TitleInfo } from '../../src/stream/protocol';
+import {
+  partyIdFrom,
+  partyLink,
+  PLUS_URL,
+  plusCodeKey,
+  watchUrl,
+  type ExtMsg,
+  type HubMsg,
+  type PartyReply,
+  type PartyRequest,
+  type PlusReply,
+  type Session,
+  type TitleInfo,
+} from '../../src/stream/protocol';
 import type { FromOffscreen, OpenReply, PartyMe, ToOffscreen } from './offscreen';
 
 /**
@@ -41,8 +54,20 @@ interface PlayerStatus {
   title?: TitleInfo | null;
 }
 
-type PlayerMsg = ExtMsg | { kind: 'openHub' } | { kind: 'status'; status: PlayerStatus } | { kind: 'startParty'; name: string };
-type ToPlayer = HubMsg | { kind: 'nohub' } | { kind: 'partyStarted'; link: string } | { kind: 'partyError'; error: string };
+type PlayerMsg =
+  | ExtMsg
+  | { kind: 'openHub' }
+  | { kind: 'status'; status: PlayerStatus }
+  | { kind: 'startParty'; name: string }
+  | { kind: 'joinParty'; link: string; name: string }
+  | { kind: 'redeem'; code: string };
+type ToPlayer =
+  | HubMsg
+  | { kind: 'nohub' }
+  | { kind: 'partyStarted'; link: string }
+  | { kind: 'partyError'; error: string }
+  | { kind: 'joined'; url: string | null }
+  | { kind: 'plusResult'; res: PlusReply };
 
 const hubs: chrome.runtime.Port[] = [];
 const players = new Set<chrome.runtime.Port>();
@@ -64,6 +89,55 @@ const stored = chrome.storage.local.get('party').then((r) => {
 
 const hub = () => hubs[hubs.length - 1] || null;
 const session = () => (party ? partySession : hub() ? siteSession : null);
+
+/* ---------------- Soultied Plus (kept on this computer: the code you added, and until when) ---------------- */
+
+interface PlusSaved {
+  code: string;
+  hash: string;
+  until: number;
+}
+
+async function plusSaved(): Promise<PlusSaved | null> {
+  const r = await chrome.storage.local.get('plus');
+  const p = r.plus as PlusSaved | undefined;
+  return p && p.until > Date.now() ? p : null;
+}
+
+async function sha256(text: string) {
+  const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, '0')).join('');
+}
+
+/** Add a Plus code to this browser (it's checked against Soultied's list), and use it for the party you're in. */
+async function redeem(code: string): Promise<PlusReply> {
+  const key = plusCodeKey(code);
+  if (key.length < 8) return { ok: false, error: 'invalid' };
+  const r = await ask<PlusReply>({ op: 'redeem', key });
+  if (!r) return { ok: false, error: 'offline' };
+  if (r.ok) {
+    await chrome.storage.local.set({ plus: { code: key, hash: await sha256(key), until: r.until } satisfies PlusSaved });
+    tellParty({ op: 'plus', plus: await plusSaved() });
+  } else if (!party && players.size === 0) void chrome.offscreen.closeDocument().catch(() => undefined);
+  return r;
+}
+
+/* ---------------- the toolbar button, per Netflix / Prime tab ---------------- */
+
+function badge(tabId: number | null, s: PlayerStatus | null) {
+  if (tabId == null) return;
+  const text = !s ? '' : s.connected ? 'ON' : '+';
+  const title = !s
+    ? 'Soultied: watch together'
+    : s.connected
+      ? s.partnerHere
+        ? 'Soultied: watching together'
+        : 'Soultied: waiting for your person'
+      : 'Start a Soultied watch party';
+  void chrome.action.setBadgeText({ tabId, text }).catch(() => undefined);
+  void chrome.action.setBadgeBackgroundColor({ tabId, color: s?.connected ? '#6a7856' : '#b8674f' }).catch(() => undefined);
+  void chrome.action.setTitle({ tabId, title }).catch(() => undefined);
+}
 
 function toPlayers(msg: ToPlayer) {
   players.forEach((p) => {
@@ -155,6 +229,7 @@ function ensureParty(): Promise<boolean> {
         return false;
       }
       setPartySession(r.session);
+      void plusSaved().then((plus) => tellParty({ op: 'plus', plus }));
       return true;
     });
   }
@@ -192,6 +267,7 @@ async function enterParty(id: string, s: Session | null) {
   if (!before) toSite({ kind: 'bye' });
   setPartySession(s);
   if (players.size) tellParty({ op: 'ext', msg: { kind: 'hello' } });
+  tellParty({ op: 'plus', plus: await plusSaved() });
 }
 
 async function startParty(name: string, title: TitleInfo | null): Promise<{ ok: true; link: string } | { ok: false; error: string }> {
@@ -264,7 +340,33 @@ function onPlayer(port: chrome.runtime.Port, msg: PlayerMsg) {
     return;
   }
   if (msg.kind === 'status') {
-    statuses.set(port, { ...msg.status, tabId: port.sender?.tab?.id ?? null });
+    const tabId = port.sender?.tab?.id ?? null;
+    const before = statuses.get(port);
+    statuses.set(port, { ...msg.status, tabId });
+    if (!before || before.connected !== msg.status.connected || before.partnerHere !== msg.status.partnerHere) badge(tabId, msg.status);
+    return;
+  }
+  if (msg.kind === 'joinParty') {
+    const id = partyIdFrom(msg.link);
+    const reply = (m: ToPlayer) => {
+      try {
+        port.postMessage(m);
+      } catch {
+        // that tab closed
+      }
+    };
+    if (!id) return reply({ kind: 'partyError', error: 'link' });
+    void joinParty(id, msg.name).then((r) => reply(r.ok ? { kind: 'joined', url: r.op === 'join' ? r.url : null } : { kind: 'partyError', error: r.error }));
+    return;
+  }
+  if (msg.kind === 'redeem') {
+    void redeem(msg.code).then((res) => {
+      try {
+        port.postMessage({ kind: 'plusResult', res } satisfies ToPlayer);
+      } catch {
+        // that tab closed
+      }
+    });
     return;
   }
   if (msg.kind === 'startParty') {
@@ -319,6 +421,7 @@ chrome.runtime.onConnect.addListener((port) => {
     port.onMessage.addListener((msg: PlayerMsg) => void stored.then(() => onPlayer(port, msg)));
     port.onDisconnect.addListener(() => {
       players.delete(port);
+      badge(statuses.get(port)?.tabId ?? null, null);
       statuses.delete(port);
       if (!players.size) toHub({ kind: 'bye' });
       tellPlayerCount();
@@ -342,6 +445,9 @@ type PopupMsg =
   | { kind: 'startParty'; name: string }
   | { kind: 'joinParty'; link: string; name: string }
   | { kind: 'leaveParty' }
+  | { kind: 'openPlus' }
+  /** a Soultied Plus code: typed in the toolbar window, or handed over by the Plus page (through the bridge) */
+  | { kind: 'plusCode'; code: string }
   /** from the join page on Soultied's site, through the bridge */
   | { kind: 'party'; req: PartyRequest };
 
@@ -365,6 +471,8 @@ async function popupState() {
     party: party ? { link: partyLink(party.id, DEFAULT_HUB), partner: partySession?.partner?.name || null } : null,
     name: await savedName(),
     site: DEFAULT_HUB,
+    plus: await plusSaved().then((p) => (p ? { until: p.until, code: p.code } : null)),
+    partyPlus: party ? partySession?.party?.plusUntil || null : null,
   };
 }
 
@@ -400,6 +508,11 @@ async function onRequest(msg: PopupMsg, sender: { tab?: { id?: number } }): Prom
     case 'leaveParty':
       await endParty(true);
       return { ok: true };
+    case 'openPlus':
+      await chrome.tabs.create({ url: PLUS_URL, active: true });
+      return { ok: true };
+    case 'plusCode':
+      return redeem(msg.code);
     case 'party': {
       // only Soultied's own pages get here (that's where the bridge runs)
       if (!sender.tab) return { ok: false, error: 'failed' };

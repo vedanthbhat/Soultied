@@ -46,6 +46,9 @@ declare namespace chrome {
   }
   namespace action {
     const onClicked: { addListener(fn: () => void): void };
+    function setBadgeText(p: { tabId?: number; text: string }): Promise<void>;
+    function setBadgeBackgroundColor(p: { tabId?: number; color: string }): Promise<void>;
+    function setTitle(p: { tabId?: number; title: string }): Promise<void>;
   }
   namespace offscreen {
     function createDocument(p: { url: string; reasons: string[]; justification: string }): Promise<void>;

@@ -58,7 +58,7 @@ export type StreamEvent =
   /** countdown start: ready to go */
   | { type: 'ready'; on: boolean; by: string; at: number }
   | { type: 'countdown'; pos: number; inMs: number; key: string | null; by: string; at: number }
-  // cameras and voice (handled by the Soultied tabs, same shapes as the YouTube room)
+  // cameras and voice (a Soultied tab handles them for a place; the show tab itself in a Plus watch party; same shapes as the YouTube room)
   | { type: 'rtc'; to: string; by: string; at: number; description?: RTCSessionDescriptionInit; candidate?: RTCIceCandidateInit | null }
   | { type: 'media'; cam: boolean; talking: boolean; by: string; at: number };
 
@@ -92,12 +92,26 @@ export interface Session {
   party?: PartyInfo;
 }
 
-/** A watch party: two people, no Soultied place needed. Voice and cameras aren't part of it (they're for Soultied Plus). */
+/** A watch party: two people, no Soultied place needed. Voice and cameras come with Soultied Plus. */
 export interface PartyInfo {
   id: string;
   /** the link to send your person */
   link: string;
+  /** Soultied Plus covers this party until then (ms): cameras and voice for both of you. One of you having it is enough. */
+  plusUntil?: number | null;
 }
+
+/** Where to get Soultied Plus. */
+export const PLUS_URL = 'https://soultied.app/plus/';
+
+/** A Plus code as typed ("abcd-efgh-jkmn", with spaces or not) -> the letters that matter. */
+export const plusCodeKey = (code: string) => code.toUpperCase().replace(/[^A-Z0-9]/g, '');
+
+/** What adding a Plus code answers. */
+export type PlusReply =
+  | { ok: true; until: number }
+  /** invalid: no such code · expired: its time is up · full: already used on three browsers */
+  | { ok: false; error: 'invalid' | 'expired' | 'full' | 'offline' | 'failed' };
 
 /** Soultied's website, where watch-party links open. */
 export const SITE = 'https://soultied.app/';
@@ -138,8 +152,18 @@ export type ExtMsg =
 export const HUB_SOURCE = 'soultied-hub';
 export const EXT_SOURCE = 'soultied-ext';
 
-export type PageBody = { kind: 'probe' } | { kind: 'hub' } | { kind: 'msg'; msg: HubMsg } | { kind: 'party'; rid: number; req: PartyRequest };
-export type BridgeBody = { kind: 'present'; version: string } | { kind: 'msg'; msg: ExtMsg } | { kind: 'party'; rid: number; res: PartyReply };
+export type PageBody =
+  | { kind: 'probe' }
+  | { kind: 'hub' }
+  | { kind: 'msg'; msg: HubMsg }
+  | { kind: 'party'; rid: number; req: PartyRequest }
+  /** the Plus page handing a fresh code to the extension */
+  | { kind: 'plus'; rid: number; code: string };
+export type BridgeBody =
+  | { kind: 'present'; version: string }
+  | { kind: 'msg'; msg: ExtMsg }
+  | { kind: 'party'; rid: number; res: PartyReply }
+  | { kind: 'plus'; rid: number; res: PlusReply };
 export type PageToBridge = { source: typeof HUB_SOURCE } & PageBody;
 export type BridgeToPage = { source: typeof EXT_SOURCE } & BridgeBody;
 
