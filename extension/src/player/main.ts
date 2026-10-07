@@ -122,6 +122,11 @@ if (adapter && !running) {
       }
       void call.talk(down);
     },
+    mic: (open) => {
+      syncCall();
+      if (!call) return overlay.plusNote();
+      void call.setMic(open);
+    },
   });
   const engine = new Engine(adapter, (m) => send(m), overlay);
   overlay.engine = engine;

@@ -14,7 +14,7 @@ import { StreamPanel } from './StreamPanel';
  * Watch together (YouTube). The camera swings round behind the couch; the
  * YouTube player sits exactly inside the pixel TV. Nothing is ever drawn on
  * top of the player: the controls live beside or below it. You can turn your
- * cameras on (little framed pictures beside the TV) and hold to talk.
+ * cameras on (little framed pictures beside the TV), and mics (unmute, or hold to talk).
  */
 
 interface Fit {
@@ -554,7 +554,7 @@ export const WatchParty: React.FC<{ onExit: () => void }> = ({ onExit }) => {
   const headerInRemote = stacked || headerRoom < 230;
 
   const paused = tv !== 'playing';
-  const showCams = !!partnerUser && !!view && (view.camOn || view.partnerCam || view.talking || view.partnerTalking);
+  const showCams = !!partnerUser && !!view && (view.camOn || view.partnerCam || view.micOpen || view.partnerMic || view.talking || view.partnerTalking);
   // where the camera frames go: beside the TV, in the corner beside the remote, or (phones) under the scene
   const leftRoom = tvBox.left - BEZEL * fit.s - 32;
   const cornerRoom = (W - Math.min(760, W - 32)) / 2 - 32;
@@ -580,10 +580,20 @@ export const WatchParty: React.FC<{ onExit: () => void }> = ({ onExit }) => {
         name={partnerName}
         avatar={partnerUser?.avatar || null}
         talking={view.partnerTalking}
+        micOpen={view.partnerMic}
         width={bigW}
         stuck={view.stuck}
       />
-      <CamFrame stream={view.local} on={view.camOn} mine name={currentUser.name} avatar={currentUser.avatar} talking={view.talking} width={smallW} />
+      <CamFrame
+        stream={view.local}
+        on={view.camOn}
+        mine
+        name={currentUser.name}
+        avatar={currentUser.avatar}
+        talking={view.talking}
+        micOpen={view.micOpen}
+        width={smallW}
+      />
     </div>
   );
 

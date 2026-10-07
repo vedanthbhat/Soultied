@@ -17,6 +17,8 @@ export interface EngineUI {
   waiting(text: string | null): void;
   /** the "don't watch ahead" check */
   guard(g: { show: string; episode: string; partner: string; onWait(): void; onWatch(): void } | null): void;
+  /** "Rohan put on Dark. Taking you there…" (goes by itself after a moment unless you stay), or null to clear */
+  follow(f: { what: string; partner: string; onGo(): void; onStay(): void } | null): void;
 }
 
 type Outgoing = StreamEvent extends infer T ? (T extends StreamEvent ? Omit<T, 'by' | 'at'> : never) : never;
@@ -25,6 +27,12 @@ const PRESENT_MS = 50_000;
 const PING_MS = 20_000;
 const STATE_MS = 15_000;
 const TOGETHER_COUNTS_AFTER = 120; // seconds watched together before an episode counts as "seen together"
+/** you picked something yourself this recently: don't get pulled to what your person picked at the same moment */
+const OWN_PICK_MS = 10_000;
+/** after following your person somewhere, this long to catch up with them before anything you do counts */
+const ARRIVE_MS = 9_000;
+/** remembered across the page load that following your person causes */
+const FOLLOW_KEY = 'soultied-following';
 
 export class Engine {
   session: Session | null = null;
@@ -60,11 +68,38 @@ export class Engine {
   private dipped: number | null = null;
   private timer = 0;
 
+  /* following your person to what they put on */
+  /** this tab has had something on (so being on the home page means you left it, not that you just arrived) */
+  private hadTitle = false;
+  /** when you last picked something in this tab yourself */
+  private ownPickAt = 0;
+  /** the title we came to by following your person: catch up with them there rather than lead */
+  private following: string | null = null;
+  private arriveUntil = 0;
+  /** what we're about to follow them to (the card is up) */
+  private followTo: string | null = null;
+  /** titles you chose to stay away from ("Stay here") */
+  private stayed = new Set<string>();
+  /** your person's tab said goodbye: wait a moment before saying they got up (they're often just changing shows) */
+  private byeTimer = 0;
+  private byeAt = 0;
+  /** when we last said your person arrived (so "joined", "on the couch" and "came along" aren't all said at once) */
+  private arrivalSaidAt = 0;
+
   constructor(
     private a: Adapter,
     private out: (m: ExtMsg) => void,
     private ui: EngineUI,
-  ) {}
+  ) {
+    // we just followed your person here (the page load that took us here)
+    try {
+      const f = JSON.parse(sessionStorage.getItem(FOLLOW_KEY) || 'null') as { key?: string; at?: number } | null;
+      sessionStorage.removeItem(FOLLOW_KEY);
+      if (f?.key && Date.now() - (f.at || 0) < 60_000) this.following = f.key;
+    } catch {
+      // storage blocked: we just won't know
+    }
+  }
 
   /* ---------------- who's here ---------------- */
 
@@ -111,18 +146,23 @@ export class Engine {
       this.ready = { me: false, partner: false };
       this.clearHold();
     }
+    // the chat panel first, so these notes land in it (rather than popping up as well)
+    this.ui.update();
     // say we're here as soon as we're connected, before anything's playing, so you each see the other arrive
     if (s && changed) {
       this.sayHello();
       const p = s.partner;
       const samePlace = !!before && before.me.id === s.me.id && (before.party?.id || '') === (s.party?.id || '');
-      if (s.party && p && samePlace) this.ui.note(`${p.name} joined your watch party.`);
-      else if (s.party && !p) this.ui.note('Your watch party is ready. Send the link to your person; when they open it, they land on this show.');
-      else if (!this.v && !this.key)
+      if (s.party && p && samePlace) {
+        this.ui.note(`${p.name} joined your watch party.`);
+        this.arrivalSaidAt = Date.now();
+      } else if (s.party && !p) {
+        // a new party: the link to send is right there in the chat panel
+      } else if (!this.v && !this.key)
         this.ui.note(
           p
             ? s.party
-              ? `You're in a watch party with ${p.name}. Start something; when ${p.name} opens the same thing, you're in sync.`
+              ? `You're in a watch party with ${p.name}. Whatever one of you puts on, the other comes along.`
               : `Soultied is on. Start something; when ${p.name} opens the same thing, you're in sync.`
             : 'Soultied is on.',
         );
@@ -183,10 +223,23 @@ export class Engine {
     v.addEventListener('playing', this.onFlowing);
     v.addEventListener('canplay', this.onFlowing);
     this.expected = { pos: v.currentTime, at: Date.now(), playing: !v.paused };
+    // followed your person here: what the player does by itself while it loads isn't you choosing anything
+    if (this.following && this.following === this.key) this.arriveUntil = Date.now() + ARRIVE_MS;
     if (this.session) this.sayHello();
     // started playing on its own (autoplay) before we were watching
-    if (!v.paused) this.guardCheck();
+    if (!v.paused && !this.arriving) this.guardCheck();
     this.ui.update();
+  }
+
+  /** just followed your person here and still catching up with them */
+  private get arriving() {
+    return Date.now() < this.arriveUntil;
+  }
+
+  /** what the player did by itself while we were arriving: note where it is, tell no one */
+  private quietly() {
+    const v = this.v!;
+    this.expected = { pos: v.currentTime, at: Date.now(), playing: !v.paused };
   }
 
   /** we caused this play/pause/seek ourselves (following your person) */
@@ -196,6 +249,7 @@ export class Engine {
 
   private onPlay = () => {
     if (this.ours(true)) return;
+    if (this.arriving) return this.quietly();
     const v = this.v!;
     // the "no watching ahead" card is up: choose there first
     if (this.guardOpen) return this.apply({ pos: v.currentTime, playing: false });
@@ -210,6 +264,7 @@ export class Engine {
 
   private onPause = () => {
     if (this.ours(false)) return;
+    if (this.arriving) return this.quietly();
     if (this.guardOpen) return;
     const v = this.v!;
     if (v.ended) return;
@@ -221,6 +276,7 @@ export class Engine {
 
   private onSeeked = () => {
     if (this.ours()) return;
+    if (this.arriving) return this.quietly();
     const v = this.v!;
     const now = Date.now();
     const guess = projectedPosition(this.expected.pos, this.expected.at, this.expected.playing, now);
@@ -343,6 +399,19 @@ export class Engine {
   private changedTitle(key: string | null) {
     const from = this.key;
     if (from && this.title && this.together >= TOGETHER_COUNTS_AFTER) this.out({ kind: 'watched', title: this.title, pos: this.v?.currentTime || 0 });
+    if (key) {
+      this.hadTitle = true;
+      // something you put on yourself (not where your person took you)
+      if (key !== this.following) {
+        this.following = null;
+        this.ownPickAt = Date.now();
+      }
+    }
+    // the card for following them goes once you're on something (theirs or your own)
+    if (key && this.followTo) {
+      this.followTo = null;
+      this.ui.follow(null);
+    }
     this.key = key;
     this.title = null;
     this.together = 0;
@@ -391,7 +460,8 @@ export class Engine {
       case 'hello': {
         this.partnerWhere = { title: e.title, pos: e.pos, playing: e.playing };
         this.partnerHelloAt = Date.now();
-        if (!was) this.ui.note(`${name} is on the couch.`);
+        if (!was) this.back(name);
+        if (e.title && this.party && !this.hadTitle) this.offerFollow(e.title);
         if (this.v) this.send({ type: 'state', reply: true, ...this.where() });
         if (this.lock.on && this.lock.by === this.me) this.send({ type: 'lock', on: true });
         if (this.ready.me) this.send({ type: 'ready', on: true });
@@ -400,11 +470,18 @@ export class Engine {
       }
       case 'ping':
         this.partnerWhere = { title: e.title, pos: e.pos, playing: e.playing };
-        if (!was) this.ui.note(`${name} is on the couch.`);
+        if (!was) this.back(name);
+        if (e.title && this.party && !this.hadTitle) this.offerFollow(e.title);
         this.setPartnerBuffering(!!e.buffering, e.pos);
         break;
       case 'bye':
-        if (was) this.ui.note(`${name} got up from the couch.`);
+        if (was) {
+          this.byeAt = Date.now();
+          window.clearTimeout(this.byeTimer);
+          this.byeTimer = window.setTimeout(() => {
+            if (!this.partnerHere) this.ui.note(`${name} got up from the couch.`);
+          }, 8000);
+        }
         this.partnerWhere = null;
         this.setPartnerBuffering(false, 0);
         this.ready.partner = false;
@@ -438,6 +515,14 @@ export class Engine {
         this.partnerWhere = { title: e.title, pos: e.pos, playing: e.playing };
         if (!this.v || !e.title || e.title.key !== this.key || this.countingDown) break;
         const pos = projectedPosition(e.pos, e.at, e.playing);
+        if (this.arriving || this.following === this.key) {
+          // we followed them here: be where they are
+          this.following = null;
+          this.arriveUntil = 0;
+          this.leader = false;
+          if (Math.abs(this.v.currentTime - pos) > 2 || e.playing !== !this.v.paused) this.apply({ pos, playing: e.playing });
+          break;
+        }
         if (e.reply) {
           // they were here first: catch up with them (if we both just arrived, one of us follows)
           const bothNew = Math.abs(this.partnerHelloAt - this.helloAt) < 5000 && this.partnerHelloAt > 0;
@@ -457,12 +542,12 @@ export class Engine {
       case 'title': {
         const prev = this.partnerWhere?.title?.key || e.from;
         this.partnerWhere = { title: e.title, pos: 0, playing: false };
-        // they moved on to the next episode of what we were watching together: come along
-        const sameShow = !!this.title && e.title.showKey === this.title.showKey;
-        if (prev && prev === this.key && sameShow && e.title.key !== this.key && this.a.platform === 'netflix' && e.title.platform === 'netflix') {
-          this.ui.note(`Following ${name} to ${titleLabel(e.title)}.`);
-          window.setTimeout(() => location.assign(this.a.linkAt(e.title, 0)), 1200);
-        }
+        // They put something on. In a watch party you go wherever they go (and they come wherever you go).
+        // With your Soultied place, you come along when you were watching the same thing together.
+        if (e.title.key === this.key) {
+          // they came to what you put on
+          if (prev !== this.key && Date.now() - this.arrivalSaidAt > 15_000) this.ui.note(this.party ? `${name} came along.` : `${name} is watching with you.`);
+        } else if (this.party || (!!prev && prev === this.key)) this.offerFollow(e.title);
         break;
       }
       case 'chat':
@@ -486,6 +571,16 @@ export class Engine {
         break;
     }
     this.ui.update();
+  }
+
+  /** Your person's tab is back: say so, unless they were only gone a moment (changing shows). */
+  private back(name: string) {
+    window.clearTimeout(this.byeTimer);
+    const blink = Date.now() - this.byeAt < 8000;
+    this.byeAt = 0;
+    if (blink || Date.now() - this.arrivalSaidAt < 15_000) return;
+    this.arrivalSaidAt = Date.now();
+    this.ui.note(`${name} is on the couch.`);
   }
 
   private same(key: string | null) {
@@ -578,7 +673,47 @@ export class Engine {
   goToPartner() {
     const w = this.partnerWhere;
     if (!w?.title) return;
-    location.assign(this.a.linkAt(w.title, projectedPosition(w.pos, Date.now(), false)));
+    this.followTo = null;
+    this.ui.follow(null);
+    this.go(w.title, projectedPosition(w.pos, Date.now(), false));
+  }
+
+  /** Go to a title your person is on, remembering (across the page load) to catch up with them there. */
+  private go(t: TitleInfo, pos: number) {
+    try {
+      sessionStorage.setItem(FOLLOW_KEY, JSON.stringify({ key: t.key, at: Date.now() }));
+    } catch {
+      // storage blocked: we'll still catch up when they say where they are
+    }
+    location.assign(this.a.linkAt(t, pos));
+  }
+
+  /**
+   * Your person put something on: take you there too, after a moment to say "stay here".
+   * Not if you're already on it, it's on the other site, you just picked something yourself
+   * (whoever picked last leads), or you said you'd stay away from it.
+   */
+  private offerFollow(t: TitleInfo) {
+    if (!this.session || t.key === this.key || t.platform !== this.a.platform) return;
+    if (this.stayed.has(t.key) || this.followTo === t.key || this.guardOpen || this.countingDown) return;
+    if (this.key && Date.now() - this.ownPickAt < OWN_PICK_MS) return;
+    this.followTo = t.key;
+    this.ui.follow({
+      what: titleLabel(t),
+      partner: this.partnerName,
+      onGo: () => {
+        if (this.followTo !== t.key) return;
+        const w = this.partnerWhere;
+        const pos = w?.title?.key === t.key ? projectedPosition(w.pos, Date.now(), false) : 0;
+        this.go(t, pos);
+      },
+      onStay: () => {
+        this.stayed.add(t.key);
+        this.followTo = null;
+        this.ui.follow(null);
+        this.ui.update();
+      },
+    });
   }
 
   /**

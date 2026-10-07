@@ -23,7 +23,7 @@ export type WatchEvent =
   | { type: 'chat'; id: string; text: string; by: string; name: string; at: number }
   // the video call: WebRTC signalling, and what each person's camera / mic is doing
   | { type: 'rtc'; to: string; by: string; at: number; description?: RTCSessionDescriptionInit; candidate?: RTCIceCandidateInit | null }
-  | { type: 'media'; cam: boolean; talking: boolean; by: string; at: number };
+  | { type: 'media'; cam: boolean; talking: boolean; mic?: boolean; by: string; at: number };
 
 export interface WatchTransport {
   kind: 'local' | 'online';

@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Soultied: watch together",
   "short_name": "Soultied",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "Watch Netflix and Prime Video in sync with your person: send a link, chat and react on a pixel couch. Cameras with Soultied Plus.",
   "icons": {
     "16": "icons/16.png",

@@ -60,7 +60,7 @@ export type StreamEvent =
   | { type: 'countdown'; pos: number; inMs: number; key: string | null; by: string; at: number }
   // cameras and voice (a Soultied tab handles them for a place; the show tab itself in a Plus watch party; same shapes as the YouTube room)
   | { type: 'rtc'; to: string; by: string; at: number; description?: RTCSessionDescriptionInit; candidate?: RTCIceCandidateInit | null }
-  | { type: 'media'; cam: boolean; talking: boolean; by: string; at: number };
+  | { type: 'media'; cam: boolean; talking: boolean; mic?: boolean; by: string; at: number };
 
 export interface Person {
   id: string;

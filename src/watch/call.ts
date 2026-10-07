@@ -5,7 +5,9 @@ import { hasRelay, iceNow, loadIce } from './ice';
  * A two-person video call for the watch room, over WebRTC.
  *
  * - Cameras are on/off per person. Turning yours off stops the camera light.
- * - Microphones are push-to-talk: your voice is only sent while you hold Talk.
+ * - Microphones are muted until you unmute them (then they stay on), or push-to-talk
+ *   while muted: your voice is only sent while you hold Talk. With the mic on, the
+ *   show turns down only while you're actually speaking.
  * - Signalling (offers, answers, network candidates) travels over the same
  *   transport as the play/pause sync, so it works wherever that works: between
  *   two tabs today, and between two devices once the backend replaces it.
@@ -25,8 +27,13 @@ export interface CallView {
   camOn: boolean;
   /** true once the mic has been allowed (we keep it, muted, between presses) */
   micReady: boolean;
+  /** my mic is unmuted (it stays on until I mute it) */
+  micOpen: boolean;
+  /** my voice is going out right now: holding Talk, or speaking with the mic on */
   talking: boolean;
   partnerCam: boolean;
+  /** the other person's mic is unmuted */
+  partnerMic: boolean;
   partnerTalking: boolean;
   link: CallLink;
   /** we've tried for a while and can't reach the other person (their picture and voice won't come through) */
@@ -37,6 +44,10 @@ export interface CallView {
 
 /** how long a connection may take before we say it isn't getting through */
 const STUCK_MS = 20_000;
+/** how loud (RMS, 0–1) the mic has to be to count as speaking, with the mic on */
+const VOICE_RMS = 0.02;
+/** keep "speaking" this long after the last loud moment, so the show doesn't bob between words */
+const VOICE_HANG_MS = 800;
 
 /** what to tell you when the two of you can't reach each other */
 export const stuckMessage = (partnerName: string) =>
@@ -59,8 +70,10 @@ export class WatchCall {
     remote: null,
     camOn: false,
     micReady: false,
+    micOpen: false,
     talking: false,
     partnerCam: false,
+    partnerMic: false,
     partnerTalking: false,
     link: 'idle',
     stuck: false,
@@ -80,6 +93,9 @@ export class WatchCall {
   private micSender: RTCRtpSender | null = null;
   private outStream = new MediaStream();
   private holding = false;
+  private micOpen = false;
+  private speaking = false;
+  private vad: { ctx: AudioContext; timer: number } | null = null;
   private closed = false;
   private ice: RTCIceServer[] = iceNow();
   private restarts = 0;
@@ -166,7 +182,7 @@ export class WatchCall {
 
   /** tell the other side what my camera and mic are doing */
   announce() {
-    this.send({ type: 'media', cam: this.view.camOn, talking: this.view.talking, by: this.me, at: Date.now() });
+    this.send({ type: 'media', cam: this.view.camOn, talking: this.view.talking, mic: this.micOpen, by: this.me, at: Date.now() });
   }
 
   /* ---------- the connection ---------- */
@@ -213,7 +229,9 @@ export class WatchCall {
     this.makingOffer = false;
     this.ignoreOffer = false;
     this.clearTimers();
-    this.set(fresh ? { remote: null, link: 'idle', stuck: false, partnerCam: false, partnerTalking: false } : { remote: null, link: 'idle' });
+    this.set(
+      fresh ? { remote: null, link: 'idle', stuck: false, partnerCam: false, partnerMic: false, partnerTalking: false } : { remote: null, link: 'idle' },
+    );
   }
 
   private ensurePc() {
@@ -273,7 +291,7 @@ export class WatchCall {
   async handle(e: WatchEvent) {
     if (this.closed || e.by === this.me) return;
     if (e.type === 'media') {
-      this.set({ partnerCam: e.cam, partnerTalking: e.talking });
+      this.set({ partnerCam: e.cam, partnerTalking: e.talking, partnerMic: !!e.mic });
       return;
     }
     if (e.type !== 'rtc' || e.to !== this.me) return;
@@ -346,47 +364,111 @@ export class WatchCall {
     }
   }
 
-  /* ---------- push to talk ---------- */
+  /* ---------- the microphone: unmuted, or push to talk ---------- */
 
-  async talk(down: boolean) {
-    this.holding = down;
-    if (down && !this.mic) {
-      if (this.view.busy) return;
-      if (!navigator.mediaDevices?.getUserMedia) {
-        this.set({ error: 'This browser can’t use a microphone here.' });
-        return;
-      }
-      this.set({ busy: 'mic', error: null });
-      try {
-        const s = await navigator.mediaDevices.getUserMedia({
-          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-          video: false,
-        });
-        if (this.closed) {
-          s.getTracks().forEach((t) => t.stop());
-          return;
-        }
-        const track = s.getAudioTracks()[0];
-        track.enabled = false;
-        this.mic = track;
-        this.outStream.addTrack(track);
-        if (this.micSender) await this.micSender.replaceTrack(track);
-        else if (this.pc) this.micSender = this.pc.addTrack(track, this.outStream);
-        else this.ensurePc();
-        this.set({ micReady: true, busy: null });
-      } catch (err) {
-        this.set({ busy: null, error: describeMediaError(err, 'microphone') });
-        return;
-      }
+  /** Ask for the microphone (once); it starts muted. */
+  private async ensureMic(): Promise<boolean> {
+    if (this.mic) return true;
+    if (this.view.busy) return false;
+    if (!navigator.mediaDevices?.getUserMedia) {
+      this.set({ error: 'This browser can’t use a microphone here.' });
+      return false;
     }
+    this.set({ busy: 'mic', error: null });
+    try {
+      const s = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+        video: false,
+      });
+      if (this.closed) {
+        s.getTracks().forEach((t) => t.stop());
+        return false;
+      }
+      const track = s.getAudioTracks()[0];
+      track.enabled = false;
+      this.mic = track;
+      this.outStream.addTrack(track);
+      if (this.micSender) await this.micSender.replaceTrack(track);
+      else if (this.pc) this.micSender = this.pc.addTrack(track, this.outStream);
+      else this.ensurePc();
+      this.set({ micReady: true, busy: null });
+      return true;
+    } catch (err) {
+      this.set({ busy: null, error: describeMediaError(err, 'microphone') });
+      return false;
+    }
+  }
+
+  /** Send my voice while held (or always, with the mic unmuted), and say whether I'm talking. */
+  private applyMic() {
     if (!this.mic) return;
-    // if the permission prompt took a while, only talk if they're still holding
-    const on = this.holding;
-    this.mic.enabled = on;
-    if (on !== this.view.talking) {
-      this.set({ talking: on });
+    this.mic.enabled = this.holding || this.micOpen;
+    const talking = this.holding || (this.micOpen && this.speaking);
+    if (talking !== this.view.talking) {
+      this.set({ talking });
       this.announce();
     }
+  }
+
+  /** Push to talk: hold to send your voice (with the mic muted). */
+  async talk(down: boolean) {
+    this.holding = down;
+    // if the permission prompt took a while, only talk if they're still holding
+    if (down && !this.mic && !(await this.ensureMic())) return;
+    this.applyMic();
+  }
+
+  /** Unmute (the mic stays on until you mute it) or mute. */
+  async setMic(open: boolean) {
+    if (open && !(await this.ensureMic())) return;
+    if (open === this.micOpen) return;
+    this.micOpen = open;
+    if (open) this.listen();
+    else this.stopListening();
+    this.set({ micOpen: open });
+    this.applyMic();
+    this.announce();
+  }
+
+  /** With the mic on: notice when I'm actually speaking (so the show turns down only then). */
+  private listen() {
+    if (this.vad || !this.mic || typeof AudioContext === 'undefined') return;
+    try {
+      const ctx = new AudioContext();
+      const an = ctx.createAnalyser();
+      an.fftSize = 1024;
+      ctx.createMediaStreamSource(new MediaStream([this.mic])).connect(an);
+      const buf = new Float32Array(an.fftSize);
+      let loud = 0;
+      let lastLoud = 0;
+      const timer = window.setInterval(() => {
+        an.getFloatTimeDomainData(buf);
+        let sum = 0;
+        for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+        const now = Date.now();
+        // two loud moments in a row (a click or a cough isn't speaking)
+        if (Math.sqrt(sum / buf.length) > VOICE_RMS) {
+          if (++loud >= 2) lastLoud = now;
+        } else loud = 0;
+        const speaking = lastLoud > 0 && now - lastLoud < VOICE_HANG_MS;
+        if (speaking !== this.speaking) {
+          this.speaking = speaking;
+          this.applyMic();
+        }
+      }, 100);
+      void ctx.resume().catch(() => undefined);
+      this.vad = { ctx, timer };
+    } catch {
+      // no way to listen: the mic still works, the show just doesn't turn down
+    }
+  }
+
+  private stopListening() {
+    if (!this.vad) return;
+    window.clearInterval(this.vad.timer);
+    void this.vad.ctx.close().catch(() => undefined);
+    this.vad = null;
+    this.speaking = false;
   }
 
   /** Ask for the microphone now (kept muted), so push-to-talk works later from another tab. */
@@ -404,11 +486,12 @@ export class WatchCall {
   destroy() {
     this.closed = true;
     this.clearTimers();
+    this.stopListening();
     this.cam?.stop();
     this.mic?.stop();
     this.cam = null;
     this.mic = null;
-    if (this.view.camOn || this.view.talking) this.send({ type: 'media', cam: false, talking: false, by: this.me, at: Date.now() });
+    if (this.view.camOn || this.view.talking || this.micOpen) this.send({ type: 'media', cam: false, talking: false, mic: false, by: this.me, at: Date.now() });
     this.pc?.close();
     this.pc = null;
     this.listeners.clear();

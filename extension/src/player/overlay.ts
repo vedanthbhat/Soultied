@@ -21,61 +21,72 @@ const REACTIONS: Array<{ kind: ReactionKind; label: string }> = [
 const CSS = `
 :host { all: initial; }
 * { box-sizing: border-box; }
-.root { position: fixed; inset: 0; pointer-events: none; z-index: 2147483600; font-family: 'Soultied Pixel', ui-sans-serif, system-ui, sans-serif; color: #3a2a26; font-size: 15px; line-height: 1.3; font-variant-ligatures: none; -webkit-font-smoothing: antialiased; }
+.root { position: fixed; inset: 0; pointer-events: none; z-index: 2147483600; font-family: 'Soultied Pixel', ui-sans-serif, system-ui, sans-serif; color: #3a2a26; font-size: 15px; line-height: 1.35; font-variant-ligatures: none; -webkit-font-smoothing: antialiased; }
 button { font: inherit; cursor: pointer; }
 .box { background: #f4e8d0; box-shadow: 0 -3px 0 0 #2b1e1c, 0 3px 0 0 #2b1e1c, -3px 0 0 0 #2b1e1c, 3px 0 0 0 #2b1e1c, 6px 6px 0 3px rgba(0,0,0,.35); }
-.btn { pointer-events: auto; border: 0; background: #b8674f; color: #fff4e2; padding: 6px 10px; box-shadow: 0 -3px 0 0 #2b1e1c, 0 3px 0 0 #2b1e1c, -3px 0 0 0 #2b1e1c, 3px 0 0 0 #2b1e1c, inset 0 -3px 0 0 #8f4b3a; }
+.btn { pointer-events: auto; border: 0; background: #b8674f; color: #fff4e2; padding: 6px 12px; line-height: 1.2; box-shadow: 0 -3px 0 0 #2b1e1c, 0 3px 0 0 #2b1e1c, -3px 0 0 0 #2b1e1c, 3px 0 0 0 #2b1e1c, inset 0 -3px 0 0 #8f4b3a; }
 .btn:hover { filter: brightness(1.06); }
 .btn:active { transform: translateY(2px); }
 .btn.paper { background: #eadbbd; color: #3a2a26; box-shadow: 0 -3px 0 0 #2b1e1c, 0 3px 0 0 #2b1e1c, -3px 0 0 0 #2b1e1c, 3px 0 0 0 #2b1e1c, inset 0 -3px 0 0 #d6c29c; }
 .btn.sage { background: #8a9a72; box-shadow: 0 -3px 0 0 #2b1e1c, 0 3px 0 0 #2b1e1c, -3px 0 0 0 #2b1e1c, 3px 0 0 0 #2b1e1c, inset 0 -3px 0 0 #6a7856; }
 .btn[disabled] { opacity: .6; cursor: default; }
-.btn.small { padding: 3px 8px; font-size: 13px; }
+.btn.small { padding: 5px 9px; font-size: 13px; }
+.btn:focus-visible, .reacts button:focus-visible, .x:focus-visible { outline: 2px solid #b8674f; outline-offset: 4px; }
 
 .tab { position: absolute; right: 0; top: 38%; pointer-events: auto; border: 0; background: #f4e8d0; padding: 10px 8px 10px 10px; display: flex; flex-direction: column; align-items: center; gap: 4px; box-shadow: 0 -3px 0 0 #2b1e1c, 0 3px 0 0 #2b1e1c, -3px 0 0 0 #2b1e1c, -6px 6px 0 0 rgba(0,0,0,.35); }
 .tab img { width: 21px; height: 18px; image-rendering: pixelated; }
 .tab .badge { background: #a84f4b; color: #fff4e2; font-size: 11px; padding: 0 5px; }
 .tab.hide { display: none; }
 
-.side { position: absolute; right: 14px; top: 9%; bottom: 13%; width: 300px; display: flex; flex-direction: column; pointer-events: auto; }
+.side { position: absolute; right: 16px; top: 9%; bottom: 12%; width: 320px; display: flex; flex-direction: column; pointer-events: auto; }
 .side.hide { display: none; }
-.head { padding: 10px 12px 8px; border-bottom: 3px dashed #d6c29c; position: relative; }
-.kicker { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: #8f4b3a; }
-.who { display: flex; align-items: center; gap: 7px; font-weight: 700; font-size: 17px; margin-top: 2px; }
+.head { padding: 12px 14px 11px; border-bottom: 3px dashed #d6c29c; display: flex; align-items: center; gap: 12px; }
+.head-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.kicker { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: #8f4b3a; }
+.who { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 17px; line-height: 1.25; color: #2b1e1c; }
 .dot { width: 9px; height: 9px; background: #b9a98f; flex: none; }
 .dot.on { background: #8a9a72; }
-.close { position: absolute; right: 8px; top: 8px; }
-.banners { display: flex; flex-direction: column; gap: 6px; padding: 8px 12px 0; }
-.banner { background: #fff8ea; padding: 7px 9px; font-size: 13px; display: flex; flex-direction: column; gap: 6px; box-shadow: inset 0 0 0 2px #d6c29c; }
+.close { flex: none; margin-right: 3px; }
+.banners { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px 0; }
+.banners:empty { display: none; }
+.banner { background: #fff8ea; padding: 10px 11px; font-size: 13px; line-height: 1.4; display: flex; flex-direction: column; gap: 9px; box-shadow: inset 0 0 0 2px #d6c29c; }
 .banner .btn { align-self: flex-start; }
-.controls { display: flex; gap: 8px; padding: 10px 12px 4px; flex-wrap: wrap; }
-.log { list-style: none; margin: 8px 0 0; padding: 4px 12px; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; scrollbar-width: thin; }
-.note { font-size: 13px; color: #7a5a48; text-align: center; }
-.msg { display: flex; gap: 6px; align-items: flex-start; }
+.controls, .calls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 14px 14px 0; }
+.calls { padding-top: 10px; }
+.controls .btn, .calls .btn { width: 100%; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.calls .btn[hidden] { display: none; }
+.log { list-style: none; margin: 14px 0 0; padding: 10px 14px; border-top: 3px dashed #d6c29c; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; scrollbar-width: thin; scrollbar-color: #d6c29c transparent; }
+.note { font-size: 12.5px; color: #7a5a48; text-align: center; line-height: 1.4; padding: 0 6px; }
+.msg { display: flex; gap: 7px; align-items: flex-end; }
 .msg.mine { flex-direction: row-reverse; }
 .msg img { width: 24px; height: 24px; image-rendering: pixelated; flex: none; background: #eadbbd; }
-.msg span { background: #eadbbd; padding: 4px 8px; max-width: 78%; word-break: break-word; font-size: 14px; }
+.msg span { background: #eadbbd; padding: 5px 9px; max-width: 78%; word-break: break-word; font-size: 14px; line-height: 1.35; }
 .msg.mine span { background: #f1dcc0; }
-.reacts { display: flex; gap: 8px; padding: 6px 12px; justify-content: space-between; }
-.reacts button { border: 0; background: #eadbbd; padding: 5px 9px; box-shadow: inset 0 0 0 2px #d6c29c; }
+.reacts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; padding: 10px 14px; border-top: 3px dashed #d6c29c; }
+.reacts button { border: 0; background: #eadbbd; height: 34px; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 0 0 2px #d6c29c; }
 .reacts button:hover { background: #fff8ea; }
 .reacts img { width: 21px; height: 21px; image-rendering: pixelated; display: block; object-fit: contain; }
-.compose { display: flex; gap: 8px; padding: 6px 12px 8px; }
-.compose input { flex: 1; min-width: 0; font: inherit; font-size: 14px; border: 0; padding: 6px 8px; background: #fff8ea; color: #2b1e1c; box-shadow: inset 0 0 0 2px #2b1e1c; outline: none; }
-.hint { font-size: 12px; color: #7a5a48; padding: 0 12px 10px; }
+.compose { display: flex; gap: 10px; padding: 0 14px 12px; }
+.compose input { flex: 1; min-width: 0; font: inherit; font-size: 14px; border: 0; padding: 7px 9px; background: #fff8ea; color: #2b1e1c; box-shadow: inset 0 0 0 2px #2b1e1c; outline: none; }
+.compose input:focus { box-shadow: inset 0 0 0 2px #2b1e1c, 0 0 0 3px #d6c29c; }
+.hint { font-size: 12px; color: #7a5a48; padding: 0 14px 12px; margin-top: -2px; line-height: 1.4; }
+.hint:empty { display: none; }
 
 .couch { position: absolute; left: 22px; bottom: 96px; pointer-events: none; filter: drop-shadow(3px 3px 0 rgba(0,0,0,.35)); }
 .couch.hide { display: none; }
 
 .toasts { position: absolute; top: 18px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 8px; align-items: center; }
-.toast { padding: 6px 12px; font-size: 14px; animation: in 160ms steps(3); max-width: 60vw; }
+.toast { padding: 8px 14px; font-size: 14px; line-height: 1.35; animation: in 160ms steps(3); max-width: min(560px, 70vw); text-align: center; }
 @keyframes in { from { opacity: 0; transform: translateY(-6px); } }
 
 .center { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
-.card { pointer-events: auto; padding: 18px 20px; max-width: 420px; display: flex; flex-direction: column; gap: 12px; }
-.card h3 { margin: 0; font-size: 22px; color: #2b1e1c; }
-.card p { margin: 0; }
-.card .row { display: flex; gap: 10px; flex-wrap: wrap; }
+.card { pointer-events: auto; padding: 18px 20px 20px; width: min(420px, calc(100vw - 40px)); display: flex; flex-direction: column; gap: 10px; }
+.card h3 { margin: 0; font-size: 21px; line-height: 1.25; color: #2b1e1c; }
+.card p { margin: 0; line-height: 1.4; }
+.card .top { display: flex; align-items: center; gap: 8px; }
+.card .top img { width: 21px; height: 18px; image-rendering: pixelated; }
+.card .muted { color: #7a5a48; font-size: 14px; }
+.card .row { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 6px; }
 .big { font-size: 120px; font-weight: 700; color: #fff4e2; text-shadow: 6px 6px 0 #2b1e1c, -3px -3px 0 #2b1e1c, 3px -3px 0 #2b1e1c, -3px 3px 0 #2b1e1c; }
 .pill { padding: 8px 14px; font-size: 16px; }
 
@@ -84,22 +95,23 @@ button { font: inherit; cursor: pointer; }
 .handle:hover { transform: translateX(-3px); background: #fff8ea; }
 .handle img { width: 21px; height: 18px; image-rendering: pixelated; }
 .handle.hide { display: none; }
-.connect { position: absolute; right: 14px; top: 38%; pointer-events: auto; padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 9px; width: 330px; font-size: 14px; }
+.connect { position: absolute; right: 16px; top: 34%; pointer-events: auto; padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 10px; width: 340px; font-size: 14px; line-height: 1.4; }
 .connect.hide { display: none; }
 .connect .top { display: flex; align-items: center; gap: 8px; }
 .connect .top img { width: 21px; height: 18px; image-rendering: pixelated; }
 .connect .top b { flex: 1; font-size: 16px; color: #2b1e1c; }
 .connect .x { border: 0; background: none; font-size: 15px; padding: 0 2px; color: #7a5a48; }
 .connect .x:hover { color: #2b1e1c; }
-.connect .or { font-size: 12px; color: #7a5a48; text-transform: uppercase; letter-spacing: .1em; border-top: 2px dashed #d6c29c; padding-top: 7px; }
-.connect .muted { font-size: 12px; color: #7a5a48; }
-.connect form { display: flex; gap: 8px; align-items: center; }
+.connect .or { font-size: 11px; color: #7a5a48; text-transform: uppercase; letter-spacing: .14em; border-top: 3px dashed #d6c29c; padding-top: 10px; margin-top: 4px; }
+.connect .muted { font-size: 12.5px; color: #7a5a48; }
+.connect form { display: flex; gap: 10px; align-items: center; }
 .connect form input { flex: 1; }
-.connect input, .banner input { font: inherit; font-size: 14px; border: 0; padding: 4px 7px; background: #fff8ea; color: #2b1e1c; box-shadow: inset 0 0 0 2px #2b1e1c; outline: none; min-width: 0; }
-.banner input { width: 100%; font-size: 12px; }
-.banner .row { display: flex; gap: 6px; align-items: center; }
+.connect input, .banner input { font: inherit; font-size: 14px; border: 0; padding: 6px 8px; background: #fff8ea; color: #2b1e1c; box-shadow: inset 0 0 0 2px #2b1e1c; outline: none; min-width: 0; }
+.connect input:focus, .banner input:focus { box-shadow: inset 0 0 0 2px #2b1e1c, 0 0 0 3px #d6c29c; }
+.banner input { width: 100%; font-size: 13px; }
+.banner .row { display: flex; gap: 10px; align-items: center; }
 .banner .row input { flex: 1; }
-.banner .muted { font-size: 12px; color: #7a5a48; }
+.banner .muted { font-size: 12.5px; color: #7a5a48; }
 
 /* cameras (Soultied Plus) */
 .cams { position: absolute; left: 22px; top: 70px; display: flex; flex-direction: column; gap: 12px; pointer-events: auto; }
@@ -116,13 +128,11 @@ button { font: inherit; cursor: pointer; }
 .wave i { width: 2px; background: #6a7856; animation: wave 600ms steps(3) infinite; }
 .wave i:nth-child(2) { animation-delay: 120ms; } .wave i:nth-child(3) { animation-delay: 240ms; }
 @keyframes wave { 0% { height: 3px; } 50% { height: 9px; } 100% { height: 4px; } }
-.calls { display: flex; gap: 8px; padding: 2px 12px 2px; flex-wrap: wrap; }
 .calls .btn { touch-action: none; user-select: none; }
 `;
 
 const HINT_PLACE = 'Hold T to talk. Cameras live in your Soultied tab (“Pop out cameras”).';
-const HINT_PARTY = 'Cameras and voice come with Soultied Plus.';
-const HINT_PLUS = 'Hold T to talk. Your camera only goes to your person.';
+const HINT_PLUS = 'Unmute to talk, or hold T while muted. Your camera and voice go only to your person.';
 
 const PLUS_ERRORS: Record<string, string> = {
   invalid: 'That code isn’t right. Check it and try again.',
@@ -139,6 +149,27 @@ export interface OverlayActions {
   redeem(code: string): void;
   camera(on: boolean): void;
   talk(down: boolean): void;
+  /** unmute (stays on) or mute */
+  mic(open: boolean): void;
+}
+
+/** a little pixel microphone, crossed out (on a camera tile whose mic is muted) */
+function mutedMic() {
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 7 9');
+  svg.setAttribute('width', '10');
+  svg.setAttribute('height', '13');
+  svg.setAttribute('shape-rendering', 'crispEdges');
+  svg.setAttribute('aria-label', 'muted');
+  const px = (x: number, y: number, w: number, h: number, o = '1') => {
+    const r = document.createElementNS(NS, 'rect');
+    for (const [k, v] of Object.entries({ x, y, width: w, height: h, fill: 'currentColor', opacity: o })) r.setAttribute(k, String(v));
+    svg.append(r);
+  };
+  for (const [x, y, w, h] of [[2, 0, 3, 3], [0, 3, 1, 2], [6, 3, 1, 2], [2, 3, 3, 1], [1, 5, 1, 1], [5, 5, 1, 1], [2, 6, 3, 1], [3, 7, 1, 1], [1, 8, 5, 1]]) px(x, y, w, h, '.5');
+  for (let i = 0; i < 7; i++) px(i, Math.round((i * 8) / 6), 1, 1);
+  return svg;
 }
 
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', text = '') => {
@@ -161,6 +192,7 @@ export class Overlay implements EngineUI {
   private banners: HTMLElement;
   private readyBtn: HTMLButtonElement;
   private lockBtn: HTMLButtonElement;
+  private controls: HTMLElement;
   private logEl: HTMLOListElement;
   private input: HTMLInputElement;
   private toasts: HTMLElement;
@@ -171,6 +203,7 @@ export class Overlay implements EngineUI {
   private calls: HTMLElement;
   private camBtn: HTMLButtonElement;
   private talkBtn: HTMLButtonElement;
+  private micBtn: HTMLButtonElement;
   private camsBtn: HTMLButtonElement;
   private cams: HTMLElement;
   private camMine: { root: HTMLElement; video: HTMLVideoElement; off: HTMLElement; tag: HTMLElement };
@@ -187,7 +220,8 @@ export class Overlay implements EngineUI {
   private unread = 0;
   private open = true;
   private seen = new Set<string>();
-  private overlayCard: 'waiting' | 'countdown' | 'guard' | null = null;
+  private overlayCard: 'waiting' | 'countdown' | 'guard' | 'follow' | null = null;
+  private followTimer = 0;
   /** "Not now" on the join card: don't ask again on this page */
   private cardDismissed = false;
   private countTimer = 0;
@@ -228,11 +262,15 @@ export class Overlay implements EngineUI {
     this.whoText = el('span', '', 'Watching together');
     who.append(this.dot, this.whoText);
     const close = el('button', 'btn paper small close', 'Hide');
+    close.title = 'Hide the chat (the heart on the right brings it back)';
     close.onclick = () => this.setOpen(false);
-    head.append(this.kicker, who, close);
+    const headText = el('div', 'head-text');
+    headText.append(this.kicker, who);
+    head.append(headText, close);
 
     this.banners = el('div', 'banners');
     const controls = el('div', 'controls');
+    this.controls = controls;
     this.readyBtn = el('button', 'btn sage small', 'I’m ready');
     this.readyBtn.title = 'When you’re both ready, a 3-2-1 countdown starts the show for both of you';
     this.readyBtn.onclick = () => this.engine.toggleReady();
@@ -272,8 +310,10 @@ export class Overlay implements EngineUI {
 
     // cameras and voice (Soultied Plus)
     this.calls = el('div', 'calls');
-    this.camBtn = el('button', 'btn sage small', 'Turn my camera on');
+    this.camBtn = el('button', 'btn sage small', 'Camera on');
     this.camBtn.onclick = () => this.act.camera(!this.call?.camOn);
+    this.micBtn = el('button', 'btn paper small', 'Unmute');
+    this.micBtn.onclick = () => this.act.mic(!this.call?.micOpen);
     this.talkBtn = el('button', 'btn paper small', 'Hold to talk');
     this.talkBtn.title = 'Or hold T';
     const up = () => this.act.talk(false);
@@ -290,7 +330,7 @@ export class Overlay implements EngineUI {
       this.camsHidden = !this.camsHidden;
       this.update();
     };
-    this.calls.append(this.camBtn, this.talkBtn, this.camsBtn);
+    this.calls.append(this.camBtn, this.micBtn, this.talkBtn, this.camsBtn);
 
     this.hint = el('div', 'hint', HINT_PLACE);
     this.side.append(head, this.banners, controls, this.calls, this.logEl, reacts, compose, this.hint);
@@ -385,7 +425,7 @@ export class Overlay implements EngineUI {
   note(text: string) {
     const li = el('li', 'note', text);
     this.append(li);
-    if (!this.open || !this.visible) this.toast(text);
+    if (!this.sideShown) this.toast(text);
   }
 
   chat(m: { id: string; by: string; text: string; mine: boolean }) {
@@ -400,7 +440,7 @@ export class Overlay implements EngineUI {
     img.title = person?.name || '';
     li.append(img, el('span', '', m.text));
     this.append(li);
-    if (!m.mine && (!this.open || !this.visible)) {
+    if (!m.mine && !this.sideShown) {
       this.unread++;
       this.toast(`${person?.name || 'Them'}: ${m.text}`);
     }
@@ -508,7 +548,7 @@ export class Overlay implements EngineUI {
       if (this.overlayCard === 'waiting') this.setCenter(null, null);
       return;
     }
-    if (this.overlayCard === 'guard' || this.overlayCard === 'countdown') return;
+    if (this.overlayCard === 'guard' || this.overlayCard === 'countdown' || this.overlayCard === 'follow') return;
     this.setCenter(el('div', 'box pill', text), 'waiting');
   }
 
@@ -532,6 +572,51 @@ export class Overlay implements EngineUI {
     this.setCenter(card, 'guard');
   }
 
+  /** Your person put something on: "Taking you there in 3…", unless you stay. */
+  follow(f: { what: string; partner: string; onGo(): void; onStay(): void } | null) {
+    window.clearInterval(this.followTimer);
+    if (!f) {
+      if (this.overlayCard === 'follow') this.setCenter(null, null);
+      return;
+    }
+    this.note(`${f.partner} put on ${f.what}.`);
+    const card = el('div', 'box card follow');
+    const top = el('div', 'top');
+    const heart = el('img');
+    heart.src = iconURL('heart', 3);
+    heart.alt = '';
+    top.append(heart, el('span', 'kicker', 'Watch party'));
+    const when = el('p', 'muted');
+    card.append(top, el('h3', '', `${f.partner} put on ${f.what}`), when);
+    const row = el('div', 'row');
+    const go = el('button', 'btn', 'Go now');
+    go.onclick = () => {
+      window.clearInterval(this.followTimer);
+      when.textContent = 'Taking you there…';
+      f.onGo();
+    };
+    const stay = el('button', 'btn paper', 'Stay here');
+    stay.onclick = () => {
+      window.clearInterval(this.followTimer);
+      f.onStay();
+    };
+    row.append(go, stay);
+    card.append(row);
+    this.setCenter(card, 'follow');
+    const at = Date.now() + 3000;
+    const step = () => {
+      const left = Math.ceil((at - Date.now()) / 1000);
+      if (left > 0) when.textContent = `Taking you there in ${left}…`;
+      else {
+        window.clearInterval(this.followTimer);
+        when.textContent = 'Taking you there…';
+        f.onGo();
+      }
+    };
+    step();
+    this.followTimer = window.setInterval(step, 200);
+  }
+
   private setCenter(node: HTMLElement | null, kind: Overlay['overlayCard']) {
     this.center.replaceChildren(...(node ? [node] : []));
     this.overlayCard = kind;
@@ -541,6 +626,11 @@ export class Overlay implements EngineUI {
 
   private get visible() {
     return this.engine?.hasVideo ?? false;
+  }
+
+  /** the chat panel is on screen */
+  private get sideShown() {
+    return !this.side.classList.contains('hide');
   }
 
   private append(li: HTMLElement) {
@@ -562,7 +652,7 @@ export class Overlay implements EngineUI {
 
   private inviteBanner(link: string) {
     const b = el('div', 'banner');
-    b.append(el('span', '', this.copied ? 'Link copied. Send it to your person; it brings them to this show.' : 'Send this link to your person; it brings them to this show.'));
+    b.append(el('span', '', this.copied ? 'Link copied. Send it to your person: opening it brings them to you.' : 'Send this link to your person: opening it brings them to you.'));
     const row = el('div', 'row');
     const field = el('input');
     field.readOnly = true;
@@ -680,7 +770,7 @@ export class Overlay implements EngineUI {
   /** "Cameras and voice": get Soultied Plus, or add the code you got. */
   private plusBanner() {
     const b = el('div', 'banner');
-    b.append(el('span', '', 'Cameras and voice for both of you come with Soultied Plus. One of you having it is enough.'));
+    b.append(el('span', '', 'See and hear each other with Soultied Plus. One of you having it covers you both.'));
     const row = el('div', 'row');
     if (!this.plusOpen) {
       const get = el('button', 'btn small', 'Get Plus');
@@ -725,7 +815,7 @@ export class Overlay implements EngineUI {
     return b;
   }
 
-  private drawTile(t: Overlay['camMine'], stream: MediaStream | null, camOn: boolean, talking: boolean, name: string, avatarFace: string, offText: string) {
+  private drawTile(t: Overlay['camMine'], stream: MediaStream | null, camOn: boolean, talking: boolean, micOpen: boolean, name: string, avatarFace: string, offText: string) {
     const hasVideo = !!stream && camOn && stream.getVideoTracks().some((tr) => tr.readyState === 'live');
     if (t.video.srcObject !== stream) {
       t.video.srcObject = stream;
@@ -741,12 +831,12 @@ export class Overlay implements EngineUI {
       t.off.replaceChildren(face, el('span', '', offText));
     }
     t.off.dataset.k = hasVideo ? '' : avatarFace + offText;
-    const tag = [el('span', '', name)];
+    const tag: Element[] = [el('span', '', name)];
     if (talking) {
       const w = el('span', 'wave');
       w.append(el('i'), el('i'), el('i'));
       tag.push(w);
-    }
+    } else if (!micOpen) tag.push(mutedMic());
     t.tag.replaceChildren(...tag);
   }
 
@@ -763,11 +853,12 @@ export class Overlay implements EngineUI {
       c.remote,
       c.partnerCam,
       c.partnerTalking,
+      c.partnerMic,
       partner?.name || 'Your person',
       partner ? faceURL(partner.avatar) : '',
       c.partnerCam ? (c.stuck ? 'Can’t connect' : 'Connecting…') : 'Camera off',
     );
-    this.drawTile(this.camMine, c.local, c.camOn, c.talking, 'You', faceURL(s.me.avatar), 'Your camera is off');
+    this.drawTile(this.camMine, c.local, c.camOn, c.talking, c.micOpen, 'You', faceURL(s.me.avatar), 'Your camera is off');
   }
 
   update() {
@@ -788,7 +879,7 @@ export class Overlay implements EngineUI {
       ? this.launchOpen || this.starting
         ? 'start'
         : null
-      : !this.cardDismissed && !video && e.partnerHere && pwNow?.title
+      : !this.cardDismissed && !video && !s.party && e.partnerHere && pwNow?.title
         ? 'join'
         : null;
     this.connect.classList.toggle('hide', !card);
@@ -824,13 +915,13 @@ export class Overlay implements EngineUI {
     this.dot.classList.toggle('on', e.partnerHere);
     this.whoText.textContent = !partner
       ? party
-        ? 'Waiting for your person to join'
+        ? 'Waiting for your person'
         : 'Invite your person in Soultied first'
       : e.partnerHere
         ? `${name} is on the couch`
         : `${name} isn’t here yet`;
     const plus = !!party && this.plusOn;
-    this.hint.textContent = !party ? HINT_PLACE : plus ? HINT_PLUS : HINT_PARTY;
+    this.hint.textContent = !party ? HINT_PLACE : plus ? HINT_PLUS : '';
 
     // banners
     const bs: HTMLElement[] = [];
@@ -843,7 +934,7 @@ export class Overlay implements EngineUI {
     } else if (party && !video) {
       // in the party, nothing on yet
       const b = el('div', 'banner');
-      b.append(el('span', '', pw?.title && e.partnerHere ? `${name} is watching ${titleLabel(pw.title)}.` : `Pick something to watch: ${name} can follow you there.`));
+      b.append(el('span', '', pw?.title && e.partnerHere ? `${name} is watching ${titleLabel(pw.title)}.` : `Put something on and ${name} comes along.`));
       if (pw?.title && e.partnerHere) {
         const go = el('button', 'btn small', 'Join them');
         go.onclick = () => e.goToPartner();
@@ -884,18 +975,19 @@ export class Overlay implements EngineUI {
     this.banners.replaceChildren(...bs);
     if (stick) this.logEl.scrollTop = this.logEl.scrollHeight;
 
-    // countdown + remote
+    // countdown + remote (only with something on)
+    this.controls.style.display = video ? '' : 'none';
     this.readyBtn.disabled = !e.partnerHere;
-    this.readyBtn.textContent = e.ready.me
-      ? e.ready.partner
-        ? 'Starting…'
-        : `Ready ✓ (waiting for ${name})`
+    this.readyBtn.textContent = e.ready.me ? (e.ready.partner ? 'Starting…' : 'Ready ✓') : e.ready.partner ? 'I’m ready too' : 'I’m ready';
+    this.readyBtn.title = e.ready.me
+      ? `Waiting for ${name} to be ready`
       : e.ready.partner
-        ? `${name} is ready. Me too!`
-        : 'I’m ready';
+        ? `${name} is ready: press to start together`
+        : 'When you’re both ready, a 3-2-1 countdown starts the show for both of you';
     const mineLock = e.lock.on && e.lock.by === e.me;
     this.lockBtn.disabled = e.lock.on && !mineLock;
-    this.lockBtn.textContent = mineLock ? 'You have the remote' : e.lock.on ? `${name} has the remote` : 'Take the remote';
+    this.lockBtn.textContent = mineLock ? 'Put remote down' : e.lock.on ? `${name} has it` : 'Take the remote';
+    this.lockBtn.title = mineLock ? 'You have the remote: only you can pause and skip' : e.lock.on ? `${name} has the remote` : 'Only the person with the remote can pause and skip';
     this.lockBtn.classList.toggle('sage', mineLock);
     this.lockBtn.classList.toggle('paper', !mineLock);
 
@@ -903,13 +995,19 @@ export class Overlay implements EngineUI {
     const c = this.call;
     this.calls.style.display = plus && partner && video && c ? '' : 'none';
     if (c) {
-      this.camBtn.textContent = c.busy === 'cam' ? 'Starting camera…' : c.camOn ? 'Turn my camera off' : 'Turn my camera on';
+      this.camBtn.textContent = c.busy === 'cam' ? 'Starting…' : c.camOn ? 'Camera off' : 'Camera on';
       this.camBtn.disabled = c.busy === 'cam';
       this.camBtn.classList.toggle('sage', !c.camOn);
       this.camBtn.classList.toggle('paper', c.camOn);
-      this.talkBtn.textContent = c.talking ? 'Talking…' : c.busy === 'mic' ? 'Allow the mic…' : 'Hold to talk';
+      this.micBtn.textContent = c.busy === 'mic' ? 'Allow the mic…' : c.micOpen ? (c.talking ? 'Mute · talking' : 'Mute') : 'Unmute';
+      this.micBtn.disabled = c.busy === 'mic';
+      this.micBtn.classList.toggle('sage', c.micOpen);
+      this.micBtn.classList.toggle('paper', !c.micOpen);
+      this.micBtn.title = c.micOpen ? `${name} can hear you. Press to mute.` : `Unmute to talk to ${name} without holding anything`;
+      this.talkBtn.hidden = c.micOpen;
+      this.talkBtn.textContent = c.talking ? 'Talking…' : 'Hold to talk';
       this.talkBtn.classList.toggle('paper', !c.talking);
-      this.camsBtn.style.display = c.camOn || c.partnerCam ? '' : 'none';
+      this.camsBtn.hidden = !(c.camOn || c.partnerCam);
       this.camsBtn.textContent = this.camsHidden ? 'Show cameras' : 'Hide cameras';
     }
   }

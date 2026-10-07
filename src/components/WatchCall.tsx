@@ -30,7 +30,7 @@ export function useWatchCall(me: string, partnerId: string | null, send: (e: Wat
   return { call, view };
 }
 
-/** Hold the space bar to talk (unless you're typing somewhere). */
+/** Hold the space bar to talk while your mic is muted (unless you're typing somewhere). */
 export function usePushToTalkKey(call: WatchCall | null) {
   useEffect(() => {
     if (!call) return;
@@ -81,6 +81,29 @@ const SoundWaves: React.FC = () => (
   </span>
 );
 
+/** A little pixel microphone (crossed out when it's muted). */
+const MIC_PIXELS = [
+  [2, 0, 3, 3], // the head
+  [0, 3, 1, 2],
+  [6, 3, 1, 2],
+  [2, 3, 3, 1],
+  [1, 5, 1, 1],
+  [5, 5, 1, 1],
+  [2, 6, 3, 1], // the stand
+  [3, 7, 1, 1],
+  [1, 8, 5, 1],
+];
+const MicIcon: React.FC<{ off?: boolean }> = ({ off }) => (
+  <svg width="14" height="18" viewBox="0 0 7 9" aria-hidden="true" shapeRendering="crispEdges" style={{ flex: 'none' }}>
+    <g opacity={off ? 0.55 : 1}>
+      {MIC_PIXELS.map(([x, y, w, h], i) => (
+        <rect key={i} x={x} y={y} width={w} height={h} fill="currentColor" />
+      ))}
+    </g>
+    {off && [0, 1, 2, 3, 4, 5, 6].map((i) => <rect key={`x${i}`} x={i} y={Math.round((i * 8) / 6)} width={1} height={1} fill="currentColor" />)}
+  </svg>
+);
+
 /**
  * A little wooden picture frame on the wall with a live camera in it, or the
  * person's pixel face when their camera is off.
@@ -92,10 +115,12 @@ export const CamFrame: React.FC<{
   name: string;
   avatar: AvatarConfig | null;
   talking: boolean;
+  /** their mic is unmuted (false shows a small muted mark; leave it out to show nothing) */
+  micOpen?: boolean;
   width: number;
   /** their picture isn't getting through */
   stuck?: boolean;
-}> = ({ stream, on, mine, name, avatar, talking, width, stuck }) => {
+}> = ({ stream, on, mine, name, avatar, talking, micOpen, width, stuck }) => {
   const ref = useRef<HTMLVideoElement | null>(null);
   const [frames, setFrames] = useState(false);
   useEffect(() => {
@@ -146,10 +171,16 @@ export const CamFrame: React.FC<{
             <span className="text-xs text-center px-1">{!on ? 'Camera off' : stuck ? 'Can’t connect' : 'Connecting…'}</span>
           </div>
         )}
-        {talking && (
+        {talking ? (
           <span className="absolute left-1.5 bottom-1.5 px-tag flex items-center gap-1.5" style={{ fontSize: 12 }}>
             <SoundWaves /> talking
           </span>
+        ) : (
+          micOpen === false && (
+            <span className="absolute right-1.5 bottom-1.5 px-tag flex items-center" style={{ fontSize: 12, padding: '2px 4px' }} title={mine ? 'Your mic is muted' : `${name}'s mic is muted`}>
+              <MicIcon off />
+            </span>
+          )
         )}
       </div>
       <figcaption className="px-box text-xs font-semibold px-2 py-0.5 -mt-1 relative whitespace-nowrap">
@@ -159,7 +190,7 @@ export const CamFrame: React.FC<{
   );
 };
 
-/** Camera toggle + the hold-to-talk button. */
+/** Camera toggle, the mic's mute / unmute, and (while muted) hold to talk. */
 export const CallButtons: React.FC<{ call: WatchCall | null; view: CallView | null; partnerName: string }> = ({
   call,
   view,
@@ -178,19 +209,31 @@ export const CallButtons: React.FC<{ call: WatchCall | null; view: CallView | nu
         {view.busy === 'cam' ? 'Starting camera…' : view.camOn ? 'Camera off' : 'Camera on'}
       </button>
       <button
-        className={`px-btn px-btn--small select-none touch-none ${view.talking ? '' : 'px-btn--paper'}`}
-        onPointerDown={(e) => {
-          (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
-          void call.talk(true);
-        }}
-        onPointerUp={release}
-        onPointerCancel={release}
-        onContextMenu={(e) => e.preventDefault()}
-        aria-pressed={view.talking}
-        title={`Hold to talk to ${partnerName} (or hold the space bar)`}
+        className={`px-btn px-btn--small inline-flex items-center gap-1.5 ${view.micOpen ? 'px-btn--sage' : 'px-btn--paper'}`}
+        onClick={() => void call.setMic(!view.micOpen)}
+        disabled={view.busy === 'mic'}
+        aria-pressed={view.micOpen}
+        title={view.micOpen ? `${partnerName} can hear you. Click to mute.` : `Unmute to talk to ${partnerName} without holding anything`}
       >
-        {view.busy === 'mic' ? 'Allow the mic…' : view.talking ? 'Talking…' : 'Hold to talk'}
+        <MicIcon off={!view.micOpen} />
+        {view.busy === 'mic' ? 'Allow the mic…' : view.micOpen ? 'Mute' : 'Unmute'}
       </button>
+      {!view.micOpen && (
+        <button
+          className={`px-btn px-btn--small select-none touch-none ${view.talking ? '' : 'px-btn--paper'}`}
+          onPointerDown={(e) => {
+            (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+            void call.talk(true);
+          }}
+          onPointerUp={release}
+          onPointerCancel={release}
+          onContextMenu={(e) => e.preventDefault()}
+          aria-pressed={view.talking}
+          title={`Hold to talk to ${partnerName} (or hold the space bar)`}
+        >
+          {view.talking ? 'Talking…' : 'Hold to talk'}
+        </button>
+      )}
     </>
   );
 };

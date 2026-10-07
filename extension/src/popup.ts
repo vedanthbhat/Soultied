@@ -38,7 +38,8 @@ const CSS = `
 * { box-sizing: border-box; }
 body { margin: 0; width: 330px; background: #f4e8d0; color: #3a2a26; font: 14px/1.35 'Soultied Pixel', ui-sans-serif, system-ui, sans-serif; font-variant-ligatures: none; -webkit-font-smoothing: antialiased; }
 @font-face { font-family: 'Soultied Pixel'; src: url('fonts/PixelifySans-Variable.ttf'); font-weight: 400 700; font-display: block; }
-.wrap { padding: 14px 14px 12px; display: flex; flex-direction: column; gap: 10px; }
+.wrap { padding: 16px 16px 14px; display: flex; flex-direction: column; gap: 12px; }
+.stack { display: flex; flex-direction: column; gap: 4px; }
 .top { display: flex; align-items: center; gap: 8px; }
 .top img { width: 24px; height: 24px; image-rendering: pixelated; }
 .kicker { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: #8f4b3a; }
@@ -49,17 +50,19 @@ body { margin: 0; width: 330px; background: #f4e8d0; color: #3a2a26; font: 14px/
 .dot.warn { background: #c9843a; }
 .muted { color: #7a5a48; font-size: 13px; }
 .err { color: #a84f4b; font-size: 13px; }
-.label { font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: #8f4b3a; }
+.err:empty { display: none; }
+.label { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: #8f4b3a; margin-top: 2px; }
 .btns { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 form { display: flex; gap: 8px; align-items: center; margin: 0; }
-input { font: inherit; font-size: 13px; flex: 1; min-width: 0; border: 0; padding: 5px 7px; background: #fff8ea; color: #2b1e1c; box-shadow: inset 0 0 0 2px #2b1e1c; outline: none; margin: 3px; }
+input { font: inherit; font-size: 13px; flex: 1; min-width: 0; border: 0; padding: 6px 8px; background: #fff8ea; color: #2b1e1c; box-shadow: inset 0 0 0 2px #2b1e1c; outline: none; margin: 3px; }
 button { font: inherit; cursor: pointer; border: 0; background: #b8674f; color: #fff4e2; padding: 5px 10px; box-shadow: 0 -3px 0 0 #2b1e1c, 0 3px 0 0 #2b1e1c, -3px 0 0 0 #2b1e1c, 3px 0 0 0 #2b1e1c, inset 0 -3px 0 0 #8f4b3a; margin: 3px; white-space: nowrap; }
 button.paper { background: #eadbbd; color: #3a2a26; box-shadow: 0 -3px 0 0 #2b1e1c, 0 3px 0 0 #2b1e1c, -3px 0 0 0 #2b1e1c, 3px 0 0 0 #2b1e1c, inset 0 -3px 0 0 #d6c29c; }
 button.sage { background: #8a9a72; box-shadow: 0 -3px 0 0 #2b1e1c, 0 3px 0 0 #2b1e1c, -3px 0 0 0 #2b1e1c, 3px 0 0 0 #2b1e1c, inset 0 -3px 0 0 #6a7856; }
 button.link { background: none; box-shadow: none; color: #8f4b3a; padding: 0; margin: 0; text-decoration: underline; font-size: 13px; }
 button[disabled] { opacity: .6; cursor: default; }
 hr { border: 0; border-top: 3px dashed #d6c29c; margin: 0; }
-.plus { background: #eadbbd; padding: 7px 9px; font-size: 13px; box-shadow: inset 0 0 0 2px #d6c29c; }
+.plus { background: #eadbbd; padding: 10px 11px; font-size: 13px; line-height: 1.4; display: flex; flex-direction: column; gap: 8px; box-shadow: inset 0 0 0 2px #d6c29c; }
+.plus .btns { margin: 0 -3px; }
 `;
 
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', text = '') => {
@@ -158,7 +161,7 @@ async function copy(text: string) {
 
 /** your name, a button, and somewhere to say what went wrong */
 function nameForm(s: Snapshot, label: string, extra: HTMLInputElement | null, onGo: (name: string, extra: string, done: (err?: string) => void) => void) {
-  const box = el('div');
+  const box = el('div', 'stack');
   const form = el('form');
   const name = el('input');
   name.placeholder = 'Your name';
@@ -304,7 +307,7 @@ function render(s: Snapshot, opts: { copied?: boolean } = {}) {
     // 3. no Soultied place: start a watch party, or join one
     wrap.append(el('div', '', 'Watch Netflix or Prime Video in sync with your person, wherever they are, with a chat and a little couch on the show.'));
     wrap.append(el('div', 'label', 'Start a watch party'));
-    if (!s.onShow) wrap.append(el('div', 'muted', 'Tip: open the show first, so the link takes them straight to it.'));
+    wrap.append(el('div', 'muted', 'Send the link to your person. Whatever one of you puts on, the other comes along.'));
     wrap.append(
       nameForm(s, 'Start', null, (name, _x, done) =>
         void ask({ kind: 'startParty', name }).then((r) => {
