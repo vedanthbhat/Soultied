@@ -30,6 +30,7 @@ await build({
     bridge: path.join(here, 'src/bridge.ts'),
     player: path.join(here, 'src/player/main.ts'),
     'netflix-main': path.join(here, 'src/netflix-main.ts'),
+    'prime-main': path.join(here, 'src/prime-main.ts'),
     popup: path.join(here, 'src/popup.ts'),
     offscreen: path.join(here, 'src/offscreen.ts'),
   },

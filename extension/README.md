@@ -35,6 +35,7 @@ To try a build of your own instead:
 
 - `src/player/`: runs on Netflix and Prime Video pages. `adapters.ts` knows each site's player, `engine.ts` keeps you in sync, `overlay.ts` and `couch.ts` draw the sidebar and the couch.
 - `src/netflix-main.ts`: runs inside the Netflix page to use Netflix's own player controls (setting the video's time directly makes Netflix show an error).
+- `src/prime-main.ts`: the same for Prime Video: it finds Amazon's own player (setting the video's time directly makes Prime show "Video Unavailable"), says which title is open, and reports where you are in the story without the ads Prime stitches into the video, so two people who saw different ads still line up.
 - `src/bridge.ts`: runs on the Soultied page and passes messages between it and the extension.
 - `src/background.ts`: the switchboard. Netflix / Prime tabs talk to whichever is in charge: your Soultied tab, or (while you're in one) a watch party.
 - `src/offscreen.ts`: the watch party's line to your person. A small hidden page Chrome keeps open while you're in a party (and closes after five minutes with no show open). It signs in to Soultied's Firebase project anonymously, keeps `parties/{id}` (two seats, names, pixel characters, what's on) current, and carries play / pause / chat over `parties/{id}/events`, the job the Soultied tab does for a place. Firebase settings come from `firebase-applet-config.json` at build time; Firebase Auth is the `firebase/auth/web-extension` build, which loads no remote code.

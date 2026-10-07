@@ -13,6 +13,8 @@ export interface Adapter {
   play(): void;
   pause(): void;
   seek(sec: number): void;
+  /** where you are in the story, in seconds (what seek() takes); the <video>'s own clock unless the site stitches ads into it */
+  pos?(v: HTMLVideoElement): number;
   setVolume(v: number): void;
   /** an ad is playing (so your person waits) */
   inAd(): boolean;
@@ -209,8 +211,79 @@ function primeNames(gti: string) {
   return p;
 }
 
-const primeRoot = () =>
-  document.querySelector<HTMLElement>('#dv-web-player, .webPlayerSDKContainer, .webPlayerContainer, [class*="webPlayerSDKContainer"]');
+/*
+ * Prime's player sits in a #dv-web-player box. The 2026 site keeps two (an
+ * empty #dv-web-player and #dv-web-player-2 with the film in it), so look in
+ * every box rather than the first one.
+ */
+const PRIME_ROOTS = '[id^="dv-web-player"], .dv-player-fullscreen, .webPlayerSDKContainer, .webPlayerContainer, [class*="webPlayerSDKContainer"]';
+const primeRoot = () => primeVideo()?.closest<HTMLElement>(PRIME_ROOTS) ?? null;
+
+/*
+ * Moving Prime's <video> to a new time directly breaks its player ("Video
+ * Unavailable"), so play / pause / seek go through Amazon's own player, which
+ * prime-main.js (running in the page) finds and works for us. It also says
+ * exactly which title is open.
+ */
+let pvSeq = 0;
+function pv<T = unknown>(cmd: string, arg?: number): Promise<{ ok: boolean; out: T | null }> {
+  const id = ++pvSeq;
+  return new Promise((resolve) => {
+    const done = (r: { ok: boolean; out: T | null }) => {
+      window.removeEventListener('message', on);
+      window.clearTimeout(t);
+      resolve(r);
+    };
+    const on = (ev: MessageEvent) => {
+      const d = ev.data as { source?: string; id?: number; ok?: boolean; out?: T };
+      if (ev.source === window && d?.source === 'soultied-pv-reply' && d.id === id) done({ ok: !!d.ok, out: d.out ?? null });
+    };
+    const t = window.setTimeout(() => done({ ok: false, out: null }), 800);
+    window.addEventListener('message', on);
+    window.postMessage({ source: 'soultied-pv', id, cmd, arg }, location.origin);
+  });
+}
+/** what Amazon's player says is open, asked for every couple of seconds */
+let primeOpen: string | null = null;
+let primeAsked = 0;
+function askPrime() {
+  if (Date.now() - primeAsked < 2000) return;
+  primeAsked = Date.now();
+  void pv<string>('id').then((r) => {
+    primeOpen = r.ok && r.out ? String(r.out) : null;
+  });
+}
+/*
+ * Where you are in the story (without the ads stitched into Prime's video):
+ * prime-main.js says a few times a second, with the <video>'s clock at that
+ * moment. Between ad breaks the gap between the two stays the same, so we can
+ * answer right away for any moment; during an ad you're held at the break.
+ */
+let primeGap = 0;
+let primeHeardAt = 0;
+let primeBreak: number | null = null;
+window.addEventListener('message', (ev: MessageEvent) => {
+  const d = ev.data as { source?: string; vt?: number; content?: number | null; ad?: boolean };
+  if (ev.source !== window || d?.source !== 'soultied-pv-tick' || typeof d.vt !== 'number' || typeof d.content !== 'number') return;
+  primeHeardAt = Date.now();
+  if (d.ad) primeBreak = d.content;
+  else {
+    primeBreak = null;
+    primeGap = d.content - d.vt;
+  }
+});
+/** story time for this <video>: its own clock while we haven't heard from Amazon's player lately */
+function primeStory(v: HTMLVideoElement) {
+  if (Date.now() - primeHeardAt > 5000) return v.currentTime;
+  if (primeBreak != null) return primeBreak;
+  return Math.max(0, v.currentTime + primeGap);
+}
+
+/** a seek the page's player couldn't take: only safe on the <video> itself inside what's already loaded */
+function inBuffer(v: HTMLVideoElement, sec: number) {
+  for (let i = 0; i < v.buffered.length; i++) if (sec >= v.buffered.start(i) && sec <= v.buffered.end(i) - 0.5) return true;
+  return false;
+}
 const primeDetail = () => location.pathname.match(/\/(?:detail|dp)\/([^/?#]+)/)?.[1] || null;
 /** "Prime Video: Waiting Hai - Season 1" → "Waiting Hai" */
 const primePageShow = () =>
@@ -220,12 +293,19 @@ const primePageShow = () =>
     .trim();
 
 function primeVideo(): HTMLVideoElement | null {
-  const root = primeRoot();
-  const v = root ? biggestVideo(root) : null;
-  if (!v) return null;
-  const r = v.getBoundingClientRect();
-  // the player overlay is open and showing something
-  return r.width > 200 && r.height > 100 && v.duration > 0 ? v : null;
+  let best: HTMLVideoElement | null = null;
+  let area = 0;
+  // only pictures inside a player box (not the trailer at the top of a show's page)
+  document.querySelectorAll('video').forEach((v) => {
+    if (v.readyState === 0 || !(v.duration > 0) || !v.closest(PRIME_ROOTS)) return;
+    const r = v.getBoundingClientRect();
+    // the player overlay is open and showing something
+    if (r.width > 200 && r.height > 100 && r.width * r.height > area) {
+      area = r.width * r.height;
+      best = v;
+    }
+  });
+  return best;
 }
 
 /** what we last asked the player to do (so a retried play never overrides you pausing it yourself) */
@@ -245,10 +325,13 @@ export const prime: Adapter = {
   platform: 'prime',
   currentKey() {
     if (!primeVideo()) return null;
+    askPrime();
+    if (primeOpen) return `prime:${primeOpen}`;
     if (primeGti) return `prime:${primeGti}`;
     return `prime:${primeDetail() || slug(primePageShow()) || 'prime'}`;
   },
   video: primeVideo,
+  pos: primeStory,
   async title() {
     const key = this.currentKey();
     if (!key) return null;
@@ -274,23 +357,40 @@ export const prime: Adapter = {
     const v = primeVideo();
     if (!v) return;
     primeWant.set(v, 'play');
-    primePlay(v);
+    // right after a seek (or going into an ad break) Prime can ignore a play: ask again until it's playing
+    const go = (tries: number) =>
+      void pv('play').then((r) => {
+        if (!r.ok) return primePlay(v);
+        window.setTimeout(() => {
+          const now = primeVideo();
+          if (tries > 0 && now && now.paused && primeWant.get(now) === 'play') go(tries - 1);
+        }, 900);
+      });
+    go(5);
   },
   pause() {
     const v = primeVideo();
     if (!v) return;
     primeWant.set(v, 'pause');
-    v.pause();
+    void pv('pause').then((r) => {
+      if (!r.ok) v.pause();
+    });
   },
   seek(sec) {
-    const v = primeVideo();
-    if (v) v.currentTime = sec;
+    void pv('seek', sec).then((r) => {
+      const v = primeVideo();
+      // without Amazon's player, only move within what's already loaded (anything else breaks Prime's player)
+      const to = sec - (Date.now() - primeHeardAt > 5000 ? 0 : primeGap);
+      if (!r.ok && v && inBuffer(v, to)) v.currentTime = to;
+    });
   },
   setVolume(v) {
     const el = primeVideo();
     if (el) el.volume = v;
   },
   inAd() {
+    // Amazon's player says so (even while paused, when the "Ad" label is hidden)
+    if (primeBreak != null && Date.now() - primeHeardAt < 3000) return true;
     if (document.querySelector('.atvwebplayersdk-ad-timer, .atvwebplayersdk-adtimeindicator-text, [class*="adtimeindicator"], [class*="ad-timer"]')) return true;
     // the new player: a small "Ad" or "Ad 1 of 2" label over the picture
     const root = primeRoot();

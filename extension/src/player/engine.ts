@@ -101,6 +101,12 @@ export class Engine {
     }
   }
 
+  /** where you are in the story, in seconds (Prime stitches ads into its video, so its clock alone runs ahead) */
+  private at(v: HTMLVideoElement | null | undefined): number {
+    if (!v) return 0;
+    return this.a.pos ? this.a.pos(v) : v.currentTime;
+  }
+
   /* ---------------- who's here ---------------- */
 
   get me() {
@@ -178,7 +184,7 @@ export class Engine {
 
   where(): Where {
     const v = this.v;
-    return { title: this.title, pos: v ? v.currentTime : 0, playing: v ? !v.paused : false };
+    return { title: this.title, pos: this.at(v), playing: v ? !v.paused : false };
   }
 
   private send(e: Outgoing) {
@@ -193,7 +199,7 @@ export class Engine {
   }
 
   private leave = () => {
-    if (this.together >= TOGETHER_COUNTS_AFTER && this.title) this.out({ kind: 'watched', title: this.title, pos: this.v?.currentTime || 0 });
+    if (this.together >= TOGETHER_COUNTS_AFTER && this.title) this.out({ kind: 'watched', title: this.title, pos: this.at(this.v) });
     this.send({ type: 'bye' });
   };
 
@@ -222,7 +228,7 @@ export class Engine {
     v.addEventListener('waiting', this.onWaiting);
     v.addEventListener('playing', this.onFlowing);
     v.addEventListener('canplay', this.onFlowing);
-    this.expected = { pos: v.currentTime, at: Date.now(), playing: !v.paused };
+    this.expected = { pos: this.at(v), at: Date.now(), playing: !v.paused };
     // followed your person here: what the player does by itself while it loads isn't you choosing anything
     if (this.following && this.following === this.key) this.arriveUntil = Date.now() + ARRIVE_MS;
     if (this.session) this.sayHello();
@@ -239,7 +245,7 @@ export class Engine {
   /** what the player did by itself while we were arriving: note where it is, tell no one */
   private quietly() {
     const v = this.v!;
-    this.expected = { pos: v.currentTime, at: Date.now(), playing: !v.paused };
+    this.expected = { pos: this.at(v), at: Date.now(), playing: !v.paused };
   }
 
   /** we caused this play/pause/seek ourselves (following your person) */
@@ -252,13 +258,13 @@ export class Engine {
     if (this.arriving) return this.quietly();
     const v = this.v!;
     // the "no watching ahead" card is up: choose there first
-    if (this.guardOpen) return this.apply({ pos: v.currentTime, playing: false });
+    if (this.guardOpen) return this.apply({ pos: this.at(v), playing: false });
     if (this.lockedOut) return this.revert();
     if (this.guardCheck()) return;
     if (this.hold) this.clearHold(); // you chose not to wait
     this.leader = true;
-    this.expected = { pos: v.currentTime, at: Date.now(), playing: true };
-    this.send({ type: 'play', pos: v.currentTime, key: this.key });
+    this.expected = { pos: this.at(v), at: Date.now(), playing: true };
+    this.send({ type: 'play', pos: this.at(v), key: this.key });
     this.resetReady();
   };
 
@@ -270,8 +276,8 @@ export class Engine {
     if (v.ended) return;
     if (this.lockedOut) return this.revert();
     this.leader = true;
-    this.expected = { pos: v.currentTime, at: Date.now(), playing: false };
-    this.send({ type: 'pause', pos: v.currentTime, key: this.key });
+    this.expected = { pos: this.at(v), at: Date.now(), playing: false };
+    this.send({ type: 'pause', pos: this.at(v), key: this.key });
   };
 
   private onSeeked = () => {
@@ -280,11 +286,11 @@ export class Engine {
     const v = this.v!;
     const now = Date.now();
     const guess = projectedPosition(this.expected.pos, this.expected.at, this.expected.playing, now);
-    if (Math.abs(v.currentTime - guess) < 1.5) return;
+    if (Math.abs(this.at(v) - guess) < 1.5) return;
     if (this.lockedOut) return this.revert();
     this.leader = true;
-    this.expected = { pos: v.currentTime, at: now, playing: !v.paused };
-    this.send({ type: 'seek', pos: v.currentTime, playing: !v.paused, key: this.key });
+    this.expected = { pos: this.at(v), at: now, playing: !v.paused };
+    this.send({ type: 'seek', pos: this.at(v), playing: !v.paused, key: this.key });
   };
 
   private onWaiting = () => {
@@ -305,14 +311,14 @@ export class Engine {
   private sendBuffering(on: boolean) {
     if (on === this.bufferingSent) return;
     this.bufferingSent = on;
-    this.send({ type: 'buffering', on, pos: this.v?.currentTime || 0 });
+    this.send({ type: 'buffering', on, pos: this.at(this.v) });
   }
 
   /** go to a spot without it counting as something I did */
   private apply(to: { pos: number; playing: boolean }) {
     const v = this.v;
     if (!v) return;
-    const jump = Math.abs(v.currentTime - to.pos) > 1;
+    const jump = Math.abs(this.at(v) - to.pos) > 1;
     // after a jump the new spot has to load before it plays, which can take a few seconds
     this.suppressUntil = Date.now() + (jump ? 4500 : 1600);
     this.expected = { pos: to.pos, at: Date.now(), playing: to.playing };
@@ -373,7 +379,7 @@ export class Engine {
 
     // keep "where we should be" current (seeks that didn't fire an event still get noticed)
     if (!this.ours() && !this.inAd && !this.countingDown) {
-      const cur = this.v.currentTime;
+      const cur = this.at(this.v);
       const guess = projectedPosition(this.expected.pos, this.expected.at, this.expected.playing, now);
       if (Math.abs(cur - guess) > 3 && !this.v.seeking && this.v.readyState >= 3) this.onSeeked();
       else this.expected = { pos: cur, at: now, playing: !this.v.paused };
@@ -391,14 +397,14 @@ export class Engine {
       const crossed = this.together >= TOGETHER_COUNTS_AFTER && this.lastWatched === 0;
       if (crossed || (this.lastWatched && now - this.lastWatched > 300_000)) {
         this.lastWatched = now;
-        this.out({ kind: 'watched', title: this.title, pos: this.v.currentTime });
+        this.out({ kind: 'watched', title: this.title, pos: this.at(this.v) });
       }
     }
   }
 
   private changedTitle(key: string | null) {
     const from = this.key;
-    if (from && this.title && this.together >= TOGETHER_COUNTS_AFTER) this.out({ kind: 'watched', title: this.title, pos: this.v?.currentTime || 0 });
+    if (from && this.title && this.together >= TOGETHER_COUNTS_AFTER) this.out({ kind: 'watched', title: this.title, pos: this.at(this.v) });
     if (key) {
       this.hadTitle = true;
       // something you put on yourself (not where your person took you)
@@ -506,7 +512,7 @@ export class Engine {
         if (!this.same(e.key)) break;
         this.leader = false;
         const pos = projectedPosition(e.pos, e.at, e.playing);
-        const cur = this.v?.currentTime ?? pos;
+        const cur = this.v ? this.at(this.v) : pos;
         this.apply({ pos, playing: e.playing });
         this.ui.note(nf ? `${name} skipped to ${clock(pos)}.` : `${name} skipped ${pos > cur ? 'ahead' : 'back'}.`);
         break;
@@ -520,19 +526,19 @@ export class Engine {
           this.following = null;
           this.arriveUntil = 0;
           this.leader = false;
-          if (Math.abs(this.v.currentTime - pos) > 2 || e.playing !== !this.v.paused) this.apply({ pos, playing: e.playing });
+          if (Math.abs(this.at(this.v) - pos) > 2 || e.playing !== !this.v.paused) this.apply({ pos, playing: e.playing });
           break;
         }
         if (e.reply) {
           // they were here first: catch up with them (if we both just arrived, one of us follows)
           const bothNew = Math.abs(this.partnerHelloAt - this.helloAt) < 5000 && this.partnerHelloAt > 0;
           if (this.leader || (bothNew && this.me < e.by)) break;
-          if (Math.abs(this.v.currentTime - pos) > 2 || e.playing !== !this.v.paused) {
+          if (Math.abs(this.at(this.v) - pos) > 2 || e.playing !== !this.v.paused) {
             this.apply({ pos, playing: e.playing });
             this.ui.note(`Caught up with ${name}.`);
           }
         } else if (!this.leader && !this.hold) {
-          if (Math.abs(this.v.currentTime - pos) > 2 || e.playing !== !this.v.paused) this.apply({ pos, playing: e.playing });
+          if (Math.abs(this.at(this.v) - pos) > 2 || e.playing !== !this.v.paused) this.apply({ pos, playing: e.playing });
         }
         break;
       }
@@ -594,12 +600,12 @@ export class Engine {
     if (!v) return;
     if (on && !v.paused) {
       this.hold = 'partner';
-      this.apply({ pos: v.currentTime, playing: false });
+      this.apply({ pos: this.at(v), playing: false });
       this.ui.waiting(`Waiting for ${this.partnerName}…`);
     } else if (!on && this.hold) {
       this.hold = null;
       this.ui.waiting(null);
-      this.apply({ pos: pos || v.currentTime, playing: true });
+      this.apply({ pos: pos || this.at(v), playing: true });
     }
   }
 
@@ -647,7 +653,7 @@ export class Engine {
   private maybeCountdown() {
     const p = this.session?.partner;
     if (!p || !this.v || !this.ready.me || !this.ready.partner || this.me > p.id) return;
-    const pos = this.v.currentTime;
+    const pos = this.at(this.v);
     this.send({ type: 'countdown', pos, inMs: 3500, key: this.key });
     this.runCountdown(pos, Date.now() + 3500, true);
   }
@@ -735,7 +741,7 @@ export class Engine {
     const here = order(t.episode);
     const there = order(s.episode);
     if (here !== null && there !== null) return here < there ? s : null;
-    return this.v && this.v.paused && this.v.currentTime < 30 ? s : null;
+    return this.v && this.v.paused && this.at(this.v) < 30 ? s : null;
   }
 
   goTo(url: string) {
@@ -751,7 +757,7 @@ export class Engine {
     if (!t || !log || !this.partner || this.partnerHere || this.guardOpen) return false;
     if (!log.shows[t.showKey] || log.seen[t.key] || this.guardOK.has(t.key)) return false;
     this.guardOpen = true;
-    this.apply({ pos: this.v?.currentTime || 0, playing: false });
+    this.apply({ pos: this.at(this.v), playing: false });
     this.ui.guard({
       show: t.show,
       episode: t.episode,

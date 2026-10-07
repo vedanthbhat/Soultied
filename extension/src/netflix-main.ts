@@ -42,8 +42,13 @@ function meta(): { show: string; episode: string; showId: string } | null {
     const movieId = p?.getMovieId?.();
     const state = (window as unknown as AnyObj).netflix.appContext.state.playerApp.getState();
     const md = state.videoPlayer.videoMetadata[movieId as number];
-    const v: AnyObj = md?.getMetadata?.()?._metadata?.video ?? md?._metadata?.video;
-    if (!v) return null;
+    // Netflix has moved this around: older players kept it under _metadata, the 2026 one under _metadataObject / getVideo()
+    const v: AnyObj =
+      md?.getMetadata?.()?._metadata?.video ?? md?._metadata?.video ?? md?._metadataObject?.video ?? md?.getVideo?.()?._video;
+    if (!v) {
+      const name = md?.getTitle?.();
+      return name ? { show: String(name), episode: '', showId: String(movieId) } : null;
+    }
     if (v.type === 'show' && Array.isArray(v.seasons)) {
       for (const s of v.seasons as AnyObj[])
         for (const e of (s.episodes || []) as AnyObj[]) {
