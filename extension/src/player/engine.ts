@@ -99,6 +99,22 @@ export class Engine {
     } catch {
       // storage blocked: we just won't know
     }
+    // or Soultied opened this tab to bring you to what your person put on (you weren't on a show)
+    const mark = location.hash.match(/(?:^#|&)soultied-follow=([^&]+)/);
+    if (mark) {
+      this.following = decodeURIComponent(mark[1]);
+      try {
+        history.replaceState(history.state, '', location.pathname + location.search);
+      } catch {
+        // leave the address as it is
+      }
+    }
+  }
+
+  /** Soultied opened this tab to take you to what your person put on: catch up with them here rather than lead. */
+  followHere(key: string) {
+    if (!this.following) this.following = key;
+    if (this.following === key && this.v && this.key === key && !this.arriving) this.arriveUntil = Date.now() + ARRIVE_MS;
   }
 
   /** where you are in the story, in seconds (Prime stitches ads into its video, so its clock alone runs ahead) */
@@ -468,7 +484,9 @@ export class Engine {
         this.partnerHelloAt = Date.now();
         if (!was) this.back(name);
         if (e.title && this.party && !this.hadTitle) this.offerFollow(e.title);
+        // say we're here straight away (with nothing on, there's no "state" to answer with)
         if (this.v) this.send({ type: 'state', reply: true, ...this.where() });
+        else this.send({ type: 'ping', ...this.where(), buffering: false });
         if (this.lock.on && this.lock.by === this.me) this.send({ type: 'lock', on: true });
         if (this.ready.me) this.send({ type: 'ready', on: true });
         this.setPartnerBuffering(!!e.buffering, e.pos);

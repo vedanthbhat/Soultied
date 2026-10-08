@@ -13,7 +13,9 @@ type FromBackground =
   | { kind: 'partyStarted'; link: string }
   | { kind: 'partyError'; error: string }
   | { kind: 'joined'; url: string | null }
-  | { kind: 'plusResult'; res: PlusReply };
+  | { kind: 'plusResult'; res: PlusReply }
+  /** Soultied opened this tab to bring you to what your person put on */
+  | { kind: 'follow'; key: string };
 type ToBackground =
   | ExtMsg
   | { kind: 'openHub' }
@@ -184,6 +186,7 @@ if (adapter && !running) {
       } else if (msg.kind === 'partyStarted') overlay.partyStarted(msg.link);
       else if (msg.kind === 'partyError') overlay.partyFailed(msg.error);
       else if (msg.kind === 'plusResult') overlay.plusResult(msg.res);
+      else if (msg.kind === 'follow') engine.followHere(msg.key);
       else if (msg.kind === 'joined') {
         // joined from the card on this page: go to their show (or stay here to pick one)
         if (msg.url && msg.url !== location.href) location.href = msg.url;

@@ -919,7 +919,7 @@ export class Overlay implements EngineUI {
         : 'Invite your person in Soultied first'
       : e.partnerHere
         ? `${name} is on the couch`
-        : `${name} isn’t here yet`;
+        : `${name} isn’t watching yet`;
     const plus = !!party && this.plusOn;
     this.hint.textContent = !party ? HINT_PLACE : plus ? HINT_PLUS : '';
 

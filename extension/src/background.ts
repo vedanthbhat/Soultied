@@ -67,7 +67,9 @@ type ToPlayer =
   | { kind: 'partyStarted'; link: string }
   | { kind: 'partyError'; error: string }
   | { kind: 'joined'; url: string | null }
-  | { kind: 'plusResult'; res: PlusReply };
+  | { kind: 'plusResult'; res: PlusReply }
+  /** we opened this tab to bring you to what your person put on */
+  | { kind: 'follow'; key: string };
 
 const hubs: chrome.runtime.Port[] = [];
 const players = new Set<chrome.runtime.Port>();
@@ -307,6 +309,58 @@ async function endParty(tell: boolean) {
   if (players.size) toSite({ kind: 'hello' });
 }
 
+/* ---------------- bringing you along ---------------- */
+
+const platformOf = (url: string | undefined): TitleInfo['platform'] | null => {
+  try {
+    const h = new URL(url || '').hostname;
+    if (h.endsWith('netflix.com')) return 'netflix';
+    if (h.endsWith('primevideo.com') || /(^|\.)amazon\./.test(h)) return 'prime';
+  } catch {
+    // not a page
+  }
+  return null;
+};
+
+/** the tabs we opened to bring you along (kept while this worker sleeps): tab id -> what you're following */
+async function followingIn(tabId: number | undefined): Promise<string | null> {
+  if (tabId == null) return null;
+  const r = await chrome.storage.session.get('followTabs').catch(() => ({}) as Record<string, unknown>);
+  const f = (r.followTabs as Record<string, { key: string; at: number }> | undefined)?.[tabId];
+  return f && Date.now() - f.at < 120_000 ? f.key : null;
+}
+
+let lastTaken: { key: string; at: number } | null = null;
+
+/**
+ * Your person put something on. If you've got that site open here, its tab offers to take you there
+ * itself (with a moment to say "stay here"). If you haven't (you're on another site, or no tab at all),
+ * open it for you: in a watch party, whatever one of you puts on, the other comes along.
+ */
+async function takeTo(t: TitleInfo) {
+  if (!party) return;
+  // once per thing they put on (their tab says it again when it learns the episode's name)
+  if (lastTaken && lastTaken.key === t.key && Date.now() - lastTaken.at < 10 * 60_000) return;
+  lastTaken = { key: t.key, at: Date.now() };
+  const there = [...players].find((p) => (statuses.get(p)?.platform || platformOf(p.sender?.url)) === t.platform);
+  if (there) {
+    // that tab shows the "taking you there" card: bring it to the front so you see it
+    const tab = there.sender?.tab;
+    if (tab?.id != null) await chrome.tabs.update(tab.id, { active: true }).catch(() => undefined);
+    if (tab?.windowId != null) await chrome.windows.update(tab.windowId, { focused: true }).catch(() => undefined);
+    return;
+  }
+  const url = `${watchUrl(t)}#soultied-follow=${encodeURIComponent(t.key)}`;
+  const tab = await chrome.tabs.create({ url, active: true }).catch(() => null);
+  if (tab?.id == null) return;
+  if (tab.windowId != null) await chrome.windows.update(tab.windowId, { focused: true }).catch(() => undefined);
+  const r = await chrome.storage.session.get('followTabs').catch(() => ({}) as Record<string, unknown>);
+  const all = { ...((r.followTabs as Record<string, { key: string; at: number }> | undefined) || {}) };
+  for (const [id, f] of Object.entries(all)) if (Date.now() - f.at > 120_000) delete all[id];
+  all[tab.id] = { key: t.key, at: Date.now() };
+  await chrome.storage.session.set({ followTabs: all }).catch(() => undefined);
+}
+
 /* ---------------- tabs ---------------- */
 
 async function openHub() {
@@ -418,6 +472,14 @@ chrome.runtime.onConnect.addListener((port) => {
 
   if (port.name === 'player') {
     players.add(port);
+    void followingIn(port.sender?.tab?.id).then((key) => {
+      if (!key) return;
+      try {
+        port.postMessage({ kind: 'follow', key } satisfies ToPlayer);
+      } catch {
+        // that tab is going away
+      }
+    });
     port.onMessage.addListener((msg: PlayerMsg) => void stored.then(() => onPlayer(port, msg)));
     port.onDisconnect.addListener(() => {
       players.delete(port);
@@ -533,14 +595,19 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
     const m = msg as FromOffscreen;
     void stored.then(() => {
       if ('idle' in m) {
-        // nothing's been open for a while (or there's no party): let it close (it opens again when needed)
-        if (!party || !players.size) {
+        // no party (just looking at a link, say): let it close (it opens again when needed). In a party it
+        // stays, listening, so whatever your person puts on can bring you along even with no show open.
+        if (!party) {
           partyOpen = null;
           void chrome.offscreen.closeDocument().catch(() => undefined);
         }
         return;
       }
       if (!party) return;
+      if ('take' in m) {
+        void takeTo(m.take);
+        return;
+      }
       if (m.msg.kind === 'session') setPartySession(m.msg.session);
       else toPlayers(m.msg);
     });
@@ -573,6 +640,11 @@ chrome.runtime.onInstalled.addListener(() => {
       .catch(() => undefined);
   }
 });
+
+// Chrome just started (or the extension was updated): in a watch party, open it again so it's listening
+const reopenParty = () => void stored.then(() => party && ensureParty());
+chrome.runtime.onStartup.addListener(reopenParty);
+chrome.runtime.onInstalled.addListener(reopenParty);
 
 // older builds had no toolbar window: the button opened Soultied
 chrome.action.onClicked.addListener(() => void openHub());

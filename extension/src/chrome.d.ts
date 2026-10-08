@@ -18,6 +18,7 @@ declare namespace chrome {
     function getURL(path: string): string;
     function getManifest(): { version: string; content_scripts?: { matches: string[]; js?: string[]; all_frames?: boolean; world?: string }[] };
     const onInstalled: { addListener(fn: (details: { reason: string }) => void): void };
+    const onStartup: { addListener(fn: () => void): void };
     const onConnect: { addListener(fn: (port: Port) => void): void };
   }
   namespace tabs {
@@ -28,7 +29,7 @@ declare namespace chrome {
       discarded?: boolean;
     }
     function query(q: { url?: string | string[]; active?: boolean; currentWindow?: boolean }): Promise<Tab[]>;
-    function create(p: { url: string; active?: boolean }): Promise<unknown>;
+    function create(p: { url: string; active?: boolean }): Promise<Tab>;
     function update(id: number, p: { active?: boolean; url?: string }): Promise<unknown>;
   }
   namespace windows {
@@ -39,6 +40,11 @@ declare namespace chrome {
       get(keys: string | string[]): Promise<Record<string, any>>;
       set(items: Record<string, unknown>): Promise<void>;
       remove(keys: string | string[]): Promise<void>;
+    };
+    /** kept while the browser is open (cleared when it closes) */
+    const session: {
+      get(keys: string | string[]): Promise<Record<string, any>>;
+      set(items: Record<string, unknown>): Promise<void>;
     };
   }
   namespace scripting {

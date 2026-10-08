@@ -85,7 +85,12 @@ export type ToOffscreen = { to: 'offscreen' } & (
 );
 
 /** here -> background */
-export type FromOffscreen = { to: 'background'; from: 'party' } & ({ msg: HubMsg } | { idle: true });
+export type FromOffscreen = { to: 'background'; from: 'party' } & (
+  | { msg: HubMsg }
+  | { idle: true }
+  /** your person put something on: take you there if you're not on that site (the show tab, if there is one, offers it itself) */
+  | { take: TitleInfo }
+);
 
 /** what create / join / open answer */
 export type OpenReply =
@@ -136,7 +141,7 @@ let idleTimer = 0;
 let lastSession = '';
 let titleKey: string | null = null;
 
-const toBackground = (m: { msg: HubMsg } | { idle: true }) =>
+const toBackground = (m: { msg: HubMsg } | { idle: true } | { take: TitleInfo }) =>
   chrome.runtime.sendMessage({ to: 'background', from: 'party', ...m } satisfies FromOffscreen).catch(() => undefined);
 const hub = (msg: HubMsg) => void toBackground({ msg });
 
@@ -170,14 +175,19 @@ function pushSession(force = false) {
   hub({ kind: 'session', session: s });
 }
 
-/** The line to your person is open while a show tab is, and there's someone to talk to. */
+/**
+ * The line to your person is open whenever there's someone in the party with you, even with no
+ * show open here: whatever they put on, you're brought along (the background opens it for you).
+ */
 function syncChannel() {
-  const want = !!current?.doc && active && current.doc.members.length > 1;
+  const want = !!current?.doc && current.doc.members.length > 1;
   if (want && !chan && current) {
     const ch = channelAt<StreamEvent>(collection(cloud().db, 'parties', current.id, 'events'));
     chan = ch;
     ch.subscribe((e) => {
-      if (e.by !== uid) hub({ kind: 'event', e });
+      if (e.by === uid) return;
+      if (active) hub({ kind: 'event', e });
+      if (e.type === 'title' && e.title) void toBackground({ take: e.title });
     });
     const waiting = queue;
     queue = [];
