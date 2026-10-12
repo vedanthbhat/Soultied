@@ -47,6 +47,9 @@ export interface CallView {
 export interface CallOptions {
   /** run my voice through a volume control (setMicVolume) before it's sent */
   processMic?: boolean;
+  /** with processMic: the audio rate to work at, and something to clean the mic with on the way (null: nothing) */
+  micRate?: number;
+  shapeMic?: (ctx: AudioContext, src: AudioNode) => Promise<AudioNode | null>;
 }
 
 /** how long a connection may take before we say it isn't getting through */
@@ -430,7 +433,7 @@ export class WatchCall {
   private async chainMic(track: MediaStreamTrack): Promise<MediaStreamTrack | null> {
     if (typeof AudioContext === 'undefined') return null;
     try {
-      const ctx = new AudioContext();
+      const ctx = this.opts.micRate ? new AudioContext({ sampleRate: this.opts.micRate }) : new AudioContext();
       await Promise.race([ctx.resume(), new Promise((r) => setTimeout(r, 600))]);
       if (ctx.state !== 'running') {
         void ctx.close().catch(() => undefined);
@@ -439,7 +442,10 @@ export class WatchCall {
       const gain = ctx.createGain();
       gain.gain.value = this.micVolume;
       const dest = ctx.createMediaStreamDestination();
-      ctx.createMediaStreamSource(new MediaStream([track])).connect(gain).connect(dest);
+      const src = ctx.createMediaStreamSource(new MediaStream([track]));
+      // (cleaned on the way, if there's something to clean it with; plain if that doesn't work out)
+      const shaped = this.opts.shapeMic ? await this.opts.shapeMic(ctx, src).catch(() => null) : null;
+      (shaped || src).connect(gain).connect(dest);
       this.micChain = { ctx, gain };
       return dest.stream.getAudioTracks()[0] || null;
     } catch {
@@ -447,7 +453,7 @@ export class WatchCall {
     }
   }
 
-  /** How loud my voice goes out (1 = as the mic hears it, up to 2). */
+  /** How loud my voice goes out (1 = as the mic hears it). */
   setMicVolume(v: number) {
     this.micVolume = Math.max(0, Math.min(2, v));
     const c = this.micChain;
@@ -492,7 +498,9 @@ export class WatchCall {
       const ctx = new AudioContext();
       const an = ctx.createAnalyser();
       an.fftSize = 1024;
-      ctx.createMediaStreamSource(new MediaStream([this.mic])).connect(an);
+      // what actually goes out (cleaned of background noise, at my volume), so noise alone isn't "speaking"
+      const sent = this.micChain && this.micOut ? this.micOut : this.mic;
+      ctx.createMediaStreamSource(new MediaStream([sent])).connect(an);
       const buf = new Float32Array(an.fftSize);
       let loud = 0;
       let lastLoud = 0;
@@ -502,7 +510,8 @@ export class WatchCall {
         for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
         const now = Date.now();
         // two loud moments in a row (a click or a cough isn't speaking)
-        if (Math.sqrt(sum / buf.length) > VOICE_RMS) {
+        const level = Math.sqrt(sum / buf.length) / (sent === this.mic ? 1 : Math.max(0.1, this.micVolume));
+        if (level > VOICE_RMS) {
           if (++loud >= 2) lastLoud = now;
         } else loud = 0;
         const speaking = lastLoud > 0 && now - lastLoud < VOICE_HANG_MS;

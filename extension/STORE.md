@@ -36,7 +36,8 @@ WATCH TOGETHER
 
 SOULTIED PLUS: SEE AND HEAR EACH OTHER
 • Your cameras in the corner of the show. Unmute to talk, or hold T.
-• Volume sliders for your mic and their voice, and their voice is evened out so nothing comes through too loud or too quiet. The show eases down while someone's talking.
+• Voice isolation: background noise (fans, traffic, the room) is taken out of your mic on your own computer, and it stays quiet between your words. On by default, with a switch.
+• Volume sliders for your mic and their voice. The show eases down while someone's talking.
 • The call carries on while you switch shows. Chrome asks for your camera and mic once, in a small Soultied window.
 • One of you having Plus covers you both.
 
@@ -98,7 +99,7 @@ Netflix and Prime Video pages: reads the video player's state (playing or paused
 Soultied pages (the Soultied website and soultied-c1543.web.app / firebaseapp.com): connects the extension to the user's signed-in Soultied tab, which carries sync and chat messages to their partner, and lets Soultied's watch-party link page (soultied.app/join/) hand a party link to the extension. On these pages the script does nothing until the page identifies itself as Soultied.
 ```
 
-**Remote code:** No, I am not using remote code. (All code is in the package.)
+**Remote code:** No, I am not using remote code. (All code is in the package. The one WebAssembly file, `rnnoise.wasm`, is RNNoise for voice isolation, packaged as published by `@jitsi/rnnoise-wasm`; the extension-page policy allows `'wasm-unsafe-eval'` only so that this packaged file can run.)
 
 **Data usage.** Collected:
 

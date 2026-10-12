@@ -157,9 +157,11 @@ export interface CallFlags {
   error: string | null;
   /** waiting for you to allow the camera and mic (a small Soultied window asks) */
   asking: boolean;
-  /** 0–2: how loud your voice goes out, and how loud theirs plays */
+  /** 0–1: how loud your voice goes out, and how loud theirs plays (1 = as it is) */
   micVolume: number;
   speakerVolume: number;
+  /** voice isolation on your mic (background noise out, quiet between words); null: not available here */
+  isolation: boolean | null;
 }
 
 /** what you press in a show tab, for the call */
@@ -168,7 +170,8 @@ export type CallCmd =
   | { op: 'mic'; open: boolean }
   | { op: 'talk'; down: boolean }
   | { op: 'micVolume'; v: number }
-  | { op: 'speakerVolume'; v: number };
+  | { op: 'speakerVolume'; v: number }
+  | { op: 'isolation'; on: boolean };
 
 /** Soultied tab -> extension */
 export type HubMsg =

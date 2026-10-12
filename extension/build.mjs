@@ -35,6 +35,8 @@ await build({
     offscreen: path.join(here, 'src/offscreen.ts'),
     allow: path.join(here, 'src/allow.ts'),
     welcome: path.join(here, 'src/welcome.ts'),
+    // voice isolation, on the audio thread of the hidden page (loaded as an AudioWorklet)
+    denoise: path.join(here, 'src/denoise.ts'),
   },
   bundle: true,
   format: 'iife',
@@ -86,6 +88,17 @@ await writeFile(
   '<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Soultied is ready</title></head><body><script src="welcome.js"></script></body></html>\n',
 );
 await copyFile(path.join(root, 'public/fonts/OFL.txt'), path.join(out, 'fonts/OFL.txt'));
+// RNNoise for voice isolation: the WebAssembly file as published, and whose it is
+await copyFile(path.join(root, 'node_modules/@jitsi/rnnoise-wasm/dist/rnnoise.wasm'), path.join(out, 'rnnoise.wasm'));
+await writeFile(
+  path.join(out, 'THIRD-PARTY.txt'),
+  [
+    'rnnoise.wasm: RNNoise (https://gitlab.xiph.org/xiph/rnnoise), BSD-3-Clause, Copyright Xiph.Org Foundation and Jean-Marc Valin,',
+    'compiled to WebAssembly by Jitsi (@jitsi/rnnoise-wasm 0.2.1, https://github.com/jitsi/rnnoise-wasm), Apache-2.0.',
+    'fonts/PixelifySans-Variable.ttf: Pixelify Sans, SIL Open Font License 1.1 (fonts/OFL.txt).',
+    '',
+  ].join('\n'),
+);
 
 /* ---------- the icon: a pixel heart, drawn here so no image files live in the repo ---------- */
 

@@ -139,6 +139,9 @@ button { font: inherit; cursor: pointer; }
 .vol input::-webkit-slider-runnable-track { height: 6px; background: linear-gradient(90deg, #8a9a72 var(--fill, 50%), #eadbbd var(--fill, 50%)); box-shadow: 0 0 0 2px #2b1e1c; }
 .vol input::-webkit-slider-thumb { -webkit-appearance: none; width: 10px; height: 16px; margin-top: -5px; background: #b8674f; box-shadow: 0 0 0 2px #2b1e1c, inset 0 -3px 0 0 #8f4b3a; }
 .vol input:focus-visible { outline: 2px solid #b8674f; outline-offset: 3px; }
+.vol.iso { grid-template-columns: 1fr auto; }
+.vol.iso[hidden] { display: none; }
+.vol.iso .btn { min-width: 52px; text-align: center; }
 `;
 
 const HINT_PLACE = 'Hold T to talk. Cameras live in your Soultied tab (“Pop out cameras”).';
@@ -164,9 +167,11 @@ export interface OverlayActions {
   mic(open: boolean): void;
   /** leave the watch party (for good, not just this tab) */
   leaveParty(): void;
-  /** how loud you go out to your person, and how loud they come in (0 to 2: 1 is as it is) */
+  /** how loud you go out to your person, and how loud they come in (0 to 1: 1 is as it is) */
   micVolume(v: number): void;
   speakerVolume(v: number): void;
+  /** voice isolation on your mic, on or off */
+  isolation(on: boolean): void;
 }
 
 /** a little pixel microphone, crossed out (on a camera tile whose mic is muted) */
@@ -225,8 +230,11 @@ export class Overlay implements EngineUI {
   private leaveArmed = 0;
   private micVol: HTMLInputElement;
   private speakerVol: HTMLInputElement;
-  /** the call's volumes (0 to 2), as the call reports them */
-  volumes: { mic: number; speaker: number } | null = null;
+  private isoRow: HTMLElement;
+  private isoBtn: HTMLButtonElement;
+  private tipSaid = false;
+  /** the call's volumes (0 to 1) and voice isolation (null: not available), as the call reports them */
+  volumes: { mic: number; speaker: number; isolation: boolean | null } | null = null;
   private cams: HTMLElement;
   private camMine: { root: HTMLElement; video: HTMLVideoElement; off: HTMLElement; tag: HTMLElement };
   private camTheirs: { root: HTMLElement; video: HTMLVideoElement; off: HTMLElement; tag: HTMLElement };
@@ -385,7 +393,7 @@ export class Overlay implements EngineUI {
       const input = el('input');
       input.type = 'range';
       input.min = '0';
-      input.max = '200';
+      input.max = '100';
       input.step = '5';
       input.value = '100';
       input.setAttribute('aria-label', label);
@@ -413,6 +421,13 @@ export class Overlay implements EngineUI {
     };
     this.micVol = slider('My mic', 'How loud you are to your person', (v) => this.act.micVolume(v));
     this.speakerVol = slider('Their voice', 'How loud your person is to you', (v) => this.act.speakerVolume(v));
+    // voice isolation: background noise out of your mic, and quiet between your words
+    this.isoRow = el('div', 'vol iso');
+    this.isoRow.title = 'Takes background noise out of your mic (fans, traffic, the room), and keeps it quiet between your words';
+    this.isoBtn = el('button', 'btn sage small', 'On');
+    this.isoBtn.onclick = () => this.act.isolation(!this.volumes?.isolation);
+    this.isoRow.append(el('span', '', 'Voice isolation'), this.isoBtn);
+    vols.append(this.isoRow);
     this.calls.append(this.camBtn, this.micBtn, this.talkBtn, this.camsBtn, vols);
 
     this.hint = el('div', 'hint', HINT_PLACE);
@@ -629,7 +644,7 @@ export class Overlay implements EngineUI {
     const pct = Math.round(v * 100);
     // (not while you're dragging it: your hand wins)
     if (this.shadow.activeElement !== input) input.value = String(pct);
-    input.style.setProperty('--fill', `${Math.max(0, Math.min(100, pct / 2))}%`);
+    input.style.setProperty('--fill', `${Math.max(0, Math.min(100, pct))}%`);
     input.setAttribute('aria-valuetext', `${pct}%`);
     const b = input.parentElement?.querySelector('b');
     if (b) b.textContent = `${pct}%`;
@@ -1157,8 +1172,32 @@ export class Overlay implements EngineUI {
         if (this.shadow.activeElement !== this.micVol) this.drawVolume(this.micVol, v.mic);
         if (this.shadow.activeElement !== this.speakerVol) this.drawVolume(this.speakerVol, v.speaker);
       }
+      this.isoRow.hidden = v?.isolation == null;
+      const iso = !!v?.isolation;
+      this.isoBtn.textContent = iso ? 'On' : 'Off';
+      this.isoBtn.classList.toggle('sage', iso);
+      this.isoBtn.classList.toggle('paper', !iso);
+      this.isoBtn.setAttribute('aria-pressed', String(iso));
+      this.isoBtn.setAttribute('aria-label', `Voice isolation ${iso ? 'on' : 'off'}`);
       this.micVol.title = `How loud you are to ${name}`;
       this.speakerVol.title = `How loud ${name} is to you`;
+      if (c.micOpen || c.talking) this.headphonesTip();
     }
+  }
+
+  /** The first time you talk (at most once a day): the show playing out loud gets into your mic. */
+  private headphonesTip() {
+    if (this.tipSaid) return;
+    this.tipSaid = true;
+    const KEY = 'headphonesTip';
+    void chrome.storage.local
+      .get(KEY)
+      .then((r) => {
+        const last = Number(r[KEY]) || 0;
+        if (Date.now() - last < 24 * 3600_000) return;
+        void chrome.storage.local.set({ [KEY]: Date.now() });
+        this.note('Tip: headphones stop the show’s sound getting into your mic, so your person hears just you.');
+      })
+      .catch(() => undefined);
   }
 }

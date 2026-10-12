@@ -10,9 +10,10 @@ import type { WatchEvent } from '../../src/watch/sync';
  * while you move between shows, and the camera and mic are allowed once, for Soultied itself (a small
  * Soultied window asks the first time).
  *
- * - Your person's voice plays from here, through a gentle compressor (so a shout or a whisper both come
- *   out at a comfortable level) and your "their voice" volume.
- * - Your voice goes out through your "my mic" volume.
+ * - Your person's voice plays from here, through a gentle compressor (so a shout doesn't blast you; quiet
+ *   sounds aren't lifted) at your "their voice" volume.
+ * - Your voice goes out through voice isolation (see denoise.ts: background noise out, quiet between
+ *   words; on unless you turn it off) and your "my mic" volume.
  * - The show tab gets the pictures (yours and theirs) over a local link: see CamLink below and
  *   player/camview.ts.
  */
@@ -33,6 +34,12 @@ export class PartyCall {
   private links = new Set<CamLink>();
   private micVolume = 1;
   private speakerVolume = 1;
+  /** voice isolation on your mic (on unless you turn it off) */
+  private isolation = true;
+  /** whether it works here (null: not tried yet) */
+  private isolationWorks: boolean | null = null;
+  private denoise: AudioWorkletNode | null = null;
+  private wasm: Promise<ArrayBuffer | null> | null = null;
   /** waiting on the "allow camera and mic" window: what to do once it's allowed */
   private pending: CallCmd[] = [];
   private asking = false;
@@ -49,9 +56,10 @@ export class PartyCall {
   constructor(private host: PartyCallHost) {
     // your volumes from last time (a hidden page can't use chrome.storage; its own storage is fine)
     try {
-      const v = JSON.parse(localStorage.getItem(VOLUMES_KEY) || 'null') as { mic?: number; speaker?: number } | null;
+      const v = JSON.parse(localStorage.getItem(VOLUMES_KEY) || 'null') as { mic?: number; speaker?: number; isolation?: boolean } | null;
       if (typeof v?.mic === 'number') this.micVolume = clampVolume(v.mic);
       if (typeof v?.speaker === 'number') this.speakerVolume = clampVolume(v.speaker);
+      if (typeof v?.isolation === 'boolean') this.isolation = v.isolation;
     } catch {
       // first time, or storage unavailable: as they come
     }
@@ -74,7 +82,12 @@ export class PartyCall {
     this.end();
     if (!key) return;
     this.key = key;
-    const c = new WatchCall(me!, (e: WatchEvent) => this.host.send(e as StreamEvent), { processMic: true });
+    const c = new WatchCall(me!, (e: WatchEvent) => this.host.send(e as StreamEvent), {
+      processMic: true,
+      // RNNoise works at 48 kHz
+      micRate: 48000,
+      shapeMic: (ctx, src) => this.isolate(ctx, src),
+    });
     this.call = c;
     c.setMicVolume(this.micVolume);
     c.setPartner(partner);
@@ -98,16 +111,19 @@ export class PartyCall {
   /** `retry`: straight after the "allow" window said yes (so don't send you back to it) */
   async command(cmd: CallCmd, retry = false) {
     const c = this.call;
-    if (cmd.op === 'micVolume' || cmd.op === 'speakerVolume') {
+    if (cmd.op === 'micVolume' || cmd.op === 'speakerVolume' || cmd.op === 'isolation') {
       if (cmd.op === 'micVolume') {
         this.micVolume = clampVolume(cmd.v);
         c?.setMicVolume(this.micVolume);
-      } else {
+      } else if (cmd.op === 'speakerVolume') {
         this.speakerVolume = clampVolume(cmd.v);
         this.applySpeaker();
+      } else {
+        this.isolation = cmd.on;
+        this.denoise?.port.postMessage({ on: cmd.on });
       }
       try {
-        localStorage.setItem(VOLUMES_KEY, JSON.stringify({ mic: this.micVolume, speaker: this.speakerVolume }));
+        localStorage.setItem(VOLUMES_KEY, JSON.stringify({ mic: this.micVolume, speaker: this.speakerVolume, isolation: this.isolation }));
       } catch {
         // kept for this session only
       }
@@ -186,6 +202,7 @@ export class PartyCall {
       asking: this.asking,
       micVolume: this.micVolume,
       speakerVolume: this.speakerVolume,
+      isolation: this.isolationWorks === false ? null : this.isolation,
     };
     const json = JSON.stringify(f);
     if (!force && json === this.lastFlags) return;
@@ -196,6 +213,7 @@ export class PartyCall {
   end() {
     this.call?.destroy();
     this.call = null;
+    this.denoise = null;
     this.key = '';
     this.pending = [];
     this.asking = false;
@@ -205,6 +223,43 @@ export class PartyCall {
   }
 
   /* ---------- inside ---------- */
+
+  /**
+   * Voice isolation between your mic and the call (see denoise.ts). If it can't run here, null: your
+   * voice goes out as before, and the switch for it isn't shown.
+   */
+  private async isolate(ctx: AudioContext, src: AudioNode): Promise<AudioNode | null> {
+    try {
+      this.wasm ??= fetch(chrome.runtime.getURL('rnnoise.wasm'))
+        .then((r) => (r.ok ? r.arrayBuffer() : null))
+        .catch(() => null);
+      const bytes = await this.wasm;
+      if (!bytes || ctx.sampleRate !== 48000) throw new Error('unavailable');
+      await ctx.audioWorklet.addModule(chrome.runtime.getURL('denoise.js'));
+      const node = new AudioWorkletNode(ctx, 'soultied-denoise', {
+        numberOfInputs: 1,
+        numberOfOutputs: 1,
+        outputChannelCount: [1],
+        channelCount: 1,
+        channelCountMode: 'explicit',
+        processorOptions: { wasm: bytes.slice(0), on: this.isolation },
+      });
+      const ready = await new Promise<boolean>((res) => {
+        node.port.onmessage = (e: MessageEvent<{ ready?: boolean }>) => res(!!e.data?.ready);
+        node.onprocessorerror = () => res(false);
+        window.setTimeout(() => res(false), 2000);
+      });
+      if (!ready) throw new Error('not ready');
+      src.connect(node);
+      this.denoise = node;
+      this.isolationWorks = true;
+      return node;
+    } catch {
+      this.isolationWorks = false;
+      this.push();
+      return null;
+    }
+  }
 
   private changed(c: WatchCall) {
     this.playRemote(c.view.remote);
@@ -244,11 +299,12 @@ export class PartyCall {
       if (!this.graph) {
         const ctx = new AudioContext();
         const comp = ctx.createDynamicsCompressor();
-        // voices: tame the loud bits, so a shout and a whisper end up closer together
-        comp.threshold.value = -26;
-        comp.knee.value = 12;
-        comp.ratio.value = 5;
-        comp.attack.value = 0.004;
+        // only the loud bits are taken down (a laugh, a shout); normal talk and quiet sounds pass as they
+        // are, so background noise isn't lifted
+        comp.threshold.value = -16;
+        comp.knee.value = 10;
+        comp.ratio.value = 3;
+        comp.attack.value = 0.005;
         comp.release.value = 0.25;
         const gain = ctx.createGain();
         comp.connect(gain).connect(ctx.destination);
@@ -280,13 +336,14 @@ export class PartyCall {
 
   private applySpeaker() {
     const g = this.graph;
-    // a little lift to make up for the compressor taking the peaks down
-    if (g) g.gain.gain.setTargetAtTime(this.speakerVolume * 1.4, g.ctx.currentTime, 0.05);
+    // 100% is their voice as it arrives (no boost); 0% is silent
+    if (g) g.gain.gain.setTargetAtTime(this.speakerVolume, g.ctx.currentTime, 0.05);
     if (this.audio) this.audio.volume = Math.min(1, this.speakerVolume);
   }
 }
 
-const clampVolume = (v: number) => (Number.isFinite(v) ? Math.max(0, Math.min(2, v)) : 1);
+/** 0 (silent) to 1 (as it is): no boosting */
+const clampVolume = (v: number) => (Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 1);
 
 async function permission(name: 'camera' | 'microphone'): Promise<PermissionState | 'unknown'> {
   try {

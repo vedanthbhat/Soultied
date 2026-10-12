@@ -82,7 +82,7 @@ if (adapter && !running) {
   const callCmd = (cmd: CallCmd) => send({ kind: 'call', cmd });
   const cams = new CamView(() => {
     const f = cams.flags;
-    overlay.volumes = f ? { mic: f.micVolume, speaker: f.speakerVolume } : null;
+    overlay.volumes = f ? { mic: f.micVolume, speaker: f.speakerVolume, isolation: f.isolation } : null;
     overlay.setCall(cams.view);
     if (f) engine.setTalking(f.talking || f.partnerTalking);
     if (f?.stuck && !stuckSaid) {
@@ -124,6 +124,7 @@ if (adapter && !running) {
     leaveParty: () => send({ kind: 'leaveParty' }),
     micVolume: (v) => callCmd({ op: 'micVolume', v }),
     speakerVolume: (v) => callCmd({ op: 'speakerVolume', v }),
+    isolation: (on) => callCmd({ op: 'isolation', on }),
   });
   const engine = new Engine(adapter, (m) => send(m), overlay);
   overlay.engine = engine;
