@@ -19,7 +19,7 @@ You each need your own Netflix or Prime Video account. No video passes between y
 
 ## Install
 
-Works in Chrome, Edge and Brave on a computer. Until the Chrome Web Store listing is live, the site publishes the store build at `https://soultied.app/soultied-extension.zip` (built by `.github/workflows/pages.yml`), and the watch-party join page and the Watch panel link to it. Unzip it, then **Load unpacked** in `chrome://extensions` with Developer mode on. When the listing is live, put its address in `STORE_URL` in `public/join/index.html` (and the Watch panel).
+Works in Chrome, Edge and Brave on a computer. Install it from the Chrome Web Store: https://chromewebstore.google.com/detail/soultied-watch-together/hcfmbadgbnfdkebllinmonemahalikcn (the watch-party join page, `STORE_URL` in `public/join/index.html`, and the Watch panel, `EXTENSION_STORE_URL` in `src/components/StreamPanel.tsx`, link there). The site also still publishes the store build at `https://soultied.app/soultied-extension.zip` (built by `.github/workflows/pages.yml`), for trying a build before it's through review: unzip it, then **Load unpacked** in `chrome://extensions` with Developer mode on.
 
 To try a build of your own instead:
 

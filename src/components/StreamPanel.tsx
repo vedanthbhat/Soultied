@@ -3,6 +3,9 @@ import { useApp } from '../context/AppContext';
 import { useStreamHub } from '../stream/StreamHub';
 import { clock } from '../stream/protocol';
 
+/** The extension on the Chrome Web Store (Chrome, Edge and Brave install from here). */
+const EXTENSION_STORE_URL = 'https://chromewebstore.google.com/detail/soultied-watch-together/hcfmbadgbnfdkebllinmonemahalikcn';
+
 /** Netflix & Prime Video together: set-up, the two buttons, and where you left off. */
 export const StreamPanel: React.FC = () => {
   const hub = useStreamHub();
@@ -30,16 +33,10 @@ export const StreamPanel: React.FC = () => {
           <span>It works in Chrome, Edge or Brave on a computer, and you both need it.</span>
           <ol className="m-0 pl-5 flex flex-col gap-1">
             <li>
-              <a href="/soultied-extension.zip" download className="underline">
-                Download the Soultied extension
+              <a href={EXTENSION_STORE_URL} target="_blank" rel="noopener" className="underline">
+                Add Soultied from the Chrome Web Store
               </a>{' '}
-              and unzip it.
-            </li>
-            <li>
-              Open <code>chrome://extensions</code> and switch on <strong>Developer mode</strong> (top right).
-            </li>
-            <li>
-              Click <strong>Load unpacked</strong> and pick the unzipped folder.
+              (free). In Edge, allow extensions from other stores when it asks.
             </li>
             <li>Come back and refresh this page.</li>
           </ol>
