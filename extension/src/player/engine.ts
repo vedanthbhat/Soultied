@@ -25,7 +25,10 @@ type Outgoing = StreamEvent extends infer T ? (T extends StreamEvent ? Omit<T, '
 
 const PRESENT_MS = 50_000;
 const PING_MS = 20_000;
-const STATE_MS = 15_000;
+/** how often whoever's leading says exactly where they are (the other side keeps within a fraction of a second) */
+const STATE_MS = 6_000;
+/** away from the tab this long (another tab, minimised): pause for you both until you're back */
+const AWAY_MS = 1_500;
 const TOGETHER_COUNTS_AFTER = 120; // seconds watched together before an episode counts as "seen together"
 /** you picked something yourself this recently: don't get pulled to what your person picked at the same moment */
 const OWN_PICK_MS = 10_000;
@@ -66,7 +69,29 @@ export class Engine {
   private guardOK = new Set<string>();
   private guardOpen = false;
   private dipped: number | null = null;
+  private dippedTo = 0;
+  /** easing back up to this (your own volume) right now */
+  private restoring: number | null = null;
+  private ramp = 0;
+  private undip = 0;
   private timer = 0;
+
+  /* staying together */
+  /** where your person said they were (they're leading): we drift towards it by playing a touch faster or slower */
+  private syncTo: { pos: number; at: number; until: number } | null = null;
+  /** the speed you chose (we nudge around it, and put it back) */
+  private baseRate: number | null = null;
+  /** why we told your person to wait */
+  private bufferingWhy: 'loading' | 'ad' | 'away' = 'loading';
+  /** you went to another tab (or minimised): paused for you both */
+  private away = false;
+  private awayTimer = 0;
+  /** play again when you're back (unless your person paused meanwhile) */
+  private awayResume = false;
+  /** your person stepped away (we're paused for them) */
+  partnerAway = false;
+  /** your person left the watch party (until they come back) */
+  partnerLeft = false;
 
   /* following your person to what they put on */
   /** this tab has had something on (so being on the home page means you left it, not that you just arrived) */
@@ -158,6 +183,8 @@ export class Engine {
     const who = (x: Session | null) => (x ? `${x.me.id}|${x.party?.id || ''}|${x.partner?.id || ''}` : '');
     const changed = who(before) !== who(s);
     this.session = s;
+    // (a tab opened after your person left the party knows it too)
+    this.partnerLeft = !!s?.party?.partnerLeft;
     // only your Soultied place is remembered (for the "no watching ahead" check)
     if (s && !s.party) this.cached = s;
     if (!s || changed) {
@@ -195,6 +222,7 @@ export class Engine {
   start() {
     this.timer = window.setInterval(() => this.tick(), 500);
     window.addEventListener('pagehide', this.leave);
+    document.addEventListener('visibilitychange', this.onVisibility);
     this.tick();
   }
 
@@ -211,7 +239,7 @@ export class Engine {
   private sayHello() {
     this.helloAt = Date.now();
     this.lastPing = this.helloAt;
-    this.send({ type: 'hello', ...this.where(), buffering: this.bufferingSent });
+    this.send({ type: 'hello', ...this.where(), buffering: this.bufferingSent, why: this.bufferingWhy });
   }
 
   private leave = () => {
@@ -230,6 +258,8 @@ export class Engine {
       this.v.removeEventListener('playing', this.onFlowing);
       this.v.removeEventListener('canplay', this.onFlowing);
     }
+    this.unNudge();
+    this.syncTo = null;
     this.v = v;
     if (!v) {
       // the player closed, but you're still here (picking the next thing)
@@ -324,10 +354,45 @@ export class Engine {
     if (this.bufferingSent && !this.inAd) this.sendBuffering(false);
   };
 
-  private sendBuffering(on: boolean) {
+  private sendBuffering(on: boolean, why: 'loading' | 'ad' | 'away' = 'loading') {
     if (on === this.bufferingSent) return;
+    // stepped away: only coming back ends the wait
+    if (!on && this.away) return;
     this.bufferingSent = on;
-    this.send({ type: 'buffering', on, pos: this.at(this.v) });
+    if (on) this.bufferingWhy = why;
+    this.send({ type: 'buffering', on, pos: this.at(this.v), why: this.bufferingWhy });
+  }
+
+  /* ---------------- stepping away from the tab ---------------- */
+
+  private onVisibility = () => {
+    window.clearTimeout(this.awayTimer);
+    if (document.hidden) this.awayTimer = window.setTimeout(() => this.stepAway(), AWAY_MS);
+    else this.comeBack();
+  };
+
+  /** You went to another tab or minimised the window mid-show: pause for you both (the show doesn't keep up in a hidden tab anyway). */
+  private stepAway() {
+    const v = this.v;
+    if (!document.hidden || this.away || !v || v.paused || !this.session || !this.partnerHere) return;
+    if (this.inAd || this.countingDown || this.guardOpen || document.pictureInPictureElement) return;
+    this.away = true;
+    this.awayResume = true;
+    this.apply({ pos: this.at(v), playing: false });
+    this.sendBuffering(true, 'away');
+  }
+
+  private comeBack() {
+    if (!this.away) return;
+    this.away = false;
+    const v = this.v;
+    const resume = this.awayResume && !!v && v.paused && !this.partnerBuffering && !this.lockedOut;
+    this.awayResume = false;
+    this.sendBuffering(false);
+    if (resume && v) {
+      this.apply({ pos: this.at(v), playing: true });
+      this.ui.note(`Welcome back. Playing again for you both.`);
+    }
   }
 
   /** go to a spot without it counting as something I did */
@@ -338,6 +403,8 @@ export class Engine {
     // after a jump the new spot has to load before it plays, which can take a few seconds
     this.suppressUntil = Date.now() + (jump ? 4500 : 1600);
     this.expected = { pos: to.pos, at: Date.now(), playing: to.playing };
+    this.syncTo = null;
+    this.unNudge();
     if (jump) this.a.seek(to.pos);
     if (to.playing && v.paused) this.a.play();
     else if (!to.playing && !v.paused) this.a.pause();
@@ -372,13 +439,14 @@ export class Engine {
       // still here (with or without something playing)
       if (now - this.lastPing > PING_MS) {
         this.lastPing = now;
-        this.send({ type: 'ping', ...this.where(), buffering: this.bufferingSent });
+        this.send({ type: 'ping', ...this.where(), buffering: this.bufferingSent, why: this.bufferingWhy });
       }
       // your person's tab went quiet
       if (this.partnerSeen && now - this.partnerSeen > PRESENT_MS) {
         this.partnerSeen = 0;
         this.partnerWhere = null;
-        this.clearHold();
+        // (a tab in the background can go quiet for a while: still waiting for them to come back)
+        if (!this.partnerAway) this.clearHold();
         this.ui.update();
       }
     }
@@ -389,7 +457,7 @@ export class Engine {
     const ad = this.a.inAd();
     if (ad !== this.inAd) {
       this.inAd = ad;
-      if (ad) this.sendBuffering(true);
+      if (ad) this.sendBuffering(true, 'ad');
       else if (this.v.readyState >= 3) this.sendBuffering(false);
     }
 
@@ -400,6 +468,8 @@ export class Engine {
       if (Math.abs(cur - guess) > 3 && !this.v.seeking && this.v.readyState >= 3) this.onSeeked();
       else this.expected = { pos: cur, at: now, playing: !this.v.paused };
     }
+
+    this.nudge(now);
 
     if (this.session && this.leader && !this.v.paused && this.partnerHere && now - this.lastState > STATE_MS) {
       this.lastState = now;
@@ -436,6 +506,8 @@ export class Engine {
     }
     this.key = key;
     this.title = null;
+    this.syncTo = null;
+    this.unNudge();
     this.together = 0;
     this.lastWatched = 0;
     this.leader = false;
@@ -474,7 +546,13 @@ export class Engine {
     if (this.session.partner && e.by !== this.session.partner.id) return;
     if (e.type === 'rtc' || e.type === 'media') return;
     const was = this.partnerHere;
-    this.partnerSeen = e.type === 'bye' ? 0 : Date.now();
+    const gone = e.type === 'bye' || e.type === 'leave';
+    this.partnerSeen = gone ? 0 : Date.now();
+    if (!gone && this.partnerLeft) {
+      this.partnerLeft = false;
+      this.ui.note(`${this.partnerName} is back in the watch party.`);
+      this.arrivalSaidAt = Date.now();
+    }
     const name = this.partnerName;
     const nf = this.a.platform === 'netflix';
 
@@ -489,14 +567,24 @@ export class Engine {
         else this.send({ type: 'ping', ...this.where(), buffering: false });
         if (this.lock.on && this.lock.by === this.me) this.send({ type: 'lock', on: true });
         if (this.ready.me) this.send({ type: 'ready', on: true });
-        this.setPartnerBuffering(!!e.buffering, e.pos);
+        this.setPartnerBuffering(!!e.buffering, e.pos, e.why);
         break;
       }
       case 'ping':
         this.partnerWhere = { title: e.title, pos: e.pos, playing: e.playing };
         if (!was) this.back(name);
         if (e.title && this.party && !this.hadTitle) this.offerFollow(e.title);
-        this.setPartnerBuffering(!!e.buffering, e.pos);
+        this.setPartnerBuffering(!!e.buffering, e.pos, e.why);
+        break;
+      case 'leave':
+        // they left the watch party (not just a tab): you stay, paused where you are if they were holding you
+        window.clearTimeout(this.byeTimer);
+        this.partnerLeft = true;
+        this.partnerWhere = null;
+        this.stopWaiting();
+        this.ready.partner = false;
+        if (this.lock.by === this.session.partner?.id) this.lock = { on: false, by: '' };
+        this.ui.note(`${name} left the watch party. If they open the link again, they’re back with you.`);
         break;
       case 'bye':
         if (was) {
@@ -507,7 +595,9 @@ export class Engine {
           }, 8000);
         }
         this.partnerWhere = null;
-        this.setPartnerBuffering(false, 0);
+        // (stepped away and then closed the tab: don't start without them)
+        if (this.partnerAway) this.stopWaiting();
+        else this.setPartnerBuffering(false, 0);
         this.ready.partner = false;
         if (this.lock.by === this.session.partner?.id) this.lock = { on: false, by: '' };
         break;
@@ -521,6 +611,7 @@ export class Engine {
         break;
       case 'pause':
         if (!this.same(e.key)) break;
+        this.awayResume = false;
         this.leader = false;
         this.clearHold();
         this.apply({ pos: e.pos, playing: false });
@@ -545,6 +636,7 @@ export class Engine {
           this.arriveUntil = 0;
           this.leader = false;
           if (Math.abs(this.at(this.v) - pos) > 2 || e.playing !== !this.v.paused) this.apply({ pos, playing: e.playing });
+          else this.driftTowards(e);
           break;
         }
         if (e.reply) {
@@ -554,14 +646,15 @@ export class Engine {
           if (Math.abs(this.at(this.v) - pos) > 2 || e.playing !== !this.v.paused) {
             this.apply({ pos, playing: e.playing });
             this.ui.note(`Caught up with ${name}.`);
-          }
+          } else this.driftTowards(e);
         } else if (!this.leader && !this.hold) {
           if (Math.abs(this.at(this.v) - pos) > 2 || e.playing !== !this.v.paused) this.apply({ pos, playing: e.playing });
+          else this.driftTowards(e);
         }
         break;
       }
       case 'buffering':
-        this.setPartnerBuffering(e.on, e.pos);
+        this.setPartnerBuffering(e.on, e.pos, e.why);
         break;
       case 'title': {
         const prev = this.partnerWhere?.title?.key || e.from;
@@ -611,20 +704,78 @@ export class Engine {
     return !key || !this.key || key === this.key;
   }
 
-  private setPartnerBuffering(on: boolean, pos: number) {
-    if (on === this.partnerBuffering) return;
+  private setPartnerBuffering(on: boolean, pos: number, why?: 'loading' | 'ad' | 'away') {
+    const away = on && why === 'away';
+    if (on === this.partnerBuffering) {
+      // (still waiting, but now for a different reason)
+      if (on && this.hold && away !== this.partnerAway) {
+        this.partnerAway = away;
+        this.ui.waiting(this.waitingText(why));
+      }
+      return;
+    }
     this.partnerBuffering = on;
+    this.partnerAway = away;
     const v = this.v;
     if (!v) return;
     if (on && !v.paused) {
       this.hold = 'partner';
       this.apply({ pos: this.at(v), playing: false });
-      this.ui.waiting(`Waiting for ${this.partnerName}…`);
+      this.ui.waiting(this.waitingText(why));
     } else if (!on && this.hold) {
       this.hold = null;
       this.ui.waiting(null);
       this.apply({ pos: pos || this.at(v), playing: true });
     }
+  }
+
+  private waitingText(why?: 'loading' | 'ad' | 'away') {
+    const name = this.partnerName;
+    if (why === 'away') return `${name} stepped away. Paused for you both until they’re back.`;
+    if (why === 'ad') return `Waiting for ${name}’s ad to finish…`;
+    return `Waiting for ${name}…`;
+  }
+
+  /** Stop waiting for your person without starting the show again (they've gone). */
+  private stopWaiting() {
+    this.partnerBuffering = false;
+    this.partnerAway = false;
+    this.clearHold();
+  }
+
+  /* ---------------- keeping within a fraction of a second ---------------- */
+
+  /** Your person (leading) said where they are, and we're close: drift there rather than jump. */
+  private driftTowards(e: { pos: number; at: number; playing: boolean }) {
+    if (!e.playing || !this.v || this.v.paused) return;
+    this.syncTo = { pos: e.pos, at: e.at, until: Date.now() + STATE_MS * 3 };
+  }
+
+  /** Play a touch faster or slower (a few percent: you won't hear it) until we're level again. */
+  private nudge(now: number) {
+    const v = this.v;
+    const t = this.syncTo;
+    if (!v || !t || now > t.until || v.paused || v.seeking || v.readyState < 3 || this.inAd || this.hold || this.countingDown || this.ours()) {
+      if (t && now > t.until) this.syncTo = null;
+      return this.unNudge();
+    }
+    const drift = this.at(v) - projectedPosition(t.pos, t.at, true, now); // ahead of them: positive
+    const off = Math.abs(drift);
+    if (off < 0.15 || off > 3) {
+      if (off < 0.15) this.syncTo = null;
+      return this.unNudge();
+    }
+    // (the line between you is only so precise: don't chase the last few tenths)
+    if (this.baseRate === null && off < 0.4) return;
+    if (this.baseRate === null) this.baseRate = v.playbackRate || 1;
+    const rate = this.baseRate * (1 - Math.sign(drift) * Math.min(0.08, Math.max(0.04, off * 0.06)));
+    if (Math.abs(v.playbackRate - rate) > 0.004) v.playbackRate = rate;
+  }
+
+  private unNudge() {
+    if (this.baseRate === null) return;
+    if (this.v) this.v.playbackRate = this.baseRate;
+    this.baseRate = null;
   }
 
   /* ---------------- things you do in the overlay ---------------- */
@@ -796,15 +947,51 @@ export class Engine {
 
   /* ---------------- talking: turn the show down ---------------- */
 
+  /** Someone's talking: the show eases down (and back up a moment after they stop, not between every word). */
   setTalking(anyone: boolean) {
     const v = this.v;
     if (!v) return;
-    if (anyone && this.dipped === null) {
-      this.dipped = v.volume;
-      this.a.setVolume(Math.max(0.04, v.volume * 0.3));
-    } else if (!anyone && this.dipped !== null) {
-      this.a.setVolume(this.dipped);
-      this.dipped = null;
+    if (anyone) {
+      window.clearTimeout(this.undip);
+      this.undip = 0;
+      if (this.dipped !== null) return;
+      // (talking again while the show was still easing back up: it's your volume we go down from, not halfway)
+      const base = this.restoring ?? v.volume;
+      this.restoring = null;
+      this.dipped = base;
+      this.dippedTo = Math.max(0.04, base * 0.35);
+      this.rampTo(this.dippedTo, 250);
+    } else if (this.dipped !== null && !this.undip) {
+      this.undip = window.setTimeout(() => {
+        this.undip = 0;
+        const back = this.dipped;
+        this.dipped = null;
+        const now = this.v;
+        if (back === null || !now) return;
+        // you turned the show up or down yourself meanwhile: yours stands
+        if (!this.ramp && Math.abs(now.volume - this.dippedTo) > 0.04) return;
+        this.restoring = back;
+        this.rampTo(back, 600);
+      }, 700);
     }
+  }
+
+  private rampTo(to: number, ms: number) {
+    window.clearInterval(this.ramp);
+    const v = this.v;
+    if (!v) return;
+    const from = v.volume;
+    const t0 = Date.now();
+    const step = () => {
+      const k = Math.min(1, (Date.now() - t0) / ms);
+      this.a.setVolume(from + (to - from) * k);
+      if (k >= 1) {
+        window.clearInterval(this.ramp);
+        this.ramp = 0;
+        this.restoring = null;
+      }
+    };
+    this.ramp = window.setInterval(step, 50);
+    step();
   }
 }

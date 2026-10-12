@@ -43,13 +43,16 @@ export interface Where {
 
 /** Between the two of you, over the live channel. */
 export type StreamEvent =
-  | ({ type: 'hello' | 'ping'; by: string; at: number; buffering?: boolean } & Where)
+  | ({ type: 'hello' | 'ping'; by: string; at: number; buffering?: boolean; why?: 'loading' | 'ad' | 'away' } & Where)
   | { type: 'bye'; by: string; at: number }
   | { type: 'play'; pos: number; key: string | null; by: string; at: number }
   | { type: 'pause'; pos: number; key: string | null; by: string; at: number }
   | { type: 'seek'; pos: number; playing: boolean; key: string | null; by: string; at: number }
   | ({ type: 'state'; by: string; at: number; reply?: boolean } & Where)
-  | { type: 'buffering'; on: boolean; pos: number; by: string; at: number }
+  /** waiting for me: the picture's loading, an ad, or I've stepped away from the tab (`why`, newer versions) */
+  | { type: 'buffering'; on: boolean; pos: number; why?: 'loading' | 'ad' | 'away'; by: string; at: number }
+  /** I left the watch party (not just this tab) */
+  | { type: 'leave'; by: string; at: number }
   | { type: 'title'; title: TitleInfo; from: string | null; by: string; at: number }
   | { type: 'chat'; id: string; text: string; by: string; at: number }
   | { type: 'react'; kind: ReactionKind; by: string; at: number }
@@ -99,6 +102,8 @@ export interface PartyInfo {
   link: string;
   /** Soultied Plus covers this party until then (ms): cameras and voice for both of you. One of you having it is enough. */
   plusUntil?: number | null;
+  /** your person left the party (they're back if they open the link again) */
+  partnerLeft?: boolean;
 }
 
 /** Where to get Soultied Plus. */
@@ -133,10 +138,44 @@ export type PartyReply =
   | { ok: true; op: 'join'; url: string | null }
   | { ok: false; error: 'missing' | 'full' | 'offline' | 'failed' };
 
+/**
+ * The cameras-and-voice call in a Plus watch party, as the show tabs see it. The call itself runs in the
+ * extension's hidden page (so it carries on while you switch shows); tabs get its state, send it what you
+ * press, and get the pictures over a local link.
+ */
+export interface CallFlags {
+  camOn: boolean;
+  micReady: boolean;
+  micOpen: boolean;
+  talking: boolean;
+  partnerCam: boolean;
+  partnerMic: boolean;
+  partnerTalking: boolean;
+  link: 'idle' | 'connecting' | 'connected' | 'lost';
+  stuck: boolean;
+  busy: 'cam' | 'mic' | null;
+  error: string | null;
+  /** waiting for you to allow the camera and mic (a small Soultied window asks) */
+  asking: boolean;
+  /** 0–2: how loud your voice goes out, and how loud theirs plays */
+  micVolume: number;
+  speakerVolume: number;
+}
+
+/** what you press in a show tab, for the call */
+export type CallCmd =
+  | { op: 'camera'; on: boolean }
+  | { op: 'mic'; open: boolean }
+  | { op: 'talk'; down: boolean }
+  | { op: 'micVolume'; v: number }
+  | { op: 'speakerVolume'; v: number };
+
 /** Soultied tab -> extension */
 export type HubMsg =
   | { kind: 'session'; session: Session | null }
   | { kind: 'event'; e: StreamEvent }
+  /** the watch party's call (null: no call, e.g. no Plus) */
+  | { kind: 'call'; flags: CallFlags | null }
   /** who's talking (to turn the show down), and whether the cameras window is open */
   | { kind: 'voice'; mine: boolean; partner: boolean; cams: boolean };
 

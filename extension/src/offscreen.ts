@@ -2,7 +2,8 @@ import { initializeApp } from 'firebase/app';
 import { type Auth, connectAuthEmulator, getAuth, signInAnonymously } from 'firebase/auth/web-extension';
 import {
   type Firestore,
-  type Timestamp,
+  Timestamp,
+  addDoc,
   arrayUnion,
   collection,
   connectFirestoreEmulator,
@@ -15,10 +16,12 @@ import {
   updateDoc,
 } from 'firebase/firestore';
 import { channelAt, type LiveChannel } from '../../src/cloud/live';
+import { PartyCall } from './partycall';
 import {
   emptyLog,
   partyLink,
   SITE,
+  type CallCmd,
   type ExtMsg,
   type HubMsg,
   type PartyReply,
@@ -82,6 +85,10 @@ export type ToOffscreen = { to: 'offscreen' } & (
   | { op: 'redeem'; key: string }
   /** this browser's Plus code, for the party you're in */
   | { op: 'plus'; plus: PlusMine | null }
+  /** something you pressed for the call (camera, mic, volumes) */
+  | { op: 'call'; cmd: CallCmd }
+  /** the small window that asks for the camera and mic got a yes */
+  | { op: 'allowed' }
 );
 
 /** here -> background */
@@ -90,6 +97,8 @@ export type FromOffscreen = { to: 'background'; from: 'party' } & (
   | { idle: true }
   /** your person put something on: take you there if you're not on that site (the show tab, if there is one, offers it itself) */
   | { take: TitleInfo }
+  /** the call needs the camera and mic allowed: open the small window that asks */
+  | { ask: true }
 );
 
 /** what create / join / open answer */
@@ -141,13 +150,16 @@ let idleTimer = 0;
 let lastSession = '';
 let titleKey: string | null = null;
 
-const toBackground = (m: { msg: HubMsg } | { idle: true } | { take: TitleInfo }) =>
+const toBackground = (m: { msg: HubMsg } | { idle: true } | { take: TitleInfo } | { ask: true }) =>
   chrome.runtime.sendMessage({ to: 'background', from: 'party', ...m } satisfies FromOffscreen).catch(() => undefined);
 const hub = (msg: HubMsg) => void toBackground({ msg });
 
 const DEFAULT_LOOK = (people: Record<string, PartyMe>) => Object.values(people)[0]?.avatar;
 
 const ms = (t: Timestamp | number | null | undefined) => (typeof t === 'number' ? t : t?.toMillis?.() ?? 0);
+
+/** Soultied Plus covers this party until then (ms), or null */
+const plusUntil = (d: PartyDoc) => (d.plus ? ms(d.plus.until) || null : null);
 
 function session(): Session | null {
   const d = current?.doc;
@@ -163,8 +175,28 @@ function session(): Session | null {
     closeness: 0.5,
     log: emptyLog(),
     hubUrl: SITE,
-    party: { id: d.id, link: partyLink(d.id), plusUntil: d.plus ? ms(d.plus.until) || null : null },
+    party: { id: d.id, link: partyLink(d.id), plusUntil: plusUntil(d), ...(partnerLeft ? { partnerLeft: true } : {}) },
   };
+}
+
+/* ---------------- cameras and voice (Soultied Plus) ---------------- */
+
+const call = new PartyCall({
+  send: (e) => send(e),
+  flags: (flags) => hub({ kind: 'call', flags }),
+  ask: () => void toBackground({ ask: true }),
+});
+let quietTimer = 0;
+
+/** The call runs while the two of you are in a party with Plus (whether or not a show is open). */
+/** your person left the party (the call waits until they're back) */
+let partnerLeft = false;
+
+function syncCall() {
+  const d = current?.doc;
+  const other = d && uid && !partnerLeft ? d.members.find((m) => m !== uid) || null : null;
+  const until = d ? plusUntil(d) : null;
+  call.sync(uid, d?.id || null, other, !!until && until > Date.now());
 }
 
 function pushSession(force = false) {
@@ -186,6 +218,19 @@ function syncChannel() {
     chan = ch;
     ch.subscribe((e) => {
       if (e.by === uid) return;
+      // the call lives here: its signalling never goes to the tabs
+      if (e.type === 'rtc' || e.type === 'media') return call.handle(e);
+      // they left the party: the call ends (until they're back)
+      if (e.type === 'leave') {
+        partnerLeft = true;
+        syncCall();
+        pushSession();
+      } else if (partnerLeft && e.type !== 'bye') {
+        partnerLeft = false;
+        syncCall();
+        pushSession();
+      }
+      if (e.type === 'hello') call.handle(e);
       if (active) hub({ kind: 'event', e });
       if (e.type === 'title' && e.title) void toBackground({ take: e.title });
     });
@@ -218,6 +263,8 @@ function noteTitle(e: StreamEvent) {
 }
 
 function close() {
+  partnerLeft = false;
+  call.end();
   current?.off();
   current = null;
   chan?.close();
@@ -245,12 +292,14 @@ async function open(id: string): Promise<OpenReply> {
       if (current !== here) return;
       here.doc = s.exists() ? (s.data() as PartyDoc) : null;
       syncChannel();
+      syncCall();
       pushSession();
       void sharePlus();
     },
     () => undefined,
   );
   syncChannel();
+  syncCall();
   lastSession = JSON.stringify(session());
   return { ok: true, id, session: session(), title: data.title || null };
 }
@@ -357,9 +406,24 @@ async function sharePlus() {
   }
 }
 
-function leave() {
-  if (uid && chan) chan.send({ type: 'bye', by: uid, at: Date.now() });
+/**
+ * You left the party: say so to your person (so they know it's not just a tab closing), and wait for
+ * that to go out before this page is closed.
+ */
+async function leave() {
+  const id = current?.id;
+  const by = uid;
+  const withSomeone = (current?.doc?.members.length || 0) > 1;
   close();
+  if (!id || !by || !withSomeone) return;
+  const said = addDoc(collection(cloud().db, 'parties', id, 'events'), {
+    type: 'leave',
+    by,
+    at: Date.now(),
+    ts: serverTimestamp(),
+    expireAt: Timestamp.fromMillis(Date.now() + 24 * 3600_000),
+  }).catch(() => undefined);
+  await Promise.race([said, new Promise((r) => window.setTimeout(r, 2500))]);
 }
 
 /* ---------------- the Netflix / Prime tabs (through the background) ---------------- */
@@ -370,8 +434,10 @@ function fromPlayers(msg: ExtMsg) {
     active = true;
     syncChannel();
     pushSession(true);
-    // no voice in a watch party (that's for Soultied Plus)
+    // no voice from a Soultied tab in a watch party (Plus has its own call, here)
     hub({ kind: 'voice', mine: false, partner: false, cams: false });
+    syncCall();
+    call.push(true);
   } else if (msg.kind === 'send') {
     send(msg.e);
     noteTitle(msg.e);
@@ -388,7 +454,12 @@ function fromPlayers(msg: ExtMsg) {
 /** With no show open for a while (or no party at all), let Chrome close this page (it opens again when you're back). */
 function players(count: number) {
   window.clearTimeout(idleTimer);
-  if (count === 0) idleTimer = window.setTimeout(() => void toBackground({ idle: true }), IDLE_MS);
+  window.clearTimeout(quietTimer);
+  if (count === 0) {
+    idleTimer = window.setTimeout(() => void toBackground({ idle: true }), IDLE_MS);
+    // no show open anywhere for a while (not just switching shows): camera off, mic muted
+    quietTimer = window.setTimeout(() => call.quiet(), 45_000);
+  }
 }
 
 const failed = (err: unknown): { ok: false; error: 'offline' | 'failed' } => ({
@@ -420,10 +491,12 @@ chrome.runtime.onMessage.addListener((m: ToOffscreen, _sender, reply) => {
       window.clearTimeout(idleTimer);
       return answer(open(m.id));
     case 'leave':
-      leave();
-      players(0);
-      reply({ ok: true });
-      return;
+      return answer(
+        leave().then(() => {
+          players(0);
+          return { ok: true };
+        }),
+      );
     case 'ext':
       fromPlayers(m.msg);
       reply({ ok: true });
@@ -437,6 +510,14 @@ chrome.runtime.onMessage.addListener((m: ToOffscreen, _sender, reply) => {
     case 'plus':
       myPlus = m.plus;
       void sharePlus();
+      reply({ ok: true });
+      return;
+    case 'call':
+      void call.command(m.cmd);
+      reply({ ok: true });
+      return;
+    case 'allowed':
+      void call.allowed();
       reply({ ok: true });
       return;
   }

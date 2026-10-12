@@ -8,7 +8,7 @@ Package: `npm run build:extension:store`, then upload `extension/soultied-extens
 
 **Name** (from the manifest): Soultied: watch together
 
-**Summary** (from the manifest, 132 characters max): Watch Netflix and Prime Video in sync with your person: send a link, then chat and react on a little pixel couch. No account needed.
+**Summary** (from the manifest, 132 characters max): Watch Netflix and Prime Video in sync with your person: send a link, chat and react on a pixel couch. Cameras with Soultied Plus.
 
 **Category:** Entertainment
 
@@ -20,17 +20,25 @@ Package: `npm run build:extension:store`, then upload `extension/soultied-extens
 Movie night, wherever you both are. Soultied keeps Netflix or Prime Video in sync for you and your person, with a chat and a little pixel couch in the corner of the show.
 
 WATCH PARTY: NO ACCOUNT NEEDED
-• Open a show, click the Soultied button, type your name and start a watch party.
+• Hover any show on Netflix or Prime Video and press "Watch together". Your watch party starts and the link is copied.
 • Send the link. When your person opens it, Soultied takes them to the same show, in sync.
 • Free: synced playback, chat, reactions and the couch.
 
 WATCH TOGETHER
-• Play, pause and skipping stay in sync. Join halfway and you catch up to where your person is.
-• If either of you is buffering or sitting through an ad, the show waits for them.
+• Play, pause and skipping stay in sync, within a fraction of a second. Join halfway and you catch up to where your person is.
+• If either of you is buffering, sitting through an ad or steps away to another tab, the show pauses for both and carries on when they're back.
+• Whatever one of you puts on, the other is taken there too.
 • When one of you moves on to the next episode, the other follows.
 • "Take the remote": only one of you can pause and skip.
 • Countdown start: you both press "I'm ready", then 3, 2, 1, and it plays for both of you at the same moment.
 • A chat sidebar over the video, with little notes like "Rohan paused at 42:10", and reactions that float up from your side of the couch.
+• Leave whenever you like: your person is told, and keeps watching.
+
+SOULTIED PLUS: SEE AND HEAR EACH OTHER
+• Your cameras in the corner of the show. Unmute to talk, or hold T.
+• Volume sliders for your mic and their voice, and their voice is evened out so nothing comes through too loud or too quiet. The show eases down while someone's talking.
+• The call carries on while you switch shows. Chrome asks for your camera and mic once, in a small Soultied window.
+• One of you having Plus covers you both.
 
 EVEN BETTER WITH A SOULTIED PLACE
 Soultied (soultied.app) is a little home online for two people who live apart: a shared pixel room, a letter to open together every day, games, and movie nights. With a place:
@@ -73,7 +81,7 @@ Remembers on this computer the user's last Soultied session (their names, pixel 
 `offscreen`:
 
 ```
-While the user is in a watch party, a hidden extension page keeps the party connected: it holds the anonymous sign-in and the live connection to Soultied's database (Firebase) that carries play, pause and chat between the two people. It closes itself five minutes after the last Netflix / Prime tab closes. It runs only the extension's own packaged code.
+While the user is in a watch party, a hidden extension page keeps the party connected: it holds the anonymous sign-in and the live connection to Soultied's database (Firebase) that carries play, pause and chat between the two people. With Soultied Plus it also runs the party's video and voice call (reasons USER_MEDIA and WEB_RTC), so the call isn't dropped when the user moves from one show page to another; the camera and microphone are used only after the user presses the camera, unmute or talk button, and are switched off when no show tab has been open for a short while or the user leaves. It closes itself five minutes after the last Netflix / Prime tab closes. It runs only the extension's own packaged code.
 ```
 
 `scripting`:
@@ -95,7 +103,7 @@ Soultied pages (the Soultied website and soultied-c1543.web.app / firebaseapp.co
 **Data usage.** Collected:
 
 - Personally identifiable information: yes (the display names the two people chose in Soultied, or typed for a watch party)
-- Personal communications: yes (chat messages and reactions between the two people)
+- Personal communications: yes (chat messages and reactions between the two people, and with Soultied Plus their video and voice call, which goes directly between the two browsers, or through an encrypted relay when a network blocks that, and is never recorded or stored)
 - Web history: yes (titles and episodes watched together, and where they stopped)
 - Website content: yes (the show's title and episode name on screen)
 - Authentication information: no (watch parties use an anonymous Firebase sign-in: a random ID, no password, email or Google account)
@@ -118,8 +126,9 @@ Free. All regions. Visibility: Unlisted at first (anyone with the link from Soul
 ```
 Soultied connects two people. No account is needed for a watch party:
 
-1. Install the extension in two Chrome profiles. In the first, open any Netflix or Prime Video title and press play. A small card offers "Start a watch party": type a name and press it (or use the toolbar button). The link is copied.
-2. Open the link in the second profile. The page shows who started the party; type a name and press "Join the party". It opens the same title, and play, pause, skipping and chat stay in sync.
+1. Install the extension in two Chrome profiles. In the first, open Netflix or Prime Video, hover any title and press "Watch together" next to its Play button (or open a title and use the card on the right, or the toolbar button). Type a name; the party starts, the title opens and the link is copied.
+2. Open the link in the second profile. The page shows who started the party; type a name and press "Join the party". It opens the same title, and play, pause, skipping and chat stay in sync. "Leave" on the chat panel (pressed twice) ends the party for that person.
+3. Cameras and voice need Soultied Plus. To try them, open "I have a code" on the chat panel in a party and enter the code below; then "Camera on" (Chrome asks once, in a small Soultied window), "Unmute", and the "My mic" / "Their voice" sliders. Test code: [add a reviewer code here]
 
 A Netflix or Prime Video subscription is needed on each side. With a Soultied place (sign in at https://soultied.app/ with Google, build a place, open the invite link in the second profile), the extension also connects through the signed-in Soultied tab.
 ```

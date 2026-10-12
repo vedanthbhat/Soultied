@@ -1,4 +1,4 @@
-import { clock, PLUS_URL, titleLabel, type PlusReply } from '../../../src/stream/protocol';
+import { clock, PLUS_URL, titleLabel, type PlusReply, type TitleInfo } from '../../../src/stream/protocol';
 import type { ReactionKind } from '../../../src/pixel/watchRoom';
 import type { CallView } from '../../../src/watch/call';
 import { CouchCorner, faceURL, iconURL } from './couch';
@@ -47,6 +47,9 @@ button { font: inherit; cursor: pointer; }
 .dot { width: 9px; height: 9px; background: #b9a98f; flex: none; }
 .dot.on { background: #8a9a72; }
 .close { flex: none; margin-right: 3px; }
+.head .btn[hidden] { display: none; }
+.head .leave { flex: none; }
+.btn.danger { background: #a84f4b; color: #fff4e2; box-shadow: 0 -3px 0 0 #2b1e1c, 0 3px 0 0 #2b1e1c, -3px 0 0 0 #2b1e1c, 3px 0 0 0 #2b1e1c, inset 0 -3px 0 0 #7d3532; }
 .banners { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px 0; }
 .banners:empty { display: none; }
 .banner { background: #fff8ea; padding: 10px 11px; font-size: 13px; line-height: 1.4; display: flex; flex-direction: column; gap: 9px; box-shadow: inset 0 0 0 2px #d6c29c; }
@@ -129,6 +132,13 @@ button { font: inherit; cursor: pointer; }
 .wave i:nth-child(2) { animation-delay: 120ms; } .wave i:nth-child(3) { animation-delay: 240ms; }
 @keyframes wave { 0% { height: 3px; } 50% { height: 9px; } 100% { height: 4px; } }
 .calls .btn { touch-action: none; user-select: none; }
+.vols { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 7px; padding-top: 2px; }
+.vol { display: grid; grid-template-columns: 74px 1fr 38px; align-items: center; gap: 8px; font-size: 12.5px; color: #5a4038; }
+.vol b { font-weight: 400; text-align: right; font-variant-numeric: tabular-nums; color: #7a5a48; }
+.vol input { -webkit-appearance: none; appearance: none; width: 100%; height: 18px; margin: 0; background: transparent; cursor: pointer; pointer-events: auto; }
+.vol input::-webkit-slider-runnable-track { height: 6px; background: linear-gradient(90deg, #8a9a72 var(--fill, 50%), #eadbbd var(--fill, 50%)); box-shadow: 0 0 0 2px #2b1e1c; }
+.vol input::-webkit-slider-thumb { -webkit-appearance: none; width: 10px; height: 16px; margin-top: -5px; background: #b8674f; box-shadow: 0 0 0 2px #2b1e1c, inset 0 -3px 0 0 #8f4b3a; }
+.vol input:focus-visible { outline: 2px solid #b8674f; outline-offset: 3px; }
 `;
 
 const HINT_PLACE = 'Hold T to talk. Cameras live in your Soultied tab (“Pop out cameras”).';
@@ -144,13 +154,19 @@ const PLUS_ERRORS: Record<string, string> = {
 /** what the overlay can ask for */
 export interface OverlayActions {
   openHub(): void;
-  startParty(name: string): void;
+  /** `title`: started from a show's card, rather than what's on here */
+  startParty(name: string, title?: TitleInfo | null): void;
   joinParty(link: string, name: string): void;
   redeem(code: string): void;
   camera(on: boolean): void;
   talk(down: boolean): void;
   /** unmute (stays on) or mute */
   mic(open: boolean): void;
+  /** leave the watch party (for good, not just this tab) */
+  leaveParty(): void;
+  /** how loud you go out to your person, and how loud they come in (0 to 2: 1 is as it is) */
+  micVolume(v: number): void;
+  speakerVolume(v: number): void;
 }
 
 /** a little pixel microphone, crossed out (on a camera tile whose mic is muted) */
@@ -205,6 +221,12 @@ export class Overlay implements EngineUI {
   private talkBtn: HTMLButtonElement;
   private micBtn: HTMLButtonElement;
   private camsBtn: HTMLButtonElement;
+  private leaveBtn: HTMLButtonElement;
+  private leaveArmed = 0;
+  private micVol: HTMLInputElement;
+  private speakerVol: HTMLInputElement;
+  /** the call's volumes (0 to 2), as the call reports them */
+  volumes: { mic: number; speaker: number } | null = null;
   private cams: HTMLElement;
   private camMine: { root: HTMLElement; video: HTMLVideoElement; off: HTMLElement; tag: HTMLElement };
   private camTheirs: { root: HTMLElement; video: HTMLVideoElement; off: HTMLElement; tag: HTMLElement };
@@ -228,6 +250,8 @@ export class Overlay implements EngineUI {
   /** your name for a watch party (from last time) */
   myName = '';
   private starting = false;
+  /** started from a show's card: that show, and where to go once the party's ready */
+  private pick: { title: TitleInfo; go: string } | null = null;
   private plusSaid = false;
   private copied = false;
   private act: OverlayActions;
@@ -266,7 +290,30 @@ export class Overlay implements EngineUI {
     close.onclick = () => this.setOpen(false);
     const headText = el('div', 'head-text');
     headText.append(this.kicker, who);
-    head.append(headText, close);
+    // leaving the watch party: press twice (once to ask, once to be sure)
+    this.leaveBtn = el('button', 'btn paper small leave', 'Leave');
+    this.leaveBtn.title = 'Leave the watch party';
+    this.leaveBtn.hidden = true;
+    const disarm = () => {
+      window.clearTimeout(this.leaveArmed);
+      this.leaveArmed = 0;
+      this.leaveBtn.textContent = 'Leave';
+      this.leaveBtn.classList.remove('danger');
+      this.leaveBtn.classList.add('paper');
+    };
+    this.leaveBtn.onclick = () => {
+      if (!this.leaveArmed) {
+        this.leaveBtn.textContent = 'Sure? Leave';
+        this.leaveBtn.classList.add('danger');
+        this.leaveBtn.classList.remove('paper');
+        this.leaveArmed = window.setTimeout(disarm, 4000);
+        return;
+      }
+      disarm();
+      this.act.leaveParty();
+      this.toast(`You left the watch party.`);
+    };
+    head.append(headText, this.leaveBtn, close);
 
     this.banners = el('div', 'banners');
     const controls = el('div', 'controls');
@@ -330,7 +377,43 @@ export class Overlay implements EngineUI {
       this.camsHidden = !this.camsHidden;
       this.update();
     };
-    this.calls.append(this.camBtn, this.micBtn, this.talkBtn, this.camsBtn);
+    // how loud: you, to them; and them, to you
+    const vols = el('div', 'vols');
+    const slider = (label: string, title: string, set: (v: number) => void) => {
+      const row = el('label', 'vol');
+      row.title = title;
+      const input = el('input');
+      input.type = 'range';
+      input.min = '0';
+      input.max = '200';
+      input.step = '5';
+      input.value = '100';
+      input.setAttribute('aria-label', label);
+      const pct = el('b', '', '100%');
+      let sent = 0;
+      let later = 0;
+      const say = () => {
+        window.clearTimeout(later);
+        sent = Date.now();
+        set(Number(input.value) / 100);
+      };
+      input.oninput = () => {
+        this.drawVolume(input, Number(input.value) / 100);
+        // while you drag: often enough to hear it change, not on every pixel
+        if (Date.now() - sent > 120) say();
+        else {
+          window.clearTimeout(later);
+          later = window.setTimeout(say, 120);
+        }
+      };
+      input.onchange = say;
+      row.append(el('span', '', label), input, pct);
+      vols.append(row);
+      return input;
+    };
+    this.micVol = slider('My mic', 'How loud you are to your person', (v) => this.act.micVolume(v));
+    this.speakerVol = slider('Their voice', 'How loud your person is to you', (v) => this.act.speakerVolume(v));
+    this.calls.append(this.camBtn, this.micBtn, this.talkBtn, this.camsBtn, vols);
 
     this.hint = el('div', 'hint', HINT_PLACE);
     this.side.append(head, this.banners, controls, this.calls, this.logEl, reacts, compose, this.hint);
@@ -457,20 +540,49 @@ export class Overlay implements EngineUI {
 
   /* ---------------- watch parties ---------------- */
 
+  /**
+   * "Watch together" on a show's card: start a party for that show (with the name you used last time)
+   * and put it on. In a party already, it's just putting it on: your person comes along.
+   */
+  startFor(title: TitleInfo, go: string) {
+    if (this.engine?.party) {
+      this.engine.goTo(go);
+      return;
+    }
+    if (this.starting) return;
+    this.pick = { title, go };
+    const name = this.myName || this.engine?.session?.me.name || '';
+    if (name) {
+      this.starting = true;
+      this.toast(`Starting a watch party for ${title.show}…`);
+      this.act.startParty(name, title);
+    } else {
+      // first time: your name first (the card says what it's for)
+      this.launchOpen = true;
+      this.cardShown = null;
+    }
+    this.update();
+  }
+
   /** The party's ready: copy the link straight away if the browser lets us. */
   partyStarted(link: string) {
     this.starting = false;
     this.cardDismissed = false;
     this.launchOpen = false;
+    const pick = this.pick;
+    this.pick = null;
     void this.copy(link).then((ok) => {
       this.copied = ok;
       this.toast(ok ? 'Watch party started. Link copied: send it to your person.' : 'Watch party started. Copy the link in the chat panel and send it to your person.');
       this.update();
+      // started from a show's card: on it goes (the link waits in the chat panel there too)
+      if (pick) window.setTimeout(() => this.engine?.goTo(pick.go), 1200);
     });
   }
 
   partyFailed(error: string) {
     this.starting = false;
+    this.pick = null;
     this.cardShown = null; // draw the card again, with its buttons back
     const said: Record<string, string> = {
       offline: 'Couldn’t reach Soultied. Check your connection and try again.',
@@ -510,6 +622,17 @@ export class Overlay implements EngineUI {
     if (view?.camOn && !before?.camOn) this.camsHidden = false;
     if (view?.partnerCam && !before?.partnerCam && this.camsHidden) this.toast(`${this.engine?.partnerName || 'Your person'} turned their camera on.`);
     this.update();
+  }
+
+  /** A volume slider: its knob, the filled part of its track, and the number beside it. */
+  private drawVolume(input: HTMLInputElement, v: number) {
+    const pct = Math.round(v * 100);
+    // (not while you're dragging it: your hand wins)
+    if (this.shadow.activeElement !== input) input.value = String(pct);
+    input.style.setProperty('--fill', `${Math.max(0, Math.min(100, pct / 2))}%`);
+    input.setAttribute('aria-valuetext', `${pct}%`);
+    const b = input.parentElement?.querySelector('b');
+    if (b) b.textContent = `${pct}%`;
   }
 
   /** Is Soultied Plus on for the party you're in? */
@@ -701,7 +824,7 @@ export class Overlay implements EngineUI {
    */
   private drawCard(card: 'start' | 'join' | null) {
     const e = this.engine;
-    const key = card === 'start' ? `start|${this.starting}|${e.partner?.name || ''}|${e.hasVideo}` : card;
+    const key = card === 'start' ? `start|${this.starting}|${e.partner?.name || ''}|${e.hasVideo}|${this.pick?.title.key || ''}` : card;
     if (key === this.cardShown && card !== 'join') return;
     this.cardShown = key;
     if (!card) {
@@ -733,9 +856,24 @@ export class Overlay implements EngineUI {
     x.onclick = () => {
       this.launchOpen = false;
       this.launchAuto = false;
+      this.pick = null;
       this.update();
     };
     const parts: HTMLElement[] = [top];
+    const pick = this.pick;
+    if (pick) {
+      // from a show's card: just your name, and you're off
+      parts.push(el('div', '', `Watch ${pick.title.show} with someone far away: you start the party, send them the link, and you’re in sync.`));
+      parts.push(
+        this.nameForm('Start the watch party', this.starting, null, (n) => {
+          this.starting = true;
+          this.myName = n;
+          this.act.startParty(n, pick.title);
+        }),
+      );
+      this.connect.replaceChildren(...parts);
+      return;
+    }
     const who = e.partner?.name;
     if (who) {
       // you have a Soultied place: it carries everything between you two
@@ -875,6 +1013,8 @@ export class Overlay implements EngineUI {
       this.launchOpen = true;
       this.launchAuto = false;
     }
+    // (once you've been in something on this page, leaving it doesn't pop the card open)
+    if (s) this.launchAuto = false;
     const card: 'start' | 'join' | null = !s
       ? this.launchOpen || this.starting
         ? 'start'
@@ -919,7 +1059,10 @@ export class Overlay implements EngineUI {
         : 'Invite your person in Soultied first'
       : e.partnerHere
         ? `${name} is on the couch`
-        : `${name} isn’t watching yet`;
+        : party && e.partnerLeft
+          ? `${name} left the party`
+          : `${name} isn’t watching yet`;
+    this.leaveBtn.hidden = !party;
     const plus = !!party && this.plusOn;
     this.hint.textContent = !party ? HINT_PLACE : plus ? HINT_PLUS : '';
 
@@ -1009,6 +1152,13 @@ export class Overlay implements EngineUI {
       this.talkBtn.classList.toggle('paper', !c.talking);
       this.camsBtn.hidden = !(c.camOn || c.partnerCam);
       this.camsBtn.textContent = this.camsHidden ? 'Show cameras' : 'Hide cameras';
+      const v = this.volumes;
+      if (v) {
+        if (this.shadow.activeElement !== this.micVol) this.drawVolume(this.micVol, v.mic);
+        if (this.shadow.activeElement !== this.speakerVol) this.drawVolume(this.speakerVol, v.speaker);
+      }
+      this.micVol.title = `How loud you are to ${name}`;
+      this.speakerVol.title = `How loud ${name} is to you`;
     }
   }
 }

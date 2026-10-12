@@ -33,6 +33,8 @@ await build({
     'prime-main': path.join(here, 'src/prime-main.ts'),
     popup: path.join(here, 'src/popup.ts'),
     offscreen: path.join(here, 'src/offscreen.ts'),
+    allow: path.join(here, 'src/allow.ts'),
+    welcome: path.join(here, 'src/welcome.ts'),
   },
   bundle: true,
   format: 'iife',
@@ -72,6 +74,16 @@ await writeFile(
 await writeFile(
   path.join(out, 'offscreen.html'),
   '<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><title>Soultied watch party</title></head><body><script src="offscreen.js"></script></body></html>\n',
+);
+// the small window that asks for the camera and mic, once (allow.js draws it)
+await writeFile(
+  path.join(out, 'allow.html'),
+  '<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Soultied</title></head><body><script src="allow.js"></script></body></html>\n',
+);
+// the page that says how to start, opened once when Soultied is added to Chrome (welcome.js draws it)
+await writeFile(
+  path.join(out, 'welcome.html'),
+  '<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Soultied is ready</title></head><body><script src="welcome.js"></script></body></html>\n',
 );
 await copyFile(path.join(root, 'public/fonts/OFL.txt'), path.join(out, 'fonts/OFL.txt'));
 

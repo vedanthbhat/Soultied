@@ -40,6 +40,13 @@ export interface CallView {
   stuck: boolean;
   busy: 'cam' | 'mic' | null;
   error: string | null;
+  /** the last camera / mic request was refused by the browser (not "no camera"): permission is needed */
+  denied: 'cam' | 'mic' | null;
+}
+
+export interface CallOptions {
+  /** run my voice through a volume control (setMicVolume) before it's sent */
+  processMic?: boolean;
 }
 
 /** how long a connection may take before we say it isn't getting through */
@@ -54,6 +61,9 @@ export const stuckMessage = (partnerName: string) =>
   hasRelay()
     ? `Can't reach ${partnerName}'s camera and mic right now. Check your connection, or try again in a minute.`
     : `Can't reach ${partnerName}'s camera and mic. One of your networks (often mobile data, or college or office Wi-Fi) blocks direct calls. Try another network, like home Wi-Fi.`;
+
+/** the browser said no (as opposed to there being no camera, or it being busy) */
+const refused = (err: unknown) => /NotAllowedError|SecurityError/.test((err as { name?: string })?.name || '');
 
 function describeMediaError(err: unknown, what: 'camera' | 'microphone') {
   const name = (err as { name?: string })?.name || '';
@@ -79,6 +89,7 @@ export class WatchCall {
     stuck: false,
     busy: null,
     error: null,
+    denied: null,
   };
 
   private listeners = new Set<() => void>();
@@ -89,6 +100,10 @@ export class WatchCall {
   private pendingIce: RTCIceCandidateInit[] = [];
   private cam: MediaStreamTrack | null = null;
   private mic: MediaStreamTrack | null = null;
+  /** what's actually sent for my voice: the mic itself, or the mic through a volume control */
+  private micOut: MediaStreamTrack | null = null;
+  private micChain: { ctx: AudioContext; gain: GainNode } | null = null;
+  private micVolume = 1;
   private camSender: RTCRtpSender | null = null;
   private micSender: RTCRtpSender | null = null;
   private outStream = new MediaStream();
@@ -105,7 +120,13 @@ export class WatchCall {
   constructor(
     private me: string,
     private send: (e: WatchEvent) => void,
+    private opts: CallOptions = {},
   ) {}
+
+  /** my camera's track (null while it's off) */
+  get camTrack() {
+    return this.cam;
+  }
 
   /** The relay arrived (or its logins were renewed): use it for this connection too, if it hasn't connected yet. */
   private useIce(servers: RTCIceServer[]) {
@@ -278,7 +299,7 @@ export class WatchCall {
       }
     };
     if (this.cam) this.camSender = pc.addTrack(this.cam, this.outStream);
-    if (this.mic) this.micSender = pc.addTrack(this.mic, this.outStream);
+    if (this.micOut) this.micSender = pc.addTrack(this.micOut, this.outStream);
     return pc;
   }
 
@@ -340,7 +361,7 @@ export class WatchCall {
       this.set({ error: 'This browser can’t use a camera here.' });
       return;
     }
-    this.set({ busy: 'cam', error: null });
+    this.set({ busy: 'cam', error: null, denied: null });
     try {
       const s = await navigator.mediaDevices.getUserMedia({
         video: { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 24, max: 30 }, facingMode: 'user' },
@@ -360,7 +381,7 @@ export class WatchCall {
       this.set({ camOn: true, local: new MediaStream([track]), busy: null });
       this.announce();
     } catch (err) {
-      this.set({ busy: null, error: describeMediaError(err, 'camera') });
+      this.set({ busy: null, error: describeMediaError(err, 'camera'), denied: refused(err) ? 'cam' : null });
     }
   }
 
@@ -374,7 +395,7 @@ export class WatchCall {
       this.set({ error: 'This browser can’t use a microphone here.' });
       return false;
     }
-    this.set({ busy: 'mic', error: null });
+    this.set({ busy: 'mic', error: null, denied: null });
     try {
       const s = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
@@ -387,16 +408,50 @@ export class WatchCall {
       const track = s.getAudioTracks()[0];
       track.enabled = false;
       this.mic = track;
-      this.outStream.addTrack(track);
-      if (this.micSender) await this.micSender.replaceTrack(track);
-      else if (this.pc) this.micSender = this.pc.addTrack(track, this.outStream);
+      const out = (this.opts.processMic && (await this.chainMic(track))) || track;
+      if (this.closed) return false;
+      this.micOut = out;
+      this.outStream.addTrack(out);
+      if (this.micSender) await this.micSender.replaceTrack(out);
+      else if (this.pc) this.micSender = this.pc.addTrack(out, this.outStream);
       else this.ensurePc();
       this.set({ micReady: true, busy: null });
       return true;
     } catch (err) {
-      this.set({ busy: null, error: describeMediaError(err, 'microphone') });
+      this.set({ busy: null, error: describeMediaError(err, 'microphone'), denied: refused(err) ? 'mic' : null });
       return false;
     }
+  }
+
+  /**
+   * My voice through a volume control. Only if the browser lets the audio graph run straight away:
+   * a stalled graph would send silence, and plain is better than silent.
+   */
+  private async chainMic(track: MediaStreamTrack): Promise<MediaStreamTrack | null> {
+    if (typeof AudioContext === 'undefined') return null;
+    try {
+      const ctx = new AudioContext();
+      await Promise.race([ctx.resume(), new Promise((r) => setTimeout(r, 600))]);
+      if (ctx.state !== 'running') {
+        void ctx.close().catch(() => undefined);
+        return null;
+      }
+      const gain = ctx.createGain();
+      gain.gain.value = this.micVolume;
+      const dest = ctx.createMediaStreamDestination();
+      ctx.createMediaStreamSource(new MediaStream([track])).connect(gain).connect(dest);
+      this.micChain = { ctx, gain };
+      return dest.stream.getAudioTracks()[0] || null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** How loud my voice goes out (1 = as the mic hears it, up to 2). */
+  setMicVolume(v: number) {
+    this.micVolume = Math.max(0, Math.min(2, v));
+    const c = this.micChain;
+    if (c) c.gain.gain.setTargetAtTime(this.micVolume, c.ctx.currentTime, 0.05);
   }
 
   /** Send my voice while held (or always, with the mic unmuted), and say whether I'm talking. */
@@ -489,8 +544,12 @@ export class WatchCall {
     this.stopListening();
     this.cam?.stop();
     this.mic?.stop();
+    this.micOut?.stop();
+    if (this.micChain) void this.micChain.ctx.close().catch(() => undefined);
+    this.micChain = null;
     this.cam = null;
     this.mic = null;
+    this.micOut = null;
     if (this.view.camOn || this.view.talking || this.micOpen) this.send({ type: 'media', cam: false, talking: false, mic: false, by: this.me, at: Date.now() });
     this.pc?.close();
     this.pc = null;

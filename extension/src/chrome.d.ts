@@ -34,6 +34,7 @@ declare namespace chrome {
   }
   namespace windows {
     function update(id: number, p: { focused?: boolean }): Promise<unknown>;
+    function create(p: { url: string; type?: 'normal' | 'popup'; width?: number; height?: number; focused?: boolean }): Promise<{ id?: number }>;
   }
   namespace storage {
     const local: {

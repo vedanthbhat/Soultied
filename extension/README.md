@@ -2,17 +2,18 @@
 
 Watch Netflix or Prime Video in sync with your person. Two ways in:
 
-- **A watch party** (no Soultied account needed): start one from the toolbar button or the card on the show, and send the link. Whoever opens it lands on the same show, in sync. Free: sync, chat, reactions and the couch.
+- **A watch party** (no Soultied account needed): hover a show on Netflix or Prime Video and press **Watch together** (or start one from the toolbar button or the card on the show), and send the link. Whoever opens it lands on the same show, in sync. Free: sync, chat, reactions and the couch. With Soultied Plus: cameras and voice too.
 - **Your Soultied place**: everything above, plus cameras and push-to-talk, the "no watching ahead" check and your history together.
 
-- Play, pause and skip stay in sync. If one of you is buffering or sitting through an ad, the other waits.
+- Play, pause and skip stay in sync, and stay within a fraction of a second: small drift is evened out by playing a touch faster or slower, not by jumping. If one of you is buffering, sitting through an ad, or goes to another tab, the show pauses for both and carries on when they're back.
 - A chat sidebar with notes like "Rohan paused at 42:10", plus reactions.
 - Your two pixel characters sit on a little couch in the corner of the show, as close as you've earned in Soultied.
 - "Take the remote": only one of you can pause and skip.
 - Countdown start: you both press "I'm ready", 3, 2, 1, and it plays.
 - Next episode: when one of you moves on, the other follows.
 - No watching ahead: it remembers what you've watched together and stops you starting an episode your person hasn't seen with you.
-- Cameras and push-to-talk (in a Soultied place): pop the cameras out of your Soultied tab into a small window that stays on top of the show. Hold T to talk; the show turns down while either of you is talking. In a watch party these are kept for Soultied Plus (coming later); the party shows a note instead.
+- Cameras and voice. In a watch party (with Soultied Plus): your camera and theirs in the corner of the show, unmute or hold T to talk, and sliders for how loud you are to them and they are to you. The call carries on while you move between shows, Chrome asks for the camera and mic once (a small Soultied window), and your person's voice is evened out so a whisper and a laugh land at a similar level. In a Soultied place: pop the cameras out of your Soultied tab into a small window that stays on top of the show, and hold T to talk. Either way the show eases down while someone's talking.
+- Leave: the Leave button on the chat panel (press twice) ends the party for you; your person is told, and can keep watching.
 
 You each need your own Netflix or Prime Video account. No video passes between you.
 
@@ -33,12 +34,15 @@ To try a build of your own instead:
 
 ## How it fits together
 
-- `src/player/`: runs on Netflix and Prime Video pages. `adapters.ts` knows each site's player, `engine.ts` keeps you in sync, `overlay.ts` and `couch.ts` draw the sidebar and the couch.
+- `src/player/`: runs on Netflix and Prime Video pages. `adapters.ts` knows each site's player, `engine.ts` keeps you in sync, `overlay.ts` and `couch.ts` draw the sidebar and the couch, `tiles.ts` puts **Watch together** next to Play on the sites' own show previews, and `camview.ts` shows the Plus call's pictures (they come from the hidden page over a local connection).
 - `src/netflix-main.ts`: runs inside the Netflix page to use Netflix's own player controls (setting the video's time directly makes Netflix show an error).
 - `src/prime-main.ts`: the same for Prime Video: it finds Amazon's own player (setting the video's time directly makes Prime show "Video Unavailable"), says which title is open, and reports where you are in the story without the ads Prime stitches into the video, so two people who saw different ads still line up.
 - `src/bridge.ts`: runs on the Soultied page and passes messages between it and the extension.
 - `src/background.ts`: the switchboard. Netflix / Prime tabs talk to whichever is in charge: your Soultied tab, or (while you're in one) a watch party.
 - `src/offscreen.ts`: the watch party's line to your person. A small hidden page Chrome keeps open while you're in a party (and closes after five minutes with no show open). It signs in to Soultied's Firebase project anonymously, keeps `parties/{id}` (two seats, names, pixel characters, what's on) current, and carries play / pause / chat over `parties/{id}/events`, the job the Soultied tab does for a place. Firebase settings come from `firebase-applet-config.json` at build time; Firebase Auth is the `firebase/auth/web-extension` build, which loads no remote code.
+- `src/partycall.ts`: the Plus call of a watch party, run by the hidden page (so switching shows doesn't drop it): cameras and voice to your person, their voice through a compressor at your chosen volume, and the pictures handed to whichever show tab is open.
+- `src/allow.ts`: the small window that asks Chrome for the camera and mic, once, for Soultied itself (a hidden page can't ask).
+- `src/welcome.ts`: the page opened once after installing: how to start.
 - `src/popup.ts`: the window under the toolbar button. Start a watch party (or paste a link to join one), copy the link, leave; or, with a place, whether your Soultied tab is open and your person is watching. Buttons for Netflix, Prime Video and soultied.app.
 - `public/join/index.html` (in the web app): where party links open (`https://soultied.app/join/#<party id>`). It asks the extension (through the bridge) who started the party and what's on, takes your name and sends you to the show; without the extension, it explains how to get it and what Soultied is.
 - Prime Video's player doesn't show its title in a way the extension can read, so `adapters.ts` recognises what's playing by the title id in the player's own requests to Amazon (`amzn1.dv.gti.…`, the same for both of you), seen through the page's resource timing. That id also makes the "Go there" link.
@@ -51,6 +55,6 @@ The extension talks to Soultied pages on the addresses in the last `content_scri
 
 ## Permissions and privacy
 
-`storage` (to remember your chat panel setting, what you've watched together, your watch-party name and the party you're in, on this computer), `offscreen` (the hidden page that keeps a watch party connected), and `scripting` with access to the same sites as its content scripts (only so that, right after you install or update it, it can start in Netflix, Prime and Soultied tabs that were already open, without a refresh). It reads nothing on Netflix or Prime beyond the video player and which title is playing. See the [privacy policy](https://soultied.app/privacy/).
+`storage` (to remember your chat panel setting, what you've watched together, your watch-party name and the party you're in, on this computer), `offscreen` (the hidden page that keeps a watch party connected and runs its Plus call: reasons `LOCAL_STORAGE`, `USER_MEDIA` and `WEB_RTC`), and `scripting` with access to the same sites as its content scripts (only so that, right after you install or update it, it can start in Netflix, Prime and Soultied tabs that were already open, without a refresh). It reads nothing on Netflix or Prime beyond the video player and which title is playing. See the [privacy policy](https://soultied.app/privacy/).
 
 Watch parties need two switches in the Firebase project: **Anonymous** sign-in turned on (Authentication → Sign-in method), and the `parties` rules in `firestore.rules` published.

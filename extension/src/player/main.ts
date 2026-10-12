@@ -1,9 +1,10 @@
-import { titleLabel, type ExtMsg, type HubMsg, type PlusReply, type Session, type StreamEvent, type TitleInfo } from '../../../src/stream/protocol';
-import { stuckMessage, WatchCall } from '../../../src/watch/call';
-import type { WatchEvent } from '../../../src/watch/sync';
+import { titleLabel, type CallCmd, type ExtMsg, type HubMsg, type PlusReply, type Session, type TitleInfo } from '../../../src/stream/protocol';
+import { stuckMessage } from '../../../src/watch/call';
 import { adapterFor } from './adapters';
+import { CamView } from './camview';
 import { Engine } from './engine';
 import { Overlay } from './overlay';
+import { TileButtons } from './tiles';
 
 /** Runs on Netflix and Prime Video pages. */
 
@@ -19,9 +20,11 @@ type FromBackground =
 type ToBackground =
   | ExtMsg
   | { kind: 'openHub' }
-  | { kind: 'startParty'; name: string }
+  | { kind: 'startParty'; name: string; title?: TitleInfo | null }
   | { kind: 'joinParty'; link: string; name: string }
   | { kind: 'redeem'; code: string }
+  | { kind: 'call'; cmd: CallCmd }
+  | { kind: 'leaveParty' }
   | {
       kind: 'status';
       status: {
@@ -66,69 +69,61 @@ if (adapter && !running) {
   };
 
   /* ---------- cameras and voice in a watch party with Soultied Plus ---------- */
-  // The call runs in the tab that's showing something (one call, even with a second Netflix tab open).
-  let call: WatchCall | null = null;
-  let callFor = '';
+  // The call runs in the extension's hidden page, so it carries on while you switch shows. This tab
+  // shows it (the pictures come over a local link) and passes on what you press.
   let stuckSaid = false;
+  let askedSaid = false;
+  /** holding T (or the Talk button) right now */
+  let holding = false;
   const plusOn = () => {
     const u = engine.party?.plusUntil;
     return !!u && u > Date.now();
   };
-  const endCall = () => {
-    call?.destroy();
-    call = null;
-    callFor = '';
-    overlay.setCall(null);
-    engine.setTalking(false);
-  };
-  /** Start, keep or end the call, to match who's in the party and whether Plus is on. */
-  const syncCall = () => {
-    const s = engine.session;
-    const want = !!s?.party && !!s.partner && plusOn() && (engine.hasVideo || !!call);
-    const key = want ? `${s!.me.id}|${s!.party!.id}|${s!.partner!.id}` : '';
-    if (key === callFor) return;
-    endCall();
-    if (!want) return;
-    callFor = key;
-    const c = new WatchCall(s!.me.id, (e: WatchEvent) => send({ kind: 'send', e: e as StreamEvent }));
-    call = c;
-    c.setPartner(s!.partner!.id);
-    c.subscribe(() => {
-      if (call !== c) return;
-      overlay.setCall(c.view);
-      engine.setTalking(c.view.talking || c.view.partnerTalking);
-      if (c.view.stuck && !stuckSaid) {
-        stuckSaid = true;
-        overlay.note(stuckMessage(engine.partnerName));
-      } else if (!c.view.stuck) stuckSaid = false;
-    });
-    overlay.setCall(c.view);
-    // say what's on here, so the other side knows whether to expect a picture
-    c.announce();
-  };
-  window.setInterval(syncCall, 1000);
+  const callCmd = (cmd: CallCmd) => send({ kind: 'call', cmd });
+  const cams = new CamView(() => {
+    const f = cams.flags;
+    overlay.volumes = f ? { mic: f.micVolume, speaker: f.speakerVolume } : null;
+    overlay.setCall(cams.view);
+    if (f) engine.setTalking(f.talking || f.partnerTalking);
+    if (f?.stuck && !stuckSaid) {
+      stuckSaid = true;
+      overlay.note(stuckMessage(engine.partnerName));
+    } else if (!f?.stuck) stuckSaid = false;
+    if (f?.asking && !askedSaid) {
+      askedSaid = true;
+      overlay.note('Allow your camera and mic in the small Soultied window (just this once).');
+    } else if (!f?.asking) askedSaid = false;
+  });
+  // the pictures, while something's showing here and a camera is on
+  window.setInterval(() => {
+    const f = cams.flags;
+    cams.show(engine.hasVideo && !!f && (f.camOn || f.partnerCam));
+  }, 700);
 
   const overlay = new Overlay({
     openHub: () => send({ kind: 'openHub' }),
-    startParty: (name) => send({ kind: 'startParty', name }),
+    startParty: (name, title) => send({ kind: 'startParty', name, title: title || null }),
     joinParty: (link, name) => send({ kind: 'joinParty', link, name }),
     redeem: (code) => send({ kind: 'redeem', code }),
     camera: (on) => {
-      syncCall();
-      void call?.setCamera(on);
+      if (!cams.flags) return overlay.plusNote();
+      callCmd({ op: 'camera', on });
     },
     talk: (down) => {
-      if (!call) {
+      if (!cams.flags) {
         if (down) overlay.plusNote();
         return;
       }
-      void call.talk(down);
+      holding = down;
+      callCmd({ op: 'talk', down });
     },
     mic: (open) => {
-      syncCall();
-      if (!call) return overlay.plusNote();
-      void call.setMic(open);
+      if (!cams.flags) return overlay.plusNote();
+      callCmd({ op: 'mic', open });
     },
+    leaveParty: () => send({ kind: 'leaveParty' }),
+    micVolume: (v) => callCmd({ op: 'micVolume', v }),
+    speakerVolume: (v) => callCmd({ op: 'speakerVolume', v }),
   });
   const engine = new Engine(adapter, (m) => send(m), overlay);
   overlay.engine = engine;
@@ -166,23 +161,16 @@ if (adapter && !running) {
     port.onMessage.addListener((msg: FromBackground) => {
       if (msg.kind === 'session') {
         engine.setSession(msg.session);
-        syncCall();
+        if (!msg.session?.party) cams.set(null);
       } else if (msg.kind === 'nohub') {
         engine.setSession(null);
-        syncCall();
+        cams.set(null);
       } else if (msg.kind === 'event') {
-        const e = msg.e;
-        if (e.type === 'rtc' || e.type === 'media') {
-          // a call only in the tab that's running one (or showing something, to answer)
-          if (!call && engine.hasVideo) syncCall();
-          if (call) void call.handle(e as WatchEvent);
-          return;
-        }
-        engine.handle(e);
-        // they (re)joined: make sure they know what's on here
-        if (e.type === 'hello' && call) call.announce();
-      } else if (msg.kind === 'voice') {
-        if (!call) engine.setTalking(msg.mine || msg.partner);
+        // (the call's own signalling stays in the hidden page)
+        if (msg.e.type !== 'rtc' && msg.e.type !== 'media') engine.handle(msg.e);
+      } else if (msg.kind === 'call') cams.set(msg.flags);
+      else if (msg.kind === 'voice') {
+        if (!cams.flags) engine.setTalking(msg.mine || msg.partner);
       } else if (msg.kind === 'partyStarted') overlay.partyStarted(msg.link);
       else if (msg.kind === 'partyError') overlay.partyFailed(msg.error);
       else if (msg.kind === 'plusResult') overlay.plusResult(msg.res);
@@ -248,9 +236,12 @@ if (adapter && !running) {
             return;
           }
           if (type === 'keydown' && !e.repeat) {
-            syncCall();
-            void call?.talk(true);
-          } else if (type === 'keyup') void call?.talk(false);
+            holding = true;
+            callCmd({ op: 'talk', down: true });
+          } else if (type === 'keyup' && holding) {
+            holding = false;
+            callCmd({ op: 'talk', down: false });
+          }
           return;
         }
         if (type === 'keydown' && !e.repeat && !talking && engine.session) {
@@ -260,11 +251,20 @@ if (adapter && !running) {
       },
       true,
     );
-  window.addEventListener('blur', () => {
+  // let go of Talk if you leave the window (or the page) while holding it; the call itself carries on
+  const letGo = () => {
     release();
-    if (call?.view.talking) void call.talk(false);
-  });
-  window.addEventListener('pagehide', () => call?.destroy());
+    if (!holding) return;
+    holding = false;
+    callCmd({ op: 'talk', down: false });
+  };
+  window.addEventListener('blur', letGo);
+  window.addEventListener('pagehide', letGo);
+
+  // "Watch together" on the site's own show cards: a party for that show, and on it goes
+  const tiles = new TileButtons(adapter.platform, (title, go) => overlay.startFor(title, go));
+  tiles.start();
+  window.setInterval(() => tiles.setLabel(engine.party ? 'Watch this together' : 'Watch together'), 1000);
 
   connect();
   engine.start();

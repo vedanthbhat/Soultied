@@ -1,5 +1,6 @@
 import { randomAvatar } from '../../src/pixel/character';
 import {
+  type CallCmd,
   partyIdFrom,
   partyLink,
   PLUS_URL,
@@ -58,9 +59,14 @@ type PlayerMsg =
   | ExtMsg
   | { kind: 'openHub' }
   | { kind: 'status'; status: PlayerStatus }
-  | { kind: 'startParty'; name: string }
+  /** `title`: started from a show's card (Netflix / Prime's own), rather than from what's on in this tab */
+  | { kind: 'startParty'; name: string; title?: TitleInfo | null }
   | { kind: 'joinParty'; link: string; name: string }
-  | { kind: 'redeem'; code: string };
+  | { kind: 'redeem'; code: string }
+  /** something pressed for the watch party's call (it runs in the hidden page) */
+  | { kind: 'call'; cmd: CallCmd }
+  /** "Leave the party" on the show */
+  | { kind: 'leaveParty' };
 type ToPlayer =
   | HubMsg
   | { kind: 'nohub' }
@@ -182,8 +188,9 @@ async function ensureOffscreen() {
   await chrome.offscreen
     .createDocument({
       url: 'offscreen.html',
-      reasons: ['LOCAL_STORAGE'],
-      justification: 'Keeps a watch party connected: it stays signed in (anonymously) and passes play, pause and chat between the two people watching.',
+      reasons: ['LOCAL_STORAGE', 'USER_MEDIA', 'WEB_RTC'],
+      justification:
+        'Keeps a watch party connected: it stays signed in (anonymously), passes play, pause and chat between the two people watching, and (with Soultied Plus) runs their camera and voice call so it carries on while they switch shows.',
     })
     .catch((err: Error) => {
       // opened by another call a moment ago
@@ -309,6 +316,28 @@ async function endParty(tell: boolean) {
   if (players.size) toSite({ kind: 'hello' });
 }
 
+/* ---------------- allowing the camera and mic (once, for Soultied itself) ---------------- */
+
+let allowWindow: number | null = null;
+
+/**
+ * The call runs in the hidden page, which can't ask for the camera and mic itself. A small Soultied
+ * window asks (Chrome's own "allow" question, for Soultied rather than for a website), once.
+ */
+async function askForMedia() {
+  if (allowWindow != null) {
+    const ok = await chrome.windows.update(allowWindow, { focused: true }).then(
+      () => true,
+      () => false,
+    );
+    if (ok) return;
+  }
+  const w = await chrome.windows
+    .create({ url: chrome.runtime.getURL('allow.html'), type: 'popup', width: 440, height: 420, focused: true })
+    .catch(() => null);
+  allowWindow = w?.id ?? null;
+}
+
 /* ---------------- bringing you along ---------------- */
 
 const platformOf = (url: string | undefined): TitleInfo['platform'] | null => {
@@ -389,8 +418,16 @@ const isShowPage = (url: string) => {
 const tellPlayerCount = () => tellParty({ op: 'players', count: players.size });
 
 function onPlayer(port: chrome.runtime.Port, msg: PlayerMsg) {
+  if (msg.kind === 'call') {
+    tellParty({ op: 'call', cmd: msg.cmd });
+    return;
+  }
   if (msg.kind === 'openHub') {
     void openHub();
+    return;
+  }
+  if (msg.kind === 'leaveParty') {
+    void endParty(true);
     return;
   }
   if (msg.kind === 'status') {
@@ -424,7 +461,7 @@ function onPlayer(port: chrome.runtime.Port, msg: PlayerMsg) {
     return;
   }
   if (msg.kind === 'startParty') {
-    const title = statuses.get(port)?.title || null;
+    const title = msg.title || statuses.get(port)?.title || null;
     void startParty(msg.name, title).then((r) => {
       try {
         port.postMessage((r.ok ? { kind: 'partyStarted', link: r.link } : { kind: 'partyError', error: r.error }) satisfies ToPlayer);
@@ -511,7 +548,9 @@ type PopupMsg =
   /** a Soultied Plus code: typed in the toolbar window, or handed over by the Plus page (through the bridge) */
   | { kind: 'plusCode'; code: string }
   /** from the join page on Soultied's site, through the bridge */
-  | { kind: 'party'; req: PartyRequest };
+  | { kind: 'party'; req: PartyRequest }
+  /** the small window that asks for the camera and mic got a yes */
+  | { kind: 'mediaAllowed' };
 
 async function popupState() {
   await stored;
@@ -543,6 +582,10 @@ async function onRequest(msg: PopupMsg, sender: { tab?: { id?: number } }): Prom
   switch (msg.kind) {
     case 'popup':
       return popupState();
+    case 'mediaAllowed':
+      allowWindow = null;
+      tellParty({ op: 'allowed' });
+      return { ok: true };
     case 'openHub':
       await openHub();
       return { ok: true };
@@ -608,6 +651,10 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
         void takeTo(m.take);
         return;
       }
+      if ('ask' in m) {
+        void askForMedia();
+        return;
+      }
       if (m.msg.kind === 'session') setPartySession(m.msg.session);
       else toPlayers(m.msg);
     });
@@ -645,6 +692,19 @@ chrome.runtime.onInstalled.addListener(() => {
 const reopenParty = () => void stored.then(() => party && ensureParty());
 chrome.runtime.onStartup.addListener(reopenParty);
 chrome.runtime.onInstalled.addListener(reopenParty);
+
+// Just added to Chrome: a page that says how to start (unless it was added from a watch party link:
+// that page notices by itself and carries on, and a second tab would only get in the way)
+chrome.runtime.onInstalled.addListener((details) => {
+  if (details.reason !== 'install') return;
+  void chrome.tabs
+    .query({})
+    .then(async (tabs) => {
+      const joining = tabs.some((t) => /^https:\/\/(www\.)?soultied\.app\/join\//.test(t.url || ''));
+      if (!joining) await chrome.tabs.create({ url: chrome.runtime.getURL('welcome.html'), active: true });
+    })
+    .catch(() => undefined);
+});
 
 // older builds had no toolbar window: the button opened Soultied
 chrome.action.onClicked.addListener(() => void openHub());
