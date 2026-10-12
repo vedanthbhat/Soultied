@@ -36,6 +36,8 @@ export class PartyCall {
   /** waiting on the "allow camera and mic" window: what to do once it's allowed */
   private pending: CallCmd[] = [];
   private asking = false;
+  /** the "allow" window said yes this time round (so just try: Chrome may still say "ask" for a one-time allow) */
+  private allowedOnce = false;
   /** their voice */
   private audio: HTMLAudioElement | null = null;
   private playingTrack: MediaStreamTrack | null = null;
@@ -116,7 +118,7 @@ export class PartyCall {
     const turningOn = cmd.op === 'camera' ? cmd.on : cmd.op === 'mic' ? cmd.open : cmd.down;
     // Not allowed for Soultied yet: this hidden page can't ask (and trying here only counts as a "no" in
     // Chrome's eyes), so the small Soultied window asks, and then it happens.
-    if (turningOn && !retry) {
+    if (turningOn && !retry && !this.allowedOnce) {
       const state = await permission(cmd.op === 'camera' ? 'camera' : 'microphone');
       if (state === 'prompt' || state === 'denied') return this.askFirst(cmd);
     }
@@ -147,6 +149,7 @@ export class PartyCall {
     const todo = this.pending;
     this.pending = [];
     this.asking = false;
+    this.allowedOnce = true;
     this.push(true);
     for (const cmd of todo) await this.command(cmd, true);
   }

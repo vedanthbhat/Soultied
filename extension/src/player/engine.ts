@@ -957,9 +957,12 @@ export class Engine {
       if (this.dipped !== null) return;
       // (talking again while the show was still easing back up: it's your volume we go down from, not halfway)
       const base = this.restoring ?? v.volume;
+      // the show's muted or turned right down: nothing to turn down, and never turn it up
+      if (v.muted || base <= 0) return;
       this.restoring = null;
       this.dipped = base;
-      this.dippedTo = Math.max(0.04, base * 0.35);
+      // a little of the show stays audible, but never louder than you had it
+      this.dippedTo = Math.min(base, Math.max(0.04, base * 0.35));
       this.rampTo(this.dippedTo, 250);
     } else if (this.dipped !== null && !this.undip) {
       this.undip = window.setTimeout(() => {
