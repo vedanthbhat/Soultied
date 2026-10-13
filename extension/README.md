@@ -3,7 +3,7 @@
 Watch Netflix or Prime Video in sync with your person. Two ways in:
 
 - **A watch party** (no Soultied account needed): hover a show on Netflix or Prime Video and press **Watch together** (or start one from the toolbar button or the card on the show), and send the link. Whoever opens it lands on the same show, in sync. Free: sync, chat, reactions and the couch. With Soultied Plus: cameras and voice too.
-- **Your Soultied place**: everything above, plus cameras and push-to-talk, the "no watching ahead" check and your history together.
+- **Your Soultied place**: everything above, plus the "no watching ahead" check and your history together, and (when the place has Soultied Plus) cameras and push-to-talk.
 
 - Play, pause and skip stay in sync, and stay within a fraction of a second: small drift is evened out by playing a touch faster or slower, not by jumping. If one of you is buffering, sitting through an ad, or goes to another tab, the show pauses for both and carries on when they're back.
 - A chat sidebar with notes like "Rohan paused at 42:10", plus reactions.
@@ -12,7 +12,7 @@ Watch Netflix or Prime Video in sync with your person. Two ways in:
 - Countdown start: you both press "I'm ready", 3, 2, 1, and it plays.
 - Next episode: when one of you moves on, the other follows.
 - No watching ahead: it remembers what you've watched together and stops you starting an episode your person hasn't seen with you.
-- Cameras and voice. In a watch party (with Soultied Plus): your camera and theirs in the corner of the show, unmute or hold T to talk, and sliders (0–100%) for how loud you are to them and they are to you. Voice isolation (on unless you switch it off) takes background noise out of your mic and keeps it quiet between your words, on your own computer. The call carries on while you move between shows, Chrome asks for the camera and mic once (a small Soultied window), and only the loud bits of your person's voice are taken down (a shout doesn't blast you). In a Soultied place: pop the cameras out of your Soultied tab into a small window that stays on top of the show, and hold T to talk. Either way the show eases down while someone's talking.
+- Cameras and voice. In a watch party (with Soultied Plus): your camera and theirs in the corner of the show, unmute or hold T to talk, and sliders (0–100%) for how loud you are to them and they are to you. Voice isolation (on unless you switch it off) takes background noise out of your mic and keeps it quiet between your words, on your own computer. The call carries on while you move between shows, Chrome asks for the camera and mic once (a small Soultied window), and only the loud bits of your person's voice are taken down (a shout doesn't blast you). In a Soultied place with Plus: pop the cameras out of your Soultied tab into a small window that stays on top of the show, and hold T to talk (without Plus, holding T says what Plus is). Either way the show eases down while someone's talking.
 - Leave: the Leave button on the chat panel (press twice) ends the party for you; your person is told, and can keep watching.
 
 You each need your own Netflix or Prime Video account. No video passes between you.

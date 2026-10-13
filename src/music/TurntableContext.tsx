@@ -3,6 +3,7 @@ import { useApp } from '../context/AppContext';
 import * as store from '../cloud/store';
 import { useStreamHub } from '../stream/StreamHub';
 import { TRACKS, Track, TurntableState, startFor, trackUrl, whereAt } from './records';
+import { parseYouTubeId, parseYouTubeStart } from '../watch/youtube';
 
 /** A record left on switches itself off after a while, so nobody walks back in to music hours later. */
 const AUTO_OFF_MS = 2 * 60 * 60 * 1000;
@@ -12,7 +13,24 @@ const FADE_OUT_MS = 500;
 interface TurntableValue {
   /** a record is on (for both of you) */
   on: boolean;
+  /** the jazz record's track (null while a YouTube song is on) */
   track: Track | null;
+  /** a song from YouTube instead of the record, and when its first second would have played */
+  yt: { id: string; title?: string } | null;
+  startedAt: number;
+  /** choosing what to put on (the jazz record, or a song from YouTube) */
+  picking: boolean;
+  openPicker: () => void;
+  closePicker: () => void;
+  playJazz: () => void;
+  /** put a YouTube song on for both of you; an error to show if the link isn't one */
+  playYouTube: (link: string) => string | null;
+  /** the song's title, once its player knows it */
+  songInfo: (id: string, title: string) => void;
+  /** the song finished (or can't play): the needle lifts for both of you */
+  songEnded: (id: string) => void;
+  /** whether the YouTube player is actually making sound here */
+  reportHearing: (on: boolean) => void;
   /** who put it on */
   by: string | null;
   /** sound is actually coming out of this device */
@@ -74,6 +92,8 @@ export const TurntableProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [prefs, setPrefs] = useState(readPrefs);
   const [blocked, setBlocked] = useState(false);
   const [hearing, setHearing] = useState(false);
+  const [ytHearing, setYtHearing] = useState(false);
+  const [picking, setPicking] = useState(false);
   const [, setTick] = useState(0);
 
   /* ---------- the shared state ---------- */
@@ -158,15 +178,17 @@ export const TurntableProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const on = isOn(rec);
+  const ytNow = on && rec?.yt ? rec.yt : null;
   const hushed = panel === 'watch' || !!hub?.active;
-  const wantSound = on && !prefs.muted && !hushed;
+  // (a YouTube song plays from its own player, in the record player card)
+  const wantSound = on && !ytNow && !prefs.muted && !hushed;
 
   /** Line the player up with the record: the right track, at the right spot, playing or not. */
   const sync = useCallback(
     (fromGesture = false) => {
       const r = recRef.current;
       const a = audioRef.current;
-      const want = isOn(r) && !prefsRef.current.muted && !(panel === 'watch' || !!hub?.active);
+      const want = isOn(r) && !r?.yt && !prefsRef.current.muted && !(panel === 'watch' || !!hub?.active);
       if (!want || !r) {
         if (a && !a.paused)
           fadeTo(0, FADE_OUT_MS, () => {
@@ -263,27 +285,74 @@ export const TurntableProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [prefs]);
 
   /* ---------- the controls ---------- */
-  const toggle = useCallback(() => {
+  const lift = useCallback(() => {
     const now = Date.now();
     const r = recRef.current;
-    if (isOn(r, now)) {
-      const { index } = whereAt(r!.startedAt, now);
-      write({ on: false, startedAt: r!.startedAt, by: me, at: now, next: (index + 1) % TRACKS.length });
-      sync();
-      return;
-    }
-    const next = r ? r.next % TRACKS.length : 0;
-    write({ on: true, startedAt: startFor(next, now), by: me, at: now, next });
+    if (!isOn(r, now)) return;
+    const next = r!.yt ? r!.next % TRACKS.length : (whereAt(r!.startedAt, now).index + 1) % TRACKS.length;
+    write({ on: false, startedAt: r!.startedAt, by: me, at: now, next, yt: null });
+    sync();
+  }, [me, write, sync]);
+
+  const unmuteForMe = () => {
     if (prefsRef.current.muted) setPrefs((p) => ({ ...p, muted: false }));
     prefsRef.current = { ...prefsRef.current, muted: false };
+  };
+
+  const playJazz = useCallback(() => {
+    const now = Date.now();
+    const r = recRef.current;
+    const next = r ? r.next % TRACKS.length : 0;
+    write({ on: true, startedAt: startFor(next, now), by: me, at: now, next, yt: null });
+    unmuteForMe();
+    setPicking(false);
     // start the sound inside the click, so the browser lets it play
     sync(true);
   }, [me, write, sync]);
 
+  const playYouTube = useCallback(
+    (link: string) => {
+      const id = parseYouTubeId(link);
+      if (!id) return 'That doesn’t look like a link to a song on YouTube. Try copying it again from the address bar or Share.';
+      const now = Date.now();
+      const r = recRef.current;
+      write({ on: true, startedAt: now - parseYouTubeStart(link) * 1000, by: me, at: now, next: r ? r.next % TRACKS.length : 0, yt: { id } });
+      unmuteForMe();
+      setPicking(false);
+      sync();
+      return null;
+    },
+    [me, write, sync]
+  );
+
+  const songInfo = useCallback(
+    (id: string, title: string) => {
+      const r = recRef.current;
+      // (only whoever put it on writes it down, once)
+      if (!r || !isOn(r) || r.yt?.id !== id || r.yt.title || r.by !== me || !title) return;
+      write({ ...r, yt: { id, title: title.slice(0, 120) } });
+    },
+    [me, write]
+  );
+
+  const songEnded = useCallback(
+    (id: string) => {
+      const r = recRef.current;
+      if (!r || !isOn(r) || r.yt?.id !== id) return;
+      write({ on: false, startedAt: r.startedAt, by: me, at: Date.now(), next: r.next % TRACKS.length, yt: null });
+    },
+    [me, write]
+  );
+
+  const toggle = useCallback(() => {
+    if (isOn(recRef.current)) lift();
+    else setPicking(true);
+  }, [lift]);
+
   const skip = useCallback(() => {
     const now = Date.now();
     const r = recRef.current;
-    if (!isOn(r, now)) return;
+    if (!isOn(r, now) || r!.yt) return;
     const { index } = whereAt(r!.startedAt, now);
     write({ ...r!, startedAt: startFor(index + 1, now), by: me, at: now });
     sync(true);
@@ -309,14 +378,30 @@ export const TurntableProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   );
 
   const now = Date.now();
-  const track = on && rec ? TRACKS[whereAt(rec.startedAt, now).index] : null;
+  const track = on && rec && !ytNow ? TRACKS[whereAt(rec.startedAt, now).index] : null;
+  const ytId = ytNow?.id || null;
+  const ytTitle = ytNow?.title;
+  const yt = useMemo(() => (ytId ? { id: ytId, title: ytTitle } : null), [ytId, ytTitle]);
+  useEffect(() => {
+    if (!ytId) setYtHearing(false);
+  }, [ytId]);
   const value = useMemo<TurntableValue>(
     () => ({
       on,
       track,
+      yt,
+      startedAt: rec?.startedAt || 0,
+      picking,
+      openPicker: () => setPicking(true),
+      closePicker: () => setPicking(false),
+      playJazz,
+      playYouTube,
+      songInfo,
+      songEnded,
+      reportHearing: setYtHearing,
       by: on ? rec?.by || null : null,
-      hearing,
-      blocked: on && blocked && !prefs.muted && !hushed,
+      hearing: yt ? ytHearing : hearing,
+      blocked: on && !yt && blocked && !prefs.muted && !hushed,
       mutedForMe: prefs.muted,
       hushed: on && hushed,
       volume: prefs.volume,
@@ -326,7 +411,7 @@ export const TurntableProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setVolume,
       setMutedForMe,
     }),
-    [on, track, rec?.by, hearing, blocked, prefs, hushed, toggle, skip, listen, setVolume, setMutedForMe]
+    [on, track, yt, rec?.startedAt, picking, playJazz, playYouTube, songInfo, songEnded, rec?.by, hearing, ytHearing, blocked, prefs, hushed, toggle, skip, listen, setVolume, setMutedForMe]
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 };

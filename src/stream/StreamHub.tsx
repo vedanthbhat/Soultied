@@ -54,7 +54,7 @@ const post = (body: PageBody) => window.postMessage({ source: HUB_SOURCE, ...bod
 const toExt = (msg: HubMsg) => post({ kind: 'msg', msg });
 
 export const StreamHubProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { currentUser, partnerUser, space, setupComplete, demo, couchLevel, openLive, cloudTarget, cloudMode, addActivity } = useApp();
+  const { currentUser, partnerUser, space, setupComplete, demo, couchLevel, openLive, cloudTarget, cloudMode, addActivity, hasPlus } = useApp();
   const me = currentUser.id;
   const [extension, setExtension] = useState<ExtensionState>('checking');
   const [active, setActive] = useState(false);
@@ -84,8 +84,9 @@ export const StreamHubProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       closeness: Math.min(1, couchLevel / COUCH_STEPS),
       log,
       hubUrl: location.origin + location.pathname,
+      plus: hasPlus,
     };
-  }, [setupComplete, space, demo, me, currentUser.name, currentUser.avatar, partnerUser, couchLevel, log]);
+  }, [setupComplete, space, demo, me, currentUser.name, currentUser.avatar, partnerUser, couchLevel, log, hasPlus]);
   const sessionJson = JSON.stringify(session);
   const sessionRef = useRef(session);
   sessionRef.current = session;
@@ -136,9 +137,12 @@ export const StreamHubProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     else queue.current = [...queue.current.slice(-20), e];
   }, []);
 
-  const { call, view } = useWatchCall(me, active && partnerUser ? partnerUser.id : null, (e) => send(e as StreamEvent));
+  // cameras and voice come with Soultied Plus
+  const { call, view } = useWatchCall(me, active && partnerUser && hasPlus ? partnerUser.id : null, (e) => send(e as StreamEvent));
   const callRef = useRef(call);
   callRef.current = call;
+  const plusRef = useRef(hasPlus);
+  plusRef.current = hasPlus;
 
   useEffect(() => {
     if (!active || !session?.partner) return;
@@ -147,7 +151,7 @@ export const StreamHubProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const off = ch.subscribe((e) => {
       if (e.by === me) return;
       if (e.type === 'rtc' || e.type === 'media') {
-        void callRef.current?.handle(e as unknown as WatchEvent);
+        if (plusRef.current) void callRef.current?.handle(e as unknown as WatchEvent);
         return;
       }
       setPartnerSeen(e.type === 'bye' ? 0 : Date.now());
@@ -173,7 +177,9 @@ export const StreamHubProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       toExt({ kind: 'session', session: sessionRef.current });
     } else if (msg.kind === 'send') send(msg.e);
     else if (msg.kind === 'watched') recordWatched(msg.title, msg.pos);
-    else if (msg.kind === 'ptt') void callRef.current?.talk(msg.down);
+    else if (msg.kind === 'ptt') {
+      if (plusRef.current || !msg.down) void callRef.current?.talk(msg.down);
+    }
     else if (msg.kind === 'bye') {
       window.clearTimeout(byeTimer.current);
       byeTimer.current = window.setTimeout(() => setActive(false), 8000);
@@ -205,6 +211,7 @@ export const StreamHubProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const [pip, setPip] = useState<Window | null>(null);
   const openCams = useCallback(() => {
+    if (!plusRef.current) return;
     if (pip && !pip.closed) {
       pip.focus();
       return;
@@ -238,6 +245,16 @@ export const StreamHubProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [pip]);
 
   useEffect(() => () => pip?.close(), [pip]);
+
+  // Plus ran out: the cameras window closes, and the camera and mic go off
+  useEffect(() => {
+    if (hasPlus) return;
+    pip?.close();
+    if (call) {
+      void call.setCamera(false);
+      void call.setMic(false);
+    }
+  }, [hasPlus, pip, call]);
 
   // who's talking: the extension turns the show down
   useEffect(() => {

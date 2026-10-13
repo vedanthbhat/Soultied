@@ -27,6 +27,8 @@ import { CloudUser, cloud, cloudEnabled, describeAuthError, signInAsTestUser, si
 import * as store from '../cloud/store';
 import { LiveChannel, browserChannel, firestoreChannel } from '../cloud/live';
 import type { Firestore } from 'firebase/firestore';
+import { redeemForPlace } from '../cloud/plus';
+import type { PlusReply } from '../stream/protocol';
 
 /**
  * The app's state. Two homes for it:
@@ -136,6 +138,11 @@ interface AppContextType {
   /** Firestore + ids when this place lives online (for features with their own documents) */
   cloudTarget: () => { db: Firestore; sid: string; uid: string } | null;
   addActivity: (a: Omit<ActivityItem, 'id' | 'timestamp'>) => void;
+  /** Soultied Plus for this place: cameras and voice for both of you (until then, ms; 0 if none) */
+  plusUntil: number;
+  hasPlus: boolean;
+  /** add a Plus code to this place */
+  redeemPlus: (code: string) => Promise<PlusReply>;
 }
 
 export type LiveTopic = 'watch' | 'escape' | 'stream' | 'doodle';
@@ -408,10 +415,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         lastActive: last,
       };
     };
-    const { members: _m, inviteExpiresAtMs: _e, joinCode: _j, ...space } = sp;
+    const { members: _m, inviteExpiresAtMs: _e, joinCode: _j, plus: _p, ...space } = sp;
     void _m;
     void _e;
     void _j;
+    void _p;
     return {
       version: 3,
       setupComplete: true,
@@ -435,6 +443,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [cloudReady, uid, cloudData, minute]);
 
   const eff = cloudState ?? state;
+
+  // Soultied Plus for the place: cameras and voice. Online it's on the place itself; a place that only lives
+  // in this browser (trying it out in two tabs) has no calls to pay for, so it's on; the demo room shows what Plus is.
+  const plusUntil = cloudMode ? (cloudData.space?.plus?.until?.toMillis?.() ?? 0) : demo ? 0 : Number.MAX_SAFE_INTEGER;
+  const [, setPlusTick] = useState(0);
+  useEffect(() => {
+    // notice the moment it runs out
+    const left = plusUntil - Date.now();
+    if (left <= 0 || left > 2 ** 31 - 1) return;
+    const t = window.setTimeout(() => setPlusTick((n) => n + 1), left + 500);
+    return () => window.clearTimeout(t);
+  }, [plusUntil]);
+  const hasPlus = plusUntil > Date.now();
 
   /** Firestore + ids, when this place lives online. */
   const online = () => {
@@ -1004,6 +1025,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         openLive,
         cloudTarget: online,
         addActivity,
+        plusUntil,
+        hasPlus,
+        redeemPlus: async (code: string) => {
+          const o = online();
+          if (!o) return { ok: false, error: 'failed' } as PlusReply;
+          return redeemForPlace(o.db, o.sid, o.uid, code, plusUntil);
+        },
       }}
     >
       {children}

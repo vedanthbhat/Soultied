@@ -93,6 +93,8 @@ export interface Session {
   hubUrl: string;
   /** a watch party from a link, rather than your Soultied place */
   party?: PartyInfo;
+  /** your Soultied place has Plus (cameras and voice); false: holding T explains Plus instead */
+  plus?: boolean;
 }
 
 /** A watch party: two people, no Soultied place needed. Voice and cameras come with Soultied Plus. */
@@ -108,6 +110,8 @@ export interface PartyInfo {
 
 /** Where to get Soultied Plus. */
 export const PLUS_URL = 'https://soultied.app/plus/';
+/** The Soultied extension on the Chrome Web Store (Chrome, Edge and Brave install it from here). */
+export const EXTENSION_STORE_URL = 'https://chromewebstore.google.com/detail/soultied-watch-together/hcfmbadgbnfdkebllinmonemahalikcn';
 
 /** A Plus code as typed ("abcd-efgh-jkmn", with spaces or not) -> the letters that matter. */
 export const plusCodeKey = (code: string) => code.toUpperCase().replace(/[^A-Z0-9]/g, '');

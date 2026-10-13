@@ -9,6 +9,7 @@ import { CallButtons, CamFrame, PartnerAudio, usePushToTalkKey, useWatchCall } f
 import { stuckMessage } from '../watch/call';
 import { PixelPanel } from './PixelPanel';
 import { StreamPanel } from './StreamPanel';
+import { PlusCard } from './PlusCard';
 
 /**
  * Watch together (YouTube). The camera swings round behind the couch; the
@@ -79,7 +80,7 @@ const ReactionIcon: React.FC<{ kind: ReactionKind }> = ({ kind }) => {
 };
 
 export const WatchParty: React.FC<{ onExit: () => void }> = ({ onExit }) => {
-  const { currentUser, partnerUser, space, openLive } = useApp();
+  const { currentUser, partnerUser, space, openLive, hasPlus } = useApp();
   const me = currentUser.id;
   const roomId = space?.id || 'solo';
   const creatorIsMe = !space || space.creatorId === me;
@@ -108,6 +109,7 @@ export const WatchParty: React.FC<{ onExit: () => void }> = ({ onExit }) => {
   const [link, setLink] = useState('');
   const [chatOpen, setChatOpen] = useState(false);
   const [streamOpen, setStreamOpen] = useState(false);
+  const [plusOpen, setPlusOpen] = useState(false);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -138,11 +140,19 @@ export const WatchParty: React.FC<{ onExit: () => void }> = ({ onExit }) => {
 
   const send = useCallback((e: WatchEvent) => transportRef.current?.send(e), []);
 
-  /* ---------- cameras + push to talk ---------- */
-  const { call, view } = useWatchCall(me, partnerUser?.id || null, send);
+  /* ---------- cameras + push to talk (with Soultied Plus) ---------- */
+  const { call, view } = useWatchCall(me, hasPlus ? partnerUser?.id || null : null, send);
   const callRef = useRef(call);
   callRef.current = call;
-  usePushToTalkKey(call);
+  const plusRef = useRef(hasPlus);
+  plusRef.current = hasPlus;
+  usePushToTalkKey(hasPlus ? call : null);
+  // Plus ran out mid-call: cameras and mic off
+  useEffect(() => {
+    if (hasPlus || !call) return;
+    void call.setCamera(false);
+    void call.setMic(false);
+  }, [hasPlus, call]);
   const [audioBlocked, setAudioBlocked] = useState(false);
   const duckRef = useRef<number | null>(null);
   // turn the show down while one of you is talking, so you can hear each other
@@ -258,7 +268,7 @@ export const WatchParty: React.FC<{ onExit: () => void }> = ({ onExit }) => {
       lastSeen.current = Date.now();
       setPartnerHere(e.type !== 'bye');
       if (e.type === 'rtc' || e.type === 'media') {
-        void callRef.current?.handle(e);
+        if (plusRef.current) void callRef.current?.handle(e);
         return;
       }
       switch (e.type) {
@@ -689,7 +699,14 @@ export const WatchParty: React.FC<{ onExit: () => void }> = ({ onExit }) => {
             <ReactionIcon kind={r.kind} />
           </button>
         ))}
-        {partnerUser && <CallButtons call={call} view={view} partnerName={partnerName} />}
+        {partnerUser &&
+          (hasPlus ? (
+            <CallButtons call={call} view={view} partnerName={partnerName} />
+          ) : (
+            <button className="px-btn px-btn--paper px-btn--small" aria-expanded={plusOpen} onClick={() => setPlusOpen((o) => !o)}>
+              Cameras & voice
+            </button>
+          ))}
         <button className="px-btn px-btn--paper px-btn--small" onClick={() => setStreamOpen(true)} title="Watch Netflix or Prime Video together">
           Netflix / Prime
         </button>
@@ -737,6 +754,11 @@ export const WatchParty: React.FC<{ onExit: () => void }> = ({ onExit }) => {
         @media (prefers-reduced-motion: reduce) { .call-wave-bar { animation: none; } }
       `}</style>
       {view?.remote && <PartnerAudio stream={view.remote} onBlocked={setAudioBlocked} />}
+      {plusOpen && (
+        <div className="fixed inset-x-0 bottom-24 z-40 flex justify-center px-4 pointer-events-none">
+          <PlusCard className="pointer-events-auto w-full max-w-[380px]" onClose={() => setPlusOpen(false)} />
+        </div>
+      )}
       <canvas
         ref={canvasRef}
         width={WATCH_W}

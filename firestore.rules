@@ -19,6 +19,20 @@ service cloud.firestore {
     function isMemberAfter(sid) {
       return signedIn() && me() in getAfter(spacePath(sid)).data.members;
     }
+    // Soultied Plus on a place: a code you've added (it's real, still valid, and yours), with its end date
+    function plusCode(code) {
+      return get(/databases/$(database)/documents/plusCodes/$(code)).data;
+    }
+    function plusGood(p) {
+      return p is map
+        && p.keys().hasOnly(['by', 'code', 'until'])
+        && p.by == me()
+        && p.code is string
+        && exists(/databases/$(database)/documents/plusCodes/$(p.code))
+        && me() in plusCode(p.code).activations
+        && p.until == plusCode(p.code).validUntil
+        && request.time < p.until;
+    }
 
     // An invite code points at a place. Anyone signed in who has the code can
     // read it (to see whose invite it is); nobody can list them.
@@ -57,6 +71,11 @@ service cloud.firestore {
           && request.resource.data.members == resource.data.members.concat([me()])
           && request.resource.data.joinCode == resource.data.inviteCode
           && request.time.toMillis() < resource.data.inviteExpiresAtMs)
+        ||
+        // Soultied Plus for the place (cameras and voice for both of you): a code one of you has added
+        (me() in resource.data.members
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['plus'])
+          && plusGood(request.resource.data.plus))
       );
 
       allow delete: if false;

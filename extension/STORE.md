@@ -43,7 +43,7 @@ SOULTIED PLUS: SEE AND HEAR EACH OTHER
 
 EVEN BETTER WITH A SOULTIED PLACE
 Soultied (soultied.app) is a little home online for two people who live apart: a shared pixel room, a letter to open together every day, games, and movie nights. With a place:
-• Pop your cameras out into a small window that stays on top of the show. Hold T to talk; the show turns itself down while either of you is talking.
+• With Plus, pop your cameras out into a small window that stays on top of the show, and hold T to talk; the show turns itself down while either of you is talking.
 • No watching ahead: Soultied remembers which episodes you've watched together and asks before you start the next one alone.
 • "Where you left off together", and a night watching together counts as a day together on your couch.
 

@@ -7,7 +7,7 @@
 <link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAvUlEQVR42mNgGOmAEZeElZbaf2zix67dYqSGehhgGugQYMHlk/mamlg1JDIw/Ef2GanqB10IMOLyuZSfL4rCZ5s2o/rs+nUGfD7HCAmoevSQGPgQINXn5ILzf/4wMDAwMEy6fRslJAZfLqC2zwmBwRcC9PL54C8HqAVwpf7BFwLUDglCPh+8IUBpSBDr88EfAqSGBKk+HzohQCgkyPX50AsB9JDIU1WlyOeDJgTIBlZaav9x9QVGRgiMgmEDALGpb3r9Lc6EAAAAAElFTkSuQmCC" type="image/png" sizes="32x32">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAALQAAAC0CAYAAAA9zQYyAAACNUlEQVR42u3dsWlyYRTH4RicIr2FU1hYxyIbuIDDZIFskEJrCydIE7CwT5MBbASzgMKBHO97eO/z1PIl9+PH4cIf4uT8+319gk48+y9A0CBoEDQIGkGDoEHQIGgQNIIGQYOgQdAgaAQNggZBg6Dhnmn1X3C5eGvyc/eHT8/rQoOgQdAgaAQNggZBg6BB0PSr2VIYXcQ+5vPSv190YRvb87rQIGgQNIIGQYOgQdAgaAQNxU2yv6cwexF7Wb2mPvDPdpf6762Px9TnrS76vK0WRRcarxwgaBA0CBpBg6BB0CBoCAovhWNbALnt63IJfe79dAp9LntRdKHxygGCBkGDoBE0CBoEDYKGoPLfU2gBxIVG0CBoEDQIGgSNoEHQIGh4gGZLoQUQFxoEjaBB0CBoEDQIGkGDoKGh8t9TyDCq/1VRFxqvHCBoEDQIGgSNoEHQIGhIlr4URlkUh9HLAuhC45UDBA2CBkGDoBE0CBoEDcmaLYVRFsXbxrYAutB45QBBg6BB0CBoBA2CBkFDsvJLYVQvi6IF0IUGQSNoEDQIGgQNgkbQIGgYRDdLYVSrRdEC6EKDoBE0CBoEDYIGQSNoEDSUMrqlMCq6KG5ms9DnLIAuNAgaQYOgQdAgaBA0ggZBQymWwn+KLooWQBcaBI2gQdAgaBA0CBpBg6ChFEshLjQIGgQNgkbQIGgQNAgaBI2gQdAgaBA0CBpBg6BB0CBoEDSCBkGDoEHQIGgEDYIGQYOgQdD06g+4xIxN7ocCigAAAABJRU5ErkJggg==">
-<meta name="description" content="Soultied Plus: see and hear each other while you watch Netflix or Prime Video together. One subscription covers you both.">
+<meta name="description" content="Soultied Plus: see and hear each other, in your Soultied place and while you watch Netflix or Prime Video together. One of you having it covers you both.">
 <style>
 @font-face { font-family: 'Pixelify Sans'; src: url('/fonts/PixelifySans-Variable.ttf') format('truetype'); font-weight: 400 700; font-display: block; }
 :root { --ink: #2b1e1c; --ink-soft: #3a2a26; --muted: #7a5a48; --paper: #f4e8d0; --paper-2: #eadbbd; --paper-hi: #fff8ea; --paper-shade: #d6c29c; --link: #8f4b3a; --bg: #f7ebd4; --terracotta: #b8674f; --terracotta-dark: #8f4b3a; --sage: #8a9a72; --sage-dark: #6a7856; }
@@ -71,9 +71,10 @@ footer { display: flex; gap: 8px 18px; flex-wrap: wrap; justify-content: center;
   <p class="kicker">Soultied Plus</p>
 
   <div id="pitch">
-    <h1>See each other while you watch</h1>
+    <h1>See and hear each other</h1>
     <ul class="perks">
       <li>Your cameras, side by side on the show, in your Soultied watch parties on Netflix and Prime Video.</li>
+      <li>Cameras and voice in your Soultied place too: in the TV room, and in a little window over Netflix or Prime Video.</li>
       <li>Talk out loud: hold T (or the Talk button) and the show turns itself down while you speak.</li>
       <li>One of you having Plus covers you both.</li>
       <li>Your picture and voice go straight to your person, never to Soultied.</li>
@@ -97,7 +98,7 @@ footer { display: flex; gap: 8px 18px; flex-wrap: wrap; justify-content: center;
         <button class="btn sage" id="buy-year" type="button">Get a year</button>
       </div>
     </div>
-    <p class="muted" id="how-pay">You pay once with UPI, a card or netbanking (through Razorpay), and get a code to add to the Soultied extension. When its time is up, get another one; nothing renews by itself.</p>
+    <p class="muted" id="how-pay">You pay once with UPI, a card or netbanking (through Razorpay), and get a code to add to your Soultied place or the Soultied extension. When its time is up, get another one; nothing renews by itself.</p>
     <p class="muted">Changed your mind? You get your money back in full if you ask within 7 days (<a href="/refunds/">refunds</a>).</p>
     <p class="err" id="buy-err" hidden></p>
   </div>
@@ -118,8 +119,8 @@ footer { display: flex; gap: 8px 18px; flex-wrap: wrap; justify-content: center;
     <p class="ok" id="used" hidden></p>
     <p class="err" id="use-err" hidden></p>
     <ol id="how">
-      <li>Open Netflix or Prime Video and start (or join) a Soultied watch party.</li>
-      <li>In the Soultied chat on the show, press <strong>I have a code</strong> and paste it. (Or paste it into the Soultied button in your browser’s toolbar.)</li>
+      <li><strong>In your Soultied place:</strong> open Watch together, press <strong>Cameras &amp; voice</strong>, then <strong>Use my Plus code</strong> (this browser remembers it).</li>
+      <li><strong>In a watch party:</strong> open Netflix or Prime Video, start (or join) a party, press <strong>I have a code</strong> in the Soultied chat on the show and paste it. (Or paste it into the Soultied button in your browser’s toolbar.)</li>
     </ol>
     <p class="muted">Keep the code somewhere safe: it works on up to three browsers. This page remembers it on this computer too.</p>
   </div>
@@ -143,7 +144,7 @@ footer { display: flex; gap: 8px 18px; flex-wrap: wrap; justify-content: center;
 
 <section class="about">
   <h2>How it works</h2>
-  <p>Soultied’s watch parties keep Netflix or Prime Video in sync between you and your person, with a chat and a little pixel couch on the show. They’re free. Plus adds cameras and voice.</p>
+  <p>Your Soultied place, and Soultied’s watch parties on Netflix or Prime Video, are free. Plus adds cameras and voice to both.</p>
   <p class="muted">Every payment gets an email receipt (from Razorpay in India, or Dodo Payments anywhere else). Lost your code? Put the payment or order number from it (it starts with <code>pay_</code> or <code>order_</code>) here:</p>
   <form id="lost">
     <input id="lost-id" placeholder="pay_… or order_…" aria-label="Payment or order number" autocomplete="off" spellcheck="false">
@@ -229,9 +230,9 @@ footer { display: flex; gap: 8px 18px; flex-wrap: wrap; justify-content: center;
     }
     $('how-pay').textContent =
       via === 'razorpay'
-        ? 'You pay once with UPI, a card or netbanking (through Razorpay), and get a code to add to the Soultied extension. When its time is up, get another one; nothing renews by itself.'
+        ? 'You pay once with UPI, a card or netbanking (through Razorpay), and get a code to add to your Soultied place or the Soultied extension. When its time is up, get another one; nothing renews by itself.'
         : via === 'dodo'
-          ? 'You pay once with a card or your usual way to pay, in your own currency where it’s available (through Dodo Payments), and get a code to add to the Soultied extension. When its time is up, get another one; nothing renews by itself.'
+          ? 'You pay once with a card or your usual way to pay, in your own currency where it’s available (through Dodo Payments), and get a code to add to your Soultied place or the Soultied extension. When its time is up, get another one; nothing renews by itself.'
           : 'Paying from here opens soon. Check back in a little while.';
     for (const id of ['buy-month', 'buy-year']) $(id).disabled = !via;
   }

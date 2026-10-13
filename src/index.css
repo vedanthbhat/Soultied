@@ -129,6 +129,7 @@ label {
   cursor: pointer;
   user-select: none;
   border: 0;
+  text-decoration: none;
   box-shadow:
     0 calc(var(--px) * -1) 0 0 var(--ink),
     0 var(--px) 0 0 var(--ink),

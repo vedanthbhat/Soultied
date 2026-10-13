@@ -59,4 +59,9 @@ export interface TurntableState {
   at: number;
   /** the track to start from next time */
   next: number;
+  /**
+   * A song from YouTube on the turntable instead of the record: its video id (and title, once known).
+   * startedAt is then when the song's first second would have played.
+   */
+  yt?: { id: string; title?: string } | null;
 }

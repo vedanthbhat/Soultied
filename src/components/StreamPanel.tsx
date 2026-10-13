@@ -1,15 +1,13 @@
 import React from 'react';
 import { useApp } from '../context/AppContext';
 import { useStreamHub } from '../stream/StreamHub';
-import { clock } from '../stream/protocol';
-
-/** The extension on the Chrome Web Store (Chrome, Edge and Brave install from here). */
-const EXTENSION_STORE_URL = 'https://chromewebstore.google.com/detail/soultied-watch-together/hcfmbadgbnfdkebllinmonemahalikcn';
+import { EXTENSION_STORE_URL, clock } from '../stream/protocol';
+import { PlusCard } from './PlusCard';
 
 /** Netflix & Prime Video together: set-up, the two buttons, and where you left off. */
 export const StreamPanel: React.FC = () => {
   const hub = useStreamHub();
-  const { partnerUser, cloudMode, cloudEnabled } = useApp();
+  const { partnerUser, cloudMode, cloudEnabled, hasPlus } = useApp();
   const name = partnerUser?.name || 'your person';
   if (!hub) return null;
 
@@ -56,17 +54,24 @@ export const StreamPanel: React.FC = () => {
             <button className="px-btn" onClick={() => open('https://www.primevideo.com/')}>
               Open Prime Video
             </button>
-            {partnerUser && (
+            {partnerUser && hasPlus && (
               <button className="px-btn px-btn--sage" onClick={hub.openCams}>
                 {hub.camsOpen ? 'Cameras open' : 'Pop out cameras'}
               </button>
             )}
           </div>
+          {partnerUser && !hasPlus && <PlusCard className="shadow-none" />}
           <ul className="m-0 pl-5 text-sm flex flex-col gap-1">
             <li>Start anything. When {name} opens the same thing, you snap into sync.</li>
             <li>Keep this Soultied tab open while you watch. It carries everything between the two of you.</li>
-            <li>Hold T to talk. The show turns down while either of you is talking.</li>
-            <li>The cameras window stays on top of the show (in Chrome and Edge).</li>
+            {hasPlus ? (
+              <>
+                <li>Hold T to talk. The show turns down while either of you is talking.</li>
+                <li>The cameras window stays on top of the show (in Chrome and Edge).</li>
+              </>
+            ) : (
+              <li>With Soultied Plus, hold T to talk, and pop your cameras out into a window that stays on top of the show.</li>
+            )}
           </ul>
           {recent.length > 0 && (
             <div className="flex flex-col gap-2">

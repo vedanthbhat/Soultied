@@ -35,7 +35,7 @@ footer { display: flex; gap: 8px 18px; flex-wrap: wrap; justify-content: center;
 <a class="home" href="/">← Soultied</a>
 <article class="card">
 <h1>Soultied privacy policy</h1>
-<p class="date">Last updated: 12 October 2026</p>
+<p class="date">Last updated: 13 October 2026</p>
 <p>Soultied is a small shared place online for two people in a long-distance relationship, plus a browser extension for watching Netflix and Prime Video together. This page explains what each part handles, where it goes, and how to delete it. It is written by the person who builds Soultied, Vedanth Bhat. Questions or requests: <a href="mailto:hello@soultied.app">hello@soultied.app</a>.</p>
 <p>The short version: what you put in Soultied is shared with your person and nobody else. There are no ads, no analytics or tracking, and nothing is sold.</p>
 <h2>The Soultied website (soultied.app)</h2>
@@ -49,7 +49,9 @@ footer { display: flex; gap: 8px 18px; flex-wrap: wrap; justify-content: center;
 </ul>
 <p>Only the two members of a place can read it. The database rules enforce this. Invite codes expire and can only be used to join.</p>
 <p><strong>Live messages.</strong> Chat, reactions, play/pause/skip and video-call setup messages travel between you as small records in the same database. They're kept there, readable only by the two of you, until your place is deleted.</p>
-<p><strong>Video and voice calls.</strong> Cameras and microphones are only switched on when you press the button, and your browser asks for permission first. Calls go directly between your two browsers (WebRTC) whenever your networks allow it. When a network blocks that (some mobile, college and office networks do), the call is passed along by a relay server (TURN). Calls are encrypted from one browser to the other either way, so a relay can't see or hear them. They are not recorded or stored. Public STUN servers (Google's and Cloudflare's) are used only to help your two browsers find each other.</p>
+<p><strong>Video and voice calls</strong> (with Soultied Plus). Cameras and microphones are only switched on when you press the button, and your browser asks for permission first. Calls go directly between your two browsers (WebRTC) whenever your networks allow it. When a network blocks that (some mobile, college and office networks do), the call is passed along by a relay server (TURN). Calls are encrypted from one browser to the other either way, so a relay can't see or hear them. They are not recorded or stored. Public STUN servers (Google's and Cloudflare's) are used only to help your two browsers find each other.</p>
+<p><strong>Soultied Plus on your place.</strong> When one of you adds a Plus code to your place, the place stores a fingerprint of the code (not the code itself), who added it and when it ends, and your account is added to the list of browsers using that code (up to three).</p>
+<p><strong>YouTube.</strong> Videos in the TV room and songs on the record player play in YouTube's own player, embedded from YouTube (a Google service), and YouTube's privacy policy covers what it collects while it plays. Soultied stores the video's ID (and, for a song, its title) in your place, so it plays for both of you.</p>
 <p><strong>On this device.</strong> The site keeps a copy of your place in your browser's local storage, so it opens quickly.</p>
 <h2>The Soultied browser extension</h2>
 <p>The extension only runs on:</p>

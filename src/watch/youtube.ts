@@ -12,6 +12,7 @@ export interface YTPlayer {
   getVideoData?(): { video_id?: string; title?: string };
   getVolume?(): number;
   setVolume?(volume: number): void;
+  getDuration?(): number;
   destroy(): void;
 }
 

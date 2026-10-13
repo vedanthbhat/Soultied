@@ -50,6 +50,8 @@ export interface MemberDoc {
 
 export interface SpaceDoc extends CoupleSpace {
   members: string[];
+  /** Soultied Plus for the place (cameras and voice): whose code, the code's fingerprint, and when it ends */
+  plus?: { by: string; code: string; until: Timestamp } | null;
   /** the invite expiry again, as a number the security rules can compare */
   inviteExpiresAtMs: number;
   joinCode?: string;

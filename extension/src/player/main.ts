@@ -209,6 +209,8 @@ if (adapter && !running) {
   // Keys typed into our chat box stay ours (Netflix would pause on the space bar).
   // Anywhere else, hold T to talk.
   let talking = false;
+  // (said once per page: a place without Plus, and you held T)
+  let placePlusSaid = false;
   const editable = (t: EventTarget | null) =>
     t instanceof HTMLElement && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
   const release = () => {
@@ -242,6 +244,14 @@ if (adapter && !running) {
           } else if (type === 'keyup' && holding) {
             holding = false;
             callCmd({ op: 'talk', down: false });
+          }
+          return;
+        }
+        // with a Soultied place, talking out loud comes with the place's Plus (the call is in your Soultied tab)
+        if (engine.session?.plus === false) {
+          if (type === 'keydown' && !e.repeat && !placePlusSaid) {
+            placePlusSaid = true;
+            overlay.note('Talking out loud and cameras come with Soultied Plus. Add it in your Soultied tab, under Watch together.');
           }
           return;
         }
