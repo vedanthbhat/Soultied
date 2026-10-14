@@ -128,97 +128,82 @@ export const Welcome: React.FC<Props> = ({ initialJoinCode, onDraftSeats, onDone
     </div>
   );
 
-  // the front door: two products side by side, a place for the two of you, and the watch-party extension
+  // the front door: two small cards stacked on the left (a place for the two of you, and the watch-party extension),
+  // leaving the room itself in view
   if (step === 'welcome' && cloudStatus !== 'checking')
     return (
       <div className="fixed inset-0 z-40 pointer-events-none px-ui flex items-end md:items-center p-3 md:p-6">
         <div
-          className="pointer-events-auto w-full flex flex-col md:flex-row md:items-start gap-4 md:gap-5 max-h-[78vh] md:max-h-none overflow-y-auto md:overflow-visible px-scroll"
-          style={{ maxWidth: 900 }}
+          className="pointer-events-auto w-full flex flex-col gap-3 max-h-[78vh] md:max-h-[calc(100vh-48px)] overflow-y-auto px-scroll"
+          style={{ maxWidth: 420 }}
         >
-          <section
-            className="px-box px-shadow px-pop flex flex-col gap-5 p-6 md:p-8 min-w-0 md:flex-[1.12] md:max-h-[calc(100vh-48px)] md:overflow-y-auto px-scroll"
-            aria-labelledby="door-place"
-          >
+          <section className="px-box px-shadow px-pop flex flex-col gap-3 p-5 min-w-0" aria-labelledby="door-place">
             <div>
-              <div className="text-sm font-semibold tracking-[0.16em] uppercase text-[var(--terracotta-d)]">Our place · for two</div>
-              <h1 id="door-place" className="text-5xl md:text-6xl font-bold leading-none text-[var(--ink-soft)] mt-1">
+              <div className="text-xs font-semibold tracking-[0.16em] uppercase text-[var(--terracotta-d)]">Our place · for two</div>
+              <h1 id="door-place" className="text-4xl font-bold leading-none text-[var(--ink-soft)] mt-1 mb-0">
                 Soultied
               </h1>
             </div>
-            <p className="text-xl leading-snug m-0">A little home for two, wherever you both are.</p>
-            <p className="text-[var(--muted)] m-0">
-              Build a cosy room together: a fire, a couch, and a seat that's always saved for your person. Come back each day to open a
-              letter, play a game or put a record on.
-            </p>
-            <div className="flex flex-col gap-4 mt-1">
-              <button className="px-btn text-lg" onClick={() => setStep('details')}>
+            <p className="m-0 leading-snug text-balance">A little home for two, wherever you both are.</p>
+            <div className="flex flex-wrap gap-3">
+              <button className="px-btn flex-1 whitespace-nowrap text-base" onClick={() => setStep('details')}>
                 Build our place →
               </button>
-              <button className="px-btn px-btn--paper" onClick={() => setStep('join')}>
+              <button className="px-btn px-btn--paper flex-1 whitespace-nowrap text-base" onClick={() => setStep('join')}>
                 I have an invite
               </button>
             </div>
-            <div className="flex flex-col gap-2 text-sm text-[var(--muted)]">
-              <div>
-                Just looking?{' '}
-                <button
-                  className="px-link"
-                  onClick={() => {
-                    loadDemo();
-                    onDone();
-                  }}
-                >
-                  Peek inside a demo room
-                </button>
-              </div>
-              <div>
-                Cameras and voice for you both:{' '}
-                <a className="px-link" href="/plus/">
-                  Soultied Plus →
-                </a>
-              </div>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+              <button
+                className="px-link"
+                onClick={() => {
+                  loadDemo();
+                  onDone();
+                }}
+              >
+                Peek inside a demo room
+              </button>
+              <a className="px-link" href="/plus/">
+                Cameras and voice: Plus →
+              </a>
             </div>
-            <nav className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--muted)]" aria-label="About Soultied">
-              <a className="px-link" href="/terms/">Terms</a>
-              <a className="px-link" href="/privacy/">Privacy</a>
-              <a className="px-link" href="/refunds/">Refunds</a>
-              <a className="px-link" href="/contact/">Contact</a>
-            </nav>
           </section>
 
-          <section
-            className="px-box px-shadow px-pop flex flex-col gap-4 p-6 md:p-7 min-w-0 md:flex-1 md:max-h-[calc(100vh-48px)] md:overflow-y-auto px-scroll"
-            aria-labelledby="door-watch"
-          >
+          <section className="px-box px-shadow px-pop flex flex-col gap-3 p-5 min-w-0" aria-labelledby="door-watch">
             <div>
-              <div className="text-sm font-semibold tracking-[0.16em] uppercase text-[var(--terracotta-d)]">Watch party · Netflix & Prime</div>
-              <h2 id="door-watch" className="text-3xl font-bold leading-tight mt-1 mb-0">
+              <div className="text-xs font-semibold tracking-[0.16em] uppercase text-[var(--terracotta-d)]">Watch party · Netflix & Prime</div>
+              <h2 id="door-watch" className="text-2xl font-bold leading-tight mt-1 mb-0">
                 Watch together
               </h2>
             </div>
-            <img
-              src={WATCH_SHOT}
-              alt="A Soultied watch party on a show: the chat beside the video and two pixel characters on a little couch in the corner."
-              width={480}
-              height={300}
-              className="block w-full h-auto"
-              style={{ imageRendering: 'auto', boxShadow: '0 0 0 3px var(--ink)' }}
-            />
-            <p className="m-0 leading-snug">
-              Press <strong>Watch together</strong> on any show and send the link: you're in sync, with a chat and a little couch on the
-              show. No account needed.
-            </p>
-            <p className="m-0 text-sm text-[var(--muted)]">Free, on Chrome, Edge or Brave. Cameras and voice with Soultied Plus.</p>
+            {/* on shorter screens (most laptops) the picture sits beside the line, so both cards fit without scrolling */}
+            <div className="flex flex-col gap-3 md:[@media(max-height:860px)]:flex-row md:[@media(max-height:860px)]:items-center">
+              <img
+                src={WATCH_SHOT}
+                alt="A Soultied watch party on a show: the chat beside the video and two pixel characters on a little couch in the corner."
+                width={480}
+                height={300}
+                className="block w-full h-auto shrink-0 md:[@media(max-height:860px)]:w-[55%]"
+                style={{ boxShadow: '0 0 0 3px var(--ink)' }}
+              />
+              <p className="m-0 leading-snug">Your shows in sync, with a chat and a little couch. Free, no account.</p>
+            </div>
             <div className="flex flex-wrap gap-3">
-              <a className="px-btn" href={EXTENSION_STORE_URL} target="_blank" rel="noopener">
+              <a className="px-btn flex-1 whitespace-nowrap text-center text-base" href={EXTENSION_STORE_URL} target="_blank" rel="noopener">
                 Add to Chrome
               </a>
-              <a className="px-btn px-btn--paper" href="/watch/">
+              <a className="px-btn px-btn--paper flex-1 whitespace-nowrap text-center text-base" href="/watch/">
                 How it works
               </a>
             </div>
           </section>
+
+          <nav className="px-box flex flex-wrap justify-center gap-x-4 gap-y-1 px-4 py-2 text-xs text-[var(--muted)]" aria-label="About Soultied">
+            <a className="px-link" href="/terms/">Terms</a>
+            <a className="px-link" href="/privacy/">Privacy</a>
+            <a className="px-link" href="/refunds/">Refunds</a>
+            <a className="px-link" href="/contact/">Contact</a>
+          </nav>
         </div>
       </div>
     );
