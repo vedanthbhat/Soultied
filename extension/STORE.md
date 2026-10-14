@@ -6,9 +6,9 @@ Package: `npm run build:extension:store`, then upload `extension/soultied-extens
 
 ## Store listing
 
-**Name** (from the manifest): Soultied: watch together
+**Name** (from the manifest, 75 characters max): Soultied: Watch Party for Netflix & Prime Video
 
-**Summary** (from the manifest, 132 characters max): Watch Netflix and Prime Video in sync with your person: send a link, chat and react on a pixel couch. Cameras with Soultied Plus.
+**Summary** (from the manifest, 132 characters max): Watch Netflix and Prime Video in sync, even long distance: send a link, chat and react on a pixel couch. Video calls with Plus.
 
 **Category:** Entertainment
 

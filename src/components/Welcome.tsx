@@ -159,20 +159,27 @@ export const Welcome: React.FC<Props> = ({ initialJoinCode, onDraftSeats, onDone
                 I have an invite
               </button>
             </div>
-            <div className="text-sm text-[var(--muted)]">
-              Just looking?{' '}
-              <button
-                className="px-link"
-                onClick={() => {
-                  loadDemo();
-                  onDone();
-                }}
-              >
-                Peek inside a demo room
-              </button>
+            <div className="flex flex-col gap-2 text-sm text-[var(--muted)]">
+              <div>
+                Just looking?{' '}
+                <button
+                  className="px-link"
+                  onClick={() => {
+                    loadDemo();
+                    onDone();
+                  }}
+                >
+                  Peek inside a demo room
+                </button>
+              </div>
+              <div>
+                Cameras and voice for you both:{' '}
+                <a className="px-link" href="/plus/">
+                  Soultied Plus →
+                </a>
+              </div>
             </div>
             <nav className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--muted)]" aria-label="About Soultied">
-              <a className="px-link" href="/plus/">Soultied Plus</a>
               <a className="px-link" href="/terms/">Terms</a>
               <a className="px-link" href="/privacy/">Privacy</a>
               <a className="px-link" href="/refunds/">Refunds</a>
