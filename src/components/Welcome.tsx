@@ -198,11 +198,28 @@ export const Welcome: React.FC<Props> = ({ initialJoinCode, onDraftSeats, onDone
             </div>
           </section>
 
-          <nav className="px-box flex flex-wrap justify-center gap-x-4 gap-y-1 px-4 py-2 text-xs text-[var(--muted)]" aria-label="About Soultied">
-            <a className="px-link" href="/terms/">Terms</a>
-            <a className="px-link" href="/privacy/">Privacy</a>
-            <a className="px-link" href="/refunds/">Refunds</a>
-            <a className="px-link" href="/contact/">Contact</a>
+          <nav className="px-box flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 py-2 text-xs text-[var(--muted)]" aria-label="About Soultied">
+            <div className="flex flex-wrap gap-x-3 gap-y-1">
+              <a className="px-link" href="/terms/">Terms</a>
+              <a className="px-link" href="/privacy/">Privacy</a>
+              <a className="px-link" href="/refunds/">Refunds</a>
+              <a className="px-link" href="/contact/">Contact</a>
+            </div>
+            <a
+              href="https://www.producthunt.com/products/soultied?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-soultied"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block shrink-0"
+            >
+              <img
+                alt="Soultied - A shared home for long-distance couples | Product Hunt"
+                width={126}
+                height={27}
+                className="block"
+                style={{ width: 126, height: 27 }}
+                src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1280412&theme=dark&t=1792054037476"
+              />
+            </a>
           </nav>
         </div>
       </div>
