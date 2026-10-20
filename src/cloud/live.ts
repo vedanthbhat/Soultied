@@ -19,7 +19,7 @@ export interface LiveChannel<E> {
 /** Messages are useless after a few seconds; this lets a Firestore TTL policy sweep them up. */
 const KEEP_MS = 24 * 60 * 60 * 1000;
 
-export function firestoreChannel<E extends { by: string; at: number }>(db: Firestore, spaceId: string, topic: 'watch' | 'escape' | 'stream' | 'doodle'): LiveChannel<E> {
+export function firestoreChannel<E extends { by: string; at: number }>(db: Firestore, spaceId: string, topic: 'watch' | 'escape' | 'stream' | 'doodle' | 'play'): LiveChannel<E> {
   return channelAt<E>(collection(db, 'spaces', spaceId, 'live', topic, 'events'));
 }
 

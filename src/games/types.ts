@@ -4,7 +4,19 @@
  * that document, so you can take your turn hours after your person took theirs.
  */
 
-export type GameKind = 'fireflies' | 'boats' | 'doodle';
+export type GameKind =
+  | 'fireflies'
+  | 'boats'
+  | 'doodle'
+  | 'noughts'
+  | 'fence'
+  | 'lanterns'
+  | 'tug'
+  | 'quickdraw'
+  | 'rps';
+
+/** 'turns': play across the day, whenever it's your move. 'live': you're both here, right now. */
+export type GameMode = 'turns' | 'live';
 
 /** 'a' is whoever built the place, 'b' is the person who joined (same as the couch). */
 export type Seat = 'a' | 'b';
@@ -42,6 +54,7 @@ export interface GameInfo {
   tagline: string;
   /** how it's played, shown on the box */
   style: string;
+  mode: GameMode;
 }
 
 export const GAMES: Record<GameKind, GameInfo> = {
@@ -50,17 +63,62 @@ export const GAMES: Record<GameKind, GameInfo> = {
     name: 'Fireflies',
     tagline: 'Drop fireflies into the jar. Four in a row, any direction, wins.',
     style: 'Take turns',
+    mode: 'turns',
   },
   boats: {
     kind: 'boats',
     name: 'Paper Boats',
     tagline: 'Hide four paper boats on your pond, then take turns guessing where theirs are.',
     style: 'Take turns',
+    mode: 'turns',
   },
   doodle: {
     kind: 'doodle',
     name: 'Doodle Guess',
     tagline: 'One draws on a little pixel canvas, the other guesses. Then swap. Six drawings, scored together.',
     style: 'Live, together',
+    mode: 'live',
+  },
+  noughts: {
+    kind: 'noughts',
+    name: 'Noughts & Hearts',
+    tagline: 'Three in a row on a little board. Best of five, and whoever went second starts the next one.',
+    style: 'Take turns',
+    mode: 'turns',
+  },
+  fence: {
+    kind: 'fence',
+    name: 'Fence the Garden',
+    tagline: 'Take turns adding a bit of fence. Close a bed and it’s yours, and you go again. Most beds wins.',
+    style: 'Take turns',
+    mode: 'turns',
+  },
+  lanterns: {
+    kind: 'lanterns',
+    name: 'Lanterns',
+    tagline: 'Light a lantern to trap theirs in a line, and they all turn your colour. Most lanterns at the end wins.',
+    style: 'Take turns',
+    mode: 'turns',
+  },
+  tug: {
+    kind: 'tug',
+    name: 'Tug of War',
+    tagline: 'Tap as fast as you can to pull the ribbon over to your side. Twenty seconds, no mercy.',
+    style: 'Live',
+    mode: 'live',
+  },
+  quickdraw: {
+    kind: 'quickdraw',
+    name: 'Quick Draw',
+    tagline: 'Wait for the lantern to light, then tap. Quickest wins the round; tap too soon and you lose it. First to three.',
+    style: 'Live',
+    mode: 'live',
+  },
+  rps: {
+    kind: 'rps',
+    name: 'Paper, Scissors, Stone',
+    tagline: 'Pick before the timer runs out, and see what they picked. First to three rounds.',
+    style: 'Live',
+    mode: 'live',
   },
 };

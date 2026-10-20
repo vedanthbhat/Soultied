@@ -145,7 +145,7 @@ interface AppContextType {
   redeemPlus: (code: string) => Promise<PlusReply>;
 }
 
-export type LiveTopic = 'watch' | 'escape' | 'stream' | 'doodle';
+export type LiveTopic = 'watch' | 'escape' | 'stream' | 'doodle' | 'play';
 
 const AppContext = createContext<AppContextType | null>(null);
 

@@ -6,7 +6,7 @@ import type { GameKind, Match, Seat } from './types';
 import { GAMES, otherSeat } from './types';
 import { botAct, botDelay, botTurn, endLine, needsMe } from './registry';
 
-export const GAME_KINDS: GameKind[] = ['fireflies', 'boats', 'doodle'];
+export const GAME_KINDS = Object.keys(GAMES) as GameKind[];
 
 type Matches = Partial<Record<GameKind, Match>>;
 
@@ -95,6 +95,8 @@ export const GamesProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const commit = useCallback(
     (m0: Match, writer: Seat) => {
       const prev = matchesRef.current[m0.kind];
+      // a second tap before the screen caught up would replay a move from an older board: ignore it
+      if (GAMES[m0.kind].mode === 'turns' && prev && prev.id === m0.id && m0.seq < prev.seq) return;
       let m: Match = { ...m0, updatedAt: Date.now(), updatedBy: writer, seq: prev && prev.id === m0.id ? prev.seq + 1 : 0 };
       const justEnded = m.status === 'over' && !(prev && prev.id === m.id && prev.status === 'over');
       if (justEnded && m.winner && m.winner !== 'draw') m = { ...m, wins: { ...m.wins, [m.winner]: (m.wins[m.winner] || 0) + 1 } };
@@ -112,7 +114,8 @@ export const GamesProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
       if (justEnded) {
         const game = GAMES[m.kind].name;
-        addActivity({ type: 'played_game', title: game, description: endLine(m, seatName, game) });
+        const line = endLine(m, seatName, game);
+        if (line) addActivity({ type: 'played_game', title: game, description: line });
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps

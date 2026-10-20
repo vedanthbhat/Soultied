@@ -3,6 +3,11 @@ import { newMatchId, otherSeat } from './types';
 import { FirefliesState, botColumn, columnPlace, drop, emptyFireflies, findLine, isFull } from './fireflies';
 import { Boat, BoatsState, boatName, botShot, coordName, emptyBoats, randomFleet, shoot } from './boats';
 import { BOT_WORDS, DRAW_SECONDS, DoodleState, ROUNDS, judge, pickChoices } from './doodle';
+import { NoughtsState, botCell, emptyNoughts, placeMark } from './noughts';
+import { FenceState, botEdge, buildFence, emptyFence, fenceNext } from './fence';
+import { LanternsState, botLantern, emptyLanterns, lightLantern } from './lanterns';
+import { GAMES } from './types';
+import { LiveLobby, liveJoin, liveStale } from './live/lobby';
 
 /**
  * The moves of each game, as plain functions from one match to the next.
@@ -91,6 +96,44 @@ export function boatsShot(m: Match<BoatsState>, seat: Seat, cell: number): Match
           : `guessed ${at}: just water`,
   };
 }
+
+/* ---------- Noughts & Hearts ---------- */
+
+export const newNoughts = (starter: Seat, wins?: Record<Seat, number>) => base<NoughtsState>('noughts', starter, emptyNoughts(starter), wins);
+
+export function noughtsMove(m: Match<NoughtsState>, seat: Seat, cell: number): Match<NoughtsState> | null {
+  if (m.status !== 'playing' || m.turn !== seat) return null;
+  const mv = placeMark(m.state, seat, cell);
+  if (!mv) return null;
+  return { ...m, state: mv.state, status: mv.over ? 'over' : 'playing', turn: mv.next, winner: mv.winner, last: mv.line };
+}
+
+/* ---------- Fence the Garden ---------- */
+
+export const newFence = (starter: Seat, wins?: Record<Seat, number>) => base<FenceState>('fence', starter, emptyFence(), wins);
+
+export function fenceMove(m: Match<FenceState>, seat: Seat, edge: number): Match<FenceState> | null {
+  if (m.status !== 'playing' || m.turn !== seat) return null;
+  const mv = buildFence(m.state, seat, edge);
+  if (!mv) return null;
+  return { ...m, state: mv.state, status: mv.over ? 'over' : 'playing', turn: fenceNext(seat, mv), winner: mv.winner, last: mv.line };
+}
+
+/* ---------- Lanterns ---------- */
+
+export const newLanterns = (starter: Seat, wins?: Record<Seat, number>) => base<LanternsState>('lanterns', starter, emptyLanterns(starter), wins);
+
+export function lanternMove(m: Match<LanternsState>, seat: Seat, cell: number): Match<LanternsState> | null {
+  if (m.status !== 'playing' || m.turn !== seat) return null;
+  const mv = lightLantern(m.state, seat, cell);
+  if (!mv) return null;
+  return { ...m, state: mv.state, status: mv.over ? 'over' : 'playing', turn: mv.next, winner: mv.winner, last: mv.line };
+}
+
+/* ---------- live games (the invitation; the game itself runs over the live link) ---------- */
+
+/** a live game that keeps its match as an invitation plus a result (Doodle Guess has its own) */
+export const isLiveInvite = (kind: GameKind) => GAMES[kind].mode === 'live' && kind !== 'doodle';
 
 /* ---------- Doodle Guess ---------- */
 
@@ -217,6 +260,10 @@ export const doodleStale = (m: Match) => m.kind === 'doodle' && m.status !== 'ov
 
 export function needsMe(m: Match | undefined | null, seat: Seat): boolean {
   if (!m) return false;
+  if (isLiveInvite(m.kind)) {
+    const l = m as Match<LiveLobby>;
+    return l.status === 'setup' && !liveStale(l) && !l.state.joined?.[seat];
+  }
   if (m.kind === 'doodle') {
     const d = m as Match<DoodleState>;
     if (d.status === 'over' || doodleStale(d)) return false;
@@ -233,6 +280,7 @@ export function needsMe(m: Match | undefined | null, seat: Seat): boolean {
 
 /** The line for the little note in the room, e.g. "Rohan wants to play Doodle Guess." */
 export function noteFor(m: Match, who: string, game: string): string {
+  if (isLiveInvite(m.kind)) return `${who} wants to play ${game} with you, right now. Join them?`;
   if (m.kind === 'doodle') {
     const d = m as Match<DoodleState>;
     if (d.state.phase === 'lobby') return `${who} wants to play ${game}. Join them?`;
@@ -246,6 +294,19 @@ export function noteFor(m: Match, who: string, game: string): string {
 
 /** The demo room's partner takes its turn. */
 export function botAct(m: Match, bot: Seat): Match | null {
+  if (isLiveInvite(m.kind)) return m.status === 'setup' ? liveJoin(m as Match<LiveLobby>, bot) : null;
+  if (m.kind === 'noughts') {
+    const n = m as Match<NoughtsState>;
+    return n.status === 'playing' && n.turn === bot ? noughtsMove(n, bot, botCell(n.state.board, bot)) : null;
+  }
+  if (m.kind === 'fence') {
+    const f = m as Match<FenceState>;
+    return f.status === 'playing' && f.turn === bot ? fenceMove(f, bot, botEdge(f.state, bot)) : null;
+  }
+  if (m.kind === 'lanterns') {
+    const l = m as Match<LanternsState>;
+    return l.status === 'playing' && l.turn === bot ? lanternMove(l, bot, botLantern(l.state.board, bot)) : null;
+  }
   if (m.kind === 'fireflies') {
     const f = m as Match<FirefliesState>;
     return f.status === 'playing' && f.turn === bot ? fireflyMove(f, bot, botColumn(f.state.board, bot)) : null;
@@ -284,6 +345,7 @@ export function botDelay(m: Match, bot: Seat): number {
     return 1500;
   }
   void bot;
+  if (isLiveInvite(m.kind)) return 1400;
   if (m.kind === 'boats' && m.status === 'setup') return 900;
   return 1100 + Math.random() * 900;
 }
@@ -300,6 +362,8 @@ export function botTurn(m: Match | undefined | null, bot: Seat): boolean {
 
 /** For the activity feed, once a game is over. */
 export function endLine(m: Match, name: (s: Seat) => string, game: string): string {
+  // a live game that was stopped before the end isn't worth a line
+  if (isLiveInvite(m.kind) && !m.winner) return '';
   if (m.kind === 'doodle') {
     const n = doodleScore((m as Match<DoodleState>).state);
     return `Guessed ${n} of ${ROUNDS} drawings together at ${game}.`;
@@ -309,6 +373,7 @@ export function endLine(m: Match, name: (s: Seat) => string, game: string): stri
 
 /** Short words for the games stack in the room, e.g. "Your turn in Fireflies". */
 export function waitingLabel(m: Match, who: string, game: string): string {
+  if (isLiveInvite(m.kind)) return `${who} wants to play ${game}`;
   if (m.kind === 'doodle') {
     const st = (m as Match<DoodleState>).state;
     if (st.phase === 'lobby') return `${who} wants to play ${game}`;
