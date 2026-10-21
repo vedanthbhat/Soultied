@@ -2,11 +2,12 @@
  * The little window under the toolbar button. Without a Soultied place: start
  * a watch party (or join one from a link), copy the link, leave. With one:
  * is everything connected, and is your person watching? With buttons to open
- * Netflix, Prime Video, or Soultied itself.
+ * the streaming sites, or Soultied itself.
  */
+import { SERVICES, serviceName, type Platform } from '../../src/stream/protocol';
 
 interface PlayerStatus {
-  platform: 'netflix' | 'prime';
+  platform: Platform;
   video: boolean;
   connected: boolean;
   watching: string | null;
@@ -20,9 +21,9 @@ interface Snapshot {
   partner: string | null;
   place: string | null;
   players: PlayerStatus[];
-  /** the Netflix / Prime tab in front of you was opened before the extension was, so it can't see it */
+  /** the streaming site's tab in front of you was opened before the extension was, so it can't see it */
   stale?: boolean;
-  /** the tab in front of you is Netflix or Prime Video */
+  /** the tab in front of you is one of the streaming sites */
   onShow?: boolean;
   party?: { link: string; partner: string | null } | null;
   /** your name from last time */
@@ -53,6 +54,7 @@ body { margin: 0; width: 330px; background: #f4e8d0; color: #3a2a26; font: 14px/
 .err:empty { display: none; }
 .label { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: #8f4b3a; margin-top: 2px; }
 .btns { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.btns.sites { gap: 4px 10px; margin-top: -2px; }
 form { display: flex; gap: 8px; align-items: center; margin: 0; }
 input { font: inherit; font-size: 13px; flex: 1; min-width: 0; border: 0; padding: 6px 8px; background: #fff8ea; color: #2b1e1c; box-shadow: inset 0 0 0 2px #2b1e1c; outline: none; margin: 3px; }
 button { font: inherit; cursor: pointer; border: 0; background: #b8674f; color: #fff4e2; padding: 5px 10px; box-shadow: 0 -3px 0 0 #2b1e1c, 0 3px 0 0 #2b1e1c, -3px 0 0 0 #2b1e1c, 3px 0 0 0 #2b1e1c, inset 0 -3px 0 0 #8f4b3a; margin: 3px; white-space: nowrap; }
@@ -92,7 +94,7 @@ function button(text: string, onClick: () => void, kind: '' | 'paper' | 'sage' |
 }
 
 const ask = <T = { ok: boolean; error?: string; link?: string }>(msg: object) => chrome.runtime.sendMessage(msg) as Promise<T>;
-const site = (p: PlayerStatus['platform']) => (p === 'netflix' ? 'Netflix' : 'Prime Video');
+const site = (p: PlayerStatus['platform']) => serviceName(p);
 const ERRORS: Record<string, string> = {
   offline: 'Couldn’t reach Soultied. Check your connection and try again.',
   missing: 'That watch party doesn’t exist any more. Ask for a new link.',
@@ -196,7 +198,7 @@ function showLines(s: Snapshot, wrap: HTMLElement, name: string) {
   if (s.stale) {
     wrap.append(line('warn', 'Refresh this tab so Soultied can see the show (it was open before the extension was).'));
   } else if (!p) {
-    wrap.append(line('off', 'Now open Netflix or Prime Video and start something.'));
+    wrap.append(line('off', 'Now open Netflix, Prime Video or another streaming site below, and start something.'));
   } else {
     wrap.append(
       line(
@@ -211,6 +213,8 @@ function showLines(s: Snapshot, wrap: HTMLElement, name: string) {
     else if (!p.watching || p.partnerWatching !== p.watching)
       wrap.append(line('warn', `${partner} is watching ${p.partnerWatching}. Press "Join them" (or "Go there") on the show to catch up.`));
     else wrap.append(line('on', `${partner} is watching with you. Play, pause and skipping stay in sync.`));
+    if (SERVICES[p.platform]?.beta)
+      wrap.append(el('div', 'muted', `Soultied on ${site(p.platform)} is new (beta). If something’s off, tell us: hello@soultied.app`));
   }
 }
 
@@ -305,7 +309,7 @@ function render(s: Snapshot, opts: { copied?: boolean } = {}) {
     wrap.append(more);
   } else {
     // 3. no Soultied place: start a watch party, or join one
-    wrap.append(el('div', '', 'Watch Netflix or Prime Video in sync with your person, wherever they are, with a chat and a little couch on the show.'));
+    wrap.append(el('div', '', 'Watch Netflix, Prime Video, JioHotstar and more in sync with your person, wherever they are, with a chat and a little couch on the show.'));
     wrap.append(el('div', 'label', 'Start a watch party'));
     wrap.append(el('div', 'muted', 'Send the link to your person. Whatever one of you puts on, the other comes along.'));
     wrap.append(
@@ -331,17 +335,19 @@ function render(s: Snapshot, opts: { copied?: boolean } = {}) {
     wrap.append(plusBox(s, () => refresh()));
   }
 
+  const openSiteTab = (p: Platform) => () => void chrome.tabs.create({ url: SERVICES[p].home, active: true });
   const opens = el('div', 'btns');
-  opens.append(
-    button('Open Netflix', () => void chrome.tabs.create({ url: 'https://www.netflix.com/browse', active: true }), 'paper'),
-    button('Open Prime Video', () => void chrome.tabs.create({ url: 'https://www.primevideo.com/', active: true }), 'paper'),
-  );
-  wrap.append(el('hr'), opens);
+  opens.append(button('Open Netflix', openSiteTab('netflix'), 'paper'), button('Open Prime Video', openSiteTab('prime'), 'paper'));
+  // the newer ones, as links
+  const others = el('div', 'btns sites');
+  others.append(el('span', 'muted', 'New (beta):'));
+  for (const p of Object.keys(SERVICES) as Platform[]) if (SERVICES[p].beta) others.append(button(SERVICES[p].name, openSiteTab(p), 'link'));
+  wrap.append(el('hr'), opens, others);
   if (party || !(s.hub || s.place)) {
     // where the extension comes from
     const about = el('div', 'muted');
     about.append(
-      'You each need your own Netflix or Prime account. New to Soultied? It’s a little home online for two people who live apart: daily letters, games and a room you share. ',
+      'You each need your own account on the site you watch. New to Soultied? It’s a little home online for two people who live apart: daily letters, games and a room you share. ',
       button('Visit soultied.app', openSite, 'link'),
     );
     wrap.append(about);

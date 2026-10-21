@@ -1,6 +1,6 @@
 # Soultied: watch together (browser extension)
 
-Watch Netflix or Prime Video in sync with your person. Two ways in:
+Watch Netflix, Prime Video and more (in beta: JioHotstar, Sony LIV, ZEE5, Disney+, Hulu, HBO Max, Crunchyroll) in sync with your person. Two ways in:
 
 - **A watch party** (no Soultied account needed): hover a show on Netflix or Prime Video and press **Watch together** (or start one from the toolbar button or the card on the show), and send the link. Whoever opens it lands on the same show, in sync. Free: sync, chat, reactions and the couch. With Soultied Plus: cameras and voice too.
 - **Your Soultied place**: everything above, plus the "no watching ahead" check and your history together, and (when the place has Soultied Plus) cameras and push-to-talk.
@@ -15,7 +15,9 @@ Watch Netflix or Prime Video in sync with your person. Two ways in:
 - Cameras and voice. In a watch party (with Soultied Plus): your camera and theirs in the corner of the show, unmute or hold T to talk, and sliders (0–100%) for how loud you are to them and they are to you. Voice isolation (on unless you switch it off) takes background noise out of your mic and keeps it quiet between your words, on your own computer. The call carries on while you move between shows, Chrome asks for the camera and mic once (a small Soultied window), and only the loud bits of your person's voice are taken down (a shout doesn't blast you). In a Soultied place with Plus: pop the cameras out of your Soultied tab into a small window that stays on top of the show, and hold T to talk (without Plus, holding T says what Plus is). Either way the show eases down while someone's talking.
 - Leave: the Leave button on the chat panel (press twice) ends the party for you; your person is told, and can keep watching.
 
-You each need your own Netflix or Prime Video account. No video passes between you.
+You each need your own account on the site you watch. No video passes between you.
+
+After a watch party of ten minutes or more ends (the first time), a small card asks for a rating on the Chrome Web Store and, if you watched without Plus, says what Plus adds. The welcome page that opens after installing has the same two.
 
 ## Install
 
@@ -34,7 +36,7 @@ To try a build of your own instead:
 
 ## How it fits together
 
-- `src/player/`: runs on Netflix and Prime Video pages. `adapters.ts` knows each site's player, `engine.ts` keeps you in sync, `overlay.ts` and `couch.ts` draw the sidebar and the couch, `tiles.ts` puts **Watch together** next to Play on the sites' own show previews, and `camview.ts` shows the Plus call's pictures (they come from the hidden page over a local connection).
+- `src/player/`: runs on the streaming sites' pages. `adapters.ts` knows Netflix's and Prime's players, `services.ts` the newer sites (beta: one adapter driven through the page's own `<video>`, told per site which addresses are watch pages, where its film and ads are and how it names what's on; on Crunchyroll it also runs inside the player's own frame, asking the background about the page around it), `engine.ts` keeps you in sync, `overlay.ts` and `couch.ts` draw the sidebar and the couch, `tiles.ts` puts **Watch together** next to Play on the sites' own show previews, and `camview.ts` shows the Plus call's pictures (they come from the hidden page over a local connection).
 - `src/netflix-main.ts`: runs inside the Netflix page to use Netflix's own player controls (setting the video's time directly makes Netflix show an error).
 - `src/prime-main.ts`: the same for Prime Video: it finds Amazon's own player (setting the video's time directly makes Prime show "Video Unavailable"), says which title is open, and reports where you are in the story without the ads Prime stitches into the video, so two people who saw different ads still line up.
 - `src/bridge.ts`: runs on the Soultied page and passes messages between it and the extension.

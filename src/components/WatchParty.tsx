@@ -707,7 +707,7 @@ export const WatchParty: React.FC<{ onExit: () => void }> = ({ onExit }) => {
               Cameras & voice
             </button>
           ))}
-        <button className="px-btn px-btn--paper px-btn--small" onClick={() => setStreamOpen(true)} title="Watch Netflix or Prime Video together">
+        <button className="px-btn px-btn--paper px-btn--small" onClick={() => setStreamOpen(true)} title="Watch Netflix, Prime Video, JioHotstar and more together">
           Netflix / Prime
         </button>
         {audioBlocked && view?.remote && (
@@ -831,7 +831,7 @@ export const WatchParty: React.FC<{ onExit: () => void }> = ({ onExit }) => {
       )}
 
       {streamOpen && (
-        <PixelPanel title="Netflix & Prime Video" kicker="Watch together" onClose={() => setStreamOpen(false)} width={600}>
+        <PixelPanel title="Netflix, Prime Video & more" kicker="Watch together" onClose={() => setStreamOpen(false)} width={600}>
           <StreamPanel />
         </PixelPanel>
       )}

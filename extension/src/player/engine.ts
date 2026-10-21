@@ -1,4 +1,4 @@
-import { clock, titleLabel, type ExtMsg, type Person, type Session, type StreamEvent, type TitleInfo, type TogetherLog, type Where } from '../../../src/stream/protocol';
+import { clock, serviceName, titleLabel, type ExtMsg, type Person, type Session, type StreamEvent, type TitleInfo, type TogetherLog, type Where } from '../../../src/stream/protocol';
 import { projectedPosition } from '../../../src/watch/sync';
 import type { ReactionKind } from '../../../src/pixel/watchRoom';
 import type { Adapter } from './adapters';
@@ -92,6 +92,10 @@ export class Engine {
   partnerAway = false;
   /** your person left the watch party (until they come back) */
   partnerLeft = false;
+  /** seconds you've watched together in watch parties, on this page */
+  partyWatched = 0;
+  /** what's on was found before we were connected: tell your person when we are */
+  private titleOwed: { from: string | null } | null = null;
 
   /* following your person to what they put on */
   /** this tab has had something on (so being on the home page means you left it, not that you just arrived) */
@@ -200,6 +204,8 @@ export class Engine {
     // say we're here as soon as we're connected, before anything's playing, so you each see the other arrive
     if (s && changed) {
       this.sayHello();
+      if (this.titleOwed && this.title) this.send({ type: 'title', title: this.title, from: this.titleOwed.from });
+      this.titleOwed = null;
       const p = s.partner;
       const samePlace = !!before && before.me.id === s.me.id && (before.party?.id || '') === (s.party?.id || '');
       if (s.party && p && samePlace) {
@@ -320,11 +326,32 @@ export class Engine {
     if (this.guardOpen) return;
     const v = this.v!;
     if (v.ended) return;
+    if (this.a.adPauses) {
+      // these sites pause the film while an ad plays over it: look again in a moment before telling your person
+      const pos = this.at(v);
+      window.clearTimeout(this.pauseTimer);
+      this.pauseTimer = window.setTimeout(() => {
+        if (this.v !== v || !v.paused || v.ended) return;
+        if (this.a.inAd()) {
+          this.inAd = true;
+          this.expected = { pos, at: Date.now(), playing: false };
+          this.sendBuffering(true, 'ad');
+          return;
+        }
+        this.pausedNow(v, pos);
+      }, 700);
+      return;
+    }
+    this.pausedNow(v, this.at(v));
+  };
+
+  private pauseTimer = 0;
+  private pausedNow(v: HTMLVideoElement, pos: number) {
     if (this.lockedOut) return this.revert();
     this.leader = true;
-    this.expected = { pos: this.at(v), at: Date.now(), playing: false };
-    this.send({ type: 'pause', pos: this.at(v), key: this.key });
-  };
+    this.expected = { pos, at: Date.now(), playing: false };
+    this.send({ type: 'pause', pos, key: this.key });
+  }
 
   private onSeeked = () => {
     if (this.ours()) return;
@@ -451,7 +478,7 @@ export class Engine {
       }
     }
     if (!this.v) return;
-    if (this.title && !this.title.episode && this.title.show.match(/^(Netflix|Prime Video)$/)) this.refreshTitle();
+    if (this.title && !this.title.episode && this.title.show === serviceName(this.a.platform)) this.refreshTitle();
 
     // an ad counts as "wait for me"
     const ad = this.a.inAd();
@@ -480,6 +507,7 @@ export class Engine {
     const sameThing = this.partnerHere && !!this.title && this.partnerWhere?.title?.key === this.key;
     if (sameThing && !this.v.paused && this.title) {
       this.together += dt;
+      if (this.party) this.partyWatched += dt;
       const crossed = this.together >= TOGETHER_COUNTS_AFTER && this.lastWatched === 0;
       if (crossed || (this.lastWatched && now - this.lastWatched > 300_000)) {
         this.lastWatched = now;
@@ -517,6 +545,8 @@ export class Engine {
     void this.a.title().then((t) => {
       if (this.key !== key) return;
       this.title = t;
+      // (not connected yet: say it once we are, so your person still comes along)
+      this.titleOwed = !!t && !this.session ? { from } : null;
       if (t) this.send({ type: 'title', title: t, from });
       this.ui.update();
       if (t && this.v && !this.v.paused) this.guardCheck();
@@ -860,7 +890,7 @@ export class Engine {
     } catch {
       // storage blocked: we'll still catch up when they say where they are
     }
-    location.assign(this.a.linkAt(t, pos));
+    this.goTo(this.a.linkAt(t, pos));
   }
 
   /**
@@ -914,7 +944,8 @@ export class Engine {
   }
 
   goTo(url: string) {
-    location.assign(url);
+    if (this.a.go) this.a.go(url);
+    else location.assign(url);
   }
 
   /* ---------------- don't watch ahead ---------------- */

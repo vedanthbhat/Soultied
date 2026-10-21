@@ -1,4 +1,4 @@
-import { clock, PLUS_URL, titleLabel, type PlusReply, type TitleInfo } from '../../../src/stream/protocol';
+import { clock, EXTENSION_REVIEW_URL, plusFrom, PLUS_URL, titleLabel, type PlusReply, type TitleInfo } from '../../../src/stream/protocol';
 import type { ReactionKind } from '../../../src/pixel/watchRoom';
 import type { CallView } from '../../../src/watch/call';
 import { CouchCorner, faceURL, iconURL } from './couch';
@@ -90,6 +90,8 @@ button { font: inherit; cursor: pointer; }
 .card .top img { width: 21px; height: 18px; image-rendering: pixelated; }
 .card .muted { color: #7a5a48; font-size: 14px; }
 .card .row { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 6px; }
+.card .plusline { margin-top: 8px; padding-top: 12px; border-top: 3px dashed #d6c29c; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.card .plusline p { font-size: 14.5px; color: #5a4038; }
 .big { font-size: 120px; font-weight: 700; color: #fff4e2; text-shadow: 6px 6px 0 #2b1e1c, -3px -3px 0 #2b1e1c, 3px -3px 0 #2b1e1c, -3px 3px 0 #2b1e1c; }
 .pill { padding: 8px 14px; font-size: 16px; }
 
@@ -250,7 +252,7 @@ export class Overlay implements EngineUI {
   private unread = 0;
   private open = true;
   private seen = new Set<string>();
-  private overlayCard: 'waiting' | 'countdown' | 'guard' | 'follow' | null = null;
+  private overlayCard: 'waiting' | 'countdown' | 'guard' | 'follow' | 'thanks' | null = null;
   private followTimer = 0;
   /** "Not now" on the join card: don't ask again on this page */
   private cardDismissed = false;
@@ -753,6 +755,52 @@ export class Overlay implements EngineUI {
     };
     step();
     this.followTimer = window.setInterval(step, 200);
+  }
+
+  /**
+   * After your first proper watch party (once): a rating helps others find Soultied, and, if you
+   * watched without it, what Plus adds. Shown only when nothing else is in the middle of the screen.
+   */
+  thanks(t: { partner: string; plus: boolean; onClose(): void }) {
+    if (this.overlayCard) return false;
+    const card = el('div', 'box card thanks');
+    const top = el('div', 'top');
+    const heart = el('img');
+    heart.src = iconURL('heart', 3);
+    heart.alt = '';
+    top.append(heart, el('span', 'kicker', 'Watch party'));
+    const close = () => {
+      if (this.overlayCard === 'thanks') this.setCenter(null, null);
+      t.onClose();
+    };
+    card.append(
+      top,
+      el('h3', '', `How was watching with ${t.partner}?`),
+      el('p', '', 'If it felt like sitting on the same couch, a quick rating helps other people who live apart find Soultied.'),
+    );
+    const row = el('div', 'row');
+    const rate = el('button', 'btn', '★ Rate Soultied');
+    rate.onclick = () => {
+      window.open(EXTENSION_REVIEW_URL, '_blank', 'noopener');
+      close();
+    };
+    const later = el('button', 'btn paper', 'Not now');
+    later.onclick = close;
+    row.append(rate, later);
+    card.append(row);
+    if (t.plus) {
+      const plus = el('div', 'plusline');
+      plus.append(el('p', '', `Next time, see and hear each other too: cameras and voice come with Soultied Plus, from ${plusFrom()}. One of you having it covers you both.`));
+      const see = el('button', 'btn sage small', 'See Plus');
+      see.onclick = () => {
+        window.open(PLUS_URL, '_blank', 'noopener');
+        close();
+      };
+      plus.append(see);
+      card.append(plus);
+    }
+    this.setCenter(card, 'thanks');
+    return true;
   }
 
   private setCenter(node: HTMLElement | null, kind: Overlay['overlayCard']) {

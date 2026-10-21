@@ -171,7 +171,7 @@ export const Welcome: React.FC<Props> = ({ initialJoinCode, onDraftSeats, onDone
 
           <section className="px-box px-shadow px-pop flex flex-col gap-3 p-5 min-w-0" aria-labelledby="door-watch">
             <div>
-              <div className="text-xs font-semibold tracking-[0.16em] uppercase text-[var(--terracotta-d)]">Watch party · Netflix & Prime</div>
+              <div className="text-xs font-semibold tracking-[0.16em] uppercase text-[var(--terracotta-d)]">Watch party · Netflix, Prime & more</div>
               <h2 id="door-watch" className="text-2xl font-bold leading-tight mt-1 mb-0">
                 Watch together
               </h2>

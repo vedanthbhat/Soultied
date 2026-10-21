@@ -1,4 +1,5 @@
 import type { Platform, TitleInfo } from '../../../src/stream/protocol';
+import { serviceFor } from './services';
 
 /**
  * One small adapter per streaming site: where the video is, what's playing,
@@ -20,6 +21,12 @@ export interface Adapter {
   inAd(): boolean;
   /** a link that puts your person on the same thing, at a time if the site allows it */
   linkAt(t: TitleInfo, sec: number): string;
+  /** the film plays in a frame of its own on this page: this copy stands back (the one in the frame does it all) */
+  standby?(): boolean;
+  /** go to another address (from inside a player frame, the whole tab goes) */
+  go?(url: string): void;
+  /** the site's ads play in a separate picture and pause the film meanwhile: a pause can be an ad starting */
+  adPauses?: boolean;
 }
 
 const txt = (sel: string) => (document.querySelector(sel)?.textContent || '').replace(/\s+/g, ' ').trim();
@@ -409,5 +416,5 @@ export const prime: Adapter = {
 export function adapterFor(host: string): Adapter | null {
   if (host.endsWith('netflix.com')) return netflix;
   if (host.includes('primevideo.com') || host.includes('amazon.')) return prime;
-  return null;
+  return serviceFor(host);
 }

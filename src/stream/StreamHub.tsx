@@ -11,6 +11,7 @@ import {
   EXT_SOURCE,
   HUB_SOURCE,
   emptyLog,
+  serviceName,
   titleLabel,
   type BridgeToPage,
   type ExtMsg,
@@ -125,7 +126,7 @@ export const StreamHubProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const k = `${title.key}|${day}`;
     if (!logged.current.has(k) && partnerUser && me < partnerUser.id) {
       logged.current.add(k);
-      addActivity({ type: 'watched_together', title: 'Watched together', description: `${titleLabel(title)} on ${title.platform === 'netflix' ? 'Netflix' : 'Prime Video'}.` });
+      addActivity({ type: 'watched_together', title: 'Watched together', description: `${titleLabel(title)} on ${serviceName(title.platform)}.` });
     }
   };
 

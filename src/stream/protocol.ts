@@ -2,10 +2,10 @@ import type { AvatarConfig } from '../types';
 import type { ReactionKind } from '../pixel/watchRoom';
 
 /**
- * Watching Netflix or Prime Video together.
+ * Watching Netflix, Prime Video and the other streaming sites in SERVICES together.
  *
  * Three pieces talk to each other:
- * - the Soultied browser extension, which sits on the Netflix / Prime page and
+ * - the Soultied browser extension, which sits on the streaming site's page and
  *   drives the player (play, pause, seek) and draws the chat and couch on top;
  * - your Soultied tab (the "hub"), which is already signed in, so it carries
  *   everything to and from your person over the online live channel, and runs
@@ -19,7 +19,22 @@ import type { ReactionKind } from '../pixel/watchRoom';
  * This file is shared by the web app and the extension.
  */
 
-export type Platform = 'netflix' | 'prime';
+export type Platform = 'netflix' | 'prime' | 'hotstar' | 'sonyliv' | 'zee5' | 'disney' | 'hulu' | 'hbomax' | 'crunchyroll';
+
+/** Each streaming service Soultied works on: its name, and where to open it. `beta`: newer, less tried. */
+export const SERVICES: Record<Platform, { name: string; home: string; beta?: boolean }> = {
+  netflix: { name: 'Netflix', home: 'https://www.netflix.com/browse' },
+  prime: { name: 'Prime Video', home: 'https://www.primevideo.com/' },
+  hotstar: { name: 'JioHotstar', home: 'https://www.hotstar.com/in/home', beta: true },
+  sonyliv: { name: 'Sony LIV', home: 'https://www.sonyliv.com/', beta: true },
+  zee5: { name: 'ZEE5', home: 'https://www.zee5.com/', beta: true },
+  disney: { name: 'Disney+', home: 'https://www.disneyplus.com/', beta: true },
+  hulu: { name: 'Hulu', home: 'https://www.hulu.com/', beta: true },
+  hbomax: { name: 'HBO Max', home: 'https://play.hbomax.com/', beta: true },
+  crunchyroll: { name: 'Crunchyroll', home: 'https://www.crunchyroll.com/', beta: true },
+};
+/** "Netflix", "JioHotstar"… (from a newer version: "the show") */
+export const serviceName = (p: string | null | undefined) => (p && p in SERVICES ? SERVICES[p as Platform].name : 'the show');
 
 export interface TitleInfo {
   platform: Platform;
@@ -112,6 +127,19 @@ export interface PartyInfo {
 export const PLUS_URL = 'https://soultied.app/plus/';
 /** The Soultied extension on the Chrome Web Store (Chrome, Edge and Brave install it from here). */
 export const EXTENSION_STORE_URL = 'https://chromewebstore.google.com/detail/soultied-watch-together/hcfmbadgbnfdkebllinmonemahalikcn';
+/** Where to rate the extension (its reviews on the Chrome Web Store). */
+export const EXTENSION_REVIEW_URL = `${EXTENSION_STORE_URL}/reviews`;
+
+/** Soultied Plus's monthly price where you are, as the Plus page shows it first (rupees in India, dollars elsewhere). */
+export function plusFrom() {
+  let tz = '';
+  try {
+    tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+  } catch {
+    // no time zone: say dollars
+  }
+  return /^Asia\/(Kolkata|Calcutta)$/.test(tz) ? '₹149 a month' : '$3.99 a month';
+}
 
 /** A Plus code as typed ("abcd-efgh-jkmn", with spaces or not) -> the letters that matter. */
 export const plusCodeKey = (code: string) => code.toUpperCase().replace(/[^A-Z0-9]/g, '');

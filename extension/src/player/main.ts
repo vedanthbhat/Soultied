@@ -1,4 +1,4 @@
-import { titleLabel, type CallCmd, type ExtMsg, type HubMsg, type PlusReply, type Session, type TitleInfo } from '../../../src/stream/protocol';
+import { titleLabel, type CallCmd, type ExtMsg, type HubMsg, type Platform, type PlusReply, type Session, type TitleInfo } from '../../../src/stream/protocol';
 import { stuckMessage } from '../../../src/watch/call';
 import { adapterFor } from './adapters';
 import { CamView } from './camview';
@@ -6,7 +6,7 @@ import { Engine } from './engine';
 import { Overlay } from './overlay';
 import { TileButtons } from './tiles';
 
-/** Runs on Netflix and Prime Video pages. */
+/** Runs on the streaming sites' pages (Netflix, Prime Video and the others in SERVICES). */
 
 type FromBackground =
   | HubMsg
@@ -28,7 +28,7 @@ type ToBackground =
   | {
       kind: 'status';
       status: {
-        platform: 'netflix' | 'prime';
+        platform: Platform;
         video: boolean;
         connected: boolean;
         watching: string | null;
@@ -60,6 +60,8 @@ if (adapter && !running) {
   w.__soultiedPlayer = alive;
   document.querySelectorAll('soultied-overlay').forEach((n) => n.remove());
   let port: chrome.runtime.Port | null = null;
+  /** the film plays in a frame of its own on this page (Crunchyroll): the copy in there does everything */
+  let standby = !!adapter.standby?.();
   const send = (m: ToBackground) => {
     try {
       port?.postMessage(m);
@@ -150,6 +152,7 @@ if (adapter && !running) {
   window.setInterval(reportStatus, 1500);
 
   const connect = () => {
+    if (standby || port) return;
     lastStatus = '';
     try {
       port = chrome.runtime.connect({ name: 'player' });
@@ -272,11 +275,96 @@ if (adapter && !running) {
   window.addEventListener('blur', letGo);
   window.addEventListener('pagehide', letGo);
 
-  // "Watch together" on the site's own show cards: a party for that show, and on it goes
-  const tiles = new TileButtons(adapter.platform, (title, go) => overlay.startFor(title, go));
-  tiles.start();
-  window.setInterval(() => tiles.setLabel(engine.party ? 'Watch this together' : 'Watch together'), 1000);
+  // "Watch together" on the site's own show cards (Netflix and Prime): a party for that show, and on it goes
+  const platform = adapter.platform;
+  if (platform === 'netflix' || platform === 'prime') {
+    const tiles = new TileButtons(platform, (title, go) => overlay.startFor(title, go));
+    tiles.start();
+    window.setInterval(() => tiles.setLabel(engine.party ? 'Watch this together' : 'Watch together'), 1000);
+  }
 
-  connect();
+  // a site whose film can play in a frame of its own: stand back while it does (and come back when it doesn't)
+  if (adapter.standby) {
+    const sync = () => {
+      overlay.host.style.display = standby ? 'none' : '';
+      if (standby) {
+        const p = port;
+        port = null;
+        engine.setSession(null);
+        cams.set(null);
+        try {
+          p?.disconnect();
+        } catch {
+          // already gone
+        }
+      } else connect();
+    };
+    window.setInterval(() => {
+      const now = !!adapter.standby?.();
+      if (now === standby) return;
+      standby = now;
+      sync();
+    }, 1000);
+    // (the frame turns up a moment after the page: look before saying hello)
+    window.setTimeout(() => {
+      standby = !!adapter.standby?.();
+      sync();
+    }, 1500);
+  } else connect();
+
+  /* ---------- after your first proper watch party: rate Soultied (and Plus, if you watched without it) ---------- */
+  const GOOD_PARTY_S = 10 * 60;
+  let thanks: { good: boolean; asked: boolean } | null = null;
+  void chrome.storage.local
+    .get(['goodParty', 'reviewAsked'])
+    .then((r) => {
+      thanks = { good: !!r.goodParty, asked: !!r.reviewAsked };
+    })
+    .catch(() => undefined);
+  let wasParty = false;
+  let hadPlus = false;
+  let partyPartner = '';
+  let quietSince = 0;
+  window.setInterval(() => {
+    if (!thanks || thanks.asked || standby) return;
+    const p = engine.party;
+    if (p) {
+      wasParty = true;
+      hadPlus = hadPlus || plusOn();
+      partyPartner = engine.session?.partner?.name || partyPartner;
+      if (!thanks.good && engine.partyWatched >= GOOD_PARTY_S) {
+        thanks.good = true;
+        void chrome.storage.local.set({ goodParty: Date.now() }).catch(() => undefined);
+      }
+    }
+    if (!thanks.good) return;
+    const v = adapter.video();
+    // the moment: the party's over, your person left, or the film reached its end (and nothing's playing)
+    // (or, after one on another day, when you're back and not watching with anyone)
+    const over = wasParty ? !p || engine.partnerLeft || !!v?.ended : !engine.session;
+    const still = !v || v.paused || v.ended;
+    if (!over || !still) {
+      quietSince = 0;
+      return;
+    }
+    // (a moment's quiet first, so it never lands on top of something happening)
+    if (!quietSince) quietSince = Date.now();
+    if (Date.now() - quietSince < (wasParty ? 2500 : 8000)) return;
+    // (once, across all your tabs)
+    const t = thanks;
+    t.asked = true;
+    void chrome.storage.local
+      .get('reviewAsked')
+      .then((r) => {
+        if (r.reviewAsked) return;
+        const shown = overlay.thanks({ partner: partyPartner || 'your person', plus: !hadPlus, onClose: () => undefined });
+        if (shown) void chrome.storage.local.set({ reviewAsked: Date.now() });
+        else t.asked = false;
+      })
+      .catch(() => {
+        t.asked = false;
+      });
+  }, 1000);
+
   engine.start();
 }

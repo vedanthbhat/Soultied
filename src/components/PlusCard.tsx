@@ -48,7 +48,7 @@ export const PlusCard: React.FC<{ onClose?: () => void; className?: string }> = 
         )}
       </div>
       <p className="m-0 text-sm leading-snug">
-        Cameras and voice come with Soultied Plus: here in your place, and on Netflix or Prime Video. One of you having it covers you both.
+        Cameras and voice come with Soultied Plus: here in your place, and on Netflix, Prime Video and the other streaming sites. One of you having it covers you both.
       </p>
       {demo || !cloudMode ? (
         <p className="m-0 text-sm text-[var(--muted)]">In your own place, either of you can add it.</p>

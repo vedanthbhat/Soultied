@@ -10,11 +10,14 @@ import {
   type HubMsg,
   type PartyReply,
   type PartyRequest,
+  type Platform,
   type PlusReply,
   type Session,
   type TitleInfo,
 } from '../../src/stream/protocol';
 import type { FromOffscreen, OpenReply, PartyMe, ToOffscreen } from './offscreen';
+import { readPage } from './player/services';
+import { isShowPage, platformOf } from './sites';
 
 /**
  * The switchboard. Every Netflix / Prime tab connects as a "player". What
@@ -43,9 +46,9 @@ function pageUrl(port: chrome.runtime.Port) {
   }
 }
 
-/** what a Netflix / Prime tab tells us about itself, for the toolbar window */
+/** what a streaming site's tab tells us about itself, for the toolbar window */
 interface PlayerStatus {
-  platform: 'netflix' | 'prime';
+  platform: Platform;
   video: boolean;
   connected: boolean;
   watching: string | null;
@@ -340,17 +343,6 @@ async function askForMedia() {
 
 /* ---------------- bringing you along ---------------- */
 
-const platformOf = (url: string | undefined): TitleInfo['platform'] | null => {
-  try {
-    const h = new URL(url || '').hostname;
-    if (h.endsWith('netflix.com')) return 'netflix';
-    if (h.endsWith('primevideo.com') || /(^|\.)amazon\./.test(h)) return 'prime';
-  } catch {
-    // not a page
-  }
-  return null;
-};
-
 /** the tabs we opened to bring you along (kept while this worker sleeps): tab id -> what you're following */
 async function followingIn(tabId: number | undefined): Promise<string | null> {
   if (tabId == null) return null;
@@ -405,15 +397,6 @@ async function openHub() {
 }
 
 const activeTab = () => chrome.tabs.query({ active: true, currentWindow: true }).then((t) => t[0] as chrome.tabs.Tab | undefined, () => undefined);
-
-const isShowPage = (url: string) => {
-  try {
-    const h = new URL(url).hostname;
-    return h.endsWith('netflix.com') || h.endsWith('primevideo.com') || (/(^|\.)amazon\./.test(h) && url.includes('/gp/video'));
-  } catch {
-    return false;
-  }
-};
 
 const tellPlayerCount = () => tellParty({ op: 'players', count: players.size });
 
@@ -550,7 +533,11 @@ type PopupMsg =
   /** from the join page on Soultied's site, through the bridge */
   | { kind: 'party'; req: PartyRequest }
   /** the small window that asks for the camera and mic got a yes */
-  | { kind: 'mediaAllowed' };
+  | { kind: 'mediaAllowed' }
+  /** a player in a frame of its own (Crunchyroll's) asks about the page around it */
+  | { kind: 'pageInfo'; selectors?: string[] }
+  /** …and to take the whole tab somewhere (following your person) */
+  | { kind: 'navigate'; url: string };
 
 async function popupState() {
   await stored;
@@ -577,9 +564,23 @@ async function popupState() {
   };
 }
 
-async function onRequest(msg: PopupMsg, sender: { tab?: { id?: number } }): Promise<unknown> {
+async function onRequest(msg: PopupMsg, sender: { tab?: { id?: number; url?: string; title?: string }; frameId?: number }): Promise<unknown> {
   await stored;
   switch (msg.kind) {
+    case 'pageInfo': {
+      // only from a frame inside one of the streaming sites' tabs
+      const tab = sender.tab;
+      if (tab?.id == null || !sender.frameId || !isShowPage(tab.url || '')) return null;
+      const selectors = (msg.selectors || []).filter((x) => typeof x === 'string').slice(0, 12);
+      const r = await chrome.scripting.executeScript({ target: { tabId: tab.id, frameIds: [0] }, func: readPage, args: [selectors] }).catch(() => null);
+      return r?.[0]?.result || (tab.url ? { url: tab.url, title: tab.title || '', ld: [], og: '', texts: {} } : null);
+    }
+    case 'navigate': {
+      const tab = sender.tab;
+      if (tab?.id == null || !sender.frameId || !isShowPage(tab.url || '') || !isShowPage(msg.url)) return { ok: false };
+      await chrome.tabs.update(tab.id, { url: msg.url }).catch(() => undefined);
+      return { ok: true };
+    }
     case 'popup':
       return popupState();
     case 'mediaAllowed':

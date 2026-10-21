@@ -13,7 +13,7 @@ declare namespace chrome {
     function connect(info: { name: string }): Port;
     function sendMessage(msg: unknown): Promise<any>;
     const onMessage: {
-      addListener(fn: (msg: any, sender: { tab?: { id?: number }; url?: string; id?: string }, reply: (r: unknown) => void) => boolean | void): void;
+      addListener(fn: (msg: any, sender: { tab?: { id?: number; url?: string; title?: string }; url?: string; id?: string; frameId?: number }, reply: (r: unknown) => void) => boolean | void): void;
     };
     function getURL(path: string): string;
     function getManifest(): { version: string; content_scripts?: { matches: string[]; js?: string[]; all_frames?: boolean; world?: string }[] };
@@ -26,6 +26,7 @@ declare namespace chrome {
       id?: number;
       windowId?: number;
       url?: string;
+      title?: string;
       discarded?: boolean;
     }
     function query(q: { url?: string | string[]; active?: boolean; currentWindow?: boolean }): Promise<Tab[]>;
@@ -50,7 +51,10 @@ declare namespace chrome {
   }
   namespace scripting {
     function executeScript(p: { target: { tabId: number; allFrames?: boolean }; files: string[]; world?: 'ISOLATED' | 'MAIN' }): Promise<unknown>;
+    function executeScript<A extends unknown[], R>(p: { target: { tabId: number; frameIds?: number[] }; func: (...args: A) => R; args: A }): Promise<{ result?: R }[]>;
   }
+  /** (content scripts) a component's shadow root, even a closed one */
+  const dom: { openOrClosedShadowRoot?(el: HTMLElement): ShadowRoot | null } | undefined;
   namespace action {
     const onClicked: { addListener(fn: () => void): void };
     function setBadgeText(p: { tabId?: number; text: string }): Promise<void>;

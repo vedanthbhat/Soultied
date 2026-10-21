@@ -1,10 +1,10 @@
 import React from 'react';
 import { useApp } from '../context/AppContext';
 import { useStreamHub } from '../stream/StreamHub';
-import { EXTENSION_STORE_URL, clock } from '../stream/protocol';
+import { EXTENSION_STORE_URL, SERVICES, clock, type Platform } from '../stream/protocol';
 import { PlusCard } from './PlusCard';
 
-/** Netflix & Prime Video together: set-up, the two buttons, and where you left off. */
+/** Netflix, Prime Video and the other streaming sites together: set-up, the buttons, and where you left off. */
 export const StreamPanel: React.FC = () => {
   const hub = useStreamHub();
   const { partnerUser, cloudMode, cloudEnabled, hasPlus } = useApp();
@@ -20,7 +20,7 @@ export const StreamPanel: React.FC = () => {
     <div className="flex flex-col gap-4">
       <p className="m-0 text-[var(--muted)]">
         Play, pause and skip stay in sync, with a chat, reactions and your two characters on a little couch in the corner of the
-        show. You each need your own Netflix or Prime account.
+        show. You each need your own account on the site you watch.
       </p>
 
       {hub.extension === 'checking' && <p className="m-0">Looking for the Soultied extension…</p>}
@@ -48,10 +48,10 @@ export const StreamPanel: React.FC = () => {
             <p className="m-0 text-[#7f3835]">This place only lives in this browser. Move it online (under “Our place”) so {name} can watch from their computer.</p>
           )}
           <div className="flex gap-3 flex-wrap">
-            <button className="px-btn" onClick={() => open('https://www.netflix.com/browse')}>
+            <button className="px-btn" onClick={() => open(SERVICES.netflix.home)}>
               Open Netflix
             </button>
-            <button className="px-btn" onClick={() => open('https://www.primevideo.com/')}>
+            <button className="px-btn" onClick={() => open(SERVICES.prime.home)}>
               Open Prime Video
             </button>
             {partnerUser && hasPlus && (
@@ -60,6 +60,20 @@ export const StreamPanel: React.FC = () => {
               </button>
             )}
           </div>
+          <p className="m-0 text-sm text-[var(--muted)]">
+            New, in beta:{' '}
+            {(Object.keys(SERVICES) as Platform[])
+              .filter((p) => SERVICES[p].beta)
+              .map((p, i, all) => (
+                <React.Fragment key={p}>
+                  <a href={SERVICES[p].home} target="_blank" rel="noopener" className="underline">
+                    {SERVICES[p].name}
+                  </a>
+                  {i < all.length - 1 ? ' · ' : ''}
+                </React.Fragment>
+              ))}
+            . Update the extension if you don’t see Soultied on them yet.
+          </p>
           {partnerUser && !hasPlus && <PlusCard className="shadow-none" />}
           <ul className="m-0 pl-5 text-sm flex flex-col gap-1">
             <li>Start anything. When {name} opens the same thing, you snap into sync.</li>
