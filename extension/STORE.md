@@ -6,9 +6,9 @@ Package: `npm run build:extension:store`, then upload `extension/soultied-extens
 
 ## Store listing
 
-**Name** (from the manifest, 75 characters max): Soultied: Watch Party for Netflix, Prime Video, Hotstar & more
+**Name** (from the manifest, 75 characters max): Soultied: Watch Party for Netflix, Prime, Hotstar, Disney+, Crunchyroll
 
-**Summary** (from the manifest, 132 characters max): Watch Netflix, Prime Video, JioHotstar, Disney+ and more in sync, even long distance: send a link, chat and react on a pixel couch.
+**Summary** (from the manifest, 132 characters max): Watch Netflix, Prime Video, JioHotstar, Disney+, Crunchyroll and more in sync with your person: send a link, chat on a pixel couch.
 
 **Category:** Entertainment
 
@@ -17,14 +17,13 @@ Package: `npm run build:extension:store`, then upload `extension/soultied-extens
 **Description:**
 
 ```
-Movie night, wherever you both are. Soultied keeps Netflix, Prime Video and more in sync for you and your person, with a chat and a little pixel couch in the corner of the show.
+Movie night, wherever you both are. Soultied is a watch party for two: it keeps Netflix, Prime Video, JioHotstar, Disney+, Crunchyroll and more in sync for you and your person, with a chat and a little pixel couch in the corner of the show.
 
 WORKS ON
-• Netflix and Prime Video
-• New, in beta: JioHotstar, Sony LIV, ZEE5, Disney+, Hulu, HBO Max and Crunchyroll
+Netflix and Prime Video, and (new, in beta) JioHotstar, Disney+, Crunchyroll and four more streaming services. The full list is in the screenshots and at soultied.app/watch
 
-WATCH PARTY: NO ACCOUNT NEEDED
-• Hover any show on Netflix or Prime Video and press "Watch together" (on the other sites, start the show and use the Soultied tab on its right). Your watch party starts and the link is copied.
+WATCH PARTY IN SECONDS, NO ACCOUNT NEEDED
+• On Netflix or Prime Video, hover any show and press "Watch together". Anywhere else, start the show and press the Watch together tab on the right of the player. Your party starts and the link is copied.
 • Send the link. When your person opens it, Soultied takes them to the same show, in sync.
 • Free: synced playback, chat, reactions and the couch.
 
@@ -32,7 +31,7 @@ WATCH TOGETHER
 • Play, pause and skipping stay in sync, within a fraction of a second. Join halfway and you catch up to where your person is.
 • If either of you is buffering, sitting through an ad or steps away to another tab, the show pauses for both and carries on when they're back.
 • Whatever one of you puts on, the other is taken there too.
-• When one of you moves on to the next episode, the other follows.
+• When one of you moves on to the next episode, the other follows: binge an anime season on Crunchyroll or a Disney+ series side by side.
 • "Take the remote": only one of you can pause and skip.
 • Countdown start: you both press "I'm ready", then 3, 2, 1, and it plays for both of you at the same moment.
 • A chat sidebar over the video, with little notes like "Rohan paused at 42:10", and reactions that float up from your side of the couch.
@@ -51,17 +50,18 @@ Soultied (soultied.app) is a little home online for two people who live apart: a
 • No watching ahead: Soultied remembers which episodes you've watched together and asks before you start the next one alone.
 • "Where you left off together", and a night watching together counts as a day together on your couch.
 
-You each need your own account on the site you watch. No video is shared between you, only play/pause and your chat.
+You each need your own account on the service you watch. No video is shared between you, only play/pause and your chat. Shows and films only: live streams aren't supported yet.
 
 No ads, no tracking. Works in Chrome, Edge and Brave on a computer.
 
-Soultied isn't affiliated with, endorsed by or sponsored by Netflix, Amazon, JioStar, Sony, ZEE, Disney, Hulu, Warner Bros. Discovery or Crunchyroll. The names of these services are trademarks of their owners.
+Soultied isn't affiliated with, endorsed by or sponsored by any of the streaming services it works with. Their names are trademarks of their owners.
 ```
 
 **Images** (kept outside the repo; the pixel art is drawn by scripts, and the screenshots are of the real extension on stand-in player pages with an original show):
 
 - Store icon 128×128: `icons/128.png` from the build (96×96 heart with 16px clear space)
-- Screenshots 1280×800: `1-sync.png`, `2-countdown.png`, `3-guard.png`, `4-wait.png`, `5-app.png`
+- Screenshots 1280×800 (five at most), in this order: `1-sync.png`, `6-services.png` (every service by name, in Soultied's own type: no service logos), `2-countdown.png`, `4-wait.png`, `5-app.png`. `3-guard.png` is kept in reserve.
+- Brand names: the store's spam policy asks for at most five supported sites or brands listed in the description, and suggests a screenshot or a link for longer lists. So the description names five and points to the screenshot and soultied.app/watch, which link a page per service.
 - Small promo tile 440×280: `promo-small.png`
 - Marquee 1400×560 (optional): `promo-marquee.png`
 
