@@ -6,6 +6,7 @@ import { CharacterStudio } from './CharacterStudio';
 import { EXTENSION_STORE_URL } from '../stream/protocol';
 import { WATCH_SHOT } from '../assets/watchShot';
 import type { Seat } from '../pixel/room';
+import { LISTED_CSS, listedOnHtml } from '../listedOn.mjs';
 
 type Step = 'welcome' | 'details' | 'look' | 'invite' | 'join' | 'join-look';
 
@@ -198,12 +199,17 @@ export const Welcome: React.FC<Props> = ({ initialJoinCode, onDraftSeats, onDone
             </div>
           </section>
 
-          <nav className="px-box flex flex-wrap justify-center gap-x-4 gap-y-1 px-4 py-2 text-xs text-[var(--muted)]" aria-label="About Soultied">
-            <a className="px-link" href="/terms/">Terms</a>
-            <a className="px-link" href="/privacy/">Privacy</a>
-            <a className="px-link" href="/refunds/">Refunds</a>
-            <a className="px-link" href="/contact/">Contact</a>
-          </nav>
+          <div className="px-box px-4 py-2 pb-3">
+            <nav className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs text-[var(--muted)]" aria-label="About Soultied">
+              <a className="px-link" href="/terms/">Terms</a>
+              <a className="px-link" href="/privacy/">Privacy</a>
+              <a className="px-link" href="/refunds/">Refunds</a>
+              <a className="px-link" href="/contact/">Contact</a>
+            </nav>
+            {/* directories Soultied is listed on (src/listed-on.json); they re-check this, so keep it */}
+            <style>{LISTED_CSS}</style>
+            <div dangerouslySetInnerHTML={{ __html: listedOnHtml() }} />
+          </div>
         </div>
       </div>
     );

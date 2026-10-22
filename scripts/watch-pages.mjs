@@ -3,7 +3,8 @@
 // the sitemap, llms.txt (a plain summary for AI assistants), and the link preview images, which are kept
 // as text in og-images.json (AI Studio edits text files only). The service pages borrow the look of
 // /watch/ (its icons and styles). Keep SERVICES in step with src/stream/protocol.ts.
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs';
+import { LISTED_CSS, listedOnHtml, LISTED_SITES } from '../src/listedOn.mjs';
 
 const SITE = 'https://soultied.app';
 const STORE = 'https://chromewebstore.google.com/detail/soultied-watch-together/hcfmbadgbnfdkebllinmonemahalikcn';
@@ -220,6 +221,7 @@ ${style}
   <a href="/privacy/">Privacy</a>
   <a href="/contact/">Contact</a>
 </footer>
+<!--listed-on-->
 </main>
 <script src="/watch/shots.js"></script>
 <script>
@@ -274,4 +276,17 @@ Shows and films only: live streams such as live sport aren't supported yet. Soul
 - [Refunds](${SITE}/refunds/): full refund within 7 days
 - [Contact](${SITE}/contact/): hello@soultied.app
 `);
+// "Listed on": the directory strip, written into the plain HTML of every page that has the marker
+// (directories check the HTML itself, so it can't be left to the app)
+const listed = `<style>${LISTED_CSS}</style>\n${listedOnHtml()}`;
+let listedPages = 0;
+for (const f of readdirSync(DIST, { recursive: true })) {
+  if (!String(f).endsWith('.html')) continue;
+  const u = new URL(String(f).replace(/\\/g, '/'), DIST);
+  const html = readFileSync(u, 'utf8');
+  if (!html.includes('<!--listed-on-->')) continue;
+  writeFileSync(u, html.replace('<!--listed-on-->', listed));
+  listedPages++;
+}
+console.log(`listed on: ${LISTED_SITES.filter((x) => x.status === 'live').length} sites on ${listedPages} pages`);
 console.log(`watch pages: ${SERVICES.length} services, sitemap with ${paths.length} addresses, llms.txt, ${Object.keys(IMAGES).length} images`);
