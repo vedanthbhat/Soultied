@@ -1,11 +1,18 @@
-// After `vite build`: a page per streaming service (soultied.app/watch/netflix/ and so on), so someone
-// searching "Crunchyroll watch party" finds Soultied, plus the sitemap. The pages borrow the look of
+// After `vite build`, for search engines and link previews: a page per streaming service
+// (soultied.app/watch/netflix/ and so on, so someone searching "Crunchyroll watch party" finds Soultied),
+// the sitemap, llms.txt (a plain summary for AI assistants), and the link preview images, which are kept
+// as text in og-images.json (AI Studio edits text files only). The service pages borrow the look of
 // /watch/ (its icons and styles). Keep SERVICES in step with src/stream/protocol.ts.
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 
 const SITE = 'https://soultied.app';
 const STORE = 'https://chromewebstore.google.com/detail/soultied-watch-together/hcfmbadgbnfdkebllinmonemahalikcn';
 const DIST = new URL('../dist/', import.meta.url);
+
+// the link preview images (og/home.png, og/watch.png) and the logo
+const IMAGES = JSON.parse(readFileSync(new URL('./og-images.json', import.meta.url), 'utf8'));
+mkdirSync(new URL('og/', DIST), { recursive: true });
+for (const [path, b64] of Object.entries(IMAGES)) writeFileSync(new URL(path, DIST), Buffer.from(b64, 'base64'));
 
 const HOVER = (name) => [
   'Add Soultied to Chrome, Edge or Brave (it’s free).',
@@ -101,9 +108,36 @@ const others = (here) =>
   `<ul class="svc">${SERVICES.map((s) =>
     `<li><a href="/watch/${s.id}/"${s.id === here ? ' aria-current="page"' : ''}>${esc(s.name)}${s.beta ? '<span class="beta">beta</span>' : ''}</a></li>`).join('')}</ul>`;
 
+/** structured data: the extension, and where this page sits */
+const ld = (s, url, desc) => ({
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'SoftwareApplication',
+      name: 'Soultied Watch Party',
+      description: desc,
+      url,
+      applicationCategory: 'EntertainmentApplication',
+      applicationSubCategory: 'Browser extension',
+      operatingSystem: 'Chrome, Edge or Brave on a computer',
+      installUrl: STORE,
+      offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+      publisher: { '@type': 'Organization', name: 'Soultied', url: `${SITE}/` },
+    },
+    {
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'Soultied', item: `${SITE}/` },
+        { '@type': 'ListItem', position: 2, name: 'Watch party', item: `${SITE}/watch/` },
+        { '@type': 'ListItem', position: 3, name: `${s.name} watch party`, item: url },
+      ],
+    },
+  ],
+});
+
 function page(s) {
   const url = `${SITE}/watch/${s.id}/`;
-  const desc = `Start a ${s.name} watch party: send one link and watch ${s.name} together in sync, with a chat, reactions and a little pixel couch. Free for Chrome, Edge and Brave.`;
+  const desc = `Start a ${s.name} watch party: send one link and watch together in sync, with a chat, reactions and a pixel couch. Free for Chrome, Edge and Brave.`;
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -118,6 +152,13 @@ ${icons}
 <meta property="og:title" content="${esc(s.title)}">
 <meta property="og:description" content="${esc(desc)}">
 <meta property="og:url" content="${url}">
+<meta property="og:image" content="${SITE}/og/watch.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Soultied watch party: Netflix, Prime Video and seven more streaming services, with a little pixel couch.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="${SITE}/og/watch.png">
+<script type="application/ld+json">${JSON.stringify(ld(s, url, desc))}</script>
 ${style}
 </head>
 <body>
@@ -208,4 +249,29 @@ writeFileSync(new URL('sitemap.xml', DIST), `<?xml version="1.0" encoding="UTF-8
 ${paths.map((p) => `  <url><loc>${SITE}${p}</loc></url>`).join('\n')}
 </urlset>
 `);
-console.log(`watch pages: ${SERVICES.length} services, sitemap with ${paths.length} addresses`);
+// llms.txt: what Soultied is, in plain words, for AI assistants and search
+writeFileSync(new URL('llms.txt', DIST), `# Soultied
+
+> A cozy pixel home online for two people who live apart, and a free browser extension for watch parties on Netflix, Prime Video and seven more streaming services.
+
+Soultied has two parts. You can use either one on its own.
+
+- [Our place](${SITE}/): a little home for two on the web. A shared pixel room with a couch and a fireplace, a letter to open together every day, 30 days of questions about each other, games for two, a record player, and movie nights. Building a place is free; you sign in with Google and send your person a link.
+- [Watch party extension](${SITE}/watch/): for Chrome, Edge and Brave on a computer. It keeps a show playing in sync for two people in different places, with a chat, reactions and a little pixel couch over the video. Start a party, send the link, and your person is taken to the same show. No account needed. Each person needs their own account on the streaming service; no video passes between them.
+- [Soultied Plus](${SITE}/plus/): adds cameras and voice (in the watch party and in your place). One of you having Plus covers you both.
+
+## Watch party by service
+
+${SERVICES.map((s) => `- [${s.name} watch party](${SITE}/watch/${s.id}/)${s.beta ? ' (beta)' : ''}`).join('\n')}
+
+Shows and films only: live streams such as live sport aren't supported yet. Soultied isn't affiliated with any of these services.
+
+## More
+
+- [Install from the Chrome Web Store](${STORE})
+- [Privacy](${SITE}/privacy/): what Soultied handles and how to delete it
+- [Terms](${SITE}/terms/)
+- [Refunds](${SITE}/refunds/): full refund within 7 days
+- [Contact](${SITE}/contact/): hello@soultied.app
+`);
+console.log(`watch pages: ${SERVICES.length} services, sitemap with ${paths.length} addresses, llms.txt, ${Object.keys(IMAGES).length} images`);
