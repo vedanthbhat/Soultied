@@ -243,7 +243,7 @@ for (const s of SERVICES) {
 // Install analytics only on public product pages. The app, join flow and payment
 // callbacks stay outside the recording scope, including URLs with parameters.
 const analyticsTag = '<script defer src="/analytics.js"></script>';
-for (const path of ['watch/index.html', 'plus/index.html', ...SERVICES.map((s) => `watch/${s.id}/index.html`)]) {
+for (const path of SERVICES.map((s) => `watch/${s.id}/index.html`)) {
   const file = new URL(path, DIST);
   const html = readFileSync(file, 'utf8');
   writeFileSync(file, html.replace('</head>', `${analyticsTag}\n</head>`));

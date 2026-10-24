@@ -1,6 +1,6 @@
 // Clarity runs only on public marketing pages, after the visitor opts in.
 (() => {
-  const allowed = /^\/watch(?:\/[^/]+)?\/?$/.test(location.pathname) || /^\/plus\/?$/.test(location.pathname);
+  const allowed = /^\/watch(?:\/[^/]+)?\/?$/.test(location.pathname);
   if (!allowed || location.search || location.hash) return;
   const key = 'soultied-marketing-analytics';
   let choice = null;
