@@ -240,8 +240,17 @@ for (const s of SERVICES) {
   writeFileSync(new URL('index.html', dir), page(s));
 }
 
+// Install analytics only on public product pages. The app, join flow and payment
+// callbacks stay outside the recording scope, including URLs with parameters.
+const analyticsTag = '<script defer src="/analytics.js"></script>';
+for (const path of ['watch/index.html', 'plus/index.html', ...SERVICES.map((s) => `watch/${s.id}/index.html`)]) {
+  const file = new URL(path, DIST);
+  const html = readFileSync(file, 'utf8');
+  writeFileSync(file, html.replace('</head>', `${analyticsTag}\n</head>`));
+}
+
 // /watch/ lists them too (the list between its markers is filled in here)
-writeFileSync(new URL('watch/index.html', DIST), watch.replace(/<!--services-->[\s\S]*?<!--\/services-->/, `<!--services-->${others('')}<!--/services-->`));
+writeFileSync(new URL('watch/index.html', DIST), watch.replace(/<!--services-->[\s\S]*?<!--\/services-->/, `<!--services-->${others('')}<!--/services-->`).replace('</head>', `${analyticsTag}\n</head>`));
 
 const paths = ['/', '/watch/', ...SERVICES.map((s) => `/watch/${s.id}/`), '/plus/', '/privacy/', '/terms/', '/refunds/', '/contact/'];
 writeFileSync(new URL('sitemap.xml', DIST), `<?xml version="1.0" encoding="UTF-8"?>

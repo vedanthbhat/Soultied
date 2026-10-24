@@ -47,9 +47,13 @@ footer { display: flex; gap: 8px 18px; flex-wrap: wrap; justify-content: center;
 <a class="home" href="/">← Soultied</a>
 <article class="card">
 <h1>Soultied privacy policy</h1>
-<p class="date">Last updated: 13 October 2026</p>
+<p class="date">Last updated: 24 October 2026</p>
 <p>Soultied is a small shared place online for two people in a long-distance relationship, plus a browser extension for watching Netflix and Prime Video together. This page explains what each part handles, where it goes, and how to delete it. It is written by the person who builds Soultied, Vedanth Bhat. Questions or requests: <a href="mailto:hello@soultied.app">hello@soultied.app</a>.</p>
-<p>The short version: what you put in Soultied is shared with your person and nobody else. There are no ads, no analytics or tracking, and nothing is sold.</p>
+<p>The short version: what you put in your private Soultied place is shared with your person. There are no ads and nothing is sold. Optional analytics on the public watch-party information and Plus pricing pages are explained below; your private place, letters and chats are excluded.</p>
+<h2 id="website-analytics">Optional analytics on public pages</h2>
+<p>If you choose “Allow analytics”, we use Microsoft Clarity on the public <code>/watch/</code> information pages and <code>/plus/</code> pricing page to understand visits, clicks, scrolling and usability problems through heatmaps and session recordings. Clarity receives usage data, device and browser information, and uses analytics cookies. Its advertising-storage consent is set to denied. The Clarity script does not load before you agree, or after you choose “No thanks”.</p>
+<p>This installation excludes the private app at the homepage, the join flow, the browser extension, and URLs containing query parameters or fragments. We do not send account names, email addresses, letters, chats, invite codes or payment details as analytics identifiers or custom events. You can change your choice with “Analytics preferences” at the bottom of a public product page. Your choice is stored in this browser.</p>
+<p>Microsoft processes the analytics under its <a href="https://privacy.microsoft.com/privacystatement">Privacy Statement</a>. We also connect Clarity to Shipped.money for course launch tracking: Shipped reads dashboard aggregates such as visits and engagement; individual recordings are not imported there. Google Search Console reports are connected separately for search-performance tracking.</p>
 <h2>The Soultied website (soultied.app)</h2>
 <p><strong>Signing in.</strong> You sign in with Google through Firebase Authentication (a Google service). Soultied receives your Google account's name, email address and a user ID. The email is only used to keep you signed in and to show you which account you're using.</p>
 <p><strong>Your place.</strong> When you build a place, or join one with your person's invite code, Soultied stores these in a Firebase Cloud Firestore database (Google Cloud, Mumbai region):</p>
@@ -86,7 +90,8 @@ footer { display: flex; gap: 8px 18px; flex-wrap: wrap; justify-content: center;
   <li><strong>Google</strong>, as the provider of Firebase Authentication and Cloud Firestore, processes the data to run the service, under <a href="https://firebase.google.com/support/privacy">Google's Firebase terms and privacy commitments</a>.</li>
   <li><strong>Razorpay</strong> (in India) and <strong>Dodo Payments</strong> (everywhere else) process Plus payments, as described above.</li>
   <li><strong>GitHub</strong> hosts the website (GitHub Pages), and <strong>Google Fonts</strong> serves its font. Like any web host, they receive your IP address and browser details when the page loads.</li>
-  <li><strong>No one else.</strong> Soultied does not sell, rent or share your data, does not use it for advertising, and does not use it to decide on credit or lending.</li>
+  <li><strong>Microsoft Clarity</strong> processes optional analytics on the public pages when you opt in; <strong>Shipped.money</strong> reads the dashboard aggregates for course launch tracking, as described above.</li>
+  <li><strong>Other uses.</strong> Soultied does not sell or rent your data, does not use it for advertising, and does not use it to decide on credit or lending. Data is shared with the service providers described on this page to operate and improve Soultied.</li>
 </ul>
 <h2>Deleting your data</h2>
 <ul>
