@@ -160,10 +160,10 @@ export const Welcome: React.FC<Props> = ({ initialJoinCode, nudge = 0, onDraftSe
     return (
       <div className="fixed inset-0 z-40 pointer-events-none px-ui flex items-end md:items-center p-3 md:p-6">
         <div
-          className="pointer-events-auto w-full flex flex-col gap-3 max-h-[78vh] md:max-h-[calc(100vh-48px)] overflow-y-auto px-scroll"
-          style={{ maxWidth: 420 }}
+          className="pointer-events-auto w-full flex flex-col gap-3 short:gap-2 max-h-[78vh] md:max-h-[calc(100vh-48px)] overflow-y-auto px-scroll"
+          style={{ maxWidth: 432, scrollbarGutter: 'stable' }}
         >
-          <section ref={placeCard} className="px-box px-shadow px-pop flex flex-col gap-3 p-5 min-w-0" aria-labelledby="door-place">
+          <section ref={placeCard} className="px-box px-shadow px-pop flex flex-col gap-3 p-5 short:gap-2.5 short:px-5 short:py-4 min-w-0" aria-labelledby="door-place">
             <div>
               <div className="text-xs font-semibold tracking-[0.16em] uppercase text-[var(--terracotta-d)]">Our place · for two</div>
               <h1 id="door-place" className="text-4xl font-bold leading-none text-[var(--ink-soft)] mt-1 mb-0">
@@ -172,7 +172,7 @@ export const Welcome: React.FC<Props> = ({ initialJoinCode, nudge = 0, onDraftSe
             </div>
             <p className="m-0 text-lg font-semibold leading-snug text-balance text-[var(--ink-soft)]">A shared home for long-distance couples.</p>
             <p className="m-0 -mt-1 leading-snug text-balance text-[var(--muted)]">
-              A little room online for the two of you: a letter to open together every day, games for two, a record player and movie nights.
+              A daily letter, games for two, a record player and movie nights.
             </p>
             {nudged > 0 && (
               <div key={nudged} className="px-inset px-nudge p-3 flex flex-col gap-3" role="status">
@@ -200,15 +200,15 @@ export const Welcome: React.FC<Props> = ({ initialJoinCode, nudge = 0, onDraftSe
                   onDone();
                 }}
               >
-                Peek inside a demo room
+                Peek at a demo room
               </button>
               <a className="px-link" href="/plus/">
-                Cameras and voice: Plus →
+                Plus: cameras & voice →
               </a>
             </div>
           </section>
 
-          <section className="px-box px-shadow px-pop flex flex-col gap-3 p-5 min-w-0" aria-labelledby="door-watch">
+          <section className="px-box px-shadow px-pop flex flex-col gap-3 p-5 short:gap-2.5 short:px-5 short:py-4 min-w-0" aria-labelledby="door-watch">
             <div>
               <div className="text-xs font-semibold tracking-[0.16em] uppercase text-[var(--terracotta-d)]">Watch party · Netflix, Prime & more</div>
               <h2 id="door-watch" className="text-2xl font-bold leading-tight mt-1 mb-0">
@@ -222,10 +222,10 @@ export const Welcome: React.FC<Props> = ({ initialJoinCode, nudge = 0, onDraftSe
                 alt="A Soultied watch party on a show: the chat beside the video and two pixel characters on a little couch in the corner."
                 width={480}
                 height={300}
-                className="block w-full h-auto shrink-0 md:[@media(max-height:860px)]:w-[55%]"
+                className="block w-full h-auto shrink-0 md:[@media(max-height:860px)]:w-[50%]"
                 style={{ boxShadow: '0 0 0 3px var(--ink)' }}
               />
-              <p className="m-0 leading-snug">Your shows in sync, with a chat and a little couch. Free, no account.</p>
+              <p className="m-0 leading-snug">Your shows in sync, with a chat. Free, no account.</p>
             </div>
             <div className="flex flex-wrap gap-3">
               <a className="px-btn flex-1 whitespace-nowrap text-center text-base" href={EXTENSION_STORE_URL} target="_blank" rel="noopener">
