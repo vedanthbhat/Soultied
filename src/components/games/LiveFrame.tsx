@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import type { Seat } from '../../games/types';
 import type { LiveGame } from '../../games/live/useLiveGame';
-import { GameFrame } from './GameFrame';
+import { GameFrame, type CoopChips } from './GameFrame';
+import type { LiveResult } from '../../games/live/lobby';
 
 /** Re-render every `ms` while `on`, for countdowns and timers. */
 export function useNow(on: boolean, ms = 100) {
@@ -39,8 +40,12 @@ export const LiveFrame: React.FC<{
   /** something to look at before the game starts */
   poster?: React.ReactNode;
   width?: number;
+  /** games you play on the same side: what each of you is up to, instead of wins */
+  coop?: CoopChips;
+  /** how the end of the game reads, instead of who won (for games you play together) */
+  outcome?: (r: LiveResult) => React.ReactNode;
   children?: React.ReactNode;
-}> = ({ title, onBack, game, marker, howTo, playing, poster, width = 820, children }) => {
+}> = ({ title, onBack, game, marker, howTo, playing, poster, width = 820, coop, outcome, children }) => {
   const { partner, ready, mySeat, result, startAt, partnerHere, mode, demo, match } = game;
   const now = useNow(game.stage === 'count' || game.stage === 'waiting', 100);
   // the countdown ends on this screen's clock, whether or not anything else has changed
@@ -95,8 +100,9 @@ export const LiveFrame: React.FC<{
   } else if (stage === 'count') status = <>Get ready… {howTo}</>;
   else if (stage === 'play') status = !partnerHere ? <>{partner}’s screen has gone quiet. Waiting for them to come back…</> : playing;
   else if (stage === 'over' && result) {
-    status =
-      result.winner === 'draw' ? (
+    status = outcome ? (
+      outcome(result)
+    ) : result.winner === 'draw' ? (
         <>
           <strong>A draw!</strong>
         </>
@@ -120,7 +126,7 @@ export const LiveFrame: React.FC<{
   const linkLine = !demo && match?.status === 'playing' ? LINK_WORDS[mode] : '';
 
   return (
-    <GameFrame title={title} onBack={onBack} match={game.m} marker={marker} status={status} width={width} actions={actions}>
+    <GameFrame title={title} onBack={onBack} match={game.m} marker={marker} status={status} width={width} actions={actions} coop={coop}>
       {linkLine && <div className="text-xs text-center opacity-70 -mt-2">{linkLine}</div>}
       <div className="relative">
         {showGame ? children : poster}

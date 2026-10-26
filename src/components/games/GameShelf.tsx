@@ -16,6 +16,9 @@ import { LanternsGame } from './LanternsGame';
 import { TugGame } from './TugGame';
 import { QuickDrawGame } from './QuickDrawGame';
 import { RpsGame } from './RpsGame';
+import { CoastersGame } from './CoastersGame';
+import { KitchenGame } from './KitchenGame';
+import type { LiveLobby } from '../../games/live/lobby';
 
 interface Shelf {
   id: BoxId;
@@ -32,8 +35,8 @@ const LIVE: Shelf[] = [
   { id: 'rps', ...GAMES.rps },
   { id: 'doodle', ...GAMES.doodle },
   { id: 'door', name: 'The dark door', tagline: 'Four escape rooms. Each of you gets half the room and half the clues.', style: 'Together, live' },
-  { id: 'coasters', name: 'Coasters', tagline: 'Air hockey on the coffee table with two drink coasters. First to 7.', style: 'Live', soon: true },
-  { id: 'kitchen', name: 'Kitchen Rush', tagline: 'One of you chops, the other cooks, and the orders keep coming.', style: 'Together, live', soon: true },
+  { id: 'coasters', ...GAMES.coasters },
+  { id: 'kitchen', ...GAMES.kitchen },
 ];
 
 const TURNS: Shelf[] = [
@@ -54,6 +57,8 @@ const SCREENS: Partial<Record<GameKind, React.FC<{ onBack: () => void }>>> = {
   tug: TugGame,
   quickdraw: QuickDrawGame,
   rps: RpsGame,
+  coasters: CoastersGame,
+  kitchen: KitchenGame,
 };
 
 const Section: React.FC<{ title: string; note: string; games: Shelf[]; card: (g: Shelf) => React.ReactNode }> = ({ title, note, games, card }) => (
@@ -95,6 +100,10 @@ export const GameShelf: React.FC<{ onExit: () => void; onOpenDoor: () => void; i
         return needsMe(m, mySeat) ? { text: `${partner} wants to play!`, hot: true } : { text: `Waiting for ${partner} to join`, hot: false };
       if (m && !liveStale(m) && m.status === 'playing') return { text: 'Playing now', hot: false };
       if (!m || m.status !== 'over' || !m.winner) return { text: `Invite ${partner}`, hot: false };
+      if (kind === 'kitchen') {
+        const r = (m as Match<LiveLobby>).state.result;
+        return { text: r?.score ? `Last shift: ${r.score.a} served` : `Invite ${partner}`, hot: false };
+      }
       return { text: m.winner === 'draw' ? 'Last game: a draw' : `${seatName(m.winner as Seat)} won last time`, hot: false };
     }
     if (!m) return { text: 'Start a game', hot: false };

@@ -241,6 +241,34 @@ function linkBox(link: string, copiedAlready: boolean) {
   return box;
 }
 
+/** The Soultied button on the side of the streaming sites: shown, see-through, or hidden. */
+function handleSetting() {
+  const box = el('div', 'stack');
+  box.append(el('div', 'label', 'The button on streaming sites'));
+  const row = el('div', 'btns');
+  const modes: Array<[string, string]> = [
+    ['show', 'Show'],
+    ['faint', 'See-through'],
+    ['hide', 'Hide'],
+  ];
+  const btns = modes.map(([m, label]) => {
+    const b = button(label, () => {
+      void chrome.storage.local.set({ handleMode: m });
+      mark(m);
+    }, 'paper', false);
+    b.dataset.mode = m;
+    return b;
+  });
+  const mark = (m: string) => btns.forEach((b) => (b.className = b.dataset.mode === m ? 'sage' : 'paper'));
+  row.append(...btns);
+  box.append(row, el('div', 'muted', 'It fades away by itself while a show plays. Hidden, you start a watch party from here.'));
+  void chrome.storage.local
+    .get('handleMode')
+    .then((r) => mark(r.handleMode === 'faint' || r.handleMode === 'hide' ? r.handleMode : 'show'))
+    .catch(() => mark('show'));
+  return box;
+}
+
 function render(s: Snapshot, opts: { copied?: boolean } = {}) {
   const style = el('style');
   style.textContent = CSS;
@@ -352,6 +380,7 @@ function render(s: Snapshot, opts: { copied?: boolean } = {}) {
     );
     wrap.append(about);
   } else wrap.append(el('div', 'muted', 'You each open the same show on your own account. Hold T to talk while you watch.'));
+  wrap.append(el('hr'), handleSetting());
   document.body.replaceChildren(style, wrap);
 }
 

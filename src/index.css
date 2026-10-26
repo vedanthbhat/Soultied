@@ -417,9 +417,32 @@ label {
   animation: px-fade 300ms steps(5) both;
 }
 
+/* a little "over here!" shake, and a pulsing ring on the button to press */
+@keyframes px-nudge {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-4px); }
+  40% { transform: translateX(4px); }
+  60% { transform: translateX(-2px); }
+  80% { transform: translateX(2px); }
+}
+.px-nudge {
+  animation: px-nudge 360ms steps(5) both;
+}
+@keyframes px-pulse {
+  0%, 100% { outline-color: rgba(184, 103, 79, 0); }
+  50% { outline-color: rgba(184, 103, 79, 0.9); }
+}
+.px-pulse {
+  outline: 3px solid rgba(184, 103, 79, 0);
+  outline-offset: 5px;
+  animation: px-pulse 1.2s steps(4) 3;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .px-pop,
-  .px-fade {
+  .px-fade,
+  .px-nudge,
+  .px-pulse {
     animation: none;
   }
 }

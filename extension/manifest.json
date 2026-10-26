@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Soultied: Watch Party for Netflix, Prime, Hotstar, Disney+, Crunchyroll",
   "short_name": "Soultied",
-  "version": "1.7.1",
+  "version": "1.8.0",
   "description": "Watch Netflix, Prime Video, JioHotstar, Disney+, Crunchyroll and more in sync with your person: send a link, chat on a pixel couch.",
   "icons": {
     "16": "icons/16.png",

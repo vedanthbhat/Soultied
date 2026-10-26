@@ -11,7 +11,7 @@ import {
   signInWithRedirect,
   signOut as fbSignOut,
 } from 'firebase/auth';
-import { Firestore, connectFirestoreEmulator, initializeFirestore } from 'firebase/firestore';
+import type { Firestore } from 'firebase/firestore';
 
 /**
  * Firebase, if this build has it. The config comes from
@@ -54,7 +54,48 @@ const EMULATOR = import.meta.env.VITE_FIREBASE_EMULATOR as string | undefined;
 
 let app: FirebaseApp | null = null;
 let auth: Auth | null = null;
-let db: Firestore | null = null;
+
+/**
+ * The place's database, loaded the first time something needs it rather than with the page: a first
+ * visit to the front door never downloads Firestore. Someone who's signed in on this browser gets it
+ * fetched straight away, alongside the page (see `ONLINE_KEY`).
+ */
+export interface CloudDb {
+  get(): Promise<Firestore>;
+}
+let dbReady: Promise<Firestore> | null = null;
+const db: CloudDb = {
+  get() {
+    if (!dbReady)
+      dbReady = import('firebase/firestore').then(
+        (F) => {
+          const settings = { ignoreUndefinedProperties: true };
+          const d =
+            cloudConfig!.firestoreDatabaseId && cloudConfig!.firestoreDatabaseId !== '(default)'
+              ? F.initializeFirestore(app!, settings, cloudConfig!.firestoreDatabaseId)
+              : F.initializeFirestore(app!, settings);
+          if (EMULATOR) F.connectFirestoreEmulator(d, EMULATOR === '1' ? '127.0.0.1' : EMULATOR, 8080);
+          return d;
+        },
+        (e) => {
+          dbReady = null; // (couldn't download it: try again next time)
+          throw e;
+        }
+      );
+    return dbReady;
+  },
+};
+/** set while someone's signed in on this browser, so the database can be fetched as the page opens */
+const ONLINE_KEY = 'soultied_online';
+const remember = (on: boolean) => {
+  try {
+    if (on) localStorage.setItem(ONLINE_KEY, '1');
+    else localStorage.removeItem(ONLINE_KEY);
+  } catch {
+    // storage blocked: it just loads a moment later
+  }
+};
+const warmUp = () => void db.get().catch(() => undefined);
 
 /**
  * Served from Firebase Hosting itself? Then Google sign-in can go the long way
@@ -69,18 +110,15 @@ export function cloud() {
   if (!app) {
     app = initializeApp(onFirebaseHosting() ? { ...cloudConfig, authDomain: window.location.hostname } : cloudConfig);
     auth = getAuth(app);
-    const settings = { ignoreUndefinedProperties: true };
-    db =
-      cloudConfig.firestoreDatabaseId && cloudConfig.firestoreDatabaseId !== '(default)'
-        ? initializeFirestore(app, settings, cloudConfig.firestoreDatabaseId)
-        : initializeFirestore(app, settings);
-    if (EMULATOR) {
-      const host = EMULATOR === '1' ? '127.0.0.1' : EMULATOR;
-      connectAuthEmulator(auth, `http://${host}:9099`, { disableWarnings: true });
-      connectFirestoreEmulator(db, host, 8080);
+    if (EMULATOR) connectAuthEmulator(auth, `http://${EMULATOR === '1' ? '127.0.0.1' : EMULATOR}:9099`, { disableWarnings: true });
+    // signed in here last time: fetch the database now, alongside everything else
+    try {
+      if (localStorage.getItem(ONLINE_KEY)) warmUp();
+    } catch {
+      // storage blocked
     }
   }
-  return { app: app!, auth: auth!, db: db! };
+  return { app: app!, auth: auth!, db };
 }
 
 export function watchAuth(fn: (user: User | null) => void) {
@@ -89,7 +127,11 @@ export function watchAuth(fn: (user: User | null) => void) {
     fn(null);
     return () => undefined;
   }
-  return onAuthStateChanged(c.auth, fn);
+  return onAuthStateChanged(c.auth, (user) => {
+    remember(!!user);
+    if (user) warmUp();
+    fn(user);
+  });
 }
 
 export function describeAuthError(err: unknown) {

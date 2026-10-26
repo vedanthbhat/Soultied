@@ -23,10 +23,9 @@ import {
   addDays,
 } from '../letters/engine';
 import { CouchState, checkIn, couchLevel, emptyCouch, normalizeCouch } from '../couch';
-import { CloudUser, cloud, cloudEnabled, describeAuthError, signInAsTestUser, signInWithGoogle, signOut as cloudSignOut, watchAuth } from '../cloud/firebase';
+import { CloudDb, CloudUser, cloud, cloudEnabled, describeAuthError, signInAsTestUser, signInWithGoogle, signOut as cloudSignOut, watchAuth } from '../cloud/firebase';
 import * as store from '../cloud/store';
 import { LiveChannel, browserChannel, firestoreChannel } from '../cloud/live';
-import type { Firestore } from 'firebase/firestore';
 import { redeemForPlace } from '../cloud/plus';
 import type { PlusReply } from '../stream/protocol';
 
@@ -136,7 +135,7 @@ interface AppContextType {
   moveOnline: () => Promise<void>;
   openLive: <E extends { by: string; at: number }>(topic: LiveTopic) => LiveChannel<E>;
   /** Firestore + ids when this place lives online (for features with their own documents) */
-  cloudTarget: () => { db: Firestore; sid: string; uid: string } | null;
+  cloudTarget: () => { db: CloudDb; sid: string; uid: string } | null;
   addActivity: (a: Omit<ActivityItem, 'id' | 'timestamp'>) => void;
   /** Soultied Plus for this place: cameras and voice for both of you (until then, ms; 0 if none) */
   plusUntil: number;

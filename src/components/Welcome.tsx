@@ -1,23 +1,26 @@
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { InvitePreview, useApp } from '../context/AppContext';
 import { AvatarConfig } from '../types';
 import { DEFAULT_AVATAR_A, DEFAULT_AVATAR_B } from '../pixel/character';
-import { CharacterStudio } from './CharacterStudio';
+import { CharacterStudio } from '../lazy';
 import { EXTENSION_STORE_URL } from '../stream/protocol';
-import { WATCH_SHOT } from '../assets/watchShot';
 import type { Seat } from '../pixel/room';
 
 type Step = 'welcome' | 'details' | 'look' | 'invite' | 'join' | 'join-look';
 
 interface Props {
   initialJoinCode?: string | null;
+  /** goes up each time someone taps an empty seat in the room behind the welcome cards */
+  nudge?: number;
   onDraftSeats: (seats: { left: Seat; right: Seat }) => void;
   onDone: () => void;
 }
 
 const empty = (name = ''): Seat => ({ avatar: null, name, status: 'empty' });
+/** a dark placeholder the size of the watch-party picture, until it's here */
+const BLANK = 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22480%22 height=%22300%22%3E%3Crect width=%22480%22 height=%22300%22 fill=%22%231d1518%22/%3E%3C/svg%3E';
 
-export const Welcome: React.FC<Props> = ({ initialJoinCode, onDraftSeats, onDone }) => {
+export const Welcome: React.FC<Props> = ({ initialJoinCode, nudge = 0, onDraftSeats, onDone }) => {
   const { createSpace, lookupInvite, joinWithCode, loadDemo, inviteLink, space, cloudEnabled, cloudStatus, signIn, authError, signedInEmail } = useApp();
   const [step, setStep] = useState<Step>(initialJoinCode ? 'join' : 'welcome');
   // online, you sign in with Google before building a place or taking a seat
@@ -38,6 +41,29 @@ export const Welcome: React.FC<Props> = ({ initialJoinCode, onDraftSeats, onDone
   const [joinLook, setJoinLook] = useState<AvatarConfig>(DEFAULT_AVATAR_B);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<'link' | 'code' | null>(null);
+
+  // the watch-party picture is a little file of its own, so the front door doesn't wait for it
+  const [watchShot, setWatchShot] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    import('../assets/watchShot').then((m) => alive && setWatchShot(m.WATCH_SHOT)).catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // Tapping a "+" seat first (most people do): point them at making their character
+  const [nudged, setNudged] = useState(0);
+  const placeCard = useRef<HTMLElement | null>(null);
+  const firstField = useRef<HTMLInputElement | null>(null);
+  useEffect(() => {
+    if (!nudge) return;
+    if (step === 'welcome') {
+      setNudged((n) => n + 1);
+      placeCard.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    } else if (step === 'details') firstField.current?.focus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nudge]);
 
   const [invite, setInvite] = useState<InvitePreview | null>(null);
   useEffect(() => {
@@ -137,14 +163,27 @@ export const Welcome: React.FC<Props> = ({ initialJoinCode, onDraftSeats, onDone
           className="pointer-events-auto w-full flex flex-col gap-3 max-h-[78vh] md:max-h-[calc(100vh-48px)] overflow-y-auto px-scroll"
           style={{ maxWidth: 420 }}
         >
-          <section className="px-box px-shadow px-pop flex flex-col gap-3 p-5 min-w-0" aria-labelledby="door-place">
+          <section ref={placeCard} className="px-box px-shadow px-pop flex flex-col gap-3 p-5 min-w-0" aria-labelledby="door-place">
             <div>
               <div className="text-xs font-semibold tracking-[0.16em] uppercase text-[var(--terracotta-d)]">Our place · for two</div>
               <h1 id="door-place" className="text-4xl font-bold leading-none text-[var(--ink-soft)] mt-1 mb-0">
                 Soultied
               </h1>
             </div>
-            <p className="m-0 leading-snug text-balance">A little home for two, wherever you both are.</p>
+            <p className="m-0 text-lg font-semibold leading-snug text-balance text-[var(--ink-soft)]">A shared home for long-distance couples.</p>
+            <p className="m-0 -mt-1 leading-snug text-balance text-[var(--muted)]">
+              A little room online for the two of you: a letter to open together every day, games for two, a record player and movie nights.
+            </p>
+            {nudged > 0 && (
+              <div key={nudged} className="px-inset px-nudge p-3 flex flex-col gap-3" role="status">
+                <p className="m-0 leading-snug">
+                  <strong>That seat’s waiting for you.</strong> First, make your little character. It takes a minute, then you can save the other seat for your person.
+                </p>
+                <button className="px-btn px-btn--sage px-pulse text-base" onClick={() => setStep('details')}>
+                  Make my character →
+                </button>
+              </div>
+            )}
             <div className="flex flex-wrap gap-3">
               <button className="px-btn flex-1 whitespace-nowrap text-base" onClick={() => setStep('details')}>
                 Build our place →
@@ -179,7 +218,7 @@ export const Welcome: React.FC<Props> = ({ initialJoinCode, onDraftSeats, onDone
             {/* on shorter screens (most laptops) the picture sits beside the line, so both cards fit without scrolling */}
             <div className="flex flex-col gap-3 md:[@media(max-height:860px)]:flex-row md:[@media(max-height:860px)]:items-center">
               <img
-                src={WATCH_SHOT}
+                src={watchShot || BLANK}
                 alt="A Soultied watch party on a show: the chat beside the video and two pixel characters on a little couch in the corner."
                 width={480}
                 height={300}
@@ -240,7 +279,7 @@ export const Welcome: React.FC<Props> = ({ initialJoinCode, onDraftSeats, onDone
               </div>
               <label>
                 <span className="px-label">Your name</span>
-                <input className="px-input" value={myName} onChange={(e) => setMyName(e.target.value)} placeholder="e.g. Vedanth" required autoFocus maxLength={24} />
+                <input ref={firstField} className="px-input" value={myName} onChange={(e) => setMyName(e.target.value)} placeholder="e.g. Vedanth" required autoFocus maxLength={24} />
               </label>
               <label>
                 <span className="px-label">Your person's name</span>
@@ -274,7 +313,9 @@ export const Welcome: React.FC<Props> = ({ initialJoinCode, onDraftSeats, onDone
                 <h2 className="text-3xl font-bold leading-tight">Now make you.</h2>
                 <p className="text-[var(--muted)] mt-1">Watch the couch: that's you, already sitting by the fire.</p>
               </div>
-              <CharacterStudio value={look} onChange={setLook} compact />
+              <Suspense fallback={<div className="py-10 text-center text-[var(--muted)]">Opening the wardrobe…</div>}>
+                <CharacterStudio value={look} onChange={setLook} compact />
+              </Suspense>
               <div className="flex items-center justify-between gap-3 mt-2">
                 <button className="px-btn px-btn--paper" onClick={() => setStep('details')}>
                   Back
@@ -414,7 +455,9 @@ export const Welcome: React.FC<Props> = ({ initialJoinCode, onDraftSeats, onDone
                 <h2 className="text-3xl font-bold leading-tight">Now make you.</h2>
                 <p className="text-[var(--muted)] mt-1">{invite.hostName} is already on the couch. Your seat's right there.</p>
               </div>
-              <CharacterStudio value={joinLook} onChange={setJoinLook} compact />
+              <Suspense fallback={<div className="py-10 text-center text-[var(--muted)]">Opening the wardrobe…</div>}>
+                <CharacterStudio value={joinLook} onChange={setJoinLook} compact />
+              </Suspense>
               {error && <div className="px-inset text-sm p-3 text-[#7f3835]">{error}</div>}
               <div className="flex items-center justify-between gap-3 mt-2">
                 <button className="px-btn px-btn--paper" onClick={() => setStep('join')}>

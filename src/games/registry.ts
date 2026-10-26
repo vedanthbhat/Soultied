@@ -364,6 +364,10 @@ export function botTurn(m: Match | undefined | null, bot: Seat): boolean {
 export function endLine(m: Match, name: (s: Seat) => string, game: string): string {
   // a live game that was stopped before the end isn't worth a line
   if (isLiveInvite(m.kind) && !m.winner) return '';
+  if (m.kind === 'kitchen') {
+    const r = (m as Match<LiveLobby>).state.result;
+    return r ? `${r.line.charAt(0).toUpperCase()}${r.line.slice(1)} at ${game}.` : '';
+  }
   if (m.kind === 'doodle') {
     const n = doodleScore((m as Match<DoodleState>).state);
     return `Guessed ${n} of ${ROUNDS} drawings together at ${game}.`;

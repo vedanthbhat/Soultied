@@ -3,18 +3,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { Suspense, useEffect, useMemo, useState } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { RoomCanvas } from './components/RoomCanvas';
 import { TopNav } from './components/TopNav';
 import { PixelPanel } from './components/PixelPanel';
 import { Welcome } from './components/Welcome';
-import { CharacterStudio } from './components/CharacterStudio';
-import { SpacePanel } from './components/SpacePanel';
-import { LettersPanel } from './components/letters/LettersPanel';
-import { UsPage } from './components/UsPage';
-import { WatchParty } from './components/WatchParty';
-import { EscapeGame } from './components/escape/EscapeGame';
 import type { Seat, HotspotId } from './pixel/room';
 import type { UserProfile } from './types';
 import type { GameKind, Match } from './games/types';
@@ -23,14 +17,25 @@ import { COUCH_STEPS } from './couch';
 import { StreamChip, StreamHubProvider } from './stream/StreamHub';
 import { GamesProvider, useGames } from './games/GamesContext';
 import { GAMES, otherSeat } from './games/types';
-import { GameShelf } from './components/games/GameShelf';
 import { noteFor, waitingLabel } from './games/registry';
 import { TurntableProvider, useTurntable } from './music/TurntableContext';
 import { NowPlaying } from './components/NowPlaying';
 import { DecorProvider, useDecor } from './decor/DecorContext';
-import { DecorDrawer } from './components/DecorDrawer';
 import type { SlotId } from './decor/catalogue';
 import { PixelIcon } from './components/letters/PixelIcon';
+import { CharacterStudio, DecorDrawer, EscapeGame, GameShelf, LettersPanel, SpacePanel, UsPage, WatchParty, prefetch } from './lazy';
+
+/** While a part of the place is still loading (only ever for a moment). */
+const Opening: React.FC<{ full?: boolean }> = ({ full }) =>
+  full ? (
+    <div className="fixed inset-0 flex items-center justify-center bg-[#1a1214] px-ui" role="status">
+      <div className="px-box px-shadow px-fade px-6 py-4 text-xl">Opening…</div>
+    </div>
+  ) : (
+    <div className="py-10 text-center text-[var(--muted)]" role="status">
+      Opening…
+    </div>
+  );
 
 /** On a narrow screen, what to turn and look at while choosing each spot (room pixels). */
 const DECOR_FOCUS: Record<SlotId, number | undefined> = {
@@ -71,7 +76,9 @@ const WardrobePanel: React.FC = () => {
   const [draft, setDraft] = useState(currentUser.avatar);
   return (
     <div className="flex flex-col gap-5">
-      <CharacterStudio value={draft} onChange={setDraft} />
+      <Suspense fallback={<Opening />}>
+        <CharacterStudio value={draft} onChange={setDraft} />
+      </Suspense>
       <div className="flex justify-end gap-3">
         <button className="px-btn px-btn--paper" onClick={() => openPanel(null)}>
           Cancel
@@ -143,8 +150,19 @@ const Home: React.FC = () => {
   const letterUnread = letterBadge !== null || journeyWaiting;
   const partnerSealed = !!partnerUser && !!getLetter('daily')?.by[partnerUser.id]?.sealedAt;
 
+  // the welcome screen: both seats are empty, and most people tap a "+" first
+  const [seatNudge, setSeatNudge] = useState(0);
+  const seatsEmpty = !draftSeats || (!draftSeats.left.avatar && !draftSeats.right.avatar);
+
   const labels = useMemo(() => {
-    if (welcomeOpen) return {};
+    if (welcomeOpen) {
+      const w: Partial<Record<HotspotId, string>> = {};
+      if (seatsEmpty) {
+        w.left = 'Your seat · make your character';
+        w.right = 'Their seat · make yours first';
+      }
+      return w;
+    }
     const l: Partial<Record<HotspotId, string>> = {
       letter:
         letterBadge === 'reveal'
@@ -175,9 +193,13 @@ const Home: React.FC = () => {
     if (guest) l.right = guest.id === currentUser.id ? meLabel : guest.name;
     else l.right = `Invite ${space?.partnerPlaceholderName || 'your person'}`;
     return l;
-  }, [welcomeOpen, letterBadge, partnerSealed, partnerUser, currentUser, host, guest, space, games.waiting, turntable.on, turntable.track, journeyWaiting, journey.next, journey.unseen, panel]);
+  }, [welcomeOpen, seatsEmpty, letterBadge, partnerSealed, partnerUser, currentUser, host, guest, space, games.waiting, turntable.on, turntable.track, journeyWaiting, journey.next, journey.unseen, panel]);
 
   const onHotspot = (id: HotspotId) => {
+    if (welcomeOpen) {
+      if (id === 'left' || id === 'right') setSeatNudge((n) => n + 1);
+      return;
+    }
     if (id === 'letter') openPanel('question');
     else if (id === 'photo') openPanel('us');
     else if (id === 'remote') openPanel('watch');
@@ -239,10 +261,15 @@ const Home: React.FC = () => {
   // signed in and still fetching your place: don't flash a room that isn't yours yet
   const veil = cloudStatus === 'checking' && !welcomeOpen && !demo;
 
+  // once you're in the room, quietly fetch the rest of the place; at the front door, just the character maker
+  useEffect(() => (welcomeOpen ? prefetch(['studio'], 2500) : veil ? undefined : prefetch()), [welcomeOpen, veil]);
+
   if (panel === 'escape' && !welcomeOpen) {
     return (
       <div className="font-['Pixelify_Sans',sans-serif]">
-        <EscapeGame onExit={() => openPanel(null)} />
+        <Suspense fallback={<Opening full />}>
+          <EscapeGame onExit={() => openPanel(null)} />
+        </Suspense>
       </div>
     );
   }
@@ -250,7 +277,9 @@ const Home: React.FC = () => {
   if (panel === 'games' && !welcomeOpen) {
     return (
       <div className="font-['Pixelify_Sans',sans-serif]">
-        <GameShelf onExit={() => openPanel(null)} onOpenDoor={() => openPanel('escape')} initial={gameToOpen} />
+        <Suspense fallback={<Opening full />}>
+          <GameShelf onExit={() => openPanel(null)} onOpenDoor={() => openPanel('escape')} initial={gameToOpen} />
+        </Suspense>
       </div>
     );
   }
@@ -258,7 +287,9 @@ const Home: React.FC = () => {
   if (panel === 'watch' && !welcomeOpen) {
     return (
       <div className="font-['Pixelify_Sans',sans-serif]">
-        <WatchParty onExit={() => openPanel(null)} />
+        <Suspense fallback={<Opening full />}>
+          <WatchParty onExit={() => openPanel(null)} />
+        </Suspense>
       </div>
     );
   }
@@ -321,6 +352,7 @@ const Home: React.FC = () => {
       {welcomeOpen ? (
         <Welcome
           initialJoinCode={joinCode}
+          nudge={seatNudge}
           onDraftSeats={setDraftSeats}
           onDone={() => {
             clearJoinParam();
@@ -338,12 +370,16 @@ const Home: React.FC = () => {
 
           {(panel === 'question' || panel === 'questions') && (
             <PixelPanel title="Letters" kicker={prettyDate(today, true)} onClose={() => openPanel(null)} width={680}>
-              <LettersPanel initialTab={panel === 'questions' ? 'past' : letterBadge === null && journeyWaiting ? 'journey' : 'today'} />
+              <Suspense fallback={<Opening />}>
+                <LettersPanel initialTab={panel === 'questions' ? 'past' : letterBadge === null && journeyWaiting ? 'journey' : 'today'} />
+              </Suspense>
             </PixelPanel>
           )}
           {panel === 'us' && (
             <PixelPanel title="Us" kicker={space?.name} onClose={() => openPanel(null)} width={820}>
-              <UsPage />
+              <Suspense fallback={<Opening />}>
+                <UsPage />
+              </Suspense>
             </PixelPanel>
           )}
           {panel === 'wardrobe' && (
@@ -351,10 +387,16 @@ const Home: React.FC = () => {
               <WardrobePanel />
             </PixelPanel>
           )}
-          {panel === 'decor' && <DecorDrawer left={seats.left} right={seats.right} />}
+          {panel === 'decor' && (
+            <Suspense fallback={null}>
+              <DecorDrawer left={seats.left} right={seats.right} />
+            </Suspense>
+          )}
           {panel === 'space' && (
             <PixelPanel title={partnerUser ? 'Our place' : 'Invite your person'} kicker={space?.name} onClose={() => openPanel(null)} width={640}>
-              <SpacePanel />
+              <Suspense fallback={<Opening />}>
+                <SpacePanel />
+              </Suspense>
             </PixelPanel>
           )}
         </>

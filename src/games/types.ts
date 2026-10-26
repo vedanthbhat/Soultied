@@ -13,7 +13,9 @@ export type GameKind =
   | 'lanterns'
   | 'tug'
   | 'quickdraw'
-  | 'rps';
+  | 'rps'
+  | 'coasters'
+  | 'kitchen';
 
 /** 'turns': play across the day, whenever it's your move. 'live': you're both here, right now. */
 export type GameMode = 'turns' | 'live';
@@ -119,6 +121,20 @@ export const GAMES: Record<GameKind, GameInfo> = {
     name: 'Paper, Scissors, Stone',
     tagline: 'Pick before the timer runs out, and see what they picked. First to three rounds.',
     style: 'Live',
+    mode: 'live',
+  },
+  coasters: {
+    kind: 'coasters',
+    name: 'Coasters',
+    tagline: 'Air hockey on the coffee table with two drink coasters and a bottle cap. First to 7.',
+    style: 'Live',
+    mode: 'live',
+  },
+  kitchen: {
+    kind: 'kitchen',
+    name: 'Kitchen Rush',
+    tagline: 'One of you chops, the other cooks, and the orders keep coming. Ninety seconds, on the same side.',
+    style: 'Together, live',
     mode: 'live',
   },
 };

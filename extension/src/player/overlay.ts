@@ -11,6 +11,9 @@ import type { Engine, EngineUI } from './engine';
  * can't touch the site).
  */
 
+type HandleMode = 'show' | 'faint' | 'hide';
+const asMode = (v: unknown): HandleMode => (v === 'faint' || v === 'hide' ? v : 'show');
+
 const REACTIONS: Array<{ kind: ReactionKind; label: string }> = [
   { kind: 'heart', label: 'Send a heart' },
   { kind: 'laugh', label: 'Laugh' },
@@ -95,11 +98,26 @@ button { font: inherit; cursor: pointer; }
 .big { font-size: 120px; font-weight: 700; color: #fff4e2; text-shadow: 6px 6px 0 #2b1e1c, -3px -3px 0 #2b1e1c, 3px -3px 0 #2b1e1c, -3px 3px 0 #2b1e1c; }
 .pill { padding: 8px 14px; font-size: 16px; }
 
-/* the Soultied handle on the right edge when you're not watching with anyone yet, and its card */
-.handle { position: absolute; right: 0; top: 38%; pointer-events: auto; border: 0; background: #f4e8d0; padding: 9px 10px 9px 11px; display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 14px; color: #2b1e1c; box-shadow: 0 -3px 0 0 #2b1e1c, 0 3px 0 0 #2b1e1c, -3px 0 0 0 #2b1e1c, -6px 6px 0 0 rgba(0,0,0,.35); transition: transform 120ms steps(3); }
+/* the Soultied handle on the right edge when you're not watching with anyone yet, and its card.
+   It fades out while a show plays and the mouse is still; it can be made see-through, or hidden. */
+.hwrap { position: absolute; right: 0; top: 38%; display: flex; align-items: center; gap: 8px; pointer-events: none; transition: opacity 400ms steps(4); }
+.hwrap.hide { display: none; }
+.hwrap.idle { opacity: 0; }
+.hwrap.idle * { pointer-events: none !important; }
+.hwrap.faint .handle { opacity: .3; padding: 9px 8px 9px 9px; }
+.hwrap.faint .handle span { display: none; }
+.hwrap.faint:hover .handle, .hwrap.faint:focus-within .handle { opacity: 1; }
+.hwrap.faint:hover .handle span, .hwrap.faint:focus-within .handle span { display: inline; }
+.hmini { pointer-events: auto; border: 0; background: #eadbbd; color: #3a2a26; font-size: 12px; padding: 4px 7px; box-shadow: 0 -2px 0 0 #2b1e1c, 0 2px 0 0 #2b1e1c, -2px 0 0 0 #2b1e1c, 2px 0 0 0 #2b1e1c; visibility: hidden; }
+.hmini:hover { background: #fff8ea; }
+.hwrap:hover .hmini, .hwrap:focus-within .hmini { visibility: visible; }
+.connect .seg { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; font-size: 12.5px; color: #7a5a48; border-top: 3px dashed #d6c29c; padding-top: 10px; margin-top: 4px; }
+.connect .seg span { flex-basis: 100%; }
+.connect .seg button { border: 0; font: inherit; font-size: 12.5px; padding: 3px 8px; background: #eadbbd; color: #3a2a26; box-shadow: inset 0 0 0 2px #d6c29c; }
+.connect .seg button.on { background: #b8674f; color: #fff4e2; box-shadow: inset 0 0 0 2px #8f4b3a; }
+.handle { position: relative; pointer-events: auto; border: 0; background: #f4e8d0; padding: 9px 10px 9px 11px; display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 14px; color: #2b1e1c; box-shadow: 0 -3px 0 0 #2b1e1c, 0 3px 0 0 #2b1e1c, -3px 0 0 0 #2b1e1c, -6px 6px 0 0 rgba(0,0,0,.35); transition: transform 120ms steps(3); }
 .handle:hover { transform: translateX(-3px); background: #fff8ea; }
 .handle img { width: 21px; height: 18px; image-rendering: pixelated; }
-.handle.hide { display: none; }
 .connect { position: absolute; right: 16px; top: 34%; pointer-events: auto; padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 10px; width: 340px; font-size: 14px; line-height: 1.4; }
 .connect.hide { display: none; }
 .connect .top { display: flex; align-items: center; gap: 8px; }
@@ -248,6 +266,12 @@ export class Overlay implements EngineUI {
   /** the start card on the right: open, and whether it opens by itself when a show starts */
   private launchOpen = false;
   private launchAuto = true;
+  /** the handle: shown, see-through, or hidden (your choice, kept in the extension's storage) */
+  private handleMode: HandleMode = 'show';
+  private modeKnown = false;
+  private hwrap: HTMLElement;
+  private hmini: HTMLButtonElement;
+  private idleTimer = 0;
   private couch = new CouchCorner(2);
   private unread = 0;
   private open = true;
@@ -451,6 +475,17 @@ export class Overlay implements EngineUI {
       this.launchOpen = true;
       this.update();
     };
+    // a small "Fade" (then "Hide") beside it on hover, for anyone who'd rather not see it
+    this.hmini = el('button', 'hmini', 'Fade');
+    this.hmini.onclick = () => {
+      this.hmini.blur();
+      if (this.handleMode === 'show') {
+        this.setHandleMode('faint');
+        this.toast('Faded. Hover it to bring it back, or change it from Soultied in your browser’s toolbar.');
+      } else this.setHandleMode('hide');
+    };
+    this.hwrap = el('div', 'hwrap hide');
+    this.hwrap.append(this.hmini, this.handle);
 
     this.cams = el('div', 'cams hide');
     const tile = (mine: boolean) => {
@@ -471,8 +506,12 @@ export class Overlay implements EngineUI {
     this.camMine = tile(true);
     this.cams.append(this.camTheirs.root, this.camMine.root);
 
-    root.append(this.couch.canvas, this.cams, this.side, this.tab, this.handle, this.toasts, this.center, this.connect);
+    root.append(this.couch.canvas, this.cams, this.side, this.tab, this.hwrap, this.toasts, this.center, this.connect);
     this.mount();
+    this.watchHandleMode();
+    // like the player's own controls: out of the way while a show plays and the mouse is still
+    window.addEventListener('mousemove', () => this.wake(), { passive: true });
+    this.wake();
     document.addEventListener('fullscreenchange', () => this.mount());
   }
 
@@ -485,6 +524,50 @@ export class Overlay implements EngineUI {
       // moving a picture out of the page pauses it: start the cameras again
       for (const v of [this.camMine.video, this.camTheirs.video]) if (v.srcObject) void v.play().catch(() => undefined);
     }
+  }
+
+  private watchHandleMode() {
+    try {
+      void chrome.storage.local
+        .get('handleMode')
+        .then((r) => {
+          this.handleMode = asMode(r.handleMode);
+          this.modeKnown = true;
+          this.update();
+        })
+        .catch(() => {
+          this.modeKnown = true;
+        });
+      chrome.storage.onChanged?.addListener((ch, area) => {
+        if (area !== 'local' || !ch.handleMode) return;
+        this.handleMode = asMode(ch.handleMode.newValue);
+        this.cardShown = null;
+        this.update();
+      });
+    } catch {
+      this.modeKnown = true; // extension reloaded
+    }
+  }
+
+  private setHandleMode(m: HandleMode) {
+    this.handleMode = m;
+    this.cardShown = null;
+    if (m === 'hide') this.toast('Hidden. To start a watch party (or show it again), click Soultied in your browser’s toolbar.');
+    try {
+      void chrome.storage.local.set({ handleMode: m });
+    } catch {
+      // extension reloaded
+    }
+    this.update();
+  }
+
+  /** the mouse moved: bring the handle back, and fade it again after a few still seconds during a show */
+  private wake() {
+    this.hwrap.classList.remove('idle');
+    window.clearTimeout(this.idleTimer);
+    this.idleTimer = window.setTimeout(() => {
+      if (this.engine?.hasVideo && !this.launchOpen && !this.hwrap.matches(':hover')) this.hwrap.classList.add('idle');
+    }, 3000);
   }
 
   fontReady() {
@@ -887,7 +970,7 @@ export class Overlay implements EngineUI {
    */
   private drawCard(card: 'start' | 'join' | null) {
     const e = this.engine;
-    const key = card === 'start' ? `start|${this.starting}|${e.partner?.name || ''}|${e.hasVideo}|${this.pick?.title.key || ''}` : card;
+    const key = card === 'start' ? `start|${this.starting}|${e.partner?.name || ''}|${e.hasVideo}|${this.pick?.title.key || ''}|${this.handleMode}` : card;
     if (key === this.cardShown && card !== 'join') return;
     this.cardShown = key;
     if (!card) {
@@ -965,6 +1048,16 @@ export class Overlay implements EngineUI {
     joinBox.style.cssText = 'display:flex;flex-direction:column;gap:6px';
     joinBox.append(link, this.nameForm('Join', false, link, (n, l) => this.act.joinParty(l, n)));
     parts.push(joinBox);
+    // the handle itself: keep it, see-through, or hidden
+    const seg = el('div', 'seg');
+    seg.append(el('span', '', 'The button on the side:'));
+    for (const [m, label] of [['show', 'Show'], ['faint', 'See-through'], ['hide', 'Hide']] as Array<[HandleMode, string]>) {
+      const b = el('button', m === this.handleMode ? 'on' : '', label);
+      b.setAttribute('aria-pressed', String(m === this.handleMode));
+      b.onclick = () => this.setHandleMode(m);
+      seg.append(b);
+    }
+    parts.push(seg);
     this.connect.replaceChildren(...parts);
   }
 
@@ -1072,7 +1165,7 @@ export class Overlay implements EngineUI {
     // Not watching with anyone yet: the Soultied handle on the right, and its card (it opens by itself
     // once, when a show starts). Connected but your person's on something else: offer to join them.
     const pwNow = e.partnerWhere;
-    if (!s && video && this.launchAuto && !this.launchOpen) {
+    if (!s && video && this.launchAuto && !this.launchOpen && this.modeKnown && this.handleMode === 'show') {
       this.launchOpen = true;
       this.launchAuto = false;
     }
@@ -1087,7 +1180,10 @@ export class Overlay implements EngineUI {
         : null;
     this.connect.classList.toggle('hide', !card);
     this.drawCard(card);
-    this.handle.classList.toggle('hide', !!s || card === 'start');
+    this.hwrap.classList.toggle('hide', !!s || card === 'start' || this.handleMode === 'hide');
+    this.hwrap.classList.toggle('faint', this.handleMode === 'faint');
+    this.hmini.textContent = this.handleMode === 'faint' ? 'Hide' : 'Fade';
+    this.hmini.title = this.handleMode === 'faint' ? 'Hide this button' : 'Make this button see-through';
 
     // the chat: while a show's on, or any time in a watch party (to send the link before you pick something)
     const on = !!s && (video || !!s.party);

@@ -43,6 +43,7 @@ declare namespace chrome {
       set(items: Record<string, unknown>): Promise<void>;
       remove(keys: string | string[]): Promise<void>;
     };
+    const onChanged: { addListener(fn: (changes: Record<string, { oldValue?: any; newValue?: any }>, area: string) => void): void } | undefined;
     /** kept while the browser is open (cleared when it closes) */
     const session: {
       get(keys: string | string[]): Promise<Record<string, any>>;

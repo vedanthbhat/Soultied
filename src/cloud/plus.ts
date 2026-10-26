@@ -1,4 +1,5 @@
-import { doc, getDoc, updateDoc, type Firestore, type Timestamp } from 'firebase/firestore';
+import type { Timestamp } from 'firebase/firestore';
+import type { CloudDb } from './firebase';
 import { plusCodeKey, type PlusReply } from '../stream/protocol';
 
 /**
@@ -27,11 +28,12 @@ async function sha256(text: string) {
 }
 
 /** Add a code to the place (a place that already has Plus for longer keeps what it has). */
-export async function redeemForPlace(db: Firestore, sid: string, uid: string, code: string, currentUntil = 0): Promise<PlusReply> {
+export async function redeemForPlace(cdb: CloudDb, sid: string, uid: string, code: string, currentUntil = 0): Promise<PlusReply> {
   const key = plusCodeKey(code);
   if (key.length < 8) return { ok: false, error: 'invalid' };
   try {
     const hash = await sha256(key);
+    const [{ doc, getDoc, updateDoc }, db] = await Promise.all([import('firebase/firestore'), cdb.get()]);
     const ref = doc(db, 'plusCodes', hash);
     const snap = await getDoc(ref);
     if (!snap.exists()) return { ok: false, error: 'invalid' };

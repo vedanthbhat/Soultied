@@ -15,7 +15,8 @@ import {
   setDoc,
   updateDoc,
 } from 'firebase/firestore';
-import { channelAt, type LiveChannel } from '../../src/cloud/live';
+import type { LiveChannel } from '../../src/cloud/live';
+import { channelAt } from '../../src/cloud/liveFs';
 import { PartyCall } from './partycall';
 import {
   emptyLog,
