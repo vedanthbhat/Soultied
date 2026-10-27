@@ -8,7 +8,12 @@ const day = (ms: number) => new Date(ms).toLocaleDateString(undefined, { day: 'n
  * Where the call buttons go when the place doesn't have Soultied Plus: what Plus is, and a way to add it
  * (a code bought in this browser in one tap, or one typed in).
  */
-export const PlusCard: React.FC<{ onClose?: () => void; className?: string }> = ({ onClose, className = '' }) => {
+export const PlusCard: React.FC<{ onClose?: () => void; className?: string; heading?: string; blurb?: string }> = ({
+  onClose,
+  className = '',
+  heading = 'See and hear each other',
+  blurb = 'Cameras and voice come with Soultied Plus: here in your place, and on Netflix, Prime Video and the other streaming sites. One of you having it covers you both.',
+}) => {
   const { redeemPlus, hasPlus, plusUntil, demo, cloudMode } = useApp();
   const [typing, setTyping] = useState(false);
   const [code, setCode] = useState('');
@@ -28,7 +33,7 @@ export const PlusCard: React.FC<{ onClose?: () => void; className?: string }> = 
     return (
       <div className={`px-box px-shadow px-pop p-4 flex flex-col gap-2 ${className}`} role="status">
         <strong className="text-lg">Soultied Plus is on</strong>
-        <p className="m-0 text-sm leading-snug">Cameras and voice are on for you both, until {day(plusUntil)}.</p>
+        <p className="m-0 text-sm leading-snug">Cameras, voice and karaoke are on for you both, until {day(plusUntil)}.</p>
         {onClose && (
           <button className="px-btn px-btn--sage px-btn--small self-start" onClick={onClose}>
             Lovely
@@ -40,16 +45,14 @@ export const PlusCard: React.FC<{ onClose?: () => void; className?: string }> = 
   return (
     <div className={`px-box px-shadow px-pop p-4 flex flex-col gap-3 ${className}`} role="region" aria-label="Soultied Plus">
       <div className="flex items-start justify-between gap-3">
-        <strong className="text-lg leading-tight">See and hear each other</strong>
+        <strong className="text-lg leading-tight">{heading}</strong>
         {onClose && (
           <button className="px-btn px-btn--paper px-btn--small" onClick={onClose} aria-label="Close">
             ✕
           </button>
         )}
       </div>
-      <p className="m-0 text-sm leading-snug">
-        Cameras and voice come with Soultied Plus: here in your place, and on Netflix, Prime Video and the other streaming sites. One of you having it covers you both.
-      </p>
+      <p className="m-0 text-sm leading-snug">{blurb}</p>
       {demo || !cloudMode ? (
         <p className="m-0 text-sm text-[var(--muted)]">In your own place, either of you can add it.</p>
       ) : (

@@ -8,6 +8,16 @@ import type { ReactionKind } from '../pixel/watchRoom';
  * room doesn't change.
  */
 
+/** A song in the karaoke queue (the karaoke room uses the same line as Watch together). */
+export interface KaraokeSong {
+  id: string;
+  videoId: string;
+  title: string;
+  /** who's singing it: one of your user ids, or both of you */
+  singer: string | 'duet';
+  by: string;
+}
+
 export type WatchEvent =
   | { type: 'load'; videoId: string; pos: number; by: string; at: number }
   /** the TV goes back to empty */
@@ -21,6 +31,8 @@ export type WatchEvent =
   | { type: 'bye'; by: string; at: number }
   | { type: 'react'; kind: ReactionKind; by: string; at: number }
   | { type: 'chat'; id: string; text: string; by: string; name: string; at: number }
+  /** karaoke: who's singing now and what's up next (v: when it last changed; the newer one wins) */
+  | { type: 'queue'; queue: KaraokeSong[]; now: KaraokeSong | null; v: number; by: string; at: number }
   // the video call: WebRTC signalling, and what each person's camera / mic is doing
   | { type: 'rtc'; to: string; by: string; at: number; description?: RTCSessionDescriptionInit; candidate?: RTCIceCandidateInit | null }
   | { type: 'media'; cam: boolean; talking: boolean; mic?: boolean; by: string; at: number };

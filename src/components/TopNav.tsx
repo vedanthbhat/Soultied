@@ -5,6 +5,7 @@ import { useGames } from '../games/GamesContext';
 import { useTurntable } from '../music/TurntableContext';
 import { useDecor } from '../decor/DecorContext';
 import { PixelIcon } from './letters/PixelIcon';
+import { sfx } from '../escape/sfx';
 
 /**
  * The menu hides above the screen and slides down when the cursor touches
@@ -18,6 +19,7 @@ export const TopNav: React.FC<{ letterUnread: boolean }> = ({ letterUnread }) =>
   const decor = useDecor();
   const [open, setOpen] = useState(false);
   const [hint, setHint] = useState(true);
+  const [quiet, setQuiet] = useState(() => sfx.isMuted());
   const closeTimer = useRef<number | null>(null);
   const navRef = useRef<HTMLElement | null>(null);
   const canHover = typeof window !== 'undefined' && window.matchMedia?.('(hover: hover)').matches;
@@ -111,6 +113,9 @@ export const TopNav: React.FC<{ letterUnread: boolean }> = ({ letterUnread }) =>
               <button className="px-btn px-btn--paper px-btn--small" onClick={() => go('watch')}>
                 Watch together
               </button>
+              <button className="px-btn px-btn--paper px-btn--small" onClick={() => go('karaoke')}>
+                Karaoke
+              </button>
               <button className="px-btn px-btn--paper px-btn--small" onClick={() => go('games')}>
                 Games
                 {waiting.length > 0 && <span aria-label="your turn" className="inline-block w-2 h-2 bg-[var(--thread)]" />}
@@ -149,6 +154,17 @@ export const TopNav: React.FC<{ letterUnread: boolean }> = ({ letterUnread }) =>
             </div>
 
             <div className="flex items-center gap-3 ml-auto">
+              <button
+                className="px-btn px-btn--paper px-btn--small"
+                aria-pressed={!quiet}
+                title={quiet ? 'Turn the little sounds back on' : 'Turn off the little sounds (the room and the games)'}
+                onClick={() => {
+                  sfx.setMuted(!quiet);
+                  setQuiet(!quiet);
+                }}
+              >
+                {quiet ? 'Sound off' : 'Sound on'}
+              </button>
               <span className="hidden lg:flex items-center gap-2 text-sm text-[var(--muted)]">
                 <span className={`inline-block w-2.5 h-2.5 ${partnerUser?.status === 'online' ? 'bg-[var(--sage)]' : 'bg-[#b9a98f]'}`} />
                 {presence}

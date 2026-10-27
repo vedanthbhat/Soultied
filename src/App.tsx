@@ -23,6 +23,7 @@ import { NowPlaying } from './components/NowPlaying';
 import { DecorProvider, useDecor } from './decor/DecorContext';
 import type { SlotId } from './decor/catalogue';
 import { PixelIcon } from './components/letters/PixelIcon';
+import { roomSound } from './escape/sfx';
 import { CharacterStudio, DecorDrawer, EscapeGame, GameShelf, LettersPanel, SpacePanel, UsPage, WatchParty, prefetch } from './lazy';
 
 /** While a part of the place is still loading (only ever for a moment). */
@@ -196,6 +197,7 @@ const Home: React.FC = () => {
   }, [welcomeOpen, seatsEmpty, letterBadge, partnerSealed, partnerUser, currentUser, host, guest, space, games.waiting, turntable.on, turntable.track, journeyWaiting, journey.next, journey.unseen, panel]);
 
   const onHotspot = (id: HotspotId) => {
+    roomSound(id);
     if (welcomeOpen) {
       if (id === 'left' || id === 'right') setSeatNudge((n) => n + 1);
       return;
@@ -284,11 +286,12 @@ const Home: React.FC = () => {
     );
   }
 
-  if (panel === 'watch' && !welcomeOpen) {
+  if ((panel === 'watch' || panel === 'karaoke') && !welcomeOpen) {
     return (
       <div className="font-['Pixelify_Sans',sans-serif]">
         <Suspense fallback={<Opening full />}>
-          <WatchParty onExit={() => openPanel(null)} />
+          {/* keyed by the mode, so switching between the TV and karaoke starts each afresh */}
+          <WatchParty key={panel} mode={panel === 'karaoke' ? 'karaoke' : 'watch'} onExit={() => openPanel(null)} />
         </Suspense>
       </div>
     );

@@ -38,7 +38,7 @@ import type { PlusReply } from '../stream/protocol';
  * Either way the rest of the app sees the same shape.
  */
 
-export type Panel = 'question' | 'questions' | 'us' | 'wardrobe' | 'space' | 'watch' | 'escape' | 'games' | 'decor' | null;
+export type Panel = 'question' | 'questions' | 'us' | 'wardrobe' | 'space' | 'watch' | 'karaoke' | 'escape' | 'games' | 'decor' | null;
 export type JoinResult = 'ok' | 'not_found' | 'full' | 'expired';
 
 export type LetterBadge = 'answer' | 'reveal' | null;
@@ -144,7 +144,7 @@ interface AppContextType {
   redeemPlus: (code: string) => Promise<PlusReply>;
 }
 
-export type LiveTopic = 'watch' | 'escape' | 'stream' | 'doodle' | 'play';
+export type LiveTopic = 'watch' | 'karaoke' | 'escape' | 'stream' | 'doodle' | 'play';
 
 const AppContext = createContext<AppContextType | null>(null);
 

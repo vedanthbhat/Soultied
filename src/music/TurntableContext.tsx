@@ -179,7 +179,7 @@ export const TurntableProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const on = isOn(rec);
   const ytNow = on && rec?.yt ? rec.yt : null;
-  const hushed = panel === 'watch' || !!hub?.active;
+  const hushed = panel === 'watch' || panel === 'karaoke' || !!hub?.active;
   // (a YouTube song plays from its own player, in the record player card)
   const wantSound = on && !ytNow && !prefs.muted && !hushed;
 
@@ -188,7 +188,7 @@ export const TurntableProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     (fromGesture = false) => {
       const r = recRef.current;
       const a = audioRef.current;
-      const want = isOn(r) && !r?.yt && !prefsRef.current.muted && !(panel === 'watch' || !!hub?.active);
+      const want = isOn(r) && !r?.yt && !prefsRef.current.muted && !(panel === 'watch' || panel === 'karaoke' || !!hub?.active);
       if (!want || !r) {
         if (a && !a.paused)
           fadeTo(0, FADE_OUT_MS, () => {

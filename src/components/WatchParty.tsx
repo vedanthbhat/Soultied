@@ -3,8 +3,23 @@ import { useApp } from '../context/AppContext';
 import { renderWatchRoom, WATCH_W, WATCH_H, TV_SCREEN, ICONS, ReactionKind, WatchState } from '../pixel/watchRoom';
 import { PixelBuffer } from '../pixel/buffer';
 import { AvatarThumb } from './PixelAvatarRenderer';
-import { projectedPosition, WatchEvent, WatchTransport } from '../watch/sync';
-import { loadYouTubeApi, parseYouTubeId, parseYouTubeStart, describeYouTubeError, YTPlayer, YTState } from '../watch/youtube';
+import { projectedPosition, KaraokeSong, WatchEvent, WatchTransport } from '../watch/sync';
+import {
+  loadYouTubeApi,
+  parseYouTubeId,
+  parseYouTubeStart,
+  describeYouTubeError,
+  YTPlayer,
+  YTState,
+  KaraokeHit,
+  newSongId,
+  rememberSung,
+  searchAvailable,
+  searchKaraoke,
+  sungBefore,
+  tidyTitle,
+  youtubeSearchUrl,
+} from '../watch/youtube';
 import { CallButtons, CamFrame, PartnerAudio, usePushToTalkKey, useWatchCall } from './WatchCall';
 import { stuckMessage } from '../watch/call';
 import { PixelPanel } from './PixelPanel';
@@ -54,6 +69,16 @@ const REACTIONS: Array<{ kind: ReactionKind; label: string }> = [
   { kind: 'wow', label: 'Wow' },
   { kind: 'cry', label: 'Tears' },
 ];
+const CHEERS: Array<{ kind: ReactionKind; label: string }> = [
+  { kind: 'star', label: 'Bravo!' },
+  { kind: 'heart', label: 'Send a heart' },
+  { kind: 'wow', label: 'Wow' },
+  { kind: 'laugh', label: 'Laugh' },
+];
+/** a song pasted as a link, until the player tells us its real name */
+const LINK_TITLE = 'A song from your link';
+
+type Mode = 'watch' | 'karaoke';
 
 const ReactionIcon: React.FC<{ kind: ReactionKind }> = ({ kind }) => {
   const ref = useRef<HTMLCanvasElement | null>(null);
@@ -79,15 +104,23 @@ const ReactionIcon: React.FC<{ kind: ReactionKind }> = ({ kind }) => {
   return <canvas ref={ref} className="pixelated" style={{ width: 21, height: 21 }} aria-hidden="true" />;
 };
 
-export const WatchParty: React.FC<{ onExit: () => void }> = ({ onExit }) => {
-  const { currentUser, partnerUser, space, openLive, hasPlus } = useApp();
+/** Watch together, or (with Soultied Plus) karaoke night: the same TV room, with a song queue and mics. */
+export const WatchParty: React.FC<{ onExit: () => void; mode?: Mode }> = ({ onExit, mode = 'watch' }) => {
+  const { hasPlus } = useApp();
+  if (mode === 'karaoke' && !hasPlus) return <KaraokeLocked onExit={onExit} />;
+  return <TvRoom onExit={onExit} mode={mode} />;
+};
+
+const TvRoom: React.FC<{ onExit: () => void; mode: Mode }> = ({ onExit, mode }) => {
+  const { currentUser, partnerUser, space, openLive, hasPlus, openPanel } = useApp();
+  const karaoke = mode === 'karaoke';
   const me = currentUser.id;
   const roomId = space?.id || 'solo';
   const creatorIsMe = !space || space.creatorId === me;
   const mySeat: 'left' | 'right' = creatorIsMe ? 'left' : 'right';
   const theirSeat: 'left' | 'right' = mySeat === 'left' ? 'right' : 'left';
   const partnerName = partnerUser?.name || space?.partnerPlaceholderName || 'your person';
-  const saveKey = `soultied_watch_${roomId}`;
+  const saveKey = `soultied_${mode}_${roomId}`;
 
   const saved = useMemo(() => {
     try {
@@ -104,12 +137,27 @@ export const WatchParty: React.FC<{ onExit: () => void }> = ({ onExit }) => {
   const [notice, setNotice] = useState<string | null>(null);
   const [needsTap, setNeedsTap] = useState(false);
   const [partnerHere, setPartnerHere] = useState(false);
+  const partnerHereRef = useRef(false);
+  partnerHereRef.current = partnerHere;
   const [chat, setChat] = useState<ChatMsg[]>([]);
   const [draft, setDraft] = useState('');
   const [link, setLink] = useState('');
   const [chatOpen, setChatOpen] = useState(false);
   const [streamOpen, setStreamOpen] = useState(false);
   const [plusOpen, setPlusOpen] = useState(false);
+  // karaoke night: who's singing now, what's up next, and finding songs
+  const [queue, setQueue] = useState<KaraokeSong[]>([]);
+  const [nowSong, setNowSong] = useState<KaraokeSong | null>(null);
+  const [query, setQuery] = useState('');
+  const [hits, setHits] = useState<KaraokeHit[] | null>(null);
+  const [searching, setSearching] = useState(false);
+  const [findNote, setFindNote] = useState<{ text: string; youtube?: string } | null>(null);
+  const [sung, setSung] = useState(() => sungBefore(roomId));
+  const queueRef = useRef<KaraokeSong[]>([]);
+  const nowRef = useRef<KaraokeSong | null>(null);
+  const qvRef = useRef(0);
+  queueRef.current = queue;
+  nowRef.current = nowSong;
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -137,6 +185,11 @@ export const WatchParty: React.FC<{ onExit: () => void }> = ({ onExit }) => {
   sceneRef.current.left.avatar = creatorIsMe ? currentUser.avatar : partnerUser?.avatar || null;
   sceneRef.current.right.avatar = creatorIsMe ? partnerUser?.avatar || null : currentUser.avatar;
   sceneRef.current.tv = videoId ? tv : 'idle';
+  const singerSeat = (song: KaraokeSong | null) => ({
+    left: !!song && (song.singer === 'duet' || song.singer === (creatorIsMe ? me : partnerUser?.id)),
+    right: !!song && (song.singer === 'duet' || song.singer === (creatorIsMe ? partnerUser?.id : me)),
+  });
+  sceneRef.current.singing = karaoke ? (videoId && nowSong ? singerSeat(nowSong) : { left: false, right: false }) : undefined;
 
   const send = useCallback((e: WatchEvent) => transportRef.current?.send(e), []);
 
@@ -156,7 +209,7 @@ export const WatchParty: React.FC<{ onExit: () => void }> = ({ onExit }) => {
   const [audioBlocked, setAudioBlocked] = useState(false);
   const duckRef = useRef<number | null>(null);
   // turn the show down while one of you is talking, so you can hear each other
-  const ducking = !!view && (view.partnerTalking || view.talking);
+  const ducking = !karaoke && !!view && (view.partnerTalking || view.talking);
   useEffect(() => {
     const p = playerRef.current;
     if (!p?.setVolume || !p.getVolume) return;
@@ -289,8 +342,16 @@ export const WatchParty: React.FC<{ onExit: () => void }> = ({ onExit }) => {
             at: Date.now(),
             reply: true,
           });
+          if (karaoke) send({ type: 'queue', queue: queueRef.current, now: nowRef.current, v: qvRef.current, by: me, at: Date.now() });
           break;
         }
+        case 'queue':
+          if (e.v > qvRef.current) {
+            qvRef.current = e.v;
+            setQueue(e.queue);
+            setNowSong(e.now);
+          }
+          break;
         case 'react':
           addReaction(e.kind, theirSeat);
           break;
@@ -333,12 +394,12 @@ export const WatchParty: React.FC<{ onExit: () => void }> = ({ onExit }) => {
           break;
       }
     },
-    [me, send, applyRemote, clearTv, theirSeat]
+    [me, send, applyRemote, clearTv, theirSeat, karaoke]
   );
 
   /* ---------- transport lifecycle ---------- */
   useEffect(() => {
-    const t: WatchTransport = openLive<WatchEvent>('watch');
+    const t: WatchTransport = openLive<WatchEvent>(karaoke ? 'karaoke' : 'watch');
     transportRef.current = t;
     // online, every message is a small write, so check in less often
     const online = t.kind === 'online';
@@ -361,7 +422,7 @@ export const WatchParty: React.FC<{ onExit: () => void }> = ({ onExit }) => {
       t.close();
       transportRef.current = null;
     };
-  }, [openLive, me]);
+  }, [openLive, me, karaoke]);
   const onRemoteRef = useRef(onRemote);
   onRemoteRef.current = onRemote;
 
@@ -411,7 +472,9 @@ export const WatchParty: React.FC<{ onExit: () => void }> = ({ onExit }) => {
               if (st === YTState.PLAYING) {
                 setTv('playing');
                 setNeedsTap(false);
+                songEvents.current.playing(ev.target);
               } else if (st === YTState.PAUSED || st === YTState.ENDED || st === YTState.CUED) setTv('paused');
+              if (st === YTState.ENDED) songEvents.current.ended();
               if (st !== YTState.PLAYING && st !== YTState.PAUSED) return; // buffering / cued aren't intent
               const isPlaying = st === YTState.PLAYING;
               // an echo of what the other person just did: swallow it. Anything else is a real click.
@@ -493,16 +556,8 @@ export const WatchParty: React.FC<{ onExit: () => void }> = ({ onExit }) => {
   }, [chat.length, chatOpen]);
 
   /* ---------- my actions ---------- */
-  const putOn = (e: React.FormEvent) => {
-    e.preventDefault();
-    const id = parseYouTubeId(link);
-    if (!id) {
-      setNotice("That doesn't look like a YouTube link. Paste the address of a video (youtube.com/watch?v=… or youtu.be/…).");
-      return;
-    }
-    const start = parseYouTubeStart(link);
+  const loadVideo = (id: string, start: number) => {
     setNotice(null);
-    setLink('');
     leaderRef.current = me;
     expected.current = { pos: start, at: Date.now(), playing: true };
     const p = playerRef.current;
@@ -514,11 +569,120 @@ export const WatchParty: React.FC<{ onExit: () => void }> = ({ onExit }) => {
     send({ type: 'load', videoId: id, pos: start, by: me, at: Date.now() });
   };
 
+  const putOn = (e: React.FormEvent) => {
+    e.preventDefault();
+    const id = parseYouTubeId(link);
+    if (!id) {
+      setNotice("That doesn't look like a YouTube link. Paste the address of a video (youtube.com/watch?v=… or youtu.be/…).");
+      return;
+    }
+    setLink('');
+    loadVideo(id, parseYouTubeStart(link));
+  };
+
   const takeOff = () => {
     leaderRef.current = me;
     clearTv();
     send({ type: 'clear', by: me, at: Date.now() });
   };
+
+  /* ---------- karaoke: the queue, shared between you ---------- */
+  const shareQueue = (q: KaraokeSong[], now: KaraokeSong | null) => {
+    const v = Math.max(Date.now(), qvRef.current + 1);
+    qvRef.current = v;
+    queueRef.current = q;
+    nowRef.current = now;
+    setQueue(q);
+    setNowSong(now);
+    send({ type: 'queue', queue: q, now, v, by: me, at: Date.now() });
+  };
+  const playSong = (song: KaraokeSong, rest: KaraokeSong[]) => {
+    shareQueue(rest, song);
+    loadVideo(song.videoId, 0);
+  };
+  const stopSinging = () => {
+    takeOff();
+    shareQueue(queueRef.current, null);
+  };
+  /** on to the next song on the list (or, when the list is done, back to an empty TV) */
+  const nextSong = () => {
+    const [next, ...rest] = queueRef.current;
+    if (next) playSong(next, rest);
+    else stopSinging();
+  };
+  const addSong = (hit: KaraokeHit, singer: string) => {
+    const song: KaraokeSong = { id: newSongId(), videoId: hit.videoId, title: hit.title === LINK_TITLE ? LINK_TITLE : tidyTitle(hit.title), singer, by: me };
+    const idle = !nowRef.current || !videoIdRef.current || playerRef.current?.getPlayerState() === YTState.ENDED;
+    if (idle) playSong(song, queueRef.current);
+    else shareQueue([...queueRef.current, song], nowRef.current);
+    setHits(null);
+    setQuery('');
+    setFindNote(null);
+  };
+  const removeSong = (id: string) => shareQueue(queueRef.current.filter((q) => q.id !== id), nowRef.current);
+
+  // the player's own news: a song finished (move on to the next one), or a pasted link's real name is known
+  const songEvents = useRef<{ ended: () => void; playing: (p: YTPlayer) => void }>({ ended: () => undefined, playing: () => undefined });
+  songEvents.current = {
+    ended: () => {
+      const song = nowRef.current;
+      if (!karaoke || !song) return;
+      const stillOver = () => nowRef.current?.id === song.id && playerRef.current?.getPlayerState() === YTState.ENDED;
+      // whoever put it on moves you both on; if that's not settled, the one with the smaller id does, a bit later
+      window.setTimeout(() => {
+        if (stillOver() && (leaderRef.current === me || !partnerHereRef.current)) nextSong();
+      }, 2500);
+      window.setTimeout(() => {
+        if (stillOver() && me < (partnerUser?.id || '')) nextSong();
+      }, 8000);
+    },
+    playing: (p: YTPlayer) => {
+      const song = nowRef.current;
+      if (!karaoke || !song || song.title !== LINK_TITLE || leaderRef.current !== me) return;
+      const t = p.getVideoData?.()?.title;
+      if (t) shareQueue(queueRef.current, { ...song, title: tidyTitle(t) });
+    },
+  };
+
+  // remember what you've sung here, for one-tap encores
+  useEffect(() => {
+    if (!karaoke || !nowSong || nowSong.title === LINK_TITLE) return;
+    rememberSung(roomId, { videoId: nowSong.videoId, title: nowSong.title });
+    setSung(sungBefore(roomId));
+  }, [karaoke, nowSong, roomId]);
+
+  const find = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const q = query.trim();
+    if (!q) return;
+    const id = parseYouTubeId(q);
+    if (id) {
+      setHits([{ videoId: id, title: LINK_TITLE, channel: '', thumb: `https://i.ytimg.com/vi/${id}/mqdefault.jpg` }]);
+      setFindNote(null);
+      return;
+    }
+    setSearching(true);
+    setFindNote(null);
+    const r = await searchKaraoke(q);
+    setSearching(false);
+    if (r.ok) {
+      setHits(r.hits);
+      if (!r.hits.length) setFindNote({ text: `Couldn't find a karaoke version of "${q}". Try adding the artist, or look on YouTube and paste the link here.`, youtube: youtubeSearchUrl(q) });
+      return;
+    }
+    setHits(null);
+    setFindNote({
+      text:
+        r.why === 'off'
+          ? 'Find the song on YouTube, then paste its link here.'
+          : r.why === 'quota'
+            ? "That's all the searching YouTube allows for today. Find the song on YouTube, then paste its link here."
+            : "Couldn't reach YouTube. Check your connection, or find the song on YouTube and paste its link here.",
+      youtube: youtubeSearchUrl(q),
+    });
+  };
+  const whoSings = (song: KaraokeSong) => (song.singer === 'duet' ? 'Duet' : song.singer === me ? 'You' : partnerName);
+  const myTurn = karaoke && !!videoId && !!nowSong && (nowSong.singer === me || nowSong.singer === 'duet');
 
   const react = (kind: ReactionKind) => {
     addReaction(kind, mySeat);
@@ -609,9 +773,13 @@ export const WatchParty: React.FC<{ onExit: () => void }> = ({ onExit }) => {
 
   const watchingLine = partnerUser
     ? partnerHere
-      ? `${partnerName} is watching with you`
+      ? karaoke
+        ? `${partnerName} is here with you`
+        : `${partnerName} is watching with you`
       : `Waiting for ${partnerName} to sit down`
-    : `Invite ${partnerName} to watch together`;
+    : karaoke
+      ? `Invite ${partnerName} to sing together`
+      : `Invite ${partnerName} to watch together`;
 
   const chatPanel = (
     <div className="px-box px-shadow flex flex-col" style={{ height: '100%' }}>
@@ -659,6 +827,14 @@ export const WatchParty: React.FC<{ onExit: () => void }> = ({ onExit }) => {
       <button className="px-btn px-btn--paper px-btn--small" onClick={onExit}>
         ← Back to the room
       </button>
+      <span className="flex gap-1" role="group" aria-label="What's on the TV">
+        <button className={`px-btn px-btn--small ${karaoke ? 'px-btn--paper' : ''}`} aria-pressed={!karaoke} onClick={() => karaoke && openPanel('watch')}>
+          TV
+        </button>
+        <button className={`px-btn px-btn--small ${karaoke ? '' : 'px-btn--paper'}`} aria-pressed={karaoke} onClick={() => !karaoke && openPanel('karaoke')}>
+          Karaoke
+        </button>
+      </span>
       <span className="px-box px-2.5 py-1 text-sm flex items-center gap-2">
         <span className={`inline-block w-2.5 h-2.5 ${partnerHere ? 'bg-[var(--sage)]' : 'bg-[#b9a98f]'}`} />
         {watchingLine}
@@ -666,10 +842,130 @@ export const WatchParty: React.FC<{ onExit: () => void }> = ({ onExit }) => {
     </div>
   );
 
+  /* ---------- karaoke: what's playing, finding songs, what's next ---------- */
+  const songRow = (h: KaraokeHit) => (
+    <li key={h.videoId} className="flex items-center gap-2">
+      {h.thumb && (
+        <img src={h.thumb} alt="" width={64} height={36} className="shrink-0 object-cover" style={{ width: 64, height: 36, boxShadow: '0 0 0 2px var(--ink)' }} />
+      )}
+      <div className="flex-1 min-w-0">
+        <div className="truncate text-sm font-semibold">{h.title === LINK_TITLE ? 'The song from your link' : h.title}</div>
+        {h.channel && <div className="truncate text-xs text-[var(--muted)]">{h.channel}</div>}
+      </div>
+      <div className="flex gap-1 shrink-0">
+        <button className="px-btn px-btn--small" onClick={() => addSong(h, me)}>
+          I'll sing
+        </button>
+        {partnerUser && (
+          <>
+            <button className="px-btn px-btn--paper px-btn--small" onClick={() => addSong(h, partnerUser.id)} title={`${partnerName} sings this one`}>
+              {partnerName}
+            </button>
+            <button className="px-btn px-btn--paper px-btn--small" onClick={() => addSong(h, 'duet')} title="Sing it together">
+              Duet
+            </button>
+          </>
+        )}
+      </div>
+    </li>
+  );
+
+  const singingNow = videoId && nowSong && (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="px-inset px-2.5 py-1 text-sm flex-1 min-w-0 truncate" aria-live="polite">
+          <strong>{nowSong.singer === 'duet' ? 'Duet' : nowSong.singer === me ? "You're singing" : `${partnerName}'s singing`}</strong> · {nowSong.title}
+        </span>
+        <button className="px-btn px-btn--paper px-btn--small" onClick={queue.length ? nextSong : stopSinging}>
+          {queue.length ? 'Next song' : 'Stop'}
+        </button>
+      </div>
+      {myTurn && partnerUser && view && !view.micOpen && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <button className="px-btn px-btn--sage px-btn--small" onClick={() => void call?.setMic(true)}>
+            Your turn: open your mic
+          </button>
+          <span className="text-xs text-[var(--muted)]">Headphones help: then your mic hears just you, not the song.</span>
+        </div>
+      )}
+    </div>
+  );
+
+  const songFinder = (
+    <div className="flex flex-col gap-2">
+      <form onSubmit={find} className="flex gap-2 items-stretch">
+        <input
+          className="px-input text-sm"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={searchAvailable() ? 'Search any song, or paste a YouTube link' : 'Type a song to find it, or paste a YouTube karaoke link'}
+          aria-label="A song to sing"
+        />
+        <button className="px-btn shrink-0" type="submit" disabled={searching}>
+          {searching ? 'Looking…' : 'Find it'}
+        </button>
+      </form>
+      {findNote && (
+        <p className="m-0 text-sm">
+          {findNote.text}{' '}
+          {findNote.youtube && (
+            <a className="px-link" href={findNote.youtube} target="_blank" rel="noopener">
+              Find it on YouTube ↗
+            </a>
+          )}
+        </p>
+      )}
+      {hits && hits.length > 0 && (
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center justify-between text-xs text-[var(--muted)]">
+            <span>{hits.length === 1 && hits[0].title === LINK_TITLE ? "Who's singing it?" : "Karaoke versions on YouTube. Who's singing?"}</span>
+            <button className="px-link text-xs" onClick={() => setHits(null)}>
+              Close
+            </button>
+          </div>
+          <ul className="m-0 p-0 list-none flex flex-col gap-2 px-scroll overflow-y-auto" style={{ maxHeight: 'min(200px, 28vh)' }}>
+            {hits.map(songRow)}
+          </ul>
+        </div>
+      )}
+      {!hits && !query && sung.length > 0 && (
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-[var(--muted)]">Sing again</span>
+          <ul className="m-0 p-0 list-none flex flex-col gap-2 px-scroll overflow-y-auto" style={{ maxHeight: 'min(150px, 22vh)' }}>
+            {sung.slice(0, 6).map((x) => songRow({ videoId: x.videoId, title: x.title, channel: '', thumb: `https://i.ytimg.com/vi/${x.videoId}/default.jpg` }))}
+          </ul>
+        </div>
+      )}
+      {queue.length > 0 && (
+        <div className="text-sm">
+          <span className="text-xs text-[var(--muted)]">Up next</span>
+          <ol className="m-0 p-0 list-none flex flex-col gap-1 mt-1">
+            {queue.map((q, i) => (
+              <li key={q.id} className="flex items-center gap-2">
+                <span className="w-4 text-right text-[var(--muted)]">{i + 1}</span>
+                <span className="flex-1 min-w-0 truncate">
+                  <strong>{whoSings(q)}</strong> · {q.title}
+                </span>
+                <button className="px-btn px-btn--paper px-btn--small" aria-label={`Take ${q.title} off the list`} onClick={() => removeSong(q.id)}>
+                  ✕
+                </button>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+    </div>
+  );
+
   const remote = (
-    <div className="px-box px-shadow flex flex-col gap-2 p-3" style={{ width: stacked ? '100%' : 'min(760px, calc(100vw - 32px))' }}>
+    <div
+      className={`px-box px-shadow flex flex-col gap-2 p-3 ${karaoke && !stacked ? 'px-scroll overflow-y-auto' : ''}`}
+      style={{ width: stacked ? '100%' : 'min(760px, calc(100vw - 32px))', maxHeight: karaoke && !stacked ? Math.max(240, H - tvBottom - 28) : undefined }}
+    >
       {headerInRemote && !stacked && header}
       {camPlace === 'panel' && camFrames}
+      {karaoke && singingNow}
+      {karaoke ? songFinder : (
       <form onSubmit={putOn} className="flex gap-2 items-stretch">
         <input
           className="px-input text-sm"
@@ -687,6 +983,7 @@ export const WatchParty: React.FC<{ onExit: () => void }> = ({ onExit }) => {
           </button>
         )}
       </form>
+      )}
       <div className="flex items-center gap-2 flex-wrap">
         {/* on a phone there's no room beside the link box */}
         {videoId && stacked && (
@@ -694,7 +991,7 @@ export const WatchParty: React.FC<{ onExit: () => void }> = ({ onExit }) => {
             Take it off
           </button>
         )}
-        {REACTIONS.map((r) => (
+        {(karaoke ? CHEERS : REACTIONS).map((r) => (
           <button key={r.kind} className="px-btn px-btn--paper px-btn--small" onClick={() => react(r.kind)} aria-label={r.label} title={r.label}>
             <ReactionIcon kind={r.kind} />
           </button>
@@ -707,9 +1004,11 @@ export const WatchParty: React.FC<{ onExit: () => void }> = ({ onExit }) => {
               Cameras & voice
             </button>
           ))}
-        <button className="px-btn px-btn--paper px-btn--small" onClick={() => setStreamOpen(true)} title="Watch Netflix, Prime Video, JioHotstar and more together">
-          Netflix / Prime
-        </button>
+        {!karaoke && (
+          <button className="px-btn px-btn--paper px-btn--small" onClick={() => setStreamOpen(true)} title="Watch Netflix, Prime Video, JioHotstar and more together">
+            Netflix / Prime
+          </button>
+        )}
         {audioBlocked && view?.remote && (
           <button
             className="px-btn px-btn--sage px-btn--small"
@@ -764,7 +1063,7 @@ export const WatchParty: React.FC<{ onExit: () => void }> = ({ onExit }) => {
         width={WATCH_W}
         height={WATCH_H}
         role="img"
-        aria-label="The two of you on the couch, seen from behind, watching the big TV."
+        aria-label={karaoke ? 'The two of you on the couch, seen from behind, holding microphones in front of the big TV.' : 'The two of you on the couch, seen from behind, watching the big TV.'}
         className="absolute pixelated"
         style={{ left: fit.left, top: fit.top, width: WATCH_W * fit.s, height: WATCH_H * fit.s }}
       />
@@ -785,8 +1084,10 @@ export const WatchParty: React.FC<{ onExit: () => void }> = ({ onExit }) => {
             <span className="text-xl font-bold">Tuning in…</span>
           ) : (
             <>
-              <span className="text-2xl font-bold mt-10">Put something on</span>
-              <span className="text-sm opacity-80">Paste a YouTube link below. It plays for both of you.</span>
+              <span className="text-2xl font-bold mt-16">{karaoke ? 'Karaoke night' : 'Put something on'}</span>
+              <span className="text-sm opacity-80">
+                {karaoke ? 'Pick a song below. It plays for both of you, with the words on screen.' : 'Paste a YouTube link below. It plays for both of you.'}
+              </span>
             </>
           )}
         </div>
@@ -838,6 +1139,91 @@ export const WatchParty: React.FC<{ onExit: () => void }> = ({ onExit }) => {
 
       {/* the camera swinging round: a quick stepped fade from black */}
       <div className="absolute inset-0 pointer-events-none watch-enter" style={{ background: '#0d0a0b', zIndex: 40 }} />
+    </div>
+  );
+};
+
+/** Karaoke without Soultied Plus: the room set up for it, and what Plus adds. */
+const KaraokeLocked: React.FC<{ onExit: () => void }> = ({ onExit }) => {
+  const { currentUser, partnerUser, space, openPanel } = useApp();
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [fit, setFit] = useState<Fit>(() => computeFit(window.innerWidth, window.innerHeight));
+  const creatorIsMe = !space || space.creatorId === currentUser.id;
+  useEffect(() => {
+    const onResize = () => setFit(computeFit(window.innerWidth, window.innerHeight));
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+  useEffect(() => {
+    const c = canvasRef.current;
+    const ctx = c?.getContext('2d');
+    if (!c || !ctx) return;
+    const scene: WatchState = {
+      left: { avatar: creatorIsMe ? currentUser.avatar : partnerUser?.avatar || null },
+      right: { avatar: creatorIsMe ? partnerUser?.avatar || null : currentUser.avatar },
+      tv: 'idle',
+      reactions: [],
+      singing: { left: true, right: true },
+    };
+    if (!scene.left.avatar) scene.singing!.left = false;
+    if (!scene.right.avatar) scene.singing!.right = false;
+    const img = ctx.createImageData(WATCH_W, WATCH_H);
+    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    let raf = 0;
+    let last = 0;
+    const start = performance.now();
+    const tick = (now: number) => {
+      raf = requestAnimationFrame(tick);
+      if (document.hidden || now - last < (reduced ? 400 : 120)) return;
+      last = now;
+      img.data.set(renderWatchRoom(scene, (now - start) / 1000).data);
+      ctx.putImageData(img, 0, 0);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [creatorIsMe, currentUser.avatar, partnerUser?.avatar]);
+
+  return (
+    <div className="fixed inset-0 z-30 overflow-hidden px-ui" style={{ background: '#1d1512' }}>
+      <canvas
+        ref={canvasRef}
+        width={WATCH_W}
+        height={WATCH_H}
+        role="img"
+        aria-label="The two of you on the couch, seen from behind, holding microphones in front of the big TV."
+        className="absolute pixelated"
+        style={{ left: fit.left, top: fit.top, width: WATCH_W * fit.s, height: WATCH_H * fit.s }}
+      />
+      <div className="absolute flex items-center gap-3 flex-wrap" style={{ left: 16, top: 16, zIndex: 20 }}>
+        <button className="px-btn px-btn--paper px-btn--small" onClick={onExit}>
+          ← Back to the room
+        </button>
+        <span className="flex gap-1" role="group" aria-label="What's on the TV">
+          <button className="px-btn px-btn--small px-btn--paper" aria-pressed={false} onClick={() => openPanel('watch')}>
+            TV
+          </button>
+          <button className="px-btn px-btn--small" aria-pressed>
+            Karaoke
+          </button>
+        </span>
+      </div>
+      {/* beside the couch on a wide screen, so the two of you (holding microphones) stay in view */}
+      <div className="absolute inset-0 flex items-end md:items-center justify-center md:justify-start p-4 md:pl-6 pt-16 overflow-y-auto" style={{ zIndex: 10 }}>
+        <div className="flex flex-col gap-3 w-full max-w-[420px]">
+          <section className="px-box px-shadow px-pop p-5 flex flex-col gap-2" aria-labelledby="karaoke-title">
+            <span className="text-xs font-semibold tracking-[0.16em] uppercase text-[var(--terracotta-d)]">Karaoke night · Soultied Plus</span>
+            <h2 id="karaoke-title" className="text-2xl font-bold leading-tight m-0">
+              Sing to each other
+            </h2>
+            <ul className="m-0 pl-5 flex flex-col gap-1 text-sm leading-snug">
+              <li>Any song, with the words on screen, playing for you both at the same moment.</li>
+              <li>Take turns or sing a duet, from one list you both add to.</li>
+              <li>Hear each other sing: cameras and voice come with Plus too.</li>
+            </ul>
+          </section>
+          <PlusCard heading="Add Soultied Plus" blurb="Karaoke, cameras and voice come with Soultied Plus. One of you having it covers you both." />
+        </div>
+      </div>
     </div>
   );
 };

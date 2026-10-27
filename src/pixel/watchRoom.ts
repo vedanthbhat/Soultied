@@ -13,7 +13,7 @@ export const WATCH_W = 320;
 export const WATCH_H = 180;
 export const TV_SCREEN = { x: 80, y: 14, w: 160, h: 90 };
 
-export type ReactionKind = 'heart' | 'laugh' | 'wow' | 'cry';
+export type ReactionKind = 'heart' | 'laugh' | 'wow' | 'cry' | 'star';
 
 export interface WatchSeat {
   avatar: AvatarConfig | null;
@@ -25,6 +25,8 @@ export interface WatchState {
   /** 'idle' = no video loaded, 'paused', 'playing' */
   tv: 'idle' | 'paused' | 'playing';
   reactions: Array<{ kind: ReactionKind; seat: 'left' | 'right'; t0: number }>;
+  /** karaoke: who's holding a mic (a warm light comes up on them while they sing) */
+  singing?: { left: boolean; right: boolean };
 }
 
 const SEAT_L = 136;
@@ -303,7 +305,34 @@ export const ICONS: Record<ReactionKind, { rows: string[]; pal: Record<string, s
     rows: ['.yyyyy.', 'yyyyyyy', 'yeyyyey', 'byyyyyy', 'byyeyyy', 'yyeyeyy', '.yyyyy.'],
     pal: { y: '#f2c14e', e: '#5a3a2c', b: '#6fa8dc' },
   },
+  // bravo: a little gold star
+  star: {
+    rows: ['...y...', '..yhy..', 'yyyyyyy', '.yyyyy.', '..yyy..', '.yy.yy.', 'yy...yy'],
+    pal: { y: '#f2c14e', h: '#fbe7a6' },
+  },
 };
+
+/** a hand-held microphone, held up beside the singer's head */
+const MIC = {
+  rows: ['.ggg..', 'gGGgg.', 'gGggg.', 'ggggg.', '.ggg..', '..bb..', '..hH..', '..hH..', '..hH..', '..hH..', '..hH..'],
+  pal: { g: '#8d96a1', G: '#e6ebf0', b: '#d0a85c', h: '#3d3944', H: '#67616f' } as Record<string, string>,
+};
+
+function drawMics(L: Layer, singing: { left: boolean; right: boolean }, seatTop: Record<'left' | 'right', number>, t: number) {
+  for (const side of ['left', 'right'] as const) {
+    if (!singing[side]) continue;
+    // a little sway with the music
+    const sway = Math.sin(t * 2.4 + (side === 'left' ? 0 : 1.3)) > 0.4 ? 1 : 0;
+    const x = side === 'left' ? SEAT_L - 17 : SEAT_R + 11;
+    const y = Math.min(seatTop[side] + 6, COUCH_TOP - 12) - sway;
+    MIC.rows.forEach((row, j) =>
+      [...row].forEach((k, i) => {
+        const c = MIC.pal[k];
+        if (c && y + j < COUCH_TOP) L.set(x + i, y + j, c);
+      })
+    );
+  }
+}
 
 function drawReactions(L: Layer, state: WatchState, now: number, seatTop: Record<'left' | 'right', number>) {
   for (const r of state.reactions) {
@@ -335,6 +364,8 @@ const LIGHTS: Light[] = [
   { x: 160, y: 60, r: 240, c: [0.62, 0.72, 0.98] }, // TV
   { x: 345, y: 120, r: 175, c: [1.08, 0.7, 0.42] }, // fire, off-screen right
   { x: 67, y: 52, r: 62, c: [0.95, 0.78, 0.52] }, // lamp
+  { x: SEAT_L, y: 118, r: 52, c: [1.2, 0.92, 0.72] }, // karaoke: a warm light on whoever's singing
+  { x: SEAT_R, y: 118, r: 52, c: [1.2, 0.92, 0.72] },
 ];
 let DIST: Float32Array[] | null = null;
 function dists() {
@@ -348,12 +379,13 @@ function dists() {
   return DIST;
 }
 
-function light(L: Layer, t: number, tv: WatchState['tv']) {
+function light(L: Layer, t: number, tv: WatchState['tv'], singing?: WatchState['singing']) {
   const d = dists();
   // TV light flickers with "the picture" while playing
   const tvK = tv === 'playing' ? 0.62 + 0.18 * hash(Math.floor(t * 3)) + 0.08 * Math.sin(t * 5) : tv === 'paused' ? 0.55 : 0.4;
   const fireK = 0.85 + Math.sin(t * 7.3) * 0.04 + (hash(Math.floor(t * 12)) - 0.5) * 0.06;
-  const ks = [tvK, fireK, 0.6];
+  const spot = (on?: boolean) => (on ? 0.72 + 0.06 * Math.sin(t * 3) : 0);
+  const ks = [tvK, fireK, 0.6, spot(singing?.left), spot(singing?.right)];
   const amb = [0.3, 0.29, 0.42];
   const levels = 5;
   const data = L.data;
@@ -366,6 +398,7 @@ function light(L: Layer, t: number, tv: WatchState['tv']) {
       let tg = 0;
       let tb = 0;
       for (let i = 0; i < LIGHTS.length; i++) {
+        if (ks[i] <= 0) continue;
         let v = 1 - d[i][p] / LIGHTS[i].r;
         if (v <= 0) continue;
         v = Math.pow(v, 1.4) * ks[i];
@@ -459,8 +492,9 @@ export function renderWatchRoom(state: WatchState, t: number, now = Date.now()):
   draw(state.left, SEAT_L, 'left', 0);
   draw(state.right, SEAT_R, 'right', 1.9);
   drawCouchBack(L);
+  if (state.singing) drawMics(L, state.singing, seatTop, t);
 
-  light(L, t, state.tv);
+  light(L, t, state.tv, state.singing);
   rimLight(L, state.tv, t);
   drawReactions(L, state, now, seatTop);
   return L;

@@ -20,7 +20,7 @@ export interface LiveChannel<E> {
  * A place's channel for one topic. Firestore loads the first time one's opened (see firebase.ts), so for
  * that first moment what you send waits here and goes as soon as it can.
  */
-export function firestoreChannel<E extends { by: string; at: number }>(db: CloudDb, spaceId: string, topic: 'watch' | 'escape' | 'stream' | 'doodle' | 'play'): LiveChannel<E> {
+export function firestoreChannel<E extends { by: string; at: number }>(db: CloudDb, spaceId: string, topic: 'watch' | 'karaoke' | 'escape' | 'stream' | 'doodle' | 'play'): LiveChannel<E> {
   const listeners = new Set<(e: E) => void>();
   let real: LiveChannel<E> | null = null;
   let closed = false;
