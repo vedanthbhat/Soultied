@@ -79,38 +79,50 @@ jobs:
       - name: Check it builds (iPhone simulator, unsigned)
         if: steps.key.outputs.ready != 'true'
         run: |
+          set -o pipefail
           xcodebuild build \
             -project ios/App/App.xcodeproj \
             -scheme App \
             -configuration Debug \
             -destination 'generic/platform=iOS Simulator' \
-            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tee "$RUNNER_TEMP/build.log"
           echo "The iPhone app builds. Add the App Store Connect key to send builds to TestFlight." >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Write the App Store Connect key
+      # Built the way Xcode Cloud does it: signed only "to run locally" here (which keeps the app's
+      # entitlements, like Sign in with Apple), and given its App Store signature when it's sent below.
+      # Signing for development here would need an iPhone registered to the team; this doesn't.
+      - name: Build
         if: steps.key.outputs.ready == 'true'
         run: |
-          mkdir -p "$RUNNER_TEMP/keys"
-          printf '%s\n' "$ASC_KEY_P8" > "$RUNNER_TEMP/keys/AuthKey_$ASC_KEY_ID.p8"
-
-      - name: Build and sign
-        if: steps.key.outputs.ready == 'true'
-        run: |
+          set -o pipefail
           xcodebuild archive \
             -project ios/App/App.xcodeproj \
             -scheme App \
             -configuration Release \
             -destination 'generic/platform=iOS' \
             -archivePath "$RUNNER_TEMP/Soultied.xcarchive" \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "$RUNNER_TEMP/keys/AuthKey_$ASC_KEY_ID.p8" \
-            -authenticationKeyID "$ASC_KEY_ID" \
-            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
             DEVELOPMENT_TEAM="$TEAM_ID" \
             CODE_SIGN_STYLE=Automatic \
-            CURRENT_PROJECT_VERSION="${{ github.run_number }}"
+            CODE_SIGN_IDENTITY=- \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES \
+            CURRENT_PROJECT_VERSION="${{ github.run_number }}" 2>&1 | tee "$RUNNER_TEMP/build.log"
+          {
+            echo "### What the app is allowed to do (entitlements)"
+            echo '```'
+            codesign -d --entitlements - "$RUNNER_TEMP/Soultied.xcarchive/Products/Applications/App.app" 2>&1 | grep -v "^Executable=" | head -30 || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Send to TestFlight
+      - name: Write the App Store Connect key
+        if: steps.key.outputs.ready == 'true'
+        run: |
+          mkdir -p "$RUNNER_TEMP/keys"
+          printf '%s\n' "$ASC_KEY_P8" > "$RUNNER_TEMP/keys/AuthKey_$ASC_KEY_ID.p8"
+          chmod 600 "$RUNNER_TEMP/keys/AuthKey_$ASC_KEY_ID.p8"
+
+      # Signs it for the App Store with a certificate Apple keeps for the team (cloud signing), makes the
+      # App Store profile if there isn't one, and uploads it
+      - name: Sign and send to TestFlight
         if: steps.key.outputs.ready == 'true'
         run: |
           cat > "$RUNNER_TEMP/export.plist" <<EOF
@@ -127,6 +139,7 @@ jobs:
           </dict>
           </plist>
           EOF
+          set -o pipefail
           xcodebuild -exportArchive \
             -archivePath "$RUNNER_TEMP/Soultied.xcarchive" \
             -exportOptionsPlist "$RUNNER_TEMP/export.plist" \
@@ -134,8 +147,32 @@ jobs:
             -allowProvisioningUpdates \
             -authenticationKeyPath "$RUNNER_TEMP/keys/AuthKey_$ASC_KEY_ID.p8" \
             -authenticationKeyID "$ASC_KEY_ID" \
-            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" 2>&1 | tee "$RUNNER_TEMP/upload.log"
           echo "Build ${{ github.run_number }} is on its way to TestFlight. App Store Connect takes a few minutes to process it, then it shows up in the TestFlight app on your iPhone." >> "$GITHUB_STEP_SUMMARY"
+
+      # The full log needs admin rights to read, so put the lines that matter where anyone can see them
+      - name: Show what went wrong
+        if: failure()
+        run: |
+          logs=$(ls "$RUNNER_TEMP"/build.log "$RUNNER_TEMP"/upload.log 2>/dev/null || true)
+          [ -n "$logs" ] || exit 0
+          {
+            echo "### What went wrong"
+            echo '```'
+            cat $logs | grep -E "error:|error :|warning: .*(sign|profile|entitlement)|\*\* (BUILD|ARCHIVE|EXPORT) FAILED|[Pp]rovisioning|[Ss]igning|certificate|Error Domain|IDEDistribution|NSLocalized" | sort -u | tail -60 || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          cat $logs | grep -E "error:|Error Domain" | sort -u | head -8 | while IFS= read -r line; do echo "::error::${line:0:500}"; done || true
+          # when sending fails, Xcode keeps its own notes in a .xcdistributionlogs folder
+          dist=$(grep -ho "/[^']*\.xcdistributionlogs" "$RUNNER_TEMP"/upload.log 2>/dev/null | head -1 || true)
+          if [ -n "$dist" ] && [ -d "$dist" ]; then
+            {
+              echo "### What Xcode noted while sending"
+              echo '```'
+              cat "$dist"/IDEDistribution*.log 2>/dev/null | grep -iE "error|fail|denied|not (found|permitted|allowed)|certificate|profile" | grep -viE "authorization|bearer|token" | sort -u | tail -40 || true
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Remove the key
         if: always()
