@@ -135,7 +135,7 @@ jobs:
             -authenticationKeyPath "$RUNNER_TEMP/keys/AuthKey_$ASC_KEY_ID.p8" \
             -authenticationKeyID "$ASC_KEY_ID" \
             -authenticationKeyIssuerID "$ASC_ISSUER_ID"
-          echo "Build ${{ github.run_number }} is on its way to TestFlight (App Store Connect takes a few minutes to process it)." >> "$GITHUB_STEP_SUMMARY"
+          echo "Build ${{ github.run_number }} is on its way to TestFlight. App Store Connect takes a few minutes to process it, then it shows up in the TestFlight app on your iPhone." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Remove the key
         if: always()
