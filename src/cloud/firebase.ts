@@ -2,9 +2,13 @@ import { FirebaseApp, initializeApp } from 'firebase/app';
 import {
   Auth,
   GoogleAuthProvider,
+  OAuthProvider,
   User,
+  browserLocalPersistence,
   connectAuthEmulator,
   getAuth,
+  indexedDBLocalPersistence,
+  initializeAuth,
   onAuthStateChanged,
   signInWithCredential,
   signInWithPopup,
@@ -54,6 +58,20 @@ const EMULATOR = import.meta.env.VITE_FIREBASE_EMULATOR as string | undefined;
 
 let app: FirebaseApp | null = null;
 let auth: Auth | null = null;
+
+/**
+ * Running inside the Soultied iPhone app? The app is a thin native shell (Capacitor) that shows this very
+ * site, and adds what a website can't do on a phone: signing in through iOS itself (Google, or Apple).
+ */
+type CapacitorGlobal = { isNativePlatform?: () => boolean; getPlatform?: () => string };
+const capacitor = () => (typeof window !== 'undefined' ? (window as unknown as { Capacitor?: CapacitorGlobal }).Capacitor : undefined);
+export const inApp = () => !!capacitor()?.isNativePlatform?.();
+export const inIosApp = () => inApp() && capacitor()?.getPlatform?.() === 'ios';
+/**
+ * The app's native sign-in (loaded only inside the app). Hand back the module, never the plugin itself:
+ * a Capacitor plugin answers to every name, so a promise that resolved to it would try to call its "then".
+ */
+const nativeAuth = () => import('@capacitor-firebase/authentication');
 
 /**
  * The place's database, loaded the first time something needs it rather than with the page: a first
@@ -109,7 +127,8 @@ export function cloud() {
   if (!cloudConfig) return null;
   if (!app) {
     app = initializeApp(onFirebaseHosting() ? { ...cloudConfig, authDomain: window.location.hostname } : cloudConfig);
-    auth = getAuth(app);
+    // in the app there are no pop-ups or redirects (iOS signs you in), so keep sign-in in the app's own storage
+    auth = inApp() ? initializeAuth(app, { persistence: [indexedDBLocalPersistence, browserLocalPersistence] }) : getAuth(app);
     if (EMULATOR) connectAuthEmulator(auth, `http://${EMULATOR === '1' ? '127.0.0.1' : EMULATOR}:9099`, { disableWarnings: true });
     // signed in here last time: fetch the database now, alongside everything else
     try {
@@ -134,8 +153,15 @@ export function watchAuth(fn: (user: User | null) => void) {
   });
 }
 
+/** iOS's own sign-in sheets, closed without signing in */
+const cancelledInApp = (err: unknown) => {
+  const e = err as { code?: string; message?: string };
+  return /cancel|1001|-5\b/i.test(`${e?.code || ''} ${e?.message || ''}`);
+};
+
 export function describeAuthError(err: unknown) {
   const code = (err as { code?: string })?.code || '';
+  if (inApp() && cancelledInApp(err)) return null;
   if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') return null;
   if (code === 'auth/unauthorized-domain')
     return 'This web address isn’t allowed to sign in yet. Add it under Firebase → Authentication → Settings → Authorized domains.';
@@ -144,13 +170,24 @@ export function describeAuthError(err: unknown) {
     return 'Your browser blocked the Google sign-in window. Allow pop-ups for this page and try again, or open the link in Chrome or Safari.';
   if (code === 'auth/operation-not-supported-in-this-environment')
     return 'This browser can’t open Google sign-in. Open the link in Chrome or Safari instead.';
-  if (code === 'auth/operation-not-allowed') return 'Google sign-in isn’t switched on for this app yet (Firebase → Authentication → Sign-in method).';
+  if (code === 'auth/operation-not-allowed') return 'That way of signing in isn’t switched on for this app yet (Firebase → Authentication → Sign-in method).';
+  if (code === 'auth/account-exists-with-different-credential')
+    return 'You’ve signed in with Google before, with this same email. Continue with Google instead, and you’ll be back in your place.';
   return 'Sign-in didn’t work. Please try again.';
 }
 
 export async function signInWithGoogle() {
   const c = cloud();
   if (!c) throw new Error('Firebase is not set up');
+  if (inApp()) {
+    // Google won't sign in inside an app's web view: iOS shows Google's own sheet, and hands us the result
+    const { FirebaseAuthentication } = await nativeAuth();
+    const r = await FirebaseAuthentication.signInWithGoogle({ skipNativeAuth: true });
+    const idToken = r.credential?.idToken;
+    if (!idToken) throw Object.assign(new Error('Sign-in was cancelled'), { code: 'cancelled' });
+    await signInWithCredential(c.auth, GoogleAuthProvider.credential(idToken, r.credential?.accessToken));
+    return;
+  }
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
   try {
@@ -166,6 +203,19 @@ export async function signInWithGoogle() {
   }
 }
 
+/** Sign in with Apple (in the iPhone app). */
+export async function signInWithApple() {
+  const c = cloud();
+  if (!c) throw new Error('Firebase is not set up');
+  if (!inIosApp()) throw Object.assign(new Error('Sign in with Apple is only in the iPhone app'), { code: 'auth/operation-not-supported-in-this-environment' });
+  const { FirebaseAuthentication } = await nativeAuth();
+  const r = await FirebaseAuthentication.signInWithApple({ skipNativeAuth: true });
+  const idToken = r.credential?.idToken;
+  if (!idToken) throw Object.assign(new Error('Sign-in was cancelled'), { code: 'cancelled' });
+  // (your name comes from the place itself, where you type it, so Apple doesn't need to share it)
+  await signInWithCredential(c.auth, new OAuthProvider('apple.com').credential({ idToken, rawNonce: r.credential?.nonce }));
+}
+
 /** Emulator only: sign in as a made-up Google user (used by the automated tests). */
 export async function signInAsTestUser(email: string, name: string) {
   const c = cloud();
@@ -176,6 +226,7 @@ export async function signInAsTestUser(email: string, name: string) {
 
 export async function signOut() {
   const c = cloud();
+  if (inApp()) await nativeAuth().then((m) => m.FirebaseAuthentication.signOut()).catch(() => undefined);
   if (c) await fbSignOut(c.auth);
 }
 

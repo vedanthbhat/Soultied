@@ -1,0 +1,35 @@
+{
+  "appId": "app.soultied",
+  "appName": "Soultied",
+  "webDir": "ios-web",
+  "backgroundColor": "#1d1512",
+  "server": {
+    "url": "https://soultied.app",
+    "errorPath": "offline.html"
+  },
+  "ios": {
+    "scheme": "App",
+    "contentInset": "never",
+    "backgroundColor": "#1d1512",
+    "appendUserAgent": "SoultiedApp/1"
+  },
+  "plugins": {
+    "FirebaseAuthentication": {
+      "skipNativeAuth": true,
+      "providers": ["google.com", "apple.com"]
+    }
+  },
+  "experimental": {
+    "ios": {
+      "spm": {
+        "swiftToolsVersion": "6.1",
+        "packageTraits": {
+          "@capacitor-firebase/authentication": ["Google"]
+        },
+        "packageOptions": {
+          "@capacitor-firebase/authentication": { "symlink": true }
+        }
+      }
+    }
+  }
+}

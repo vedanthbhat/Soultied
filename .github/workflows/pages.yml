@@ -4,6 +4,13 @@ name: Publish the site
 on:
   push:
     branches: [main]
+    # changes to the iPhone app alone don't touch the website (they have their own workflow, ios.yml)
+    paths-ignore:
+      - 'ios/**'
+      - 'ios-web/**'
+      - 'capacitor.config.json'
+      - 'scripts/ios-assets.mjs'
+      - '.github/workflows/ios.yml'
   workflow_dispatch:
 
 permissions:

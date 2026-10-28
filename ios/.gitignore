@@ -1,0 +1,19 @@
+App/build
+App/Pods
+App/output
+App/App/public
+DerivedData
+xcuserdata
+
+# Cordova plugins for Capacitor
+capacitor-cordova-ios-plugins
+
+# Generated Config files
+App/App/capacitor.config.json
+App/App/config.xml
+
+# Drawn by scripts/ios-assets.mjs during the iPhone build (the repo only keeps text)
+App/App/Assets.xcassets/AppIcon.appiconset/*.png
+App/App/Assets.xcassets/Splash.imageset/*.png
+# Made by `npx cap sync ios` (links into node_modules)
+App/CapApp-SPM/symlinks

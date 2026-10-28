@@ -23,7 +23,7 @@ import {
   addDays,
 } from '../letters/engine';
 import { CouchState, checkIn, couchLevel, emptyCouch, normalizeCouch } from '../couch';
-import { CloudDb, CloudUser, cloud, cloudEnabled, describeAuthError, signInAsTestUser, signInWithGoogle, signOut as cloudSignOut, watchAuth } from '../cloud/firebase';
+import { CloudDb, CloudUser, cloud, cloudEnabled, describeAuthError, signInAsTestUser, signInWithApple, signInWithGoogle, signOut as cloudSignOut, watchAuth } from '../cloud/firebase';
 import * as store from '../cloud/store';
 import { LiveChannel, browserChannel, firestoreChannel } from '../cloud/live';
 import { redeemForPlace } from '../cloud/plus';
@@ -130,7 +130,8 @@ interface AppContextType {
   signedInEmail: string | null;
   authError: string | null;
   clearAuthError: () => void;
-  signIn: () => Promise<void>;
+  /** Google everywhere; Apple too in the iPhone app */
+  signIn: (how?: 'google' | 'apple') => Promise<void>;
   signOut: () => Promise<void>;
   moveOnline: () => Promise<void>;
   openLive: <E extends { by: string; at: number }>(topic: LiveTopic) => LiveChannel<E>;
@@ -480,10 +481,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cloudReady, cloudSpaceId, uid]);
 
-  const signIn = async () => {
+  const signIn = async (how: 'google' | 'apple' = 'google') => {
     setAuthError(null);
     try {
-      await signInWithGoogle();
+      if (how === 'apple') await signInWithApple();
+      else await signInWithGoogle();
     } catch (err) {
       setAuthError(describeAuthError(err));
     }

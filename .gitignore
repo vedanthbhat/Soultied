@@ -8,3 +8,6 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# copied in by scripts/ios-assets.mjs
+ios-web/fonts

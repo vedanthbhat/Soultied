@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { plusError, savedPlusCodes } from '../cloud/plus';
+import { inApp } from '../cloud/firebase';
 
 const day = (ms: number) => new Date(ms).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
 
@@ -55,6 +56,9 @@ export const PlusCard: React.FC<{ onClose?: () => void; className?: string; head
       <p className="m-0 text-sm leading-snug">{blurb}</p>
       {demo || !cloudMode ? (
         <p className="m-0 text-sm text-[var(--muted)]">In your own place, either of you can add it.</p>
+      ) : inApp() ? (
+        // the iPhone app can't sell Plus yet (that comes through the App Store); a place that has it, has it here too
+        <p className="m-0 text-sm text-[var(--muted)]">Plus isn’t in the iPhone app yet. If your place already has it, it works here too.</p>
       ) : (
         <>
           {saved && (

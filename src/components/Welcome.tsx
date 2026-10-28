@@ -4,6 +4,7 @@ import { AvatarConfig } from '../types';
 import { DEFAULT_AVATAR_A, DEFAULT_AVATAR_B } from '../pixel/character';
 import { CharacterStudio } from '../lazy';
 import { EXTENSION_STORE_URL } from '../stream/protocol';
+import { inApp, inIosApp } from '../cloud/firebase';
 import type { Seat } from '../pixel/room';
 
 type Step = 'welcome' | 'details' | 'look' | 'invite' | 'join' | 'join-look';
@@ -25,7 +26,10 @@ export const Welcome: React.FC<Props> = ({ initialJoinCode, nudge = 0, onDraftSe
   const [step, setStep] = useState<Step>(initialJoinCode ? 'join' : 'welcome');
   // online, you sign in with Google before building a place or taking a seat
   const needSignIn = cloudEnabled && cloudStatus === 'signedOut';
-  const [signingIn, setSigningIn] = useState(false);
+  const [signingIn, setSigningIn] = useState<false | 'google' | 'apple'>(false);
+  // in the iPhone app: Apple's sign-in too, and none of the computer-only things (the Chrome extension, buying Plus on the web)
+  const app = inApp();
+  const apple = inIosApp();
   const [joining, setJoining] = useState(false);
 
   // create flow
@@ -46,7 +50,7 @@ export const Welcome: React.FC<Props> = ({ initialJoinCode, nudge = 0, onDraftSe
   const [watchShot, setWatchShot] = useState<string | null>(null);
   useEffect(() => {
     let alive = true;
-    import('../assets/watchShot').then((m) => alive && setWatchShot(m.WATCH_SHOT)).catch(() => undefined);
+    if (!inApp()) import('../assets/watchShot').then((m) => alive && setWatchShot(m.WATCH_SHOT)).catch(() => undefined);
     return () => {
       alive = false;
     };
@@ -89,9 +93,9 @@ export const Welcome: React.FC<Props> = ({ initialJoinCode, nudge = 0, onDraftSe
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cloudStatus, step]);
 
-  const doSignIn = async () => {
-    setSigningIn(true);
-    await signIn();
+  const doSignIn = async (how: 'google' | 'apple' = 'google') => {
+    setSigningIn(how);
+    await signIn(how);
     setSigningIn(false);
   };
 
@@ -139,15 +143,24 @@ export const Welcome: React.FC<Props> = ({ initialJoinCode, nudge = 0, onDraftSe
         <h2 className="text-3xl font-bold leading-tight mt-1">{step === 'join' ? 'Sign in to take your seat.' : 'Sign in to save your place.'}</h2>
         <p className="text-[var(--muted)] mt-1">
           {step === 'join'
-            ? 'Your seat is saved to your Google account, so you can come back from any phone or laptop.'
-            : 'Your place is saved to your Google account, so your person can join you from their own phone, and you can come back from anywhere.'}
+            ? `Your seat is saved to your ${apple ? '' : 'Google '}account, so you can come back from any phone or laptop.`
+            : `Your place is saved to your ${apple ? '' : 'Google '}account, so your person can join you from their own phone, and you can come back from anywhere.`}
         </p>
       </div>
-      <button className="px-btn text-lg" onClick={doSignIn} disabled={signingIn}>
-        {signingIn ? 'Opening Google…' : 'Continue with Google'}
+      <button className="px-btn text-lg" onClick={() => void doSignIn('google')} disabled={!!signingIn}>
+        {signingIn === 'google' ? 'Opening Google…' : 'Continue with Google'}
       </button>
+      {apple && (
+        <button className="px-btn px-btn--paper text-lg" onClick={() => void doSignIn('apple')} disabled={!!signingIn}>
+          {signingIn === 'apple' ? 'Opening Apple…' : 'Continue with Apple'}
+        </button>
+      )}
       {authError && <div className="px-inset text-sm p-3 text-[#7f3835]">{authError}</div>}
-      <p className="text-xs text-[var(--muted)]">We only use your Google account to sign you in. Your letters stay between the two of you.</p>
+      <p className="text-xs text-[var(--muted)]">
+        {apple
+          ? 'Already use Soultied on a computer? Pick the same one you used there. We only use it to sign you in, and your letters stay between the two of you.'
+          : 'We only use your Google account to sign you in. Your letters stay between the two of you.'}
+      </p>
       <button className="px-btn px-btn--paper self-start" onClick={() => setStep('welcome')}>
         Back
       </button>
@@ -202,40 +215,45 @@ export const Welcome: React.FC<Props> = ({ initialJoinCode, nudge = 0, onDraftSe
               >
                 Peek at a demo room
               </button>
-              <a className="px-link" href="/plus/">
-                Plus: cameras & voice →
-              </a>
+              {!app && (
+                <a className="px-link" href="/plus/">
+                  Plus: cameras & voice →
+                </a>
+              )}
             </div>
           </section>
 
-          <section className="px-box px-shadow px-pop flex flex-col gap-3 p-5 short:gap-2.5 short:px-5 short:py-4 min-w-0" aria-labelledby="door-watch">
-            <div>
-              <div className="text-xs font-semibold tracking-[0.16em] uppercase text-[var(--terracotta-d)]">Watch party · Netflix, Prime & more</div>
-              <h2 id="door-watch" className="text-2xl font-bold leading-tight mt-1 mb-0">
-                Watch together
-              </h2>
-            </div>
-            {/* on shorter screens (most laptops) the picture sits beside the line, so both cards fit without scrolling */}
-            <div className="flex flex-col gap-3 md:[@media(max-height:860px)]:flex-row md:[@media(max-height:860px)]:items-center">
-              <img
-                src={watchShot || BLANK}
-                alt="A Soultied watch party on a show: the chat beside the video and two pixel characters on a little couch in the corner."
-                width={480}
-                height={300}
-                className="block w-full h-auto shrink-0 md:[@media(max-height:860px)]:w-[50%]"
-                style={{ boxShadow: '0 0 0 3px var(--ink)' }}
-              />
-              <p className="m-0 leading-snug">Your shows in sync, with a chat. Free, no account.</p>
-            </div>
-            <div className="flex flex-wrap gap-3">
-              <a className="px-btn flex-1 whitespace-nowrap text-center text-base" href={EXTENSION_STORE_URL} target="_blank" rel="noopener">
-                Add to Chrome
-              </a>
-              <a className="px-btn px-btn--paper flex-1 whitespace-nowrap text-center text-base" href="/watch/">
-                How it works
-              </a>
-            </div>
-          </section>
+          {/* the watch-party extension is for computers: not shown in the iPhone app */}
+          {!app && (
+            <section className="px-box px-shadow px-pop flex flex-col gap-3 p-5 short:gap-2.5 short:px-5 short:py-4 min-w-0" aria-labelledby="door-watch">
+              <div>
+                <div className="text-xs font-semibold tracking-[0.16em] uppercase text-[var(--terracotta-d)]">Watch party · Netflix, Prime & more</div>
+                <h2 id="door-watch" className="text-2xl font-bold leading-tight mt-1 mb-0">
+                  Watch together
+                </h2>
+              </div>
+              {/* on shorter screens (most laptops) the picture sits beside the line, so both cards fit without scrolling */}
+              <div className="flex flex-col gap-3 md:[@media(max-height:860px)]:flex-row md:[@media(max-height:860px)]:items-center">
+                <img
+                  src={watchShot || BLANK}
+                  alt="A Soultied watch party on a show: the chat beside the video and two pixel characters on a little couch in the corner."
+                  width={480}
+                  height={300}
+                  className="block w-full h-auto shrink-0 md:[@media(max-height:860px)]:w-[50%]"
+                  style={{ boxShadow: '0 0 0 3px var(--ink)' }}
+                />
+                <p className="m-0 leading-snug">Your shows in sync, with a chat. Free, no account.</p>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <a className="px-btn flex-1 whitespace-nowrap text-center text-base" href={EXTENSION_STORE_URL} target="_blank" rel="noopener">
+                  Add to Chrome
+                </a>
+                <a className="px-btn px-btn--paper flex-1 whitespace-nowrap text-center text-base" href="/watch/">
+                  How it works
+                </a>
+              </div>
+            </section>
+          )}
 
           <nav className="px-box flex flex-wrap justify-center gap-x-4 gap-y-1 px-4 py-2 text-xs text-[var(--muted)]" aria-label="About Soultied">
             <a className="px-link" href="/terms/">Terms</a>
