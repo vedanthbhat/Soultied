@@ -1,12 +1,9 @@
-import { THIS_OR_THAT } from './deckThisOrThat';
-import { KNOW_ME } from './deckKnowMe';
-import { CONNECT } from './deckConnect';
-import { AFTER_DARK } from './deckAfterDark';
 import { JOURNEY, JOURNEY_DAYS } from './deckJourney';
 
 /**
- * Daily letters: five quick cards a day (This or That ×2, Know Me ×2,
- * Daily Connect ×1), plus an opt-in After dark set of three.
+ * Daily letters: five cards a day (This or That, Know Me, Who's more likely,
+ * Daily Connect or Far apart, and one In your words), plus an opt-in After
+ * dark set of three (flirty, or hot when you've both chosen it).
  *
  * Which cards a couple gets on a date is worked out from the couple's id and
  * the date, so both phones agree without asking a server. Each person's
@@ -21,12 +18,19 @@ import { JOURNEY, JOURNEY_DAYS } from './deckJourney';
  * both sealed.
  */
 
-export type CardKind = 'tot' | 'know' | 'connect' | 'spicy' | 'journey';
+export type CardKind = 'tot' | 'know' | 'connect' | 'spicy' | 'journey' | 'open' | 'likely' | 'distance' | 'hot';
 export type LetterKind = 'daily' | 'afterDark' | 'journey';
+
+/**
+ * choice: pick one of the options · open: answer in your own words · likely: pick one of you two
+ * ("Who's more likely to…"; option 0 is whoever's answering, 1 is their person)
+ */
+export type CardStyle = 'choice' | 'open' | 'likely';
 
 export interface Card {
   id: string;
   kind: CardKind;
+  style: CardStyle;
   prompt: string;
   options: string[];
   /** also guess what your partner picked */
@@ -39,10 +43,16 @@ export interface Card {
 }
 
 export interface CardAnswer {
+  /** the option picked (0 on an open card) */
   pick: number;
   guess?: number;
   note?: string;
+  /** an open card's answer, in your own words */
+  text?: string;
 }
+
+/** how long an answer in your own words can be */
+export const OPEN_MAX = 400;
 
 export interface UserLetter {
   cards: Record<string, CardAnswer>;
@@ -67,6 +77,8 @@ export interface LettersState {
   journeyStart?: string;
   /** each person's own switch; After dark opens only when both are on */
   afterDarkOn: Record<string, boolean>;
+  /** how hot each of you wants it: 1 flirty, 2 hot (the cards follow whichever of you is lower) */
+  afterDarkHeat: Record<string, number>;
   /** dates saved by the once-a-week streak mend */
   repairs: string[];
 }
@@ -76,95 +88,9 @@ export const emptyLetters = (): LettersState => ({
   afterDark: {},
   journey: {},
   afterDarkOn: {},
+  afterDarkHeat: {},
   repairs: [],
 });
-
-/* ---------- the card registry ---------- */
-
-const CARDS = new Map<string, Card>();
-const IDS: Record<CardKind, string[]> = {
-  tot: [],
-  know: [],
-  connect: [],
-  spicy: [],
-  journey: [],
-};
-const add = (c: Card) => {
-  CARDS.set(c.id, c);
-  IDS[c.kind].push(c.id);
-};
-
-THIS_OR_THAT.forEach((x, i) =>
-  add({
-    id: `tot-${i}`,
-    kind: 'tot',
-    prompt: x[2] || 'This or that?',
-    options: [x[0], x[1]],
-    guess: false,
-    note: false,
-  }),
-);
-KNOW_ME.forEach(([p, a, b, c, d], i) =>
-  add({
-    id: `know-${i}`,
-    kind: 'know',
-    prompt: p,
-    options: [a, b, c, d],
-    guess: true,
-    note: false,
-  }),
-);
-CONNECT.forEach(([p, a, b, c, d], i) =>
-  add({
-    id: `con-${i}`,
-    kind: 'connect',
-    prompt: p,
-    options: [a, b, c, d],
-    guess: false,
-    note: true,
-  }),
-);
-AFTER_DARK.forEach((x, i) =>
-  add(
-    x.length === 5
-      ? {
-          id: `ad-${i}`,
-          kind: 'spicy',
-          prompt: x[0],
-          options: x.slice(1),
-          guess: false,
-          note: false,
-        }
-      : {
-          id: `ad-${i}`,
-          kind: 'spicy',
-          prompt: x[2] || 'This or that?',
-          options: [x[0], x[1]],
-          guess: false,
-          note: false,
-        },
-  ),
-);
-
-JOURNEY.flatMap((ch) => ch.questions).forEach(([p, a, b, c, d], i) =>
-  add({
-    id: `jr-${i}`,
-    kind: 'journey',
-    prompt: p,
-    options: [a, b, c, d],
-    guess: true,
-    note: true,
-    // the last day: a letter to each other
-    ...(i === JOURNEY_DAYS - 1 ? { noteLabel: 'Write them a letter about this month', noteMax: 600 } : {}),
-  }),
-);
-
-export const cardById = (id: string) => CARDS.get(id);
-export const cardsOf = (ids: string[]) => ids.map((id) => CARDS.get(id)).filter((c): c is Card => !!c);
-
-/** "Chai or coffee?" reads better than a generic "This or that?" once answered. */
-export const cardTitle = (c: Card) =>
-  c.options.length === 2 && c.prompt === 'This or that?' ? `${c.options[0]} or ${c.options[1]}?` : c.prompt;
 
 export const KIND_LABEL: Record<CardKind, string> = {
   tot: 'This or that',
@@ -172,11 +98,15 @@ export const KIND_LABEL: Record<CardKind, string> = {
   connect: 'Daily connect',
   spicy: 'After dark',
   journey: '30 days',
+  open: 'In your words',
+  likely: 'Who’s more likely',
+  distance: 'Far apart',
+  hot: 'After dark · hot',
 };
 
 /* ---------- dates (YYYY-MM-DD, each person's local calendar) ---------- */
 
-const pad = (n: number) => String(n).padStart(2, '0');
+export const pad = (n: number) => String(n).padStart(2, '0');
 
 export function todayKey(d = new Date()) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -212,7 +142,45 @@ export function prettyDate(key: string, long = false) {
 
 /* ---------- which cards on which day ---------- */
 
-function hashStr(s: string) {
+/**
+ * How many cards each deck has, so working out today's cards doesn't need the decks themselves
+ * (they load with the letters; see cards.ts, which checks these). Append to a deck, bump its number.
+ */
+export const DECK_SIZES: Record<Exclude<CardKind, 'journey'>, number> = {
+  tot: 220,
+  know: 220,
+  connect: 120,
+  spicy: 160,
+  hot: 100,
+  distance: 120,
+  open: 200,
+  likely: 149,
+};
+
+/** card ids are the deck's prefix and the card's place in it ("tot-12") */
+export const ID_PREFIX: Record<CardKind, string> = {
+  tot: 'tot',
+  know: 'know',
+  connect: 'con',
+  spicy: 'ad',
+  hot: 'hot',
+  distance: 'far',
+  open: 'open',
+  likely: 'lk',
+  journey: 'jr',
+};
+
+const ID_LISTS = new Map<CardKind, string[]>();
+function idsOf(kind: Exclude<CardKind, 'journey'>) {
+  let ids = ID_LISTS.get(kind);
+  if (!ids) {
+    ids = Array.from({ length: DECK_SIZES[kind] }, (_, i) => `${ID_PREFIX[kind]}-${i}`);
+    ID_LISTS.set(kind, ids);
+  }
+  return ids;
+}
+
+export function hashStr(s: string) {
   let h = 2166136261;
   for (let i = 0; i < s.length; i++) {
     h ^= s.charCodeAt(i);
@@ -221,7 +189,7 @@ function hashStr(s: string) {
   return h >>> 0;
 }
 
-function rng(seed: number) {
+export function rng(seed: number) {
   let a = seed >>> 0;
   return () => {
     a = (a + 0x6d2b79f5) >>> 0;
@@ -262,74 +230,29 @@ function pick(ids: string[], perDay: number, seed: string, day: number) {
 
 /**
  * `startKey` is the couple's first day (a fixed date both phones agree on).
- * Counting from it means a couple's first two months never repeat a card.
+ * Counting from it means a couple's first months never repeat a card.
+ * `heat` is After dark's: 1 flirty, 2 hot (two hot cards and a flirty one).
  */
-export function cardsFor(kind: LetterKind, coupleId: string, dateKey: string, startKey: string) {
+export function cardsFor(kind: LetterKind, coupleId: string, dateKey: string, startKey: string, heat = 1) {
   if (kind === 'journey') {
     const n = journeyDayOf(dateKey);
     return n ? [`jr-${n - 1}`] : [];
   }
   const day = dayNumber(dateKey) - dayNumber(startKey);
-  if (kind === 'afterDark') return pick(IDS.spicy, 3, `${coupleId}:ad`, day);
-  return [
-    ...pick(IDS.tot, 2, `${coupleId}:tot`, day),
-    ...pick(IDS.know, 2, `${coupleId}:know`, day),
-    ...pick(IDS.connect, 1, `${coupleId}:con`, day),
-  ];
-}
-
-export function isAnswered(card: Card, a?: CardAnswer) {
-  if (!a || a.pick == null) return false;
-  if (card.guess && a.guess == null) return false;
-  return true;
-}
-
-/* ---------- scoring ---------- */
-
-export interface Score {
-  same: number;
-  total: number;
-  myGuesses: { right: number; total: number };
-  theirGuesses: { right: number; total: number };
-  /** the card worth talking about tonight (first one you split on, deepest first) */
-  talkAbout: string | null;
-}
-
-export function scoreDay(day: LetterDay, me: string, them: string): Score {
-  const cards = cardsOf(day.cardIds);
-  const mine = day.by[me]?.cards || {};
-  const theirs = day.by[them]?.cards || {};
-  const s: Score = {
-    same: 0,
-    total: cards.length,
-    myGuesses: { right: 0, total: 0 },
-    theirGuesses: { right: 0, total: 0 },
-    talkAbout: null,
-  };
-  const splits: Card[] = [];
-  for (const c of cards) {
-    const a = mine[c.id];
-    const b = theirs[c.id];
-    if (!a || !b) continue;
-    if (a.pick === b.pick) s.same++;
-    else splits.push(c);
-    if (c.guess) {
-      s.myGuesses.total++;
-      s.theirGuesses.total++;
-      if (a.guess === b.pick) s.myGuesses.right++;
-      if (b.guess === a.pick) s.theirGuesses.right++;
-    }
+  if (kind === 'afterDark') {
+    if (heat >= 2) return [...pick(idsOf('hot'), 2, `${coupleId}:hot`, day), ...pick(idsOf('spicy'), 1, `${coupleId}:ad`, day)];
+    return pick(idsOf('spicy'), 3, `${coupleId}:ad`, day);
   }
-  const depth: Record<CardKind, number> = {
-    journey: -1,
-    connect: 0,
-    spicy: 1,
-    know: 2,
-    tot: 3,
-  };
-  splits.sort((x, y) => depth[x.kind] - depth[y.kind] || y.options.length - x.options.length);
-  s.talkAbout = splits[0]?.id || null;
-  return s;
+  // the fourth card takes turns: Daily connect one day, Far apart the next
+  const half = Math.floor(day / 2);
+  const fourth = ((day % 2) + 2) % 2 === 0 ? pick(idsOf('connect'), 1, `${coupleId}:con`, half) : pick(idsOf('distance'), 1, `${coupleId}:far`, half);
+  return [
+    ...pick(idsOf('tot'), 1, `${coupleId}:tot`, day),
+    ...pick(idsOf('know'), 1, `${coupleId}:know`, day),
+    ...pick(idsOf('likely'), 1, `${coupleId}:lk`, day),
+    ...fourth,
+    ...pick(idsOf('open'), 1, `${coupleId}:open`, day),
+  ];
 }
 
 /* ---------- 30 days of knowing each other ---------- */
@@ -448,84 +371,3 @@ export function streakInfo(state: LettersState, today: string, sinceKey?: string
   return { current, best, together: done.size, week, mendable };
 }
 
-/* ---------- demo room history ---------- */
-
-const NOTES = [
-  'Can’t wait for December.',
-  'You make the distance feel smaller.',
-  'Call me tonight?',
-  'Still thinking about our last trip.',
-  'Proud of you, always.',
-  'Save me a seat on the couch.',
-];
-
-export function demoLetters(coupleId: string, startKey: string, a: string, b: string, today: string): LettersState {
-  const r = rng(hashStr(coupleId + today));
-  const st = emptyLetters();
-  const answer = (c: Card, other?: CardAnswer): CardAnswer => {
-    const n = c.options.length;
-    const pick = other && r() < 0.6 ? other.pick : Math.floor(r() * n);
-    return { pick };
-  };
-  const build = (key: string, who: 'both' | 'a' | 'b', note?: string) => {
-    const cardIds = cardsFor('daily', coupleId, key, startKey);
-    const cards = cardsOf(cardIds);
-    const A: UserLetter = { cards: {} };
-    const B: UserLetter = { cards: {} };
-    for (const c of cards) {
-      const x = answer(c);
-      const y = answer(c, x);
-      if (c.guess) {
-        x.guess = r() < 0.55 ? y.pick : Math.floor(r() * c.options.length);
-        y.guess = r() < 0.65 ? x.pick : Math.floor(r() * c.options.length);
-      }
-      if (c.note) {
-        if (r() < 0.5) x.note = NOTES[Math.floor(r() * NOTES.length)];
-        y.note = note || (r() < 0.6 ? NOTES[Math.floor(r() * NOTES.length)] : undefined);
-      }
-      A.cards[c.id] = x;
-      B.cards[c.id] = y;
-    }
-    const at = `${key}T21:${pad(10 + Math.floor(r() * 40))}:00`;
-    const day: LetterDay = { dateKey: key, cardIds, by: {} };
-    if (who !== 'b')
-      day.by[a] = {
-        ...A,
-        sealedAt: at,
-        seenAt: who === 'both' ? at : undefined,
-      };
-    if (who !== 'a')
-      day.by[b] = {
-        ...B,
-        sealedAt: at,
-        seenAt: who === 'both' ? at : undefined,
-      };
-    if (who === 'both') day.revealedAt = at;
-    st.daily[key] = day;
-  };
-  for (const back of [1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 12, 14, 16, 17]) build(addDays(today, -back), 'both');
-  build(addDays(today, -5), 'a');
-  build(today, 'b', 'Miss your laugh. Call tonight?');
-  st.afterDarkOn[b] = true;
-
-  // three days into the 30 days; Rohan has already answered day 4
-  st.journeyStart = addDays(today, -3);
-  const JNOTES = ['Same, always.', 'Okay this one made me smile.', 'Tell you the story on our call.'];
-  for (let n = 1; n <= 4; n++) {
-    const key = journeyKey(n);
-    const card = cardById(`jr-${n - 1}`)!;
-    const x = answer(card);
-    const y = answer(card, x);
-    x.guess = r() < 0.6 ? y.pick : Math.floor(r() * 4);
-    y.guess = r() < 0.6 ? x.pick : Math.floor(r() * 4);
-    if (n % 2) y.note = JNOTES[(n - 1) / 2];
-    const at = `${addDays(today, n - 4)}T22:${pad(10 + n)}:00`;
-    const day: LetterDay = { dateKey: key, cardIds: [card.id], by: { [b]: { cards: { [card.id]: y }, sealedAt: at, seenAt: n < 4 ? at : undefined } } };
-    if (n < 4) {
-      day.by[a] = { cards: { [card.id]: x }, sealedAt: at, seenAt: at };
-      day.revealedAt = at;
-    }
-    st.journey[key] = day;
-  }
-  return st;
-}

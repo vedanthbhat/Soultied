@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { UserProfile } from '../../types';
 import { AvatarThumb } from '../PixelAvatarRenderer';
 import { PixelIcon } from './PixelIcon';
-import { Card, CardAnswer, KIND_LABEL, LetterDay, cardTitle, cardsOf, isAnswered } from '../../letters/engine';
+import { Card, CardAnswer, KIND_LABEL, LetterDay, OPEN_MAX } from '../../letters/engine';
+import { cardTitle, cardsOf, isAnswered } from '../../letters/cards';
 
 interface Props {
   day: LetterDay;
@@ -31,6 +32,8 @@ export const LetterFlow: React.FC<Props> = ({ day, me, partner, night, tag, titl
   /** on a Know Me card: showing your own answer or your guess for your partner */
   const [mode, setMode] = useState<{ id: string; m: 'pick' | 'guess' } | null>(null);
   const [note, setNote] = useState('');
+  /** an answer in your own words, as you type it */
+  const [text, setText] = useState('');
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   const card: Card | undefined = cards[step];
@@ -39,14 +42,26 @@ export const LetterFlow: React.FC<Props> = ({ day, me, partner, night, tag, titl
   const guessing = !!card?.guess && ans?.pick != null && (mode?.id === card.id ? mode.m === 'guess' : ans.guess == null && !card.note);
   const setGuessing = (g: boolean) => card && setMode({ id: card.id, m: g ? 'guess' : 'pick' });
 
-  // entering a card: back to the top, and bring back any note already written
+  // entering a card: back to the top, and bring back any note or answer already written
   useEffect(() => {
     rootRef.current?.closest('.px-scroll')?.scrollTo({ top: 0 });
     setNote((card && answers[card.id]?.note) || '');
+    setText((card && answers[card.id]?.text) || '');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step]);
 
-  const go = (to: number) => setStep(Math.max(0, Math.min(cards.length, to)));
+  /** keep what you've written so far (leaving the card, or tapping away) */
+  const saveText = () => {
+    if (!card || card.style !== 'open') return;
+    const v = text.trim();
+    if (v === (ans?.text || '')) return;
+    if (v) onAnswer(card.id, { pick: 0, text: v });
+  };
+
+  const go = (to: number) => {
+    saveText();
+    setStep(Math.max(0, Math.min(cards.length, to)));
+  };
   const later = (fn: () => void) => window.setTimeout(fn, 170);
 
   const choose = (i: number) => {
@@ -113,8 +128,8 @@ export const LetterFlow: React.FC<Props> = ({ day, me, partner, night, tag, titl
                 >
                   <span className="flex-1 min-w-0 leading-snug">
                     <span className="block text-sm text-[var(--muted)]">{cardTitle(c)}</span>
-                    <span className="block font-semibold">
-                      {a ? c.options[a.pick] : '—'}
+                    <span className="block font-semibold whitespace-pre-line">
+                      {!a ? '—' : c.style === 'open' ? a.text || '—' : c.style === 'likely' ? (a.pick === 0 ? me.name : partner.name) : c.options[a.pick]}
                       {c.guess && a?.guess != null && (
                         <span className="font-normal text-sm text-[var(--muted)]">
                           {' '}
@@ -176,7 +191,38 @@ export const LetterFlow: React.FC<Props> = ({ day, me, partner, night, tag, titl
         )}
         <h3 className="text-2xl font-bold leading-snug m-0">{header}</h3>
 
-        {two ? (
+        {card.style === 'likely' ? (
+          <div className="grid grid-cols-2 gap-3" role="group" aria-label={header}>
+            {[me, partner].map((who, i) => (
+              <button
+                key={who.id}
+                className="px-option px-option--big flex flex-col items-center justify-center gap-1.5"
+                aria-pressed={ans?.pick === i}
+                onClick={() => choose(i)}
+              >
+                <AvatarThumb config={who.avatar} region="head" size={44} />
+                <span>{i === 0 ? `Me (${who.name})` : who.name}</span>
+              </button>
+            ))}
+          </div>
+        ) : card.style === 'open' ? (
+          <div className="flex flex-col gap-1.5">
+            <textarea
+              className="px-input"
+              rows={4}
+              value={text}
+              maxLength={OPEN_MAX}
+              onChange={(e) => setText(e.target.value)}
+              onBlur={saveText}
+              aria-label={card.prompt}
+              placeholder="In your own words"
+              autoFocus
+            />
+            <span className="text-sm text-[var(--muted)]">
+              {partner.name} reads this once you’ve both sealed · {OPEN_MAX - text.length} left
+            </span>
+          </div>
+        ) : two ? (
           <div className="grid items-center gap-3" style={{ gridTemplateColumns: '1fr auto 1fr' }}>
             <button className="px-option px-option--big" aria-pressed={ans?.pick === 0} onClick={() => choose(0)}>
               {card.options[0]}
@@ -239,13 +285,24 @@ export const LetterFlow: React.FC<Props> = ({ day, me, partner, night, tag, titl
         ) : (
           <span className="text-sm text-[var(--muted)]">
             {cards.length > 1
-              ? `${cards.length} cards · ${cards.length > 3 ? 'about 90 seconds' : 'under a minute'}`
+              ? `${cards.length} cards · ${cards.length > 3 ? 'about two minutes' : 'under a minute'}`
               : card.guess
                 ? `Your answer, then a guess at ${partner.name}’s`
                 : 'One card'}
           </span>
         )}
-        {card.note && !guessing ? (
+        {card.style === 'open' ? (
+          <button
+            className="px-btn shrink-0 whitespace-nowrap"
+            disabled={!text.trim()}
+            onClick={() => {
+              onAnswer(card.id, { pick: 0, text: text.trim() });
+              setStep(step + 1);
+            }}
+          >
+            Next →
+          </button>
+        ) : card.note && !guessing ? (
           <button className="px-btn shrink-0 whitespace-nowrap" disabled={!ans} onClick={saveNote}>
             Next →
           </button>

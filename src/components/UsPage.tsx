@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import { COUCH_STEPS, couchLine } from '../couch';
 import { PixelAvatarRenderer } from './PixelAvatarRenderer';
 import { PixelIcon, SpriteName } from './letters/PixelIcon';
-import { scoreDay } from '../letters/engine';
+import { scoreDay } from '../letters/cards';
 
 const Stat: React.FC<{ icon: SpriteName; value: string; label: string }> = ({ icon, value, label }) => (
   <div className="px-inset flex items-center gap-3 px-3.5 py-3">

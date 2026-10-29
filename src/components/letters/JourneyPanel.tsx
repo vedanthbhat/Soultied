@@ -4,7 +4,8 @@ import type { UserProfile } from '../../types';
 import { LetterFlow } from './LetterFlow';
 import { LetterReveal } from './LetterReveal';
 import { PixelIcon } from './PixelIcon';
-import { JOURNEY, JOURNEY_DAYS, LetterDay, addDays, cardsOf, journeyChapter, journeyKey, prettyDate } from '../../letters/engine';
+import { JOURNEY, JOURNEY_DAYS, LetterDay, addDays, journeyChapter, journeyKey, prettyDate } from '../../letters/engine';
+import { cardsOf } from '../../letters/cards';
 
 /**
  * 30 days of knowing each other: one question a day, five chapters, each a

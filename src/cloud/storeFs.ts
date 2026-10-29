@@ -4,6 +4,7 @@ import {
   arrayUnion,
   collection,
   doc,
+  documentId,
   getDoc,
   getDocs,
   limit,
@@ -179,8 +180,14 @@ export function subscribeSpace(db: Firestore, sid: string, sinceKey: string, onP
     onSnapshot(
       metaRef(db, sid, 'letters'),
       (s) => {
-        const v = (s.data() || {}) as { afterDarkOn?: Record<string, boolean>; repairs?: string[]; journeyStart?: string };
-        onPatch((d) => ({ ...d, afterDarkOn: v.afterDarkOn || {}, repairs: v.repairs || [], journeyStart: v.journeyStart || null }));
+        const v = (s.data() || {}) as { afterDarkOn?: Record<string, boolean>; afterDarkHeat?: Record<string, number>; repairs?: string[]; journeyStart?: string };
+        onPatch((d) => ({
+          ...d,
+          afterDarkOn: v.afterDarkOn || {},
+          afterDarkHeat: v.afterDarkHeat || {},
+          repairs: v.repairs || [],
+          journeyStart: v.journeyStart || null,
+        }));
       },
       onError
     ),
@@ -247,6 +254,20 @@ export const writeJourneyStart = (db: Firestore, sid: string, dateKey: string) =
 
 export const writeAfterDark = (db: Firestore, sid: string, uid: string, on: boolean) =>
   setDoc(metaRef(db, sid, 'letters'), { afterDarkOn: { [uid]: on } }, { merge: true });
+
+export const writeAfterDarkHeat = (db: Firestore, sid: string, uid: string, heat: number) =>
+  setDoc(metaRef(db, sid, 'letters'), { afterDarkHeat: { [uid]: heat } }, { merge: true });
+
+/** Letters from before `beforeKey` (newest first): the ones the live copy of the place doesn't keep. */
+export async function fetchLettersBefore(db: Firestore, sid: string, beforeKey: string, n: number) {
+  const snap = await getDocs(query(collection(db, 'spaces', sid, 'letters'), where('dateKey', '<', beforeKey), orderBy('dateKey', 'desc'), limit(n)));
+  const out: Array<{ kind: LetterKind; day: LetterDay }> = [];
+  snap.forEach((x) => {
+    const v = x.data() as LetterDay & { kind: LetterKind };
+    out.push({ kind: v.kind, day: { dateKey: v.dateKey, cardIds: v.cardIds || [], by: v.by || {}, revealedAt: v.revealedAt } });
+  });
+  return out;
+}
 
 export const writeRepair = (db: Firestore, sid: string, dateKey: string) =>
   setDoc(metaRef(db, sid, 'letters'), { repairs: arrayUnion(dateKey) }, { merge: true });
@@ -339,3 +360,31 @@ export const subscribeDecor = (db: Firestore, sid: string, fn: (d: DecorDoc) => 
 
 /** Merged in, so the two of you earning or buying at once never undo each other. */
 export const writeDecor = (db: Firestore, sid: string, patch: Partial<DecorDoc>) => setDoc(decorRef(db, sid), patch, { merge: true });
+
+/* ---------- the place's other shared things (see src/together/useSharedDoc.ts) ---------- */
+
+const metaNamed = (db: Firestore, sid: string, name: string) => doc(db, 'spaces', sid, 'meta', name);
+
+/** Firestore turns away `undefined`; dropping it the JSON way keeps everything else as it is. */
+const clean = <T,>(v: T): T => JSON.parse(JSON.stringify(v));
+
+export const subscribeMeta = (db: Firestore, sid: string, name: string, fn: (raw: unknown) => void) =>
+  onSnapshot(
+    metaNamed(db, sid, name),
+    (s) => fn(s.exists() ? s.data() : null),
+    () => undefined
+  );
+
+/** Merged in (nested maps too), so the two of you writing at once never undo each other. */
+export const writeMeta = (db: Firestore, sid: string, name: string, patch: object) => setDoc(metaNamed(db, sid, name), clean(patch), { merge: true });
+
+/** A whole document of its own (a photo, a doodle): written once, replaced whole. */
+export const writeMetaDoc = (db: Firestore, sid: string, name: string, value: object) => setDoc(metaNamed(db, sid, name), clean(value));
+
+/** Every `meta/{prefix}…` document (ids sort by when they were made), newest last. */
+export const subscribeMetaList = (db: Firestore, sid: string, prefix: string, fn: (docs: Array<{ id: string; data: unknown }>) => void) =>
+  onSnapshot(
+    query(collection(db, 'spaces', sid, 'meta'), where(documentId(), '>=', prefix), where(documentId(), '<', prefix + '\uf8ff')),
+    (s) => fn(s.docs.map((d) => ({ id: d.id, data: d.data() }))),
+    () => undefined
+  );

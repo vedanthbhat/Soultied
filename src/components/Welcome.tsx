@@ -209,8 +209,7 @@ export const Welcome: React.FC<Props> = ({ initialJoinCode, nudge = 0, onDraftSe
               <button
                 className="px-link"
                 onClick={() => {
-                  loadDemo();
-                  onDone();
+                  loadDemo().then(onDone);
                 }}
               >
                 Peek at a demo room

@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useRef } from 'react';
 import type { UserProfile } from '../../types';
 import { AvatarThumb } from '../PixelAvatarRenderer';
 import { PixelIcon } from './PixelIcon';
-import { KIND_LABEL, LetterDay, cardTitle, cardsOf, scoreDay } from '../../letters/engine';
+import { KIND_LABEL, LetterDay } from '../../letters/engine';
+import { cardTitle, cardsOf, sameAnswer, scoreDay } from '../../letters/cards';
 
 interface Props {
   day: LetterDay;
@@ -66,7 +67,7 @@ export const LetterReveal: React.FC<Props> = ({ day, me, partner, night, compact
       ) : (
         <div className="flex items-center gap-4 flex-wrap">
           <div className="flex items-center gap-1" aria-hidden="true">
-            {cards.map((_, i) => (
+            {Array.from({ length: score.total }, (_, i) => (
               <PixelIcon key={i} name={i < score.same ? 'heart' : 'heartEmpty'} scale={compact ? 2 : 3} />
             ))}
           </div>
@@ -89,8 +90,10 @@ export const LetterReveal: React.FC<Props> = ({ day, me, partner, night, compact
           <span className={`px-tag self-start ${night ? 'px-tag--night' : ''}`}>Talk about it tonight</span>
           <span className="font-semibold leading-snug">{cardTitle(talk)}</span>
           <span className="text-sm leading-snug">
-            You said <strong>{talk.options[mine[talk.id].pick]}</strong>, {partner.name} said{' '}
-            <strong>{talk.options[theirs[talk.id].pick]}</strong>. Ask each other why.
+            You said <strong>{talk.style === 'likely' ? (mine[talk.id].pick === 0 ? me.name : partner.name) : talk.options[mine[talk.id].pick]}</strong>,{' '}
+            {partner.name} said{' '}
+            <strong>{talk.style === 'likely' ? (theirs[talk.id].pick === 0 ? partner.name : me.name) : talk.options[theirs[talk.id].pick]}</strong>. Ask
+            each other why.
           </span>
         </div>
       )}
@@ -102,18 +105,33 @@ export const LetterReveal: React.FC<Props> = ({ day, me, partner, night, compact
           const a = mine[c.id];
           const b = theirs[c.id];
           if (!a || !b) return null;
-          const same = a.pick === b.pick;
+          const same = sameAnswer(c, a, b);
+          // what each of you said, in words: "Who's more likely" names one of you
+          const said = (x: typeof a, mineToo: boolean) =>
+            c.style === 'likely' ? ((x.pick === 0) === mineToo ? me.name : partner.name) : c.options[x.pick];
           return (
             <li key={c.id} className="flex flex-col gap-1.5">
               <div className="flex items-baseline gap-2 flex-wrap">
                 <span className={`px-tag ${night ? 'px-tag--night' : ''}`}>{tag || KIND_LABEL[c.kind]}</span>
                 <span className="font-semibold leading-snug">{cardTitle(c)}</span>
               </div>
-              {same ? (
+              {c.style === 'open' ? (
+                <div className="flex flex-col gap-1.5 pl-1">
+                  {[
+                    { who: me, text: a.text },
+                    { who: partner, text: b.text },
+                  ].map((n) => (
+                    <div key={n.who.id} className="px-inset px-3 py-2 flex items-start gap-2">
+                      <Head who={n.who} />
+                      <span className="leading-snug whitespace-pre-line">{n.text || '—'}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : same ? (
                 <div className="flex items-center gap-2 pl-1">
                   <Head who={me} />
                   <Head who={partner} />
-                  <span className="font-semibold">Both: {c.options[a.pick]}</span>
+                  <span className="font-semibold">Both: {said(a, true)}</span>
                   <PixelIcon name="check" scale={2} label="Same answer" />
                 </div>
               ) : (
@@ -124,10 +142,10 @@ export const LetterReveal: React.FC<Props> = ({ day, me, partner, night, compact
                   }}
                 >
                   <span className="flex items-center gap-2">
-                    <Head who={me} /> {c.options[a.pick]}
+                    <Head who={me} /> {said(a, true)}
                   </span>
                   <span className="flex items-center gap-2">
-                    <Head who={partner} /> {c.options[b.pick]}
+                    <Head who={partner} /> {said(b, false)}
                   </span>
                 </div>
               )}

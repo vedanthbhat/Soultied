@@ -13,16 +13,16 @@ import {
   journeyDayOf,
   journeyInfo,
   cardsFor,
-  cardsOf,
-  demoLetters,
   emptyLetters,
-  isAnswered,
-  scoreDay,
   streakInfo,
   todayKey,
   addDays,
 } from '../letters/engine';
 import { CouchState, checkIn, couchLevel, emptyCouch, normalizeCouch } from '../couch';
+
+/** the questions themselves load with the letters, not at the front door */
+type Cards = typeof import('../letters/cards');
+const loadCards = (): Promise<Cards> => import('../letters/cards');
 import { CloudDb, CloudUser, cloud, cloudEnabled, describeAuthError, signInAsTestUser, signInWithApple, signInWithGoogle, signOut as cloudSignOut, watchAuth } from '../cloud/firebase';
 import * as store from '../cloud/store';
 import { LiveChannel, browserChannel, firestoreChannel } from '../cloud/live';
@@ -89,6 +89,15 @@ interface AppContextType {
   markLetterSeen: (kind: LetterKind, dateKey: string) => void;
   setAfterDark: (on: boolean) => void;
   afterDarkOpen: boolean;
+  /** After dark for the two of you: 1 flirty, 2 hot (the lower of what you each chose) */
+  afterDarkHeat: number;
+  /** what I chose */
+  myHeat: number;
+  setAfterDarkHeat: (heat: number) => void;
+  /** online: letters older than the ones kept live (newest first) */
+  fetchOlderLetters: (beforeKey: string, n?: number) => Promise<LetterDay[]>;
+  /** the date the live copy of letters starts from (online); older ones come from fetchOlderLetters */
+  lettersSince: string | null;
   mendStreak: () => void;
   streak: StreakInfo;
   /** 30 days of knowing each other: where the two of you are */
@@ -118,7 +127,8 @@ interface AppContextType {
   }) => CoupleSpace;
   lookupInvite: (code: string) => Promise<InvitePreview | null>;
   joinWithCode: (code: string, name: string, avatar: AvatarConfig) => Promise<JoinResult>;
-  loadDemo: () => void;
+  /** open the demo room (once its letters have loaded) */
+  loadDemo: () => Promise<void>;
   resetAll: () => void;
   // online
   cloudEnabled: boolean;
@@ -197,7 +207,7 @@ function emptyState(): PersistedState {
   };
 }
 
-function demoState(): PersistedState {
+function demoState(demoLetters: Cards['demoLetters']): PersistedState {
   const now = new Date().toISOString();
   const createdAt = new Date(Date.now() - 21 * DAY).toISOString();
   return {
@@ -433,6 +443,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         journey: cloudData.journey,
         journeyStart: cloudData.journeyStart || undefined,
         afterDarkOn: cloudData.afterDarkOn,
+        afterDarkHeat: cloudData.afterDarkHeat,
         repairs: cloudData.repairs,
       },
       activities: cloudData.activities,
@@ -587,8 +598,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const partnerOf = (s: PersistedState, id: string) => (id === s.userA.id ? s.userB : s.userA);
   const bucket = (kind: LetterKind) => kind;
 
+  const heatOf = (s: PersistedState) => {
+    const ids = [s.userA.id, s.userB?.id].filter((x): x is string => !!x);
+    return ids.length < 2 ? 1 : Math.max(1, Math.min(...ids.map((id) => s.letters.afterDarkHeat?.[id] || 1)));
+  };
   const makeDay = (s: PersistedState, kind: LetterKind, dateKey: string): LetterDay | null =>
-    s.space ? { dateKey, cardIds: cardsFor(kind, s.space.id, dateKey, startKeyOf(s.space)), by: {} } : null;
+    s.space ? { dateKey, cardIds: cardsFor(kind, s.space.id, dateKey, startKeyOf(s.space), kind === 'afterDark' ? heatOf(s) : 1), by: {} } : null;
 
   const getLetter: AppContextType['getLetter'] = (kind, dateKey = today) => eff.letters[bucket(kind)][dateKey] || makeDay(eff, kind, dateKey);
 
@@ -620,6 +635,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const sealLetter: AppContextType['sealLetter'] = (kind, dateKey) => {
+    loadCards()
+      .then((cards) => sealWith(cards, kind, dateKey))
+      .catch(warn('seal'));
+  };
+
+  const sealWith = ({ cardsOf, isAnswered, scoreDay }: Cards, kind: LetterKind, dateKey: string) => {
     const o = online();
     if (o) {
       const d = getLetter(kind, dateKey);
@@ -710,6 +731,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
     setState((s) => ({ ...s, letters: { ...s.letters, afterDarkOn: { ...s.letters.afterDarkOn, [meId(s)]: on } } }));
+  };
+
+  const setAfterDarkHeat = (heat: number) => {
+    const h = heat >= 2 ? 2 : 1;
+    const o = online();
+    if (o) {
+      store.writeAfterDarkHeat(o.db, o.sid, o.uid, h).catch(warn('after dark heat'));
+      return;
+    }
+    setState((s) => ({ ...s, letters: { ...s.letters, afterDarkHeat: { ...s.letters.afterDarkHeat, [meId(s)]: h } } }));
+  };
+
+  const lettersSince = cloudMode ? addDays(today, -60) : null;
+  const fetchOlderLetters = async (beforeKey: string, n = 30): Promise<LetterDay[]> => {
+    const o = online();
+    if (!o) return [];
+    const rows = await store.fetchLettersBefore(o.db, o.sid, beforeKey, n);
+    return rows.filter((r) => r.kind === 'daily').map((r) => r.day);
   };
 
   /* ---------- 30 days of knowing each other ---------- */
@@ -910,19 +949,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return 'ok';
   };
 
-  const loadDemo = () => {
-    setPanel(null);
-    setDemo(true);
-    // back for another peek the same day: pick up where you left off
-    let saved: PersistedState | null = null;
-    try {
-      const d = JSON.parse(localStorage.getItem(DEMO_KEY) || 'null') as { day?: string; state?: PersistedState } | null;
-      if (d?.day === todayKey() && d.state?.space?.id === 'space-demo') saved = { ...demoState(), ...d.state, couch: normalizeCouch(d.state.couch) };
-    } catch {
-      // a fresh demo, then
-    }
-    setState(saved || demoState());
-  };
+  const loadDemo = () =>
+    loadCards()
+      .then(({ demoLetters }) => {
+        setPanel(null);
+        setDemo(true);
+        // back for another peek the same day: pick up where you left off
+        let saved: PersistedState | null = null;
+        try {
+          const d = JSON.parse(localStorage.getItem(DEMO_KEY) || 'null') as { day?: string; state?: PersistedState } | null;
+          if (d?.day === todayKey() && d.state?.space?.id === 'space-demo')
+            saved = { ...demoState(demoLetters), ...d.state, couch: normalizeCouch(d.state.couch) };
+        } catch {
+          // a fresh demo, then
+        }
+        setState(saved || demoState(demoLetters));
+      })
+      .catch(warn('demo'));
 
   const resetAll = () => {
     // in the demo, "start over" just steps back out: your own place is untouched
@@ -995,6 +1038,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         markLetterSeen,
         setAfterDark,
         afterDarkOpen,
+        afterDarkHeat: heatOf(eff),
+        myHeat: eff.letters.afterDarkHeat?.[currentUser.id] || 1,
+        setAfterDarkHeat,
+        fetchOlderLetters,
+        lettersSince,
         mendStreak,
         streak,
         journey,

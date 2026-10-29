@@ -44,6 +44,7 @@ export interface CloudData {
   afterDark: Record<string, LetterDay>;
   journey: Record<string, LetterDay>;
   afterDarkOn: Record<string, boolean>;
+  afterDarkHeat: Record<string, number>;
   repairs: string[];
   journeyStart: string | null;
   couch: CouchState;
@@ -59,6 +60,7 @@ export const emptyCloudData = (): CloudData => ({
   afterDark: {},
   journey: {},
   afterDarkOn: {},
+  afterDarkHeat: {},
   repairs: [],
   journeyStart: null,
   couch: { seen: {}, together: [], shown: {} },
@@ -126,6 +128,8 @@ export const subscribeGame = listen('subscribeGame');
 export const subscribeDoodleCanvas = listen('subscribeDoodleCanvas');
 export const subscribeTurntable = listen('subscribeTurntable');
 export const subscribeDecor = listen('subscribeDecor');
+export const subscribeMeta = listen('subscribeMeta');
+export const subscribeMetaList = listen('subscribeMetaList');
 
 /* ---------- writing ---------- */
 
@@ -145,3 +149,7 @@ export const writeGame = later('writeGame');
 export const writeDoodleCanvas = later('writeDoodleCanvas');
 export const writeTurntable = later('writeTurntable');
 export const writeDecor = later('writeDecor');
+export const writeAfterDarkHeat = later('writeAfterDarkHeat');
+export const fetchLettersBefore = later('fetchLettersBefore');
+export const writeMeta = later('writeMeta');
+export const writeMetaDoc = later('writeMetaDoc');

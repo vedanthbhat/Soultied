@@ -21,6 +21,7 @@ import { noteFor, waitingLabel } from './games/registry';
 import { TurntableProvider, useTurntable } from './music/TurntableContext';
 import { NowPlaying } from './components/NowPlaying';
 import { DecorProvider, useDecor } from './decor/DecorContext';
+import { TogetherProvider, useTogether } from './together/TogetherContext';
 import type { SlotId } from './decor/catalogue';
 import { PixelIcon } from './components/letters/PixelIcon';
 import { roomSound } from './escape/sfx';
@@ -130,6 +131,7 @@ const Home: React.FC = () => {
   const games = useGames();
   const turntable = useTurntable();
   const decor = useDecor();
+  const { asks } = useTogether();
   const [joinCode] = useState(readJoinCode);
   const [welcomeOpen, setWelcomeOpen] = useState(() => !setupComplete || !!joinCode);
   const [draftSeats, setDraftSeats] = useState<{ left: Seat; right: Seat } | null>(null);
@@ -148,7 +150,9 @@ const Home: React.FC = () => {
 
   // the 30 days: a day waiting for you, or one that's just opened
   const journeyWaiting = !!partnerUser && journey.started && (journey.next !== null || journey.unseen !== null);
-  const letterUnread = letterBadge !== null || journeyWaiting;
+  // a question your person wrote for you, or one that's just opened
+  const askWaiting = !!partnerUser && (asks.forMe.length > 0 || asks.fresh.length > 0);
+  const letterUnread = letterBadge !== null || journeyWaiting || askWaiting;
   const partnerSealed = !!partnerUser && !!getLetter('daily')?.by[partnerUser.id]?.sealedAt;
 
   // the welcome screen: both seats are empty, and most people tap a "+" first
@@ -172,11 +176,15 @@ const Home: React.FC = () => {
             ? partnerSealed
               ? `${partnerUser?.name} is waiting on today’s letter ✉`
               : 'Today’s letter ✉'
-            : journeyWaiting
-              ? journey.unseen !== null
-                ? `Day ${journey.unseen} of your 30 days is open ✉`
-                : `Day ${journey.next} of your 30 days ✉`
-              : 'Letters',
+            : askWaiting
+              ? asks.forMe.length
+                ? `${partnerUser?.name} asked you something ✉`
+                : `${partnerUser?.name} answered your question ✉`
+              : journeyWaiting
+                ? journey.unseen !== null
+                  ? `Day ${journey.unseen} of your 30 days is open ✉`
+                  : `Day ${journey.next} of your 30 days ✉`
+                : 'Letters',
       fire: 'Poke the fire',
       photo: 'Us',
       remote: 'Watch something together',
@@ -194,7 +202,7 @@ const Home: React.FC = () => {
     if (guest) l.right = guest.id === currentUser.id ? meLabel : guest.name;
     else l.right = `Invite ${space?.partnerPlaceholderName || 'your person'}`;
     return l;
-  }, [welcomeOpen, seatsEmpty, letterBadge, partnerSealed, partnerUser, currentUser, host, guest, space, games.waiting, turntable.on, turntable.track, journeyWaiting, journey.next, journey.unseen, panel]);
+  }, [welcomeOpen, seatsEmpty, letterBadge, partnerSealed, partnerUser, currentUser, host, guest, space, games.waiting, turntable.on, turntable.track, journeyWaiting, journey.next, journey.unseen, panel, askWaiting, asks.forMe.length]);
 
   const onHotspot = (id: HotspotId) => {
     roomSound(id);
@@ -374,7 +382,11 @@ const Home: React.FC = () => {
           {(panel === 'question' || panel === 'questions') && (
             <PixelPanel title="Letters" kicker={prettyDate(today, true)} onClose={() => openPanel(null)} width={680}>
               <Suspense fallback={<Opening />}>
-                <LettersPanel initialTab={panel === 'questions' ? 'past' : letterBadge === null && journeyWaiting ? 'journey' : 'today'} />
+                <LettersPanel
+                  initialTab={
+                    panel === 'questions' ? 'past' : letterBadge !== null ? 'today' : askWaiting ? 'ask' : journeyWaiting ? 'journey' : 'today'
+                  }
+                />
               </Suspense>
             </PixelPanel>
           )}
@@ -415,7 +427,9 @@ export default function App() {
         <TurntableProvider>
           <GamesProvider>
             <DecorProvider>
-              <Home />
+              <TogetherProvider>
+                <Home />
+              </TogetherProvider>
             </DecorProvider>
           </GamesProvider>
         </TurntableProvider>

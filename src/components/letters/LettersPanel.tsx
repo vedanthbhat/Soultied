@@ -4,10 +4,13 @@ import type { UserProfile } from '../../types';
 import { LetterFlow } from './LetterFlow';
 import { LetterReveal } from './LetterReveal';
 import { JourneyPanel } from './JourneyPanel';
+import { AskPanel } from './AskPanel';
 import { PixelIcon } from './PixelIcon';
-import { LetterKind, LetterDay, prettyDate, scoreDay } from '../../letters/engine';
+import { LetterKind, LetterDay, prettyDate } from '../../letters/engine';
+import { scoreDay } from '../../letters/cards';
+import { useTogether } from '../../together/TogetherContext';
 
-export type LettersTab = 'today' | 'journey' | 'afterdark' | 'past';
+export type LettersTab = 'today' | 'journey' | 'ask' | 'afterdark' | 'past';
 
 /* ---------- streak ---------- */
 
@@ -120,6 +123,38 @@ const LetterView: React.FC<{
 
 /* ---------- After dark ---------- */
 
+/** Flirty or hot: each of you chooses, and the cards follow whichever of you chose the milder one. */
+const Heat: React.FC<{ partner: UserProfile }> = ({ partner }) => {
+  const { myHeat, afterDarkHeat, setAfterDarkHeat } = useApp();
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-sm opacity-90">How daring?</span>
+        {[
+          { h: 1, label: 'Flirty' },
+          { h: 2, label: 'Hot' },
+        ].map((o) => (
+          <button
+            key={o.h}
+            className={`px-btn px-btn--small ${myHeat === o.h ? '' : 'px-btn--paper'}`}
+            aria-pressed={myHeat === o.h}
+            onClick={() => setAfterDarkHeat(o.h)}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+      <p className="m-0 text-sm opacity-80 leading-snug">
+        {myHeat >= 2 && afterDarkHeat < 2
+          ? `Hot cards start once ${partner.name} picks Hot too. Until then, it stays flirty.`
+          : myHeat >= 2
+            ? 'You both picked Hot: two bold cards and a flirty one each night, from the next letter you start.'
+            : 'Flirty: suggestive, never explicit. Pick Hot for bolder cards (only if you both do).'}
+      </p>
+    </div>
+  );
+};
+
 const AfterDark: React.FC<{ me: UserProfile; partner: UserProfile }> = ({ me, partner }) => {
   const { letters, setAfterDark, afterDarkOpen } = useApp();
   const [adult, setAdult] = useState(false);
@@ -171,7 +206,12 @@ const AfterDark: React.FC<{ me: UserProfile; partner: UserProfile }> = ({ me, pa
 
   return (
     <div className="flex flex-col gap-4">
-      {box(<p className="m-0 leading-snug opacity-90">Tonight’s three. Same rules: answer in secret, it opens when you’ve both sealed.</p>)}
+      {box(
+        <>
+          <p className="m-0 leading-snug opacity-90">Tonight’s three. Same rules: answer in secret, it opens when you’ve both sealed.</p>
+          <Heat partner={partner} />
+        </>
+      )}
       <LetterView kind="afterDark" me={me} partner={partner} />
       <button className="px-link self-start text-sm" onClick={() => setAfterDark(false)}>
         Switch After dark off for me
@@ -183,21 +223,48 @@ const AfterDark: React.FC<{ me: UserProfile; partner: UserProfile }> = ({ me, pa
 /* ---------- Past letters ---------- */
 
 const Past: React.FC<{ me: UserProfile; partner: UserProfile }> = ({ me, partner }) => {
-  const { letters, today } = useApp();
+  const { letters, today, lettersSince, fetchOlderLetters } = useApp();
   const [open, setOpen] = useState<string | null>(null);
-  const days = useMemo(
-    () =>
-      Object.values(letters.daily)
-        .filter((d) => d.dateKey < today && Object.values(d.by).some((u) => u.sealedAt))
-        .sort((a, b) => (a.dateKey < b.dateKey ? 1 : -1)),
-    [letters.daily, today],
+  // online, only the last two months are kept live; anything older is fetched when you ask for it
+  const [older, setOlder] = useState<LetterDay[]>([]);
+  const [olderState, setOlderState] = useState<'idle' | 'loading' | 'done' | 'failed'>('idle');
+  const days = useMemo(() => {
+    const all = new Map<string, LetterDay>();
+    [...older, ...Object.values(letters.daily)].forEach((d) => all.set(d.dateKey, d));
+    return [...all.values()]
+      .filter((d) => d.dateKey < today && Object.values(d.by).some((u) => u.sealedAt))
+      .sort((a, b) => (a.dateKey < b.dateKey ? 1 : -1));
+  }, [letters.daily, older, today]);
+
+  const loadOlder = async () => {
+    const oldest = older.length ? older[older.length - 1].dateKey : lettersSince;
+    if (!oldest) return;
+    setOlderState('loading');
+    try {
+      const more = await fetchOlderLetters(oldest, 30);
+      setOlder((o) => [...o, ...more].sort((a, b) => (a.dateKey < b.dateKey ? 1 : -1)));
+      setOlderState(more.length < 30 ? 'done' : 'idle');
+    } catch {
+      setOlderState('failed');
+    }
+  };
+  const moreButton = lettersSince && olderState !== 'done' && (
+    <button className="px-btn px-btn--paper px-btn--small self-start" disabled={olderState === 'loading'} onClick={loadOlder}>
+      {olderState === 'loading' ? 'Finding them…' : olderState === 'failed' ? 'Couldn’t load them. Try again' : 'Show older letters'}
+    </button>
   );
 
   if (!days.length) {
-    return <p className="m-0 text-[var(--muted)]">Letters you open together will collect here, day by day.</p>;
+    return (
+      <div className="flex flex-col gap-3">
+        <p className="m-0 text-[var(--muted)]">Letters you open together will collect here, day by day, for as long as you’re here.</p>
+        {moreButton}
+      </div>
+    );
   }
 
   return (
+    <div className="flex flex-col gap-3">
     <ol className="flex flex-col gap-2.5 list-none p-0 m-0">
       {days.map((d) => {
         const sc = d.revealedAt ? scoreDay(d, me.id, partner.id) : null;
@@ -238,6 +305,8 @@ const Past: React.FC<{ me: UserProfile; partner: UserProfile }> = ({ me, partner
         );
       })}
     </ol>
+    {moreButton}
+    </div>
   );
 };
 
@@ -267,6 +336,7 @@ const JourneyNudge: React.FC<{ onOpen: () => void }> = ({ onOpen }) => {
 
 export const LettersPanel: React.FC<{ initialTab?: LettersTab }> = ({ initialTab = 'today' }) => {
   const { currentUser, partnerUser, space, openPanel, afterDarkOpen, journey } = useApp();
+  const { asks } = useTogether();
   const [tab, setTab] = useState<LettersTab>(initialTab);
 
   if (!partnerUser) {
@@ -287,6 +357,7 @@ export const LettersPanel: React.FC<{ initialTab?: LettersTab }> = ({ initialTab
   const tabs: Array<{ id: LettersTab; label: string }> = [
     { id: 'today', label: 'Today' },
     { id: 'journey', label: journey.started && (journey.next !== null || journey.unseen !== null) ? '30 days •' : '30 days' },
+    { id: 'ask', label: asks.forMe.length || asks.fresh.length ? `Ask • ${asks.forMe.length + asks.fresh.length}` : 'Ask' },
     { id: 'afterdark', label: afterDarkOpen ? 'After dark ☾' : 'After dark' },
     { id: 'past', label: 'Past' },
   ];
@@ -307,6 +378,7 @@ export const LettersPanel: React.FC<{ initialTab?: LettersTab }> = ({ initialTab
         </>
       )}
       {tab === 'journey' && <JourneyPanel me={currentUser} partner={partnerUser} />}
+      {tab === 'ask' && <AskPanel me={currentUser} partner={partnerUser} />}
       {tab === 'afterdark' && <AfterDark me={currentUser} partner={partnerUser} />}
       {tab === 'past' && <Past me={currentUser} partner={partnerUser} />}
       {(tab === 'today' || tab === 'past') && <StreakStrip />}
