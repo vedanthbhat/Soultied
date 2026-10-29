@@ -83,14 +83,16 @@ export const SPRITES = {
 export type SpriteName = keyof typeof SPRITES;
 
 export const PixelIcon: React.FC<{
-  name: SpriteName;
+  /** one of the sprites above, or `sprite` for any other little picture */
+  name?: SpriteName;
+  sprite?: Sprite;
   scale?: number;
   label?: string;
   className?: string;
   style?: React.CSSProperties;
-}> = ({ name, scale = 3, label, className = '', style }) => {
+}> = ({ name, sprite: own, scale = 3, label, className = '', style }) => {
   const ref = useRef<HTMLCanvasElement | null>(null);
-  const sprite: Sprite = SPRITES[name];
+  const sprite: Sprite = own || SPRITES[name || 'heart'];
   const w = Math.max(...sprite.rows.map((r) => r.length));
   const h = sprite.rows.length;
 

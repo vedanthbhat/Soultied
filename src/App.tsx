@@ -22,6 +22,8 @@ import { TurntableProvider, useTurntable } from './music/TurntableContext';
 import { NowPlaying } from './components/NowPlaying';
 import { DecorProvider, useDecor } from './decor/DecorContext';
 import { TogetherProvider, useTogether } from './together/TogetherContext';
+import { type TouchKind, moodGlyph, moodLine, touchDef, touchSummary } from './together/moods';
+import { MeCard, ThemCard, ago } from './components/SeatCard';
 import type { SlotId } from './decor/catalogue';
 import { PixelIcon } from './components/letters/PixelIcon';
 import { roomSound } from './escape/sfx';
@@ -125,16 +127,37 @@ const EarnNote: React.FC = () => {
   );
 };
 
+/** what to say on the button that sends the same touch straight back */
+const BACK: Record<TouchKind, string> = {
+  hug: 'Hug back',
+  kiss: 'Kiss back',
+  forehead: 'Kiss back',
+  highfive: 'High five back',
+  hands: 'Hold on tight',
+  boop: 'Boop back',
+};
+
 const Home: React.FC = () => {
   const { setupComplete, currentUser, partnerUser, space, panel, openPanel, letterBadge, getLetter, today, journey } = useApp();
   const { couchLevel, couchShown, markCouchShown, cloudStatus, demo } = useApp();
   const games = useGames();
   const turntable = useTurntable();
   const decor = useDecor();
-  const { asks } = useTogether();
+  const together = useTogether();
+  const { asks, myMood, theirMood, roomTouch, touchNews, moodNews, lastSent } = together;
   const [joinCode] = useState(readJoinCode);
   const [welcomeOpen, setWelcomeOpen] = useState(() => !setupComplete || !!joinCode);
   const [draftSeats, setDraftSeats] = useState<{ left: Seat; right: Seat } | null>(null);
+  // the card over a seat: how you're feeling, or a hug for them
+  const [seatCard, setSeatCard] = useState<'left' | 'right' | null>(null);
+  const seatClosed = React.useRef({ id: '', at: 0 });
+  const closeSeatCard = () => {
+    if (seatCard) seatClosed.current = { id: seatCard, at: Date.now() };
+    setSeatCard(null);
+  };
+  useEffect(() => {
+    if (panel) setSeatCard(null);
+  }, [panel]);
 
   // If the app is reset from inside, go back to the welcome sheet.
   useEffect(() => {
@@ -197,12 +220,13 @@ const Home: React.FC = () => {
       music: turntable.on ? `Lift the needle${turntable.track ? ` · ${turntable.track.title}` : ''}` : 'Put a record on',
       decor: panel === 'decor' ? 'Choose a painting' : 'Decorate the room',
     };
-    const meLabel = `${currentUser.name} · change my look`;
-    if (host) l.left = host.id === currentUser.id ? meLabel : host.name;
-    if (guest) l.right = guest.id === currentUser.id ? meLabel : guest.name;
+    const meLabel = `${currentUser.name} · ${myMood ? moodLine(myMood) : 'how are you feeling?'}`;
+    const themLabel = (u: UserProfile) => [u.name, theirMood && moodLine(theirMood), 'send a hug'].filter(Boolean).join(' · ');
+    if (host) l.left = host.id === currentUser.id ? meLabel : themLabel(host);
+    if (guest) l.right = guest.id === currentUser.id ? meLabel : themLabel(guest);
     else l.right = `Invite ${space?.partnerPlaceholderName || 'your person'}`;
     return l;
-  }, [welcomeOpen, seatsEmpty, letterBadge, partnerSealed, partnerUser, currentUser, host, guest, space, games.waiting, turntable.on, turntable.track, journeyWaiting, journey.next, journey.unseen, panel, askWaiting, asks.forMe.length]);
+  }, [welcomeOpen, seatsEmpty, letterBadge, partnerSealed, partnerUser, currentUser, host, guest, space, games.waiting, turntable.on, turntable.track, journeyWaiting, journey.next, journey.unseen, panel, askWaiting, asks.forMe.length, myMood, theirMood]);
 
   const onHotspot = (id: HotspotId) => {
     roomSound(id);
@@ -220,10 +244,63 @@ const Home: React.FC = () => {
     else if (id === 'left' || id === 'right') {
       const who = id === 'left' ? host : guest;
       if (!who) openPanel('space');
-      else if (who.id === currentUser.id) openPanel('wardrobe');
-      else openPanel('us');
+      // tapping the same seat again closes its card (the tap itself already did)
+      else if (!(seatClosed.current.id === id && Date.now() - seatClosed.current.at < 400)) setSeatCard(id);
     }
   };
+
+  // how each of you is feeling, over your heads; and a touch playing on the couch
+  const moodOf = (u: UserProfile | null) => (!u ? null : u.id === currentUser.id ? myMood : theirMood);
+  const roomMoods = welcomeOpen ? undefined : { left: moodGlyph(moodOf(host)), right: moodGlyph(moodOf(guest)) };
+  const playTouch =
+    !welcomeOpen && roomTouch
+      ? { id: roomTouch.id, kind: roomTouch.kind, together: touchDef(roomTouch.kind).together, from: roomTouch.by === host?.id ? ('left' as const) : ('right' as const), glyph: touchDef(roomTouch.kind) }
+      : null;
+  const seatWho = seatCard === 'left' ? host : seatCard === 'right' ? guest : null;
+  const seatPop =
+    seatCard && seatWho && !welcomeOpen && !panel
+      ? {
+          at: seatCard,
+          onClose: closeSeatCard,
+          node:
+            seatWho.id === currentUser.id ? (
+              <MeCard
+                partner={partnerUser}
+                onLook={() => {
+                  setSeatCard(null);
+                  openPanel('wardrobe');
+                }}
+              />
+            ) : (
+              <ThemCard
+                partner={seatWho}
+                // on a phone the card covers the couch: tuck it away so you can watch the hug
+                onSent={() => window.innerWidth < 640 && window.setTimeout(() => setSeatCard(null), 250)}
+                onUs={() => {
+                  setSeatCard(null);
+                  openPanel('us');
+                }}
+              />
+            ),
+        }
+      : null;
+
+  // a touch that came in, or a new mood: a small note along the bottom
+  const touchNote = useMemo(() => {
+    if (!partnerUser || !touchNews.length) return null;
+    const newest = touchNews[0];
+    const d = touchDef(newest.kind);
+    if (touchNews.length > 1) return { kind: newest.kind, text: `${partnerUser.name} sent you ${touchSummary(touchNews)}.` };
+    const back = !!lastSent && lastSent.kind === newest.kind && newest.at - lastSent.at > 0 && newest.at - lastSent.at < 3 * 60e3 && newest.kind !== 'hands';
+    const old = Date.now() - newest.at > 5 * 60e3;
+    return { kind: newest.kind, text: `${partnerUser.name} ${d.did}${back ? ' back' : ''}.${old ? ` (${ago(newest.at)})` : ''}` };
+  }, [partnerUser, touchNews, lastSent]);
+  const moodNote =
+    partnerUser && moodNews && seatWho?.id !== partnerUser.id
+      ? moodNews.mood
+        ? `${partnerUser.name} is ${moodLine(moodNews).replace(' · ', ': ')}`
+        : `${partnerUser.name}: “${moodNews.text}”`
+      : null;
 
   const seats = welcomeOpen && draftSeats ? draftSeats : { left: liveLeft, right: liveRight };
 
@@ -319,6 +396,9 @@ const Home: React.FC = () => {
         decor={decor.shown}
         focusX={panel === 'decor' ? DECOR_FOCUS[decor.slot] : undefined}
         closeness={closeness}
+        moods={roomMoods}
+        touch={playTouch}
+        pop={seatPop}
         scoot={scootGo}
         onScooted={(c) => {
           if (scootPending && c * COUCH_STEPS >= couchLevel - 1e-6) {
@@ -331,7 +411,48 @@ const Home: React.FC = () => {
       {!welcomeOpen && !veil && panel !== 'decor' && <StreamChip />}
       {!welcomeOpen && !veil && panel !== 'decor' && <NowPlaying />}
 
-      {gameNote && !welcomeOpen && !veil && !couchNote && (
+      {touchNote && !welcomeOpen && !veil && !couchNote && !seatCard && !panel && (
+        <div className="fixed left-1/2 bottom-5 z-30 -translate-x-1/2 px-ui w-[min(92vw,520px)]" role="status">
+          <div className="px-box px-shadow px-fade px-3 py-2 flex items-center gap-3 flex-wrap justify-center">
+            <PixelIcon sprite={touchDef(touchNote.kind)} scale={3} />
+            <span className="text-sm leading-snug flex-1 min-w-[180px]">{touchNote.text}</span>
+            <button
+              className="px-btn px-btn--sage px-btn--small"
+              onClick={() => {
+                together.markTouchesSeen();
+                together.sendTouch(touchNote.kind, true);
+              }}
+            >
+              {BACK[touchNote.kind]}
+            </button>
+            <button className="px-btn px-btn--paper px-btn--small" aria-label="Not now" onClick={together.markTouchesSeen}>
+              Later
+            </button>
+          </div>
+        </div>
+      )}
+
+      {moodNote && !touchNote && !welcomeOpen && !veil && !couchNote && !seatCard && !panel && (
+        <div className="fixed left-1/2 bottom-5 z-30 -translate-x-1/2 px-ui w-[min(92vw,520px)]" role="status">
+          <div className="px-box px-shadow px-fade px-3 py-2 flex items-center gap-3 flex-wrap justify-center">
+            <span className="text-sm leading-snug flex-1 min-w-[180px]">{moodNote}</span>
+            <button
+              className="px-btn px-btn--sage px-btn--small"
+              onClick={() => {
+                together.markMoodSeen();
+                together.sendTouch('hug');
+              }}
+            >
+              Send a hug
+            </button>
+            <button className="px-btn px-btn--paper px-btn--small" aria-label="Not now" onClick={together.markMoodSeen}>
+              Later
+            </button>
+          </div>
+        </div>
+      )}
+
+      {gameNote && !welcomeOpen && !veil && !couchNote && !touchNote && !moodNote && !seatCard && (
         <div className="fixed right-4 bottom-4 z-30 px-ui max-w-[92vw]" role="status">
           <div className="px-box px-shadow px-fade px-3 py-2 flex items-center gap-3 flex-wrap">
             <span className="text-sm">{gameNote.text}</span>
@@ -358,7 +479,7 @@ const Home: React.FC = () => {
         </div>
       )}
 
-      {decor.note && !couchNote && !gameNote && !welcomeOpen && !veil && !panel && <EarnNote />}
+      {decor.note && !couchNote && !gameNote && !touchNote && !moodNote && !seatCard && !welcomeOpen && !veil && !panel && <EarnNote />}
 
       {welcomeOpen ? (
         <Welcome

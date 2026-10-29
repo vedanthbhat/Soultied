@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { renderRoom, ROOM_W, ROOM_H, ROOM_FOCUS_X, hitTest, hotspotRect, HotspotId, RoomState, Seat } from '../pixel/room';
+import { renderRoom, ROOM_W, ROOM_H, ROOM_FOCUS_X, TOUCH_LEN, hitTest, hotspotRect, HotspotId, RoomState, RoomTouch, Seat } from '../pixel/room';
 import type { Decor } from '../decor/catalogue';
+import type { Glyph } from '../together/moods';
 
 interface Props {
   left: Seat;
@@ -25,6 +26,12 @@ interface Props {
   decor?: Decor;
   /** on a narrow screen, keep this x (room pixels) in view instead of the couch */
   focusX?: number;
+  /** how each of them is feeling: a little bubble over their head */
+  moods?: { left?: Glyph | null; right?: Glyph | null };
+  /** a touch to play on the couch, once per id */
+  touch?: { id: string; kind: string; together: boolean; from: 'left' | 'right'; glyph: Glyph } | null;
+  /** a little card that opens over one of the two seats */
+  pop?: { at: 'left' | 'right'; node: React.ReactNode; onClose: () => void } | null;
 }
 
 /** one step along the couch (1/7) takes about a second and a half */
@@ -68,6 +75,61 @@ const HoverTag: React.FC<{ x: number; y: number; text: string }> = ({ x, y, text
 };
 
 /**
+ * A card over one of the seats (or, on a phone, along the bottom). Closes on Escape or a tap
+ * anywhere else.
+ */
+const SeatPop: React.FC<{ x: number; y: number; onClose: () => void; children: React.ReactNode }> = ({ x, y, onClose, children }) => {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const narrow = window.innerWidth < 640;
+  // above the seat, kept inside the window (and pushed down if it's taller than the room above)
+  const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (narrow || !el) return;
+    const place = () => {
+      const w = el.offsetWidth;
+      const h = el.offsetHeight;
+      const left = Math.min(window.innerWidth - 12 - w, Math.max(12, x - w / 2));
+      const top = Math.max(12, y - h);
+      setPos((p) => (p && p.left === left && p.top === top ? p : { left, top }));
+    };
+    place();
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(place) : null;
+    ro?.observe(el);
+    return () => ro?.disconnect();
+  }, [x, y, narrow]);
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && closeRef.current();
+    const onDown = (e: PointerEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) closeRef.current();
+    };
+    window.addEventListener('keydown', onKey);
+    // a beat later, so the tap that opened it doesn't close it
+    const t = window.setTimeout(() => window.addEventListener('pointerdown', onDown), 0);
+    return () => {
+      window.clearTimeout(t);
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('pointerdown', onDown);
+    };
+  }, []);
+  return narrow ? (
+    <div ref={ref} className="fixed inset-x-0 bottom-0 z-[35] px-ui p-3">
+      <div className="px-box px-shadow px-fade p-4 max-h-[72vh] overflow-y-auto">{children}</div>
+    </div>
+  ) : (
+    <div
+      ref={ref}
+      className="absolute z-[35] px-ui px-box px-shadow px-fade p-4 w-[430px] max-w-[calc(100vw-24px)] max-h-[calc(100vh-24px)] overflow-y-auto"
+      style={{ left: pos?.left ?? x, top: pos?.top ?? y, visibility: pos ? 'visible' : 'hidden' }}
+    >
+      {children}
+    </div>
+  );
+};
+
+/**
  * The whole screen is the room. The canvas is 320x180 real pixels, scaled
  * to cover the viewport with nearest-neighbour upscaling.
  */
@@ -85,6 +147,9 @@ export const RoomCanvas: React.FC<Props> = ({
   onScooted,
   decor,
   focusX = ROOM_FOCUS_X,
+  moods,
+  touch,
+  pop,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [fit, setFit] = useState<Fit>(() => computeFit(window.innerWidth, window.innerHeight, focusX));
@@ -105,6 +170,19 @@ export const RoomCanvas: React.FC<Props> = ({
   stateRef.current.music = music;
   stateRef.current.hover = hover;
   stateRef.current.decor = decor;
+  stateRef.current.moods = moods;
+
+  // a touch plays once, from the moment it arrives (in the room's own clock); one that comes in
+  // while another is still playing waits its turn
+  const sceneT = useRef(0);
+  const playedTouch = useRef<string | null>(null);
+  const touchQueue = useRef<Omit<RoomTouch, 'at'>[]>([]);
+  useEffect(() => {
+    if (!touch || playedTouch.current === touch.id) return;
+    playedTouch.current = touch.id;
+    touchQueue.current = [...touchQueue.current, { kind: touch.kind, together: touch.together, from: touch.from, glyph: touch.glyph }].slice(-3);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [touch?.id]);
 
   const [panning, setPanning] = useState(false);
   useEffect(() => {
@@ -162,7 +240,10 @@ export const RoomCanvas: React.FC<Props> = ({
       }
       fireBoost.current = Math.max(0, fireBoost.current - 0.012);
       stateRef.current.fire = Math.min(1, 0.6 + fireBoost.current);
-      const buf = renderRoom(stateRef.current, reduced ? t * 0.3 : t);
+      sceneT.current = reduced ? t * 0.3 : t;
+      const playing = st.touch;
+      if (touchQueue.current.length && (!playing || sceneT.current - playing.at > TOUCH_LEN + 0.15)) st.touch = { ...touchQueue.current.shift()!, at: sceneT.current };
+      const buf = renderRoom(stateRef.current, sceneT.current);
       img.data.set(buf.data);
       ctx.putImageData(img, 0, 0);
     };
@@ -189,7 +270,8 @@ export const RoomCanvas: React.FC<Props> = ({
     onHotspot?.(id);
   };
 
-  const tag = hover ? hotspotRect(hover, stateRef.current.closeness) : null;
+  const tag = hover && !pop ? hotspotRect(hover, stateRef.current.closeness) : null;
+  const popAt = pop ? hotspotRect(pop.at, stateRef.current.closeness) : null;
 
   return (
     <div className="fixed inset-0 overflow-hidden bg-[#1a1214]" aria-hidden={false}>
@@ -224,6 +306,13 @@ export const RoomCanvas: React.FC<Props> = ({
       {/* hover label, pinned above the hotspot */}
       {tag && labels[hover!] && (
         <HoverTag x={fit.left + (tag.x + tag.w / 2) * fit.scale} y={fit.top + tag.y * fit.scale - 10} text={labels[hover!]!} />
+      )}
+
+      {/* the card over a seat: how you're feeling, or a hug for them */}
+      {pop && popAt && (
+        <SeatPop key={pop.at} x={fit.left + (popAt.x + popAt.w / 2) * fit.scale} y={fit.top + (popAt.y - 20) * fit.scale} onClose={pop.onClose}>
+          {pop.node}
+        </SeatPop>
       )}
 
       {/* Keyboard access to the room's hotspots (visually hidden until focused) */}
