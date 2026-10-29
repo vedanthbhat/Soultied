@@ -6,6 +6,7 @@ import { useTurntable } from '../music/TurntableContext';
 import { useDecor } from '../decor/DecorContext';
 import { PixelIcon } from './letters/PixelIcon';
 import { sfx } from '../escape/sfx';
+import { useTogether } from '../together/TogetherContext';
 
 /**
  * The menu hides above the screen and slides down when the cursor touches
@@ -17,6 +18,7 @@ export const TopNav: React.FC<{ letterUnread: boolean }> = ({ letterUnread }) =>
   const { waiting } = useGames();
   const turntable = useTurntable();
   const decor = useDecor();
+  const { wallNews } = useTogether();
   const [open, setOpen] = useState(false);
   const [hint, setHint] = useState(true);
   const [quiet, setQuiet] = useState(() => sfx.isMuted());
@@ -109,6 +111,10 @@ export const TopNav: React.FC<{ letterUnread: boolean }> = ({ letterUnread }) =>
               <button className="px-btn px-btn--paper px-btn--small" onClick={() => go('question')}>
                 Letters
                 {letterUnread && <span aria-label="new" className="inline-block w-2 h-2 bg-[var(--thread)]" />}
+              </button>
+              <button className="px-btn px-btn--paper px-btn--small" onClick={() => go('wall')}>
+                Our wall
+                {wallNews && <span aria-label="new" className="inline-block w-2 h-2 bg-[var(--thread)]" />}
               </button>
               <button className="px-btn px-btn--paper px-btn--small" onClick={() => go('watch')}>
                 Watch together

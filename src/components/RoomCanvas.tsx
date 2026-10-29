@@ -30,6 +30,10 @@ interface Props {
   moods?: { left?: Glyph | null; right?: Glyph | null };
   /** a touch to play on the couch, once per id */
   touch?: { id: string; kind: string; together: boolean; from: 'left' | 'right'; glyph: Glyph } | null;
+  /** the picture in the frame over the couch */
+  wallArt?: RoomState['wallArt'];
+  /** your person pinned something new to the wall */
+  wallNews?: boolean;
   /** a little card that opens over one of the two seats */
   pop?: { at: 'left' | 'right'; node: React.ReactNode; onClose: () => void } | null;
 }
@@ -150,6 +154,8 @@ export const RoomCanvas: React.FC<Props> = ({
   moods,
   touch,
   pop,
+  wallArt = null,
+  wallNews = false,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [fit, setFit] = useState<Fit>(() => computeFit(window.innerWidth, window.innerHeight, focusX));
@@ -171,6 +177,8 @@ export const RoomCanvas: React.FC<Props> = ({
   stateRef.current.hover = hover;
   stateRef.current.decor = decor;
   stateRef.current.moods = moods;
+  stateRef.current.wallArt = wallArt;
+  stateRef.current.wallNews = wallNews;
 
   // a touch plays once, from the moment it arrives (in the room's own clock); one that comes in
   // while another is still playing waits its turn

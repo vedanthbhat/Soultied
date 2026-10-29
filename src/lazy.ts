@@ -14,6 +14,7 @@ const load = {
   decor: () => import('./components/DecorDrawer'),
   space: () => import('./components/SpacePanel'),
   studio: () => import('./components/CharacterStudio'),
+  wall: () => import('./components/wall/WallPanel'),
 };
 export type Part = keyof typeof load;
 
@@ -25,6 +26,7 @@ export const UsPage = lazy(() => load.us().then((m) => ({ default: m.UsPage })))
 export const DecorDrawer = lazy(() => load.decor().then((m) => ({ default: m.DecorDrawer })));
 export const SpacePanel = lazy(() => load.space().then((m) => ({ default: m.SpacePanel })));
 export const CharacterStudio = lazy(() => load.studio().then((m) => ({ default: m.CharacterStudio })));
+export const WallPanel = lazy(() => load.wall().then((m) => ({ default: m.WallPanel })));
 
 /** Fetch these parts now (when the browser's idle), so they open instantly later. */
 export function prefetch(parts: Part[] = Object.keys(load) as Part[], delayMs = 1200) {

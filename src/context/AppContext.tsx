@@ -38,7 +38,7 @@ import type { PlusReply } from '../stream/protocol';
  * Either way the rest of the app sees the same shape.
  */
 
-export type Panel = 'question' | 'questions' | 'us' | 'wardrobe' | 'space' | 'watch' | 'karaoke' | 'escape' | 'games' | 'decor' | null;
+export type Panel = 'question' | 'questions' | 'us' | 'wardrobe' | 'space' | 'watch' | 'karaoke' | 'escape' | 'games' | 'decor' | 'wall' | null;
 export type JoinResult = 'ok' | 'not_found' | 'full' | 'expired';
 
 export type LetterBadge = 'answer' | 'reveal' | null;

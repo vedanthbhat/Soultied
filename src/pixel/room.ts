@@ -45,6 +45,10 @@ export interface RoomState {
   moods?: { left?: Glyph | null; right?: Glyph | null };
   /** a hug, a kiss, a high five… playing out on the couch (scene time it started) */
   touch?: RoomTouch | null;
+  /** the picture in the frame over the couch: a doodle or a photo, as a few pixels */
+  wallArt?: { w: number; h: number; pal: string[]; px: string } | null;
+  /** your person pinned something new to the wall: a little note tucked in the frame */
+  wallNews?: boolean;
 }
 
 export interface RoomTouch {
@@ -60,7 +64,7 @@ export interface RoomTouch {
 /** how long a touch plays, in seconds */
 export const TOUCH_LEN = 2.8;
 
-export type HotspotId = 'left' | 'right' | 'letter' | 'fire' | 'photo' | 'remote' | 'door' | 'games' | 'music' | 'decor';
+export type HotspotId = 'left' | 'right' | 'letter' | 'fire' | 'photo' | 'remote' | 'door' | 'games' | 'music' | 'decor' | 'board';
 
 export interface Hotspot {
   id: HotspotId;
@@ -103,6 +107,8 @@ const HOTSPOTS: Hotspot[] = [
   { id: 'games', x: GAMES_STACK.x - 1, y: GAMES_STACK.y - 2, w: GAMES_STACK.w + 2, h: GAMES_STACK.h + 2 },
   // the painting over the mantel: decorate the room
   { id: 'decor', x: 109, y: 14, w: 38, h: 28 },
+  // the three pictures over the couch: our wall (notes, doodles, photos, memories)
+  { id: 'board', x: 190, y: 24, w: 84, h: 32 },
 ];
 
 /* ------------------------------------------------------------------------ */
@@ -610,6 +616,47 @@ function drawGallery(L: Layer) {
     if (d < 30) return P.mustard;
     return j > 9 ? P.couch : '#e9d7b7';
   });
+}
+
+/** The middle picture over the couch: whatever you've hung there, and a note tucked in when there's news. */
+function drawWallArt(L: Layer, state: RoomState, t: number) {
+  const a = state.wallArt;
+  // the frame's opening is 26 × 18, from (218, 28); the picture is 24 wide, with a strip of mat each side
+  if (a && a.px.length === a.w * a.h) {
+    L.rect(218, 28, 26, 18, '#e8d9bc');
+    const ox = 218 + Math.floor((26 - Math.min(26, a.w)) / 2);
+    for (let j = 0; j < Math.min(18, a.h); j++)
+      for (let i = 0; i < Math.min(26, a.w); i++) {
+        const c = a.pal[parseInt(a.px[j * a.w + i], 16)];
+        if (c) L.set(ox + i, 28 + j, c);
+      }
+  }
+  if (state.hover === 'board') {
+    for (let i = 215; i < 247; i++) {
+      L.glow(i, 25, '#fff1c9', 170);
+      L.glow(i, 48, '#fff1c9', 170);
+    }
+    for (let j = 25; j < 49; j++) {
+      L.glow(215, j, '#fff1c9', 170);
+      L.glow(246, j, '#fff1c9', 170);
+    }
+  }
+  if (state.wallNews) {
+    // a little yellow note pinned over the corner, twinkling now and then
+    const bob = Math.sin(t * 2.2) > 0.75 ? -1 : 0;
+    const x = 240;
+    const y = 41 + bob;
+    L.rect(x, y, 7, 6, '#f2d66b');
+    L.rect(x, y + 5, 7, 1, '#d9b84a');
+    L.set(x + 1, y + 2, '#a58a3a');
+    L.set(x + 2, y + 2, '#a58a3a');
+    L.set(x + 4, y + 2, '#a58a3a');
+    L.set(x + 1, y + 3, '#a58a3a');
+    L.set(x + 3, y + 3, '#a58a3a');
+    L.glow(x + 3, y - 1, '#e0605a');
+    L.glow(x + 3, y, '#c4453f');
+    if (Math.floor(t * 1.6) % 3 === 0) L.glow(x + 6, y - 1, '#fff1c9');
+  }
 }
 
 /** A small, very dark door between the chimney and the pictures. */
@@ -1956,6 +2003,7 @@ export function renderRoom(state: RoomState, t: number): PixelBuffer {
   const d = state.decor || START_DECOR;
   L.copyFrom(staticLayer(d));
   drawPainting(L, d.painting, state);
+  drawWallArt(L, state, t);
   drawFire(L, t, state.fire);
   drawDoorGlow(L, t, state.hover === 'door');
   drawCandles(L, t);

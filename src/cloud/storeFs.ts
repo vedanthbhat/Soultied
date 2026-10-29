@@ -388,3 +388,9 @@ export const subscribeMetaList = (db: Firestore, sid: string, prefix: string, fn
     (s) => fn(s.docs.map((d) => ({ id: d.id, data: d.data() }))),
     () => undefined
   );
+
+/** One `meta/{name}` document, read once (null if there isn't one). */
+export const fetchMeta = async (db: Firestore, sid: string, name: string): Promise<unknown> => {
+  const s = await getDoc(metaNamed(db, sid, name));
+  return s.exists() ? s.data() : null;
+};

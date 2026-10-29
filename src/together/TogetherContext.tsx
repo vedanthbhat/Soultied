@@ -17,6 +17,7 @@ import {
   unseenTouches,
 } from './moods';
 import { tone } from '../escape/sfx';
+import { type BoardDoc, type WallArt, demoBoard, normalizeBoard } from './board';
 
 /**
  * The little shared things of a place that aren't letters, games or decor: the questions you write
@@ -52,6 +53,16 @@ interface TogetherValue {
   lastSent: Touch | null;
   /** the touch the room is playing (or just played): one you sent, or the newest one that came in */
   roomTouch: Touch | null;
+
+  /** our wall: who pinned what last, and the picture in the frame over the couch */
+  board: BoardDoc;
+  /** what your person pinned since you last looked at the wall */
+  wallNews: { at: number; kind: 'text' | 'doodle' | 'photo' } | null;
+  markWallSeen: () => void;
+  /** say you've just pinned something up (so your person sees there's something new) */
+  pinned: (kind: 'text' | 'doodle' | 'photo') => void;
+  /** hang a doodle or photo in the frame over the couch (null takes it down) */
+  hangArt: (art: WallArt | null) => void;
 }
 
 const Ctx = createContext<TogetherValue | null>(null);
@@ -203,6 +214,19 @@ export const TogetherProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (newestAt) writeTouch({ seen: { [me]: newestAt } });
   }, [newestAt, me, writeTouch]);
 
+  /* ---------- our wall ---------- */
+
+  const boardDoc = useSharedDoc('board', normalizeBoard, demoBoard);
+  const writeBoard = boardDoc.write;
+  const theirLast = them ? boardDoc.doc.last[them] : undefined;
+  const wallNews = theirLast && theirLast.at > (boardDoc.doc.seen[me] ?? 0) ? theirLast : null;
+  const wallNewsAt = wallNews?.at ?? 0;
+  const markWallSeen = useCallback(() => {
+    if (wallNewsAt) writeBoard({ seen: { [me]: wallNewsAt } });
+  }, [wallNewsAt, me, writeBoard]);
+  const pinned = useCallback<TogetherValue['pinned']>((kind) => writeBoard({ last: { [me]: { at: Date.now(), kind } } }), [me, writeBoard]);
+  const hangArt = useCallback<TogetherValue['hangArt']>((art) => writeBoard({ art: art ? { ...art } : null }), [writeBoard]);
+
   const value = useMemo<TogetherValue>(
     () => ({
       asksReady: asksDoc.ready,
@@ -221,8 +245,13 @@ export const TogetherProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       markTouchesSeen,
       lastSent,
       roomTouch,
+      board: boardDoc.doc,
+      wallNews,
+      markWallSeen,
+      pinned,
+      hangArt,
     }),
-    [asksDoc.ready, asks, ask, answerAsk, markAskSeen, withdrawAsk, myMood, theirMood, setMood, moodNews, markMoodSeen, sendTouch, touchNews, markTouchesSeen, lastSent, roomTouch]
+    [asksDoc.ready, asks, ask, answerAsk, markAskSeen, withdrawAsk, myMood, theirMood, setMood, moodNews, markMoodSeen, sendTouch, touchNews, markTouchesSeen, lastSent, roomTouch, boardDoc.doc, wallNews, markWallSeen, pinned, hangArt]
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 };

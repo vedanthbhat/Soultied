@@ -27,7 +27,7 @@ import { MeCard, ThemCard, ago } from './components/SeatCard';
 import type { SlotId } from './decor/catalogue';
 import { PixelIcon } from './components/letters/PixelIcon';
 import { roomSound } from './escape/sfx';
-import { CharacterStudio, DecorDrawer, EscapeGame, GameShelf, LettersPanel, SpacePanel, UsPage, WatchParty, prefetch } from './lazy';
+import { CharacterStudio, DecorDrawer, EscapeGame, GameShelf, LettersPanel, SpacePanel, UsPage, WallPanel, WatchParty, prefetch } from './lazy';
 
 /** While a part of the place is still loading (only ever for a moment). */
 const Opening: React.FC<{ full?: boolean }> = ({ full }) =>
@@ -144,7 +144,8 @@ const Home: React.FC = () => {
   const turntable = useTurntable();
   const decor = useDecor();
   const together = useTogether();
-  const { asks, myMood, theirMood, roomTouch, touchNews, moodNews, lastSent } = together;
+  const { asks, myMood, theirMood, roomTouch, touchNews, moodNews, lastSent, board, wallNews } = together;
+  const pinnedWhat = wallNews ? (wallNews.kind === 'doodle' ? 'a doodle' : wallNews.kind === 'photo' ? 'a photo' : 'a note') : '';
   const [joinCode] = useState(readJoinCode);
   const [welcomeOpen, setWelcomeOpen] = useState(() => !setupComplete || !!joinCode);
   const [draftSeats, setDraftSeats] = useState<{ left: Seat; right: Seat } | null>(null);
@@ -219,6 +220,7 @@ const Home: React.FC = () => {
         : 'Games',
       music: turntable.on ? `Lift the needle${turntable.track ? ` · ${turntable.track.title}` : ''}` : 'Put a record on',
       decor: panel === 'decor' ? 'Choose a painting' : 'Decorate the room',
+      board: wallNews && partnerUser ? `${partnerUser.name} pinned ${pinnedWhat} up` : 'Our wall · notes, doodles, photos',
     };
     const meLabel = `${currentUser.name} · ${myMood ? moodLine(myMood) : 'how are you feeling?'}`;
     const themLabel = (u: UserProfile) => [u.name, theirMood && moodLine(theirMood), 'send a hug'].filter(Boolean).join(' · ');
@@ -226,7 +228,7 @@ const Home: React.FC = () => {
     if (guest) l.right = guest.id === currentUser.id ? meLabel : themLabel(guest);
     else l.right = `Invite ${space?.partnerPlaceholderName || 'your person'}`;
     return l;
-  }, [welcomeOpen, seatsEmpty, letterBadge, partnerSealed, partnerUser, currentUser, host, guest, space, games.waiting, turntable.on, turntable.track, journeyWaiting, journey.next, journey.unseen, panel, askWaiting, asks.forMe.length, myMood, theirMood]);
+  }, [welcomeOpen, seatsEmpty, letterBadge, partnerSealed, partnerUser, currentUser, host, guest, space, games.waiting, turntable.on, turntable.track, journeyWaiting, journey.next, journey.unseen, panel, askWaiting, asks.forMe.length, myMood, theirMood, wallNews, pinnedWhat]);
 
   const onHotspot = (id: HotspotId) => {
     roomSound(id);
@@ -241,6 +243,7 @@ const Home: React.FC = () => {
     else if (id === 'games') openPanel('games');
     else if (id === 'music') turntable.toggle();
     else if (id === 'decor') decor.openCatalogue('painting');
+    else if (id === 'board') openPanel('wall');
     else if (id === 'left' || id === 'right') {
       const who = id === 'left' ? host : guest;
       if (!who) openPanel('space');
@@ -397,6 +400,8 @@ const Home: React.FC = () => {
         focusX={panel === 'decor' ? DECOR_FOCUS[decor.slot] : undefined}
         closeness={closeness}
         moods={roomMoods}
+        wallArt={welcomeOpen ? null : board.art}
+        wallNews={!welcomeOpen && !!wallNews}
         touch={playTouch}
         pop={seatPop}
         scoot={scootGo}
@@ -452,7 +457,24 @@ const Home: React.FC = () => {
         </div>
       )}
 
-      {gameNote && !welcomeOpen && !veil && !couchNote && !touchNote && !moodNote && !seatCard && (
+      {wallNews && partnerUser && !touchNote && !moodNote && !welcomeOpen && !veil && !couchNote && !seatCard && !panel && (
+        <div className="fixed left-1/2 bottom-5 z-30 -translate-x-1/2 px-ui w-[min(92vw,520px)]" role="status">
+          <div className="px-box px-shadow px-fade px-3 py-2 flex items-center gap-3 flex-wrap justify-center">
+            <PixelIcon name="envelope" scale={2} />
+            <span className="text-sm leading-snug flex-1 min-w-[180px]">
+              {partnerUser.name} pinned {pinnedWhat} up on the wall for you.
+            </span>
+            <button className="px-btn px-btn--sage px-btn--small" onClick={() => openPanel('wall')}>
+              Look
+            </button>
+            <button className="px-btn px-btn--paper px-btn--small" aria-label="Not now" onClick={together.markWallSeen}>
+              Later
+            </button>
+          </div>
+        </div>
+      )}
+
+      {gameNote && !welcomeOpen && !veil && !couchNote && !touchNote && !moodNote && !wallNews && !seatCard && (
         <div className="fixed right-4 bottom-4 z-30 px-ui max-w-[92vw]" role="status">
           <div className="px-box px-shadow px-fade px-3 py-2 flex items-center gap-3 flex-wrap">
             <span className="text-sm">{gameNote.text}</span>
@@ -479,7 +501,7 @@ const Home: React.FC = () => {
         </div>
       )}
 
-      {decor.note && !couchNote && !gameNote && !touchNote && !moodNote && !seatCard && !welcomeOpen && !veil && !panel && <EarnNote />}
+      {decor.note && !couchNote && !gameNote && !touchNote && !moodNote && !wallNews && !seatCard && !welcomeOpen && !veil && !panel && <EarnNote />}
 
       {welcomeOpen ? (
         <Welcome
@@ -515,6 +537,13 @@ const Home: React.FC = () => {
             <PixelPanel title="Us" kicker={space?.name} onClose={() => openPanel(null)} width={820}>
               <Suspense fallback={<Opening />}>
                 <UsPage />
+              </Suspense>
+            </PixelPanel>
+          )}
+          {panel === 'wall' && (
+            <PixelPanel title="Our wall" kicker={space?.name} onClose={() => openPanel(null)} width={880}>
+              <Suspense fallback={<Opening />}>
+                <WallPanel />
               </Suspense>
             </PixelPanel>
           )}

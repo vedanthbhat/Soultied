@@ -130,6 +130,11 @@ const SOUNDS: Record<HotspotId, () => void> = {
   },
   // the needle touching the record (the music itself is the record player's own)
   music: () => tone(1200, 0.02, 0, 'square', SOFT * 0.5),
+  // a note being unpinned from the wall
+  board: () => {
+    tone(988, 0.05, 0, 'triangle', SOFT);
+    tone(740, 0.08, 0.05, 'triangle', SOFT * 0.8);
+  },
   // a little sparkle
   decor: () => {
     tone(1319, 0.06, 0, 'triangle', SOFT * 0.8);

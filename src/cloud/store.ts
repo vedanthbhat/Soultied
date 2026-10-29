@@ -153,3 +153,4 @@ export const writeAfterDarkHeat = later('writeAfterDarkHeat');
 export const fetchLettersBefore = later('fetchLettersBefore');
 export const writeMeta = later('writeMeta');
 export const writeMetaDoc = later('writeMetaDoc');
+export const fetchMeta = later('fetchMeta');
