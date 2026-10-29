@@ -52,7 +52,7 @@ jobs:
             echo "::notice::No App Store Connect key yet (see ios.yml), so nothing to do."
           fi
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         if: steps.key.outputs.ready == 'true'
         with:
           python-version: '3.12'
