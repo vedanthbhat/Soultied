@@ -11,6 +11,7 @@ on:
       - 'capacitor.config.json'
       - 'scripts/ios-assets.mjs'
       - '.github/workflows/ios.yml'
+      - '.github/workflows/testflight.yml'
   workflow_dispatch:
 
 permissions:
