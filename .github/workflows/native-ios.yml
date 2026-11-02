@@ -2,8 +2,8 @@
 #   1. the shared code's tests (SoultiedCore), including that its letters engine picks exactly the cards the website does
 #   2. the app builds for the iPhone simulator
 #   3. screenshots of the app in the demo room
-# Anyone can read what happened without signing in: build errors are annotations on the run, and so are the
-# screenshots (small JPEGs, base64, in "shot …" notices).
+# Anyone can read what happened without signing in: build errors are annotations on the run, and the screenshots
+# (with the build's errors and warnings) are kept on the native-shots branch, replaced every run.
 # Runs when the native app (or the questions it shares with the website) change, or by hand.
 name: Soultied for iPhone (native)
 
@@ -14,6 +14,7 @@ on:
     paths:
       - 'native/**'
       - 'scripts/native-*'
+      - '.github/native-shots.py'
       - 'scripts/ios-assets.mjs'
       - 'src/letters/**'
       - '.github/workflows/native-ios.yml'
@@ -23,7 +24,8 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: read
+  # (to keep the screenshots on the native-shots branch)
+  contents: write
 
 jobs:
   build:
@@ -146,17 +148,11 @@ jobs:
           ls -la "$RUNNER_TEMP/shots"
           echo "dev=$dev" >> "$GITHUB_OUTPUT"
 
-      - name: Screenshots (1)
-        if: always() && steps.shots.outcome != 'skipped'
-        run: python3 .github/native-shots.py welcome home letters
-
-      - name: Screenshots (2)
-        if: always() && steps.shots.outcome != 'skipped'
-        run: python3 .github/native-shots.py wall play us
-
-      - name: Screenshots (3)
-        if: always() && steps.shots.outcome != 'skipped'
-        run: python3 .github/native-shots.py mood decor
+      - name: Keep the screenshots and the build's messages (on the native-shots branch)
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 .github/native-shots.py
 
       - name: Did the app crash?
         if: always() && steps.shots.outcome != 'skipped'
