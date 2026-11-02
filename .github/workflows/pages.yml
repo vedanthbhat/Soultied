@@ -12,6 +12,11 @@ on:
       - 'scripts/ios-assets.mjs'
       - '.github/workflows/ios.yml'
       - '.github/workflows/testflight.yml'
+      # nor does the native iPhone app (native-ios.yml)
+      - 'native/**'
+      - 'scripts/native-*'
+      - '.github/native-shots.py'
+      - '.github/workflows/native-ios.yml'
   workflow_dispatch:
 
 permissions:

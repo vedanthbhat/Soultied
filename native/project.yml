@@ -1,0 +1,93 @@
+# The native Soultied iPhone app (SwiftUI). GitHub's Macs turn this into an Xcode project with XcodeGen
+# (see .github/workflows/native-ios.yml); nothing generated is kept in the repo.
+name: Soultied
+options:
+  bundleIdPrefix: app.soultied
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+  developmentLanguage: en
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "2.0"
+    CURRENT_PROJECT_VERSION: "1"
+    ENABLE_USER_SCRIPT_SANDBOXING: NO
+
+packages:
+  SoultiedCore:
+    path: SoultiedCore
+  Firebase:
+    url: https://github.com/firebase/firebase-ios-sdk
+    from: "13.0.0"
+  GoogleSignIn:
+    url: https://github.com/google/GoogleSignIn-iOS
+    from: "10.0.0"
+
+targets:
+  Soultied:
+    type: application
+    platform: iOS
+    sources:
+      - path: Soultied
+      # the pixel font, Firebase's settings and the icon live elsewhere in the repo; the app uses them as they are
+      # (the icon's picture is drawn by scripts/ios-assets.mjs before a build)
+      - path: ../public/fonts/PixelifySans-Variable.ttf
+        buildPhase: resources
+      - path: ../ios/App/App/GoogleService-Info.plist
+        buildPhase: resources
+      - path: ../ios/App/App/Assets.xcassets
+        buildPhase: resources
+    entitlements:
+      path: Soultied/Soultied.entitlements
+      properties:
+        com.apple.developer.applesignin: [Default]
+    info:
+      path: Soultied/Info.plist
+      properties:
+        CFBundleDisplayName: Soultied
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSRequiresIPhoneOS: true
+        ITSAppUsesNonExemptEncryption: false
+        UIAppFonts: [PixelifySans-Variable.ttf]
+        UILaunchScreen:
+          UIColorName: LaunchBackground
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        # sideways, the home screen is the whole living room
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
+        UIUserInterfaceStyle: Light
+        UIStatusBarStyle: UIStatusBarStyleLightContent
+        CFBundleURLTypes:
+          # Google sign-in hands back to the app through this address (REVERSED_CLIENT_ID in GoogleService-Info.plist)
+          - CFBundleURLSchemes: [com.googleusercontent.apps.244397778893-sej2cpv7mis4279vdoh7eh8u2g510bj3]
+        NSCameraUsageDescription: So you can take a photo for your wall, and so your person can see you on a call.
+        NSMicrophoneUsageDescription: So your person can hear you on a call and at karaoke night.
+        NSPhotoLibraryUsageDescription: So you can put your photos on your shared wall.
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.soultied
+        PRODUCT_NAME: Soultied
+        TARGETED_DEVICE_FAMILY: "1"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        CODE_SIGN_STYLE: Automatic
+    dependencies:
+      - package: SoultiedCore
+      - package: Firebase
+        product: FirebaseAuth
+      - package: Firebase
+        product: FirebaseFirestore
+      - package: GoogleSignIn
+        product: GoogleSignIn
+
+schemes:
+  Soultied:
+    build:
+      targets:
+        Soultied: all
+    run:
+      config: Debug
+    archive:
+      config: Release

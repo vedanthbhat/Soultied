@@ -1,0 +1,150 @@
+import SwiftUI
+import SoultiedCore
+
+/*
+ * The living room, drawn by the same renderer as the website (SoultiedCore's RoomRenderer, checked pixel
+ * for pixel against it). On the iPhone's home it's cropped to the couch: the two of you, your moods over
+ * your heads, the picture over the couch. Turned sideways, it's the whole room.
+ */
+
+struct RoomScene: View {
+    let place: PlaceModel
+    /// just the couch (the home screen), or the whole room (sideways)
+    var couchOnly = true
+    /// how many room pixels across the couch view shows, at least
+    var minWidth: CGFloat = 160
+    var paused = false
+    /// what to show instead of what's out in the room (trying something on in the catalogue)
+    var decor: Decor?
+    var onTap: (HotspotId) -> Void = { _ in }
+
+    @Environment(\.displayScale) private var displayScale
+    @State private var renderer = RoomRenderer()
+    @State private var start = Date()
+    @State private var fireAt = -100.0
+    @State private var scoot: (from: Double, to: Double, at: Double)?
+    @State private var heartAt = -1.0
+    @State private var touch: RoomTouch?
+    @State private var scootNote: String?
+
+    static let cropTop: CGFloat = 34
+    static let cropHeight: CGFloat = 130
+
+    private func now() -> Double { Date().timeIntervalSince(start) }
+
+    /// pt per room pixel, and where the room's top-left corner goes
+    private func layout(_ size: CGSize) -> (u: CGFloat, x: CGFloat, y: CGFloat, h: CGFloat) {
+        let W = max(1, size.width)
+        if couchOnly {
+            let k = max(1, (W * displayScale / minWidth).rounded(.down))
+            let u = k / displayScale
+            var x = W / 2 - CGFloat(ROOM_FOCUS_X) * u
+            x = min(0, max(W - CGFloat(ROOM_W) * u, x))
+            return (u, x, -Self.cropTop * u, Self.cropHeight * u)
+        }
+        let H = max(1, size.height)
+        let k = max(1, min(W * displayScale / CGFloat(ROOM_W), H * displayScale / CGFloat(ROOM_H)).rounded(.down))
+        let u = k / displayScale
+        return (u, (W - CGFloat(ROOM_W) * u) / 2, (H - CGFloat(ROOM_H) * u) / 2, H)
+    }
+
+    /// how close the two of you sit right now (scooting closer plays once, for each of you)
+    private func closeness(_ t: Double) -> (Double, Bool) {
+        let settled = Double(place.couchLevel) / Double(COUCH_STEPS)
+        guard let s = scoot else { return (Double(min(place.couchShown, place.couchLevel)) / Double(COUCH_STEPS), false) }
+        let p = (t - s.at) / 1.4
+        if p <= 0 { return (s.from, false) }
+        if p >= 1 { return (settled, false) }
+        let e = p < 0.5 ? 2 * p * p : 1 - pow(-2 * p + 2, 2) / 2
+        return (s.from + (s.to - s.from) * e, true)
+    }
+
+    private func state(_ t: Double) -> RoomState {
+        let seats = place.seats
+        var st = RoomState(left: seats.left, right: seats.right)
+        st.decor = decor ?? place.decor
+        st.letterUnread = place.letterWaiting
+        st.fire = 0.6 + 0.4 * max(0, 1 - (t - fireAt) / 6)
+        let (c, moving) = closeness(t)
+        st.closeness = c
+        st.scooting = moving
+        st.heartAt = heartAt
+        let host = place.hostId, guest = place.guestId
+        st.moodLeft = place.moods.current(host, now: place.now.timeIntervalSince1970 * 1000)?.glyph
+        st.moodRight = place.moods.current(guest, now: place.now.timeIntervalSince1970 * 1000)?.glyph
+        if let tc = touch, t - tc.at < TOUCH_LEN { st.touch = tc }
+        st.wallArt = place.board.art?.pixels
+        st.wallNews = place.wallNews != nil
+        return st
+    }
+
+    var body: some View {
+        GeometryReader { geo in
+            let L = layout(geo.size)
+            TimelineView(.animation(minimumInterval: 1.0 / 12, paused: paused)) { ctx in
+                let t = ctx.date.timeIntervalSince(start)
+                let img = Pixels.image(renderer.render(state(t), t))
+                ZStack(alignment: .topLeading) {
+                    Color.roomBrown
+                    if let img {
+                        Image(decorative: img, scale: 1)
+                            .resizable()
+                            .interpolation(.none)
+                            .frame(width: CGFloat(ROOM_W) * L.u, height: CGFloat(ROOM_H) * L.u)
+                            .offset(x: L.x, y: L.y)
+                    }
+                }
+                .frame(width: geo.size.width, height: couchOnly ? L.h : geo.size.height, alignment: .topLeading)
+                .clipped()
+            }
+            .contentShape(Rectangle())
+            .gesture(
+                SpatialTapGesture().onEnded { v in
+                    let rx = Double((v.location.x - L.x) / L.u), ry = Double((v.location.y - L.y) / L.u)
+                    guard let id = hitTest(rx, ry, closeness(now()).0) else { return }
+                    if id == .fire {
+                        fireAt = now()
+                        Haptics.soft()
+                    }
+                    onTap(id)
+                }
+            )
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityText)
+        .onAppear { startScootIfDue() }
+        .onChange(of: place.couchLevel) { _, _ in startScootIfDue() }
+        .onChange(of: place.playing?.id) { _, _ in playTouch() }
+    }
+
+    private var accessibilityText: String {
+        let s = place.seats
+        if s.right.status == .empty { return "\(s.left.name) on the couch, saving a seat for \(place.theirName)." }
+        return "\(s.left.name) and \(s.right.name) on the couch."
+    }
+
+    private func startScootIfDue() {
+        let level = place.couchLevel, shown = place.couchShown
+        guard place.partnerHere, shown < level, scoot == nil else { return }
+        let t = now() + 0.9
+        scoot = (Double(shown) / Double(COUCH_STEPS), Double(level) / Double(COUCH_STEPS), t)
+        heartAt = t + 1.2
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.6) {
+            place.markCouchShown(level)
+            Haptics.soft()
+        }
+    }
+
+    private func playTouch() {
+        guard let p = place.playing else { return }
+        let d = touchDef(p.kind)
+        touch = RoomTouch(kind: p.kind.rawValue, together: d.together, from: p.by == place.hostId ? .left : .right, at: now(), glyph: d.glyph)
+        if p.by != place.me { Haptics.touch(p.kind) }
+    }
+}
+
+/// how tall the couch view is for a width (so the home screen can lay itself out)
+func couchHeight(width: CGFloat, scale: CGFloat, minWidth: CGFloat = 160) -> CGFloat {
+    let k = max(1, (width * scale / minWidth).rounded(.down))
+    return RoomScene.cropHeight * k / scale
+}

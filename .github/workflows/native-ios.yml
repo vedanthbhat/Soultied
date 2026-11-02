@@ -1,0 +1,173 @@
+# Builds the native Soultied iPhone app (native/, SwiftUI) on one of GitHub's Macs and checks it:
+#   1. the shared code's tests (SoultiedCore), including that its letters engine picks exactly the cards the website does
+#   2. the app builds for the iPhone simulator
+#   3. screenshots of the app in the demo room
+# Anyone can read what happened without signing in: build errors are annotations on the run, and so are the
+# screenshots (small JPEGs, base64, in "shot …" notices).
+# Runs when the native app (or the questions it shares with the website) change, or by hand.
+name: Soultied for iPhone (native)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'native/**'
+      - 'scripts/native-*'
+      - 'scripts/ios-assets.mjs'
+      - 'src/letters/**'
+      - '.github/workflows/native-ios.yml'
+
+concurrency:
+  group: native-ios
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-26
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          package-manager-cache: false
+
+      # AI Studio doesn't keep a package-lock.json, so install from package.json
+      - run: npm install --no-audit --no-fund
+
+      - name: Write the questions for the app, and what the website's letters engine says
+        run: |
+          node --experimental-strip-types scripts/native-decks.mjs
+          npx esbuild scripts/native-fixtures.ts --bundle --platform=node --log-level=warning --outfile="$RUNNER_TEMP/fx.cjs"
+          node "$RUNNER_TEMP/fx.cjs" "$RUNNER_TEMP/fixtures.json"
+
+      - name: Draw the icon
+        run: |
+          npm install --no-save --no-audit --no-fund sharp@0.35.5
+          npm run ios:assets
+
+      - name: Which Xcode
+        run: |
+          xcodebuild -version
+          swift --version
+
+      # (on failure the app still builds, so one run says everything that's wrong)
+      - name: Test the shared code
+        id: core
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          cd native/SoultiedCore
+          SOULTIED_FIXTURES="$RUNNER_TEMP/fixtures.json" swift test 2>&1 | tee "$RUNNER_TEMP/core.log"
+
+      - name: Make the Xcode project
+        run: |
+          brew list xcodegen >/dev/null 2>&1 || brew install xcodegen
+          cd native && xcodegen generate
+
+      - uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/dd/SourcePackages
+          key: spm-${{ runner.os }}-${{ hashFiles('native/project.yml') }}
+          restore-keys: spm-${{ runner.os }}-
+
+      - name: Build for the iPhone simulator
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project native/Soultied.xcodeproj \
+            -scheme Soultied \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/dd" \
+            -skipMacroValidation -skipPackagePluginValidation \
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tee "$RUNNER_TEMP/build.log" | grep -E "error:|warning: .*(deprecated|never|unused)|\*\* BUILD" || true
+          grep -q "\*\* BUILD SUCCEEDED \*\*" "$RUNNER_TEMP/build.log"
+
+      # The full log needs a GitHub sign-in to read, so put the errors where anyone can see them
+      - name: Show what went wrong
+        if: failure() || steps.core.outcome == 'failure'
+        run: |
+          python3 - <<'PY'
+          import os, re
+          logs = [os.path.join(os.environ['RUNNER_TEMP'], f) for f in ('core.log', 'build.log')]
+          seen, errs = set(), []
+          for p in logs:
+              if not os.path.exists(p):
+                  continue
+              for line in open(p, errors='replace'):
+                  m = re.match(r'^(/\S+?):(\d+):(\d+): error: (.*)$', line.strip())
+                  if m and line not in seen:
+                      seen.add(line)
+                      f = m.group(1).split('/native/', 1)[-1]
+                      errs.append((('native/' + f) if '/native/' in m.group(1) else m.group(1), m.group(2), m.group(3), m.group(4)))
+                  elif ('error:' in line or 'failed' in line.lower()) and line not in seen and len(errs) < 200:
+                      seen.add(line)
+                      errs.append(('', '', '', line.strip()[:400]))
+          for f, l, c, msg in errs[:9]:
+              print(f'::error file={f},line={l},col={c}::{msg}' if f else f'::error::{msg}')
+          rest = ' || '.join((f'{f}:{l}:{c}: {msg}' if f else msg) for f, l, c, msg in errs[9:])
+          if rest:
+              print('::error title=more errors::' + rest[:60000])
+          PY
+
+      - name: Take screenshots in the demo room
+        id: shots
+        run: |
+          set -x
+          app="$RUNNER_TEMP/dd/Build/Products/Debug-iphonesimulator/Soultied.app"
+          dev=$(xcrun simctl list devices available -j | python3 -c "import json,sys; d=json.load(sys.stdin)['devices']; ds=[x for k,v in d.items() if 'iOS' in k for x in v if x['name'].startswith('iPhone') and 'Pro' in x['name'] and 'Max' not in x['name']] or [x for k,v in d.items() if 'iOS' in k for x in v if x['name'].startswith('iPhone')]; print(ds[-1]['udid'])")
+          xcrun simctl boot "$dev"
+          xcrun simctl bootstatus "$dev" -b
+          xcrun simctl status_bar "$dev" override --time 9:41 --batteryLevel 100 --cellularBars 4 || true
+          xcrun simctl install "$dev" "$app"
+          mkdir -p "$RUNNER_TEMP/shots"
+          shot() {
+            name=$1; shift
+            xcrun simctl terminate "$dev" app.soultied 2>/dev/null || true
+            xcrun simctl launch "$dev" app.soultied "$@"
+            sleep 9
+            xcrun simctl io "$dev" screenshot "$RUNNER_TEMP/shots/$name.png"
+          }
+          shot welcome
+          shot home -demo -tab home
+          shot letters -demo -tab letters
+          shot wall -demo -tab wall
+          shot play -demo -tab play
+          shot us -demo -tab us
+          shot mood -demo -open me
+          shot decor -demo -open decor
+          ls -la "$RUNNER_TEMP/shots"
+          echo "dev=$dev" >> "$GITHUB_OUTPUT"
+
+      - name: Screenshots (1)
+        if: always() && steps.shots.outcome != 'skipped'
+        run: python3 .github/native-shots.py welcome home letters
+
+      - name: Screenshots (2)
+        if: always() && steps.shots.outcome != 'skipped'
+        run: python3 .github/native-shots.py wall play us
+
+      - name: Screenshots (3)
+        if: always() && steps.shots.outcome != 'skipped'
+        run: python3 .github/native-shots.py mood decor
+
+      - name: Did the app crash?
+        if: always() && steps.shots.outcome != 'skipped'
+        run: |
+          d="$HOME/Library/Logs/DiagnosticReports"
+          ls "$d" 2>/dev/null | grep -i soultied | head -3 | while read -r f; do
+            echo "::error title=crash::$(head -c 6000 "$d/$f" | tr '\n' ' ' | sed 's/  */ /g')"
+          done || true
+
+      - name: The shared code's tests
+        if: steps.core.outcome == 'failure'
+        run: |
+          grep -E "error:|failed" "$RUNNER_TEMP/core.log" | head -20 | while IFS= read -r line; do echo "::error title=core test::${line:0:600}"; done
+          exit 1

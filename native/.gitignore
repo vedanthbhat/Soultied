@@ -1,0 +1,7 @@
+# made before each build (see .github/workflows/native-ios.yml)
+SoultiedCore/Sources/SoultiedCore/Resources/decks.json
+SoultiedCore/.build/
+*.xcodeproj
+# written by XcodeGen from project.yml
+Soultied/Info.plist
+Soultied/Soultied.entitlements
