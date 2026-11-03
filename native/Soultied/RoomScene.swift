@@ -75,6 +75,7 @@ struct RoomScene: View {
         if let tc = touch, t - tc.at < TOUCH_LEN { st.touch = tc }
         st.wallArt = place.board.art?.pixels
         st.wallNews = place.wallNews != nil
+        st.gamesWaiting = !place.gamesWaiting.isEmpty
         return st
     }
 

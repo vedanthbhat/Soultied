@@ -2,26 +2,14 @@ import SwiftUI
 import SoultiedCore
 
 /*
- * Play: decorating the room with the stitches you earn, and the games, escape rooms and watch nights.
+ * Play: decorating the room with the stitches you earn, the games for two, and the escape rooms and watch nights.
  */
 
 struct PlayView: View {
     let place: PlaceModel
     @State private var decorating = false
+    @State private var open: GameKind?
     @Environment(\.openURL) private var openURL
-
-    private let games: [(String, String)] = [
-        ("Fireflies", "Drop fireflies into the jar. Four in a row, any direction, wins."),
-        ("Paper Boats", "Hide four paper boats on your pond, then take turns guessing where theirs are."),
-        ("Doodle Guess", "One draws on a little pixel canvas, the other guesses. Then swap."),
-        ("Noughts & Hearts", "Three in a row on a little board. Best of five."),
-        ("Fence the Garden", "Take turns adding a bit of fence. Close a bed and it’s yours."),
-        ("Lanterns", "Light a lantern to trap theirs in a line, and they all turn your colour."),
-        ("Tug of War", "Tap as fast as you can to pull the ribbon over to your side."),
-        ("Quick Draw", "Wait for the lantern to light, then tap. Quickest wins."),
-        ("Paper, Scissors, Stone", "Pick before the timer runs out. First to three."),
-        ("Coasters", "Air hockey on the coffee table with two coasters and a bottle cap."),
-    ]
 
     var body: some View {
         ScrollView {
@@ -48,26 +36,7 @@ struct PlayView: View {
                 }
                 .buttonStyle(.plain)
 
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack(spacing: 12) {
-                        GlyphView(glyph: Icons.play, scale: 4)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Games for two").font(.pxHeading).foregroundStyle(Color.inkSoft)
-                            Text("Being rebuilt for the iPhone, one by one. Tonight, play them together on soultied.app.").font(.pxSmall).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
-                    ForEach(games, id: \.0) { g in
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(g.0).font(.pxBodyBold).foregroundStyle(Color.inkSoft)
-                            Text(g.1).font(.pxSmall).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
-                        }
-                        .padding(10)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .pxInset()
-                    }
-                    Button("Play on soultied.app") { openURL(URL(string: "https://soultied.app/")!) }.buttonStyle(.px(.sage, wide: true))
-                }
-                .pxCard()
+                GamesShelf(place: place) { open = $0 }
 
                 HStack(alignment: .top, spacing: 14) {
                     GlyphView(glyph: Icons.tv, scale: 4)
@@ -97,6 +66,7 @@ struct PlayView: View {
         .sheet(isPresented: $decorating) {
             DecorView(place: place).presentationBackground(Color.paper)
         }
+        .fullScreenCover(item: $open) { k in GameScreen(place: place, kind: k) }
     }
 }
 

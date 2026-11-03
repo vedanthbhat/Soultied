@@ -145,6 +145,8 @@ jobs:
           shot us -demo -tab us
           shot mood -demo -open me
           shot decor -demo -open decor
+          shot fireflies -demo -game fireflies
+          shot boats -demo -game boats
           ls -la "$RUNNER_TEMP/shots"
           echo "dev=$dev" >> "$GITHUB_OUTPUT"
 

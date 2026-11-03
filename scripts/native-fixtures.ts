@@ -5,6 +5,13 @@
 import { writeFileSync } from 'node:fs';
 import { addDays, cardsFor, emptyLetters, hashStr, journeyInfo, journeyChapter, rng, streakInfo, weekday, weekStart, type LetterKind, type LettersState } from '../src/letters/engine';
 import { cardsOf, demoLetters, isAnswered, sameAnswer, scoreDay } from '../src/letters/cards';
+import type { GameKind, Match, Seat } from '../src/games/types';
+import * as play from '../src/games/registry';
+import { botColumn } from '../src/games/fireflies';
+import { botCell } from '../src/games/noughts';
+import { botEdge } from '../src/games/fence';
+import { botLantern } from '../src/games/lanterns';
+import { botShot, randomFleet } from '../src/games/boats';
 
 const r = rng(20261029);
 const int = (n: number) => Math.floor(r() * n);
@@ -91,6 +98,49 @@ const chapters = Array.from({ length: 32 }, (_, i) => {
   return { n: i, index: c.index, dayInChapter: c.dayInChapter, last: c.last };
 });
 
+// the games you take turns at: whole games between two of the demo room's partners, every move written down
+// (with the random numbers each pick was made from), so the iPhone's rules and partner can be checked move by move
+const games: Array<{ kind: GameKind; seat: Seat; seed: number; arg: unknown; before: Match; after: Match }> = [];
+const starters: Record<string, (s: Seat) => Match> = {
+  fireflies: (s) => play.newFireflies(s),
+  noughts: (s) => play.newNoughts(s),
+  fence: (s) => play.newFence(s),
+  lanterns: (s) => play.newLanterns(s),
+  boats: (s) => play.newBoats(s),
+};
+for (const kind of Object.keys(starters) as GameKind[]) {
+  for (let g = 0; g < 8; g++) {
+    let m: Match = { ...starters[kind](g % 2 ? 'b' : 'a'), id: `mtest${g}`, startedAt: 0, updatedAt: 0 };
+    for (let step = 0; step < 200 && m.status !== 'over'; step++) {
+      const seed = int(2 ** 31);
+      const r = rng(seed);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const st = m.state as any;
+      let seat: Seat;
+      let arg: unknown;
+      let after: Match | null;
+      if (kind === 'boats' && m.status === 'setup') {
+        seat = st.fleets.a ? 'b' : 'a';
+        arg = randomFleet(r);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        after = play.boatsReady(m as any, seat, arg as any);
+      } else {
+        seat = m.turn as Seat;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const mm = m as any;
+        if (kind === 'fireflies') after = play.fireflyMove(mm, seat, (arg = botColumn(st.board, seat, r)) as number);
+        else if (kind === 'noughts') after = play.noughtsMove(mm, seat, (arg = botCell(st.board, seat, r)) as number);
+        else if (kind === 'fence') after = play.fenceMove(mm, seat, (arg = botEdge(st, seat, r)) as number);
+        else if (kind === 'lanterns') after = play.lanternMove(mm, seat, (arg = botLantern(st.board, seat, r)) as number);
+        else after = play.boatsShot(mm, seat, (arg = botShot(st, seat, r)) as number);
+      }
+      if (!after) throw new Error(`no move in ${kind}`);
+      games.push({ kind, seat, seed, arg, before: m, after });
+      m = after;
+    }
+  }
+}
+
 const out = process.argv[2] || 'native-fixtures.json';
-writeFileSync(out, JSON.stringify({ cards, days, hashes, rngSeq, streaks, demo, same, chapters }));
-console.log(`wrote ${cards.length} card days, ${streaks.length} streaks, ${demo.length} demo rooms to ${out}`);
+writeFileSync(out, JSON.stringify({ cards, days, hashes, rngSeq, streaks, demo, same, chapters, games }));
+console.log(`wrote ${cards.length} card days, ${streaks.length} streaks, ${demo.length} demo rooms, ${games.length} game moves to ${out}`);

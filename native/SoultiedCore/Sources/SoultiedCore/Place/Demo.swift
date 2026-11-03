@@ -56,6 +56,13 @@ public enum Demo {
                            "answers": [me: ["pick": 2, "at": nowMs - 3 * 86400e3], them: ["pick": 2, "at": nowMs - 3 * 86400e3 + 5400e3]],
                            "seen": [me: nowMs - 2 * 86400e3, them: nowMs - 2 * 86400e3]],
         ]])
+        // Rohan started a game of Fireflies and dropped the first one: your move
+        if var ff = Play.fireflies(Play.newFireflies(.b), .b, col: 3) {
+            ff.seq = 1
+            ff.updatedAt = nowMs - 40 * 60e3
+            ff.updatedBy = .b
+            db.seed("\(p)/meta/game-fireflies", ff.doc)
+        }
         let acts: [(String, String, String, Double)] = [
             ("question_revealed", "Letter opened together", "In sync on 4 of 5.", 86400),
             ("avatar_updated", "Wardrobe refresh", "Rohan put on a terracotta cardigan and round glasses.", 3 * 86400),
@@ -185,6 +192,23 @@ final class DemoPartner {
             guard let p = self?.place, let db = p.db as? MemoryBackend else { return }
             let reply: Doc = options.isEmpty ? ["text": DEMO_REPLIES.randomElement()!, "at": Values.nowMs()] : ["pick": Int.random(in: 0..<options.count), "at": Values.nowMs()]
             db.apply(Write("spaces/\(p.sid)/meta/asks", ["items": [id: ["answers": [Demo.them: reply]]]], merge: true))
+        }
+    }
+
+    /// takes its turn in any game that's waiting on it, after a moment's thought
+    private var thinking: Set<String> = []
+    func games() {
+        guard let p = place else { return }
+        let bot = p.mySeat.other
+        for (kind, m) in p.games where Play.needsMe(m, bot) {
+            let key = "\(kind.rawValue):\(m.id):\(m.seq)"
+            if thinking.contains(key) { continue }
+            thinking.insert(key)
+            DispatchQueue.main.asyncAfter(deadline: .now() + Play.botDelay(m)) { [weak self] in
+                self?.thinking.remove(key)
+                guard let p = self?.place, let cur = p.games[kind], cur.id == m.id, cur.seq == m.seq, let next = Play.botAct(cur, bot) else { return }
+                p.commitGame(next, by: bot)
+            }
         }
     }
 

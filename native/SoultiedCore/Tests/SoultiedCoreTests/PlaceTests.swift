@@ -185,6 +185,32 @@ final class PlaceTests: XCTestCase {
         await settle()
         XCTAssertEqual(pa.asksView.fresh.count, 0)
 
+        // a game of Fireflies, across both phones
+        XCTAssertEqual(pa.mySeat, .a)
+        XCTAssertEqual(pb.mySeat, .b)
+        pa.saveGame(Play.newFireflies(.a))
+        await settle()
+        XCTAssertEqual(pb.games[.fireflies]?.turn, .a)
+        for (i, col) in [3, 1, 3, 1, 3, 1, 3].enumerated() {
+            let p = i % 2 == 0 ? pa : pb
+            let m = try XCTUnwrap(Play.fireflies(try XCTUnwrap(p.games[.fireflies]), p.mySeat, col: col))
+            p.saveGame(m)
+            await settle()
+            if i == 0 {
+                XCTAssertEqual(pb.gamesWaiting, [.fireflies])
+                XCTAssertEqual(pb.games[.fireflies]?.seq, 1)
+                // a stale tap from an older board is ignored
+                pa.saveGame(m)
+                XCTAssertEqual(pa.games[.fireflies]?.seq, 1)
+            }
+        }
+        XCTAssertEqual(pb.games[.fireflies]?.status, .over)
+        XCTAssertEqual(pb.games[.fireflies]?.winner, "a")
+        XCTAssertEqual(pb.games[.fireflies]?.wins[.a], 1)
+        XCTAssertTrue(pb.activities.contains { $0.description == "Aanya won at Fireflies." })
+        let again = try XCTUnwrap(Play.rematch(.fireflies, me: .b, last: pb.games[.fireflies]))
+        XCTAssertEqual(again.wins[.a], 1, "the tally carries on")
+
         // the 30 days
         pa.startJourney()
         await settle()
@@ -213,6 +239,15 @@ final class PlaceTests: XCTestCase {
         XCTAssertEqual(p.activities.count, 3)
         XCTAssertEqual(p.seats.left.name, "Aanya")
         XCTAssertEqual(p.seats.right.avatar?.facialHair, "stubble")
+
+        // Rohan started Fireflies; your move, and then he takes his
+        XCTAssertEqual(p.gamesWaiting, [.fireflies])
+        let m = try XCTUnwrap(Play.fireflies(try XCTUnwrap(p.games[.fireflies]), .a, col: 2))
+        p.saveGame(m)
+        for _ in 0..<40 where p.games[.fireflies]?.turn != .a { try? await Task.sleep(nanoseconds: 100_000_000) }
+        XCTAssertEqual(p.games[.fireflies]?.turn, .a)
+        XCTAssertEqual(p.games[.fireflies]?.seq, 3)
+        XCTAssertEqual(p.games[.fireflies]?.updatedBy, .b)
     }
 
 }

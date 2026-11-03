@@ -11,6 +11,7 @@ struct HomeView: View {
     var paused = false
     var go: (AppTab) -> Void
     var onRoom: (HotspotId) -> Void
+    var openGame: (GameKind) -> Void = { _ in }
     @Environment(\.displayScale) private var displayScale
 
     var body: some View {
@@ -27,6 +28,7 @@ struct HomeView: View {
                         touches
                         LetterCard(place: place, open: { go(.letters) })
                         AsksCard(place: place, open: { go(.letters) })
+                        GameCard(place: place, open: openGame)
                         WallCard(place: place, open: { go(.wall) })
                         StreakCard(place: place)
                         CouchCard(place: place, invite: { go(.us) })

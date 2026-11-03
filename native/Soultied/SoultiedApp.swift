@@ -25,6 +25,8 @@ struct SoultiedApp: App {
 /// Launch options for looking around without signing in (the screenshots GitHub takes of each build):
 ///   -demo            open the demo room
 ///   -tab letters     start on a tab (home, letters, wall, play, us)
+///   -open me         open a sheet from the room (me, them, letters, wall, decor, play, us)
+///   -game fireflies  open a game
 enum Launch {
     static let args = ProcessInfo.processInfo.arguments
     static var demo: Bool { args.contains("-demo") }
@@ -34,6 +36,11 @@ enum Launch {
     }
     static var sheet: String? {
         guard let i = args.firstIndex(of: "-open"), i + 1 < args.count else { return nil }
+        return args[i + 1]
+    }
+    /// -game fireflies   open one of the games
+    static var game: String? {
+        guard let i = args.firstIndex(of: "-game"), i + 1 < args.count else { return nil }
         return args[i + 1]
     }
 }

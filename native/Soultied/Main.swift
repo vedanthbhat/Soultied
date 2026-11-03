@@ -36,6 +36,7 @@ struct MainView: View {
     @State private var tab: AppTab = AppTab(rawValue: Launch.tab ?? "") ?? .home
     @State private var sheet: RoomSheet? = Launch.sheet.flatMap { RoomSheet(rawValue: $0) }
     @State private var lettersStart: LettersTab = .today
+    @State private var game: GameKind? = Launch.game.flatMap { GameKind(rawValue: $0) }
     @Environment(\.verticalSizeClass) private var vertical
 
     private var sideways: Bool { vertical == .compact }
@@ -48,7 +49,7 @@ struct MainView: View {
             } else {
                 VStack(spacing: 0) {
                     ZStack {
-                        HomeView(place: place, paused: tab != .home || sheet != nil, go: go, onRoom: { open($0, sheet: false) })
+                        HomeView(place: place, paused: tab != .home || sheet != nil || game != nil, go: go, onRoom: { open($0, sheet: false) }, openGame: { game = $0 })
                             .opacity(tab == .home ? 1 : 0)
                             .allowsHitTesting(tab == .home)
                         if tab == .letters { LettersView(place: place, start: lettersStart) }
@@ -60,7 +61,7 @@ struct MainView: View {
                     TabBar(tab: $tab, place: place)
                 }
             }
-            Toasts(place: place, onLetter: { go(.letters) })
+            Toasts(place: place, onHome: sideways || (tab == .home && sheet == nil), onLetter: { go(.letters) })
                 .padding(.bottom, sideways ? 12 : 84)
         }
         .sheet(item: $sheet) { s in
@@ -68,6 +69,7 @@ struct MainView: View {
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Color.paper)
         }
+        .fullScreenCover(item: $game) { k in GameScreen(place: place, kind: k) }
     }
 
     func go(_ t: AppTab) {
@@ -161,6 +163,8 @@ struct TabBar: View {
 
 struct Toasts: View {
     let place: PlaceModel
+    /// your person's mood only comes up on the couch (it's over their head there too); touches come up anywhere
+    var onHome = true
     var onLetter: () -> Void
 
     var body: some View {
@@ -182,7 +186,7 @@ struct Toasts: View {
                         Button("Later") { place.markTouchesSeen() }.font(.pxSmall).foregroundStyle(Color.muted)
                     }
                 }
-            } else if let m = place.moodNews {
+            } else if onHome, let m = place.moodNews {
                 Toast(glyph: m.glyph, text: m.mood != nil ? "\(place.theirName) is \(m.line.replacingOccurrences(of: " · ", with: ": "))" : "\(place.theirName): “\(m.text)”") {
                     VStack(spacing: 6) {
                         Button("Send a hug") {

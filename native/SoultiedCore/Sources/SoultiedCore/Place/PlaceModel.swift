@@ -34,6 +34,8 @@ public final class PlaceModel {
     public internal(set) var memoryItems: [String: Memory] = [:]
     public internal(set) var activities: [Activity] = []
     public internal(set) var askItems: [String: Ask] = [:]
+    /// every game's current match
+    public internal(set) var games: [GameKind: Match] = [:]
     /// which documents have arrived at least once
     public internal(set) var loaded: Set<String> = []
 
@@ -141,6 +143,18 @@ public final class PlaceModel {
             db.listen(meta("memories")) { [weak self] d in
                 self?.memoryItems = memories(d)
                 self?.loaded.insert("memories")
+            },
+            db.listen(prefixQuery("game-")) { [weak self] rows in
+                guard let self else { return }
+                var next: [GameKind: Match] = [:]
+                for r in rows {
+                    guard let m = Match(r.data), r.id == m.kind.docName else { continue }
+                    // an older copy arriving after our own newer move
+                    if let cur = self.games[m.kind], cur.id == m.id, cur.seq > m.seq { next[m.kind] = cur } else { next[m.kind] = m }
+                }
+                self.games = next
+                self.loaded.insert("games")
+                self.demoPartner?.games()
             },
             db.listen(QuerySpec(path("activities"), orderBy: "at", descending: true, limit: 30)) { [weak self] rows in
                 self?.activities = rows.map { Activity(row: $0) }
@@ -536,6 +550,43 @@ public final class PlaceModel {
         timeline(memories: Array(memoryItems.values), notes: notes, photos: photos, togetherSince: space?.togetherSince, movedIn: space.map { $0.startKey })
     }
 
+    /* ---------- games ---------- */
+
+    /// whoever made the place is "a", the person who joined is "b"
+    public var mySeat: Side { space == nil || space?.creatorId == me ? .a : .b }
+    public func seatName(_ s: Side) -> String { s == mySeat ? myName : theirName }
+    public func seatLook(_ s: Side) -> AvatarConfig? { s == mySeat ? myLook : theirLook }
+
+    /// the games waiting on you: your move, boats to hide, or an invitation
+    public var gamesWaiting: [GameKind] {
+        guard partnerHere else { return [] }
+        let t = now.timeIntervalSince1970 * 1000
+        return GameKind.allCases.filter { Play.needsMe(games[$0], mySeat, now: t) }
+    }
+
+    /// a move you made (or a new game you started)
+    public func saveGame(_ m: Match) { commitGame(m, by: mySeat) }
+
+    /// Stores a move by `writer` and, if it ended the game, counts the win and notes it in what's happened lately.
+    func commitGame(_ m0: Match, by writer: Side) {
+        let prev = games[m0.kind]
+        // a second tap before the screen caught up would replay a move from an older board: ignore it
+        if m0.kind.info.mode == .turns, let p = prev, p.id == m0.id, m0.seq < p.seq { return }
+        var m = m0
+        m.updatedAt = Values.nowMs()
+        m.updatedBy = writer
+        m.seq = prev.map { $0.id == m0.id ? $0.seq + 1 : 0 } ?? 0
+        let justEnded = m.status == .over && !(prev?.id == m.id && prev?.status == .over)
+        if justEnded, let w = m.winnerSeat { m.wins[w, default: 0] += 1 }
+        games[m.kind] = m
+        db.setLater(meta(m.kind.docName), m.doc, self)
+        if justEnded {
+            let line = Play.endLine(m, name: seatName)
+            if !line.isEmpty { activity(.new(.playedGame, m.kind.info.name, line)) }
+        }
+        demoPartner?.games()
+    }
+
     /* ---------- decorating ---------- */
 
     public var decor: Decor { decorDoc.decor }
@@ -650,3 +701,6 @@ extension Backend {
         }
     }
 }
+
+/// every change happens on the main thread (the screens, and the database's callbacks)
+extension PlaceModel: @unchecked Sendable {}

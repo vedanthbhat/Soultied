@@ -142,6 +142,8 @@ struct NoteView: View {
         .padding(10)
         .frame(maxWidth: .infinity, minHeight: 120, alignment: .topLeading)
         .background(Color(hex: NOTE_PAPERS[note.paper]))
+        // (flattened first, so only the paper casts a shadow, not each line of writing on it)
+        .compositingGroup()
         .shadow(color: .black.opacity(0.35), radius: 0, x: 3, y: 3)
         .rotationEffect(.degrees(tilt))
         .contextMenu {
@@ -292,6 +294,7 @@ struct PhotosPanel: View {
                         .padding(8)
                         .padding(.bottom, 6)
                         .background(Color.paperHi)
+                        .compositingGroup()
                         .shadow(color: .black.opacity(0.35), radius: 0, x: 3, y: 3)
                     }
                     .buttonStyle(.plain)
