@@ -89,6 +89,8 @@ public protocol Backend: AnyObject {
     func millis(_ v: Any?) -> Double?
     /// a moment in time, as the database keeps it
     func timestamp(ms: Double) -> Any
+    /// short messages between the two of you, kept in this collection (see LiveChannel)
+    func live(_ collection: String) -> LiveChannel
 }
 
 public extension Backend {

@@ -45,7 +45,7 @@ enum GameArt {
     static func icon(_ k: GameKind) -> Glyph {
         switch k {
         case .fireflies: return firefly(.a)
-        case .boats: return Glyph(["....k....", "...kk....", "..kkk....", ".kkkk....", "....k....", "hhhhhhhhh", ".hhhhhhh.", "..sssss.."], ["k": "#f7eedb", "h": "#efe3cb", "s": "#bfae8c"])
+        case .boats: return Glyph(["....k....", "...kk....", "..kKk....", ".kKKk....", "....m....", "hhhhhhhhh", ".hHHHHHh.", "..sssss.."], ["k": "#6b5a40", "K": "#fbf3e2", "m": "#6b5a40", "h": "#6b5a40", "H": "#d6c29c", "s": "#5f8fb0"])
         case .noughts: return heart
         case .fence: return flower(.a)
         case .lanterns: return lantern(.b)
@@ -113,8 +113,8 @@ struct PlayerChip: View {
         HStack(spacing: 8) {
             if let l = place.seatLook(side) { HeadView(look: l, size: 32) } else { Color.paper2.frame(width: 32, height: 32) }
             VStack(alignment: .leading, spacing: 0) {
-                Text(place.seatName(side) + (mine ? " (you)" : "")).font(.px(14, 700)).foregroundStyle(Color.inkSoft).lineLimit(1)
-                Text("\(wins) \(wins == 1 ? "win" : "wins")\(note)").font(.pxTiny).foregroundStyle(Color.muted).lineLimit(1).minimumScaleFactor(0.8)
+                Text(mine ? "You" : place.seatName(side)).font(.px(14, 700)).foregroundStyle(Color.inkSoft).lineLimit(1).minimumScaleFactor(0.8)
+                Text("\(wins) \(wins == 1 ? "win" : "wins")\(note)").font(.pxTiny).foregroundStyle(Color.muted).lineLimit(1).minimumScaleFactor(0.7)
             }
             Spacer(minLength: 0)
             if let marker { GlyphView(glyph: marker, scale: 3) }
@@ -194,6 +194,9 @@ struct GameScreen: View {
         case .fence: FenceGameView(place: place)
         case .lanterns: LanternsGameView(place: place)
         case .boats: BoatsGameView(place: place)
+        case .tug: TugGameView(place: place)
+        case .rps: RpsGameView(place: place)
+        case .quickdraw: QuickDrawGameView(place: place)
         default: LiveGameNote(place: place, kind: kind)
         }
     }
@@ -764,9 +767,9 @@ struct PondView: View {
             Text(label).font(.px(17, 700)).foregroundStyle(Color.paper)
             HStack(alignment: .top, spacing: 4) {
                 VStack(spacing: 0) {
-                    Color.clear.frame(height: p * 0.6)
+                    Color.clear.frame(width: 16, height: p * 0.6)
                     ForEach(0..<Boats.size, id: \.self) { y in
-                        Text("\(y + 1)").font(.pxTiny).foregroundStyle(Color.paper.opacity(0.7)).frame(height: p)
+                        Text("\(y + 1)").font(.pxTiny).foregroundStyle(Color.paper.opacity(0.7)).frame(width: 16, height: p)
                     }
                 }
                 VStack(spacing: 0) {
@@ -980,7 +983,6 @@ struct LiveGameNote: View {
 struct GamesShelf: View {
     let place: PlaceModel
     var open: (GameKind) -> Void
-    @Environment(\.openURL) private var openURL
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -1000,11 +1002,12 @@ struct GamesShelf: View {
                 GlyphView(glyph: Icons.flame, scale: 4)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Play live").font(.pxHeading).foregroundStyle(Color.inkSoft)
-                    Text("For when you’re both here at once. These are on soultied.app for now.").font(.pxSmall).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
+                    Text("For when you’re both here at once: invite \(place.theirName), and play the moment they join, phone or laptop.").font(.pxSmall).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
                 }
             }
-            ForEach(LIVE_GAMES) { k in row(k) }
-            Button("Play live on soultied.app") { openURL(URL(string: "https://soultied.app/")!) }.buttonStyle(.px(.sage, wide: true))
+            ForEach(LIVE_GAMES.filter { Play.onIPhone.contains($0) }) { k in row(k) }
+            Text("On soultied.app for now").font(.px(14, 700)).foregroundStyle(Color.muted).padding(.top, 4)
+            ForEach(LIVE_GAMES.filter { !Play.onIPhone.contains($0) }) { k in row(k) }
         }
         .pxCard()
     }
@@ -1049,7 +1052,7 @@ struct GameCard: View {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(k.info.name).font(.px(14, 600)).foregroundStyle(Color.muted)
                         Text(Play.note(m, who: place.theirName)).font(.pxBodyBold).foregroundStyle(Color.inkSoft).multilineTextAlignment(.leading).fixedSize(horizontal: false, vertical: true)
-                        Text(Play.isLiveInvite(k) || k == .doodle ? "Open soultied.app →" : "Play →").font(.px(16, 700)).foregroundStyle(Color.terracottaD)
+                        Text(Play.onIPhone.contains(k) ? (Play.isLiveInvite(k) ? "Join →" : "Play →") : "Open soultied.app →").font(.px(16, 700)).foregroundStyle(Color.terracottaD)
                     }
                     Spacer(minLength: 0)
                 }

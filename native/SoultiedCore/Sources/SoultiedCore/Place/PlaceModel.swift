@@ -567,6 +567,9 @@ public final class PlaceModel {
     /// a move you made (or a new game you started)
     public func saveGame(_ m: Match) { commitGame(m, by: mySeat) }
 
+    /// the line between the two of you for live things (games, for now)
+    public func liveChannel(_ topic: String) -> LiveChannel { db.live(path("live/\(topic)/events")) }
+
     /// Stores a move by `writer` and, if it ended the game, counts the win and notes it in what's happened lately.
     func commitGame(_ m0: Match, by writer: Side) {
         let prev = games[m0.kind]

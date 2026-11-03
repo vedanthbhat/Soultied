@@ -254,6 +254,9 @@ public enum Play {
 
     public static func isLiveInvite(_ kind: GameKind) -> Bool { kind.info.mode == .live && kind != .doodle }
 
+    /// the games the iPhone plays itself (the others open soultied.app, for now)
+    public static let onIPhone: Set<GameKind> = Set(TURN_GAMES + [.tug, .rps, .quickdraw])
+
     public static func stale(_ m: Match, now: Double = Values.nowMs()) -> Bool {
         guard m.status != .over else { return false }
         if isLiveInvite(m.kind) { return now - m.updatedAt > liveStaleMs }
@@ -285,7 +288,7 @@ public enum Play {
     /// the line for the little note in the room, e.g. "Rohan dropped a firefly in the middle in Fireflies. Your move."
     public static func note(_ m: Match, who: String) -> String {
         let game = m.kind.info.name
-        if isLiveInvite(m.kind) { return "\(who) wants to play \(game) with you, right now. Join them on soultied.app?" }
+        if isLiveInvite(m.kind) { return "\(who) wants to play \(game) with you, right now. Join them\(onIPhone.contains(m.kind) ? "" : " on soultied.app")?" }
         if m.kind == .doodle {
             switch m.state.str("phase") {
             case "lobby": return "\(who) wants to play \(game). Join them on soultied.app?"
@@ -344,6 +347,7 @@ public enum Play {
 
     /// the pretend partner's move, if it has one to make
     public static func botAct(_ m: Match, _ bot: Side, _ rng: Random = { Double.random(in: 0..<1) }) -> Match? {
+        if isLiveInvite(m.kind) { return m.status == .setup ? liveJoin(m, bot) : nil }
         switch m.kind {
         case .noughts:
             guard m.status == .playing, m.turn == bot else { return nil }
@@ -369,6 +373,7 @@ public enum Play {
 
     /// how long the pretend partner thinks, in seconds
     public static func botDelay(_ m: Match) -> Double {
+        if isLiveInvite(m.kind) { return 1.4 }
         if m.kind == .boats && m.status == .setup { return 0.9 }
         return 1.1 + Double.random(in: 0..<0.9)
     }

@@ -134,4 +134,48 @@ public final class MemoryBackend: Backend {
     }
 
     public func timestamp(ms: Double) -> Any { Date(timeIntervalSince1970: ms / 1000) }
+
+    /* ---------- live channels: everyone listening on a collection hears every message, their own too ---------- */
+
+    private var buses: [String: [Int: (Doc) -> Void]] = [:]
+    private var outbox: [(String, Doc)] = []
+    private var sending = false
+
+    final class Channel: LiveChannel {
+        weak var db: MemoryBackend?
+        let collection: String
+        let id: Int
+        init(_ db: MemoryBackend, _ collection: String, _ id: Int) {
+            self.db = db
+            self.collection = collection
+            self.id = id
+        }
+        var isLocal: Bool { true }
+        func send(_ e: Doc) { db?.post(collection, e) }
+        func subscribe(_ fn: @escaping (Doc) -> Void) { db?.buses[collection, default: [:]][id] = fn }
+        func close() { db?.buses[collection]?[id] = nil }
+    }
+
+    public func live(_ collection: String) -> LiveChannel {
+        nextId += 1
+        return Channel(self, collection, nextId)
+    }
+
+    /// one message at a time, in the order they were sent (a reply sent while hearing a message waits its turn)
+    private func post(_ collection: String, _ e: Doc) {
+        if !synchronous {
+            DispatchQueue.main.async { [weak self] in
+                for fn in (self?.buses[collection] ?? [:]).values { fn(e) }
+            }
+            return
+        }
+        outbox.append((collection, e))
+        if sending { return }
+        sending = true
+        while !outbox.isEmpty {
+            let (c, m) = outbox.removeFirst()
+            for (_, fn) in (buses[c] ?? [:]).sorted(by: { $0.key < $1.key }) { fn(m) }
+        }
+        sending = false
+    }
 }

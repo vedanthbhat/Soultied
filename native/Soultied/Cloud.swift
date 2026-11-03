@@ -101,6 +101,92 @@ final class FirestoreBackend: Backend {
     }
 
     func timestamp(ms: Double) -> Any { Timestamp(date: Date(timeIntervalSince1970: ms / 1000)) }
+
+    func live(_ collection: String) -> LiveChannel { FirestoreChannel(db.collection(collection), encode: encode) }
+}
+
+/**
+ * Short messages between the two of you (the website's channelAt, src/cloud/liveFs.ts): every message is a
+ * tiny document the other person's listener picks up a moment later. "From now on" is by the server's clock:
+ * the newest message already there marks now, and we listen for anything after it.
+ */
+final class FirestoreChannel: LiveChannel {
+    /// messages are useless after a few seconds; this lets a Firestore TTL policy sweep them up
+    private static let keep: TimeInterval = 24 * 60 * 60
+
+    private let col: CollectionReference
+    private let encode: (Any) -> Any
+    private var fn: ((Doc) -> Void)?
+    private var reg: ListenerRegistration?
+    /// said before we were listening: sent once we are, so we can't miss the answers
+    private var outbox: [Doc]? = []
+    private var closed = false
+
+    var isLocal: Bool { false }
+
+    init(_ col: CollectionReference, encode: @escaping (Any) -> Any) {
+        self.col = col
+        self.encode = encode
+        col.order(by: "ts", descending: true).limit(to: 1).getDocuments { [weak self] snap, err in
+            guard let self, !self.closed else { return }
+            if err == nil {
+                let newest = snap?.documents.first?.data()["ts"] as? Timestamp
+                self.listen(since: newest ?? Timestamp(seconds: 0, nanoseconds: 0), skip: nil)
+            } else {
+                // can't ask (offline?): fall back to this phone's clock, skipping what was already there
+                let opened = Date()
+                self.listen(since: Timestamp(date: opened.addingTimeInterval(-60))) { ts in ts.map { $0.dateValue() < opened.addingTimeInterval(-1.5) } ?? true }
+            }
+        }
+    }
+
+    private func listen(since: Timestamp, skip: ((Timestamp?) -> Bool)?) {
+        guard !closed else { return }
+        var first = true
+        reg = col.whereField("ts", isGreaterThan: since).addSnapshotListener { [weak self] snap, _ in
+            guard let self, let snap, !self.closed else { return }
+            let history = first
+            first = false
+            for ch in snap.documentChanges where ch.type == .added {
+                var d = ch.document.data()
+                if history, let skip, skip(d["ts"] as? Timestamp) { continue }
+                d["ts"] = nil
+                d["expireAt"] = nil
+                // clocks on two devices disagree; "when it arrived" is a better "when it happened" than their clock
+                d["at"] = Date().timeIntervalSince1970 * 1000 - 150
+                self.fn?(d)
+            }
+        }
+        let waiting = outbox ?? []
+        outbox = nil
+        waiting.forEach(write)
+    }
+
+    private func write(_ e: Doc) {
+        var d = e.mapValues(encode)
+        d["ts"] = FieldValue.serverTimestamp()
+        d["expireAt"] = Timestamp(date: Date().addingTimeInterval(Self.keep))
+        col.addDocument(data: d) { err in
+            if let err { print("[soultied] live: \(err.localizedDescription)") }
+        }
+    }
+
+    func send(_ e: Doc) {
+        guard !closed else { return }
+        if outbox != nil { outbox?.append(e) } else { write(e) }
+    }
+
+    func subscribe(_ fn: @escaping (Doc) -> Void) { self.fn = fn }
+
+    func close() {
+        // a goodbye sent just now still goes; nothing more is heard
+        closed = true
+        reg?.remove()
+        reg = nil
+        if let waiting = outbox { waiting.forEach(write) }
+        outbox = nil
+        fn = nil
+    }
 }
 
 /* ---------- signing in: Apple and Google, through Firebase ---------- */

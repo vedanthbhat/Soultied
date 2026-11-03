@@ -43,6 +43,8 @@ enum Launch {
         guard let i = args.firstIndex(of: "-game"), i + 1 < args.count else { return nil }
         return args[i + 1]
     }
+    /// -invite   in the demo room, invite the pretend partner to the live game that's open (for screenshots)
+    static var invite: Bool { args.contains("-invite") }
 }
 
 struct RootView: View {

@@ -147,6 +147,9 @@ jobs:
           shot decor -demo -open decor
           shot fireflies -demo -game fireflies
           shot boats -demo -game boats
+          shot tug -demo -game tug -invite
+          shot rps -demo -game rps -invite
+          shot quickdraw -demo -game quickdraw -invite
           ls -la "$RUNNER_TEMP/shots"
           echo "dev=$dev" >> "$GITHUB_OUTPUT"
 

@@ -12,6 +12,10 @@ import { botCell } from '../src/games/noughts';
 import { botEdge } from '../src/games/fence';
 import { botLantern } from '../src/games/lanterns';
 import { botShot, randomFleet } from '../src/games/boats';
+import { TUG } from '../src/games/tug';
+import { RPS } from '../src/games/rps';
+import { QUICK } from '../src/games/quickdraw';
+import { COUNTDOWN_MS, type LiveDef, seeded } from '../src/games/live/lobby';
 
 const r = rng(20261029);
 const int = (n: number) => Math.floor(r() * n);
@@ -141,6 +145,49 @@ for (const kind of Object.keys(starters) as GameKind[]) {
   }
 }
 
+// the live games: whole games between two of the demo room's partners as the host runs them (time passing in
+// small steps, each partner asked for a move every so often), with Math.random made repeatable, so the iPhone's
+// rules can be checked step by step
+type LiveStep = { t: number; op: 'init' | 'tick' | 'act'; seat?: Seat; a?: unknown; changed?: boolean; s: unknown };
+const live: Array<{ kind: string; seed: number; start: number; steps: LiveStep[]; result: unknown }> = [];
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const liveDefs: Record<string, LiveDef<any, any>> = { tug: TUG, rps: RPS, quickdraw: QUICK };
+const realRandom = Math.random;
+for (const kind of Object.keys(liveDefs)) {
+  const def = liveDefs[kind];
+  for (let g = 0; g < 6; g++) {
+    const seed = int(2 ** 31);
+    Math.random = rng(seed ^ 0x5bd1e995);
+    const start = 1_790_000_000_000 + g * 1000;
+    let s = def.init(seeded(seed), start);
+    const steps: LiveStep[] = [{ t: start, op: 'init', s }];
+    const begin = start + COUNTDOWN_MS;
+    let res = null;
+    for (let t = begin; t < begin + 180_000 && !res; t += 5) {
+      const el = t - begin;
+      if (def.tick && el % (def.tickMs || 100) === 0) {
+        const n = def.tick(s, t);
+        if (n !== s) steps.push({ t, op: 'tick', s: (s = n) });
+        res = def.result(s);
+        if (res) break;
+      }
+      if (def.bot && el % (def.botMs || 400) === 0) {
+        for (const seat of ['a', 'b'] as Seat[]) {
+          const a = def.bot(s, seat, t);
+          if (a === null || a === undefined) continue;
+          const n = def.act(s, seat, a, t);
+          steps.push({ t, op: 'act', seat, a, changed: n !== s, s: n });
+          s = n;
+          res = def.result(s);
+          if (res) break;
+        }
+      }
+    }
+    Math.random = realRandom;
+    live.push({ kind, seed, start, steps: JSON.parse(JSON.stringify(steps)), result: res });
+  }
+}
+
 const out = process.argv[2] || 'native-fixtures.json';
-writeFileSync(out, JSON.stringify({ cards, days, hashes, rngSeq, streaks, demo, same, chapters, games }));
-console.log(`wrote ${cards.length} card days, ${streaks.length} streaks, ${demo.length} demo rooms, ${games.length} game moves to ${out}`);
+writeFileSync(out, JSON.stringify({ cards, days, hashes, rngSeq, streaks, demo, same, chapters, games, live }));
+console.log(`wrote ${cards.length} card days, ${streaks.length} streaks, ${demo.length} demo rooms, ${games.length} game moves, ${live.length} live games to ${out}`);
