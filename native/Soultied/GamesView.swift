@@ -197,6 +197,7 @@ struct GameScreen: View {
         case .tug: TugGameView(place: place)
         case .rps: RpsGameView(place: place)
         case .quickdraw: QuickDrawGameView(place: place)
+        case .doodle: DoodleGameView(place: place)
         default: LiveGameNote(place: place, kind: kind)
         }
     }

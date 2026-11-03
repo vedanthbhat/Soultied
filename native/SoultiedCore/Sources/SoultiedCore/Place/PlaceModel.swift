@@ -570,6 +570,10 @@ public final class PlaceModel {
     /// the line between the two of you for live things (games, for now)
     public func liveChannel(_ topic: String) -> LiveChannel { db.live(path("live/\(topic)/events")) }
 
+    /// Doodle Guess's page, as last saved by whoever's drawing
+    public func watchDoodleCanvas(_ fn: @escaping (Doc?) -> Void) -> Listener { db.listen(meta("doodle-canvas"), fn) }
+    public func saveDoodleCanvas(_ d: Doc) { db.setLater(meta("doodle-canvas"), d, self) }
+
     /// Stores a move by `writer` and, if it ended the game, counts the win and notes it in what's happened lately.
     func commitGame(_ m0: Match, by writer: Side) {
         let prev = games[m0.kind]

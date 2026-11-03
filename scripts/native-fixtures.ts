@@ -16,6 +16,7 @@ import { TUG } from '../src/games/tug';
 import { RPS } from '../src/games/rps';
 import { QUICK } from '../src/games/quickdraw';
 import { COUNTDOWN_MS, type LiveDef, seeded } from '../src/games/live/lobby';
+import { WORDS, brushLine, fillCells, judge, pickChoices } from '../src/games/doodle';
 
 const r = rng(20261029);
 const int = (n: number) => Math.floor(r() * n);
@@ -188,6 +189,70 @@ for (const kind of Object.keys(liveDefs)) {
   }
 }
 
+// Doodle Guess: how guesses are judged, the brush, the paint bucket, the words offered, and whole games
+// between two of the demo room's partners (with Math.random and the clock made repeatable)
+const typo = (w: string) => {
+  const i = int(w.length);
+  const k = int(3);
+  const ch = 'abcdefghijklmnopqrstuvwxyz'[int(26)];
+  return k === 0 ? w.slice(0, i) + w.slice(i + 1) : k === 1 ? w.slice(0, i) + ch + w.slice(i) : w.slice(0, i) + ch + w.slice(i + 1);
+};
+const judges: Array<[string, string, string]> = [];
+for (let i = 0; i < 1500; i++) {
+  const w = pickOf(WORDS);
+  const k = int(12);
+  const g =
+    k === 0 ? w
+    : k === 1 ? w + 's'
+    : k === 2 ? w + 'es'
+    : k === 3 ? w.toUpperCase() + '!'
+    : k === 4 ? `the ${w}`
+    : k === 5 ? `  A ${w}  `
+    : k === 6 ? typo(w)
+    : k === 7 ? typo(typo(w))
+    : k === 8 ? w.slice(0, 1 + int(w.length))
+    : k === 9 ? pickOf(WORDS)
+    : k === 10 ? pickOf(['', '   ', 'the', 'an a', 'Café', 'naïve', '😀 cat', 'ice-cream', 'icecream', 'the end', 'thermos', 'another'])
+    : `${pickOf(WORDS)} ${w}`;
+  judges.push([g, w, judge(g, w)]);
+}
+const brushes = Array.from({ length: 400 }, () => {
+  const a = [int(50) - 5, int(40) - 5, int(50) - 5, int(40) - 5, 1 + int(3)];
+  return [...a, brushLine(a[0], a[1], a[2], a[3], a[4])];
+});
+const fills = Array.from({ length: 60 }, () => {
+  const cols = ['.', 'k', 'r', 'y'];
+  let p = '';
+  for (let i = 0; i < 40 * 30; i++) p += i % 40 === 0 || int(5) === 0 ? pickOf(cols) : p[i - 1];
+  const start = int(40 * 30);
+  return [p, start, fillCells(p, start)];
+});
+const choices = Array.from({ length: 200 }, () => {
+  const seed = int(2 ** 31);
+  const avoid = Array.from({ length: int(6) }, () => pickOf(WORDS));
+  return [seed, avoid, pickChoices(rng(seed), avoid)];
+});
+const doodles: Array<{ seat: Seat; seed: number; now: number; before: Match; after: Match }> = [];
+const realNow = Date.now;
+for (let g = 0; g < 12; g++) {
+  let t = 1_790_000_000_000 + g * 3_600_000;
+  Date.now = () => t;
+  let m: Match = { ...play.newDoodle(g % 2 ? 'b' : 'a', g), id: `mdoodle${g}` };
+  for (let step = 0; step < 400 && m.status !== 'over'; step++) {
+    const seat = (['a', 'b'] as Seat[]).find((s) => play.botTurn(m, s));
+    if (!seat) throw new Error('nobody to move in doodle');
+    t += 1000 + int(20000);
+    const seed = int(2 ** 31);
+    Math.random = rng(seed);
+    const after = play.botAct(m, seat);
+    Math.random = realRandom;
+    if (!after) throw new Error(`no doodle move for ${seat} in ${(m.state as { phase: string }).phase}`);
+    doodles.push({ seat, seed, now: t, before: m, after });
+    m = { ...after, seq: m.seq + 1, updatedAt: t, updatedBy: seat };
+  }
+}
+Date.now = realNow;
+
 const out = process.argv[2] || 'native-fixtures.json';
-writeFileSync(out, JSON.stringify({ cards, days, hashes, rngSeq, streaks, demo, same, chapters, games, live }));
-console.log(`wrote ${cards.length} card days, ${streaks.length} streaks, ${demo.length} demo rooms, ${games.length} game moves, ${live.length} live games to ${out}`);
+writeFileSync(out, JSON.stringify({ cards, days, hashes, rngSeq, streaks, demo, same, chapters, games, live, doodle: { judges, brushes, fills, choices, games: doodles } }));
+console.log(`wrote ${cards.length} card days, ${streaks.length} streaks, ${demo.length} demo rooms, ${games.length} game moves, ${live.length} live games, ${doodles.length} doodle moves to ${out}`);

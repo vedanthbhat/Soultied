@@ -255,7 +255,7 @@ public enum Play {
     public static func isLiveInvite(_ kind: GameKind) -> Bool { kind.info.mode == .live && kind != .doodle }
 
     /// the games the iPhone plays itself (the others open soultied.app, for now)
-    public static let onIPhone: Set<GameKind> = Set(TURN_GAMES + [.tug, .rps, .quickdraw])
+    public static let onIPhone: Set<GameKind> = Set(TURN_GAMES + [.tug, .rps, .quickdraw, .doodle])
 
     public static func stale(_ m: Match, now: Double = Values.nowMs()) -> Bool {
         guard m.status != .over else { return false }
@@ -291,9 +291,9 @@ public enum Play {
         if isLiveInvite(m.kind) { return "\(who) wants to play \(game) with you, right now. Join them\(onIPhone.contains(m.kind) ? "" : " on soultied.app")?" }
         if m.kind == .doodle {
             switch m.state.str("phase") {
-            case "lobby": return "\(who) wants to play \(game). Join them on soultied.app?"
-            case "drawing": return "\(who) is drawing something in \(game). Come and guess on soultied.app!"
-            default: return "It’s your turn to draw in \(game), on soultied.app."
+            case "lobby": return "\(who) wants to play \(game). Join them?"
+            case "drawing": return "\(who) is drawing something in \(game). Come and guess!"
+            default: return "It’s your turn to draw in \(game)."
             }
         }
         if m.status == .setup { return "\(who) started \(game). Hide your boats!" }
@@ -366,6 +366,8 @@ public enum Play {
             if m.status == .setup && st.fleets[bot] == nil { return boatsReady(m, bot, Boats.randomFleet(rng)) }
             if m.status == .playing && m.turn == bot { return boatsShot(m, bot, cell: Boats.botShot(st, bot, rng)) }
             return nil
+        case .doodle:
+            return doodleBot(m, bot, rng)
         default:
             return nil
         }
@@ -373,6 +375,12 @@ public enum Play {
 
     /// how long the pretend partner thinks, in seconds
     public static func botDelay(_ m: Match) -> Double {
+        if m.kind == .doodle {
+            let phase = m.state.str("phase")
+            if phase == "drawing" { return 7 + Double.random(in: 0..<7) }
+            if phase == "reveal" { return 5 }
+            return 1.5
+        }
         if isLiveInvite(m.kind) { return 1.4 }
         if m.kind == .boats && m.status == .setup { return 0.9 }
         return 1.1 + Double.random(in: 0..<0.9)

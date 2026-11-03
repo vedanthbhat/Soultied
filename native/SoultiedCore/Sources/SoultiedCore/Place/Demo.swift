@@ -200,7 +200,7 @@ final class DemoPartner {
     func games() {
         guard let p = place else { return }
         let bot = p.mySeat.other
-        for (kind, m) in p.games where Play.needsMe(m, bot) {
+        for (kind, m) in p.games where Play.botTurn(m, bot) {
             let key = "\(kind.rawValue):\(m.id):\(m.seq)"
             if thinking.contains(key) { continue }
             thinking.insert(key)
