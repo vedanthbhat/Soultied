@@ -1,1 +1,1 @@
-`decks.json` (every question card, the same as the website's) is written here by `node --experimental-strip-types scripts/native-decks.mjs` before a build, so it isn't kept in the repo.
+`decks.json` (every question card, the same as the website's) is written here by `node --experimental-strip-types scripts/native-decks.mjs` before a build, and `escape.json` (the escape rooms' words, things to look at and puzzles) by `scripts/native-escape.ts` (see the top of that file), so neither is kept in the repo.

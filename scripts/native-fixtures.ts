@@ -19,6 +19,8 @@ import { COUNTDOWN_MS, type LiveDef, seeded } from '../src/games/live/lobby';
 import { WORDS, brushLine, fillCells, judge, pickChoices } from '../src/games/doodle';
 import { COASTERS } from '../src/games/coasters';
 import { KITCHEN } from '../src/games/kitchen';
+import { ROOMS } from '../src/escape/rooms';
+import { Scene } from '../src/escape/scene';
 
 const r = rng(20261029);
 const int = (n: number) => Math.floor(r() * n);
@@ -298,6 +300,22 @@ for (const [x, y, vx, vy] of [[40, 140, 10, 200], [60, 25, -20, -230], [30, 120,
   }
 }
 
+// every escape room, both halves, at every step and a few moments: a hash of the pixels (and which ones glow)
+const fnv = (a: ArrayLike<number>, h: number) => {
+  for (let i = 0; i < a.length; i++) h = Math.imul(h ^ a[i], 0x01000193) >>> 0;
+  return h;
+};
+const escape: Array<{ room: string; side: string; step: number; t: number; hash: number }> = [];
+for (const room of ROOMS)
+  for (const side of ['a', 'b'] as const)
+    for (let step = 0; step <= room.puzzles.length; step++)
+      for (const t of [0, 0.73, 2.41, 7.9]) {
+        const s = new Scene();
+        s.reset();
+        room.draw(s, side, step, t);
+        escape.push({ room: room.id, side, step, t, hash: fnv(s.data, fnv(s.emit, 0x811c9dc5)) });
+      }
+
 const out = process.argv[2] || 'native-fixtures.json';
-writeFileSync(out, JSON.stringify({ cards, days, hashes, rngSeq, streaks, demo, same, chapters, games, live, doodle: { judges, brushes, fills, choices, games: doodles }, coasters: coasterSteps }));
+writeFileSync(out, JSON.stringify({ cards, days, hashes, rngSeq, streaks, demo, same, chapters, games, live, doodle: { judges, brushes, fills, choices, games: doodles }, coasters: coasterSteps, escape }));
 console.log(`wrote ${cards.length} card days, ${streaks.length} streaks, ${demo.length} demo rooms, ${games.length} game moves, ${live.length} live games, ${doodles.length} doodle moves to ${out}`);

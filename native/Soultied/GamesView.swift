@@ -952,34 +952,6 @@ struct BoatsGameView: View {
     }
 }
 
-/* ---------- the live games (on soultied.app, for now) ---------- */
-
-struct LiveGameNote: View {
-    let place: PlaceModel
-    let kind: GameKind
-    @Environment(\.dismiss) private var dismiss
-    @Environment(\.openURL) private var openURL
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Button("← All games") { dismiss() }.buttonStyle(.px(.paper, small: true))
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(spacing: 12) {
-                    GlyphView(glyph: GameArt.icon(kind), scale: 4)
-                    Text(kind.info.name).font(.pxHeading).foregroundStyle(Color.inkSoft)
-                }
-                Text(kind.info.tagline).font(.pxBody).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
-                Text("You play this one at the same moment, so for now it’s on soultied.app: open it on both your phones or laptops and play together.").font(.pxSmall).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
-                Button("Play on soultied.app") { openURL(URL(string: "https://soultied.app/")!) }.buttonStyle(.px(.sage, wide: true))
-            }
-            .pxCard()
-            Spacer()
-        }
-        .padding(16)
-        .background(GameBackdrop())
-    }
-}
-
 /* ---------- the games shelf (on the Play tab) ---------- */
 
 struct GamesShelf: View {

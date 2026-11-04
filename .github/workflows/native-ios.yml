@@ -42,9 +42,11 @@ jobs:
       # AI Studio doesn't keep a package-lock.json, so install from package.json
       - run: npm install --no-audit --no-fund
 
-      - name: Write the questions for the app, and what the website's letters engine says
+      - name: Write the questions and the escape rooms for the app, and what the website's engines say
         run: |
           node --experimental-strip-types scripts/native-decks.mjs
+          npx esbuild scripts/native-escape.ts --bundle --platform=node --log-level=warning --outfile="$RUNNER_TEMP/escape.cjs"
+          node "$RUNNER_TEMP/escape.cjs"
           npx esbuild scripts/native-fixtures.ts --bundle --platform=node --log-level=warning --outfile="$RUNNER_TEMP/fx.cjs"
           node "$RUNNER_TEMP/fx.cjs" "$RUNNER_TEMP/fixtures.json"
 
@@ -153,6 +155,12 @@ jobs:
           shot doodle -demo -game doodle -invite
           shot coasters -demo -game coasters -invite
           shot kitchen -demo -game kitchen -invite
+          shot escape -demo -escape
+          shot escape-attic -demo -escape attic -escapeStep 1 -escapeOpen trunk
+          shot escape-music -demo -escape attic -escapeStep 3 -escapeOpen musicbox
+          shot escape-tiles -demo -escape library -escapeStep 3 -escapeOpen tiles
+          shot escape-ghost -demo -escape cellar -escapeStep 4 -escapeOpen ghostA
+          shot escape-map -demo -escape office -escapeStep 4 -escapeOpen map
           ls -la "$RUNNER_TEMP/shots"
           echo "dev=$dev" >> "$GITHUB_OUTPUT"
 
