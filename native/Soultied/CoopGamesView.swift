@@ -161,7 +161,7 @@ private struct CoastersBoard: View {
         } content: {
             VStack(spacing: 10) {
                 HStack {
-                    HStack(spacing: 8) { Text(partner).lineLimit(1); Pips(won: s?.score[them] ?? 0, of: Coasters.toWin) }
+                    HStack(spacing: 8) { Text(partner).lineLimit(1).fixedSize(); Pips(won: s?.score[them] ?? 0, of: Coasters.toWin) }
                     Spacer()
                     Text("their goal ↑").font(.pxSmall).opacity(0.7)
                 }
