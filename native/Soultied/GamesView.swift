@@ -198,7 +198,8 @@ struct GameScreen: View {
         case .rps: RpsGameView(place: place)
         case .quickdraw: QuickDrawGameView(place: place)
         case .doodle: DoodleGameView(place: place)
-        default: LiveGameNote(place: place, kind: kind)
+        case .coasters: CoastersGameView(place: place)
+        case .kitchen: KitchenGameView(place: place)
         }
     }
 }
@@ -1006,9 +1007,7 @@ struct GamesShelf: View {
                     Text("For when you’re both here at once: invite \(place.theirName), and play the moment they join, phone or laptop.").font(.pxSmall).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
                 }
             }
-            ForEach(LIVE_GAMES.filter { Play.onIPhone.contains($0) }) { k in row(k) }
-            Text("On soultied.app for now").font(.px(14, 700)).foregroundStyle(Color.muted).padding(.top, 4)
-            ForEach(LIVE_GAMES.filter { !Play.onIPhone.contains($0) }) { k in row(k) }
+            ForEach(LIVE_GAMES) { k in row(k) }
         }
         .pxCard()
     }

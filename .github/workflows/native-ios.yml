@@ -151,6 +151,8 @@ jobs:
           shot rps -demo -game rps -invite
           shot quickdraw -demo -game quickdraw -invite
           shot doodle -demo -game doodle -invite
+          shot coasters -demo -game coasters -invite
+          shot kitchen -demo -game kitchen -invite
           ls -la "$RUNNER_TEMP/shots"
           echo "dev=$dev" >> "$GITHUB_OUTPUT"
 

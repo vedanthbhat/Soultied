@@ -312,9 +312,13 @@ struct DoodleGameView: View {
             }
             HStack(spacing: 6) {
                 ForEach([DoodleSession.Tool.pen, .fill, .erase], id: \.self) { t in
-                    Button(t == .pen ? "Pen" : t == .fill ? "Fill" : "Rubber") { session.tool = t }.buttonStyle(.px(session.tool == t ? .ink : .paper, small: true))
+                    Button(t == .pen ? "Pen" : t == .fill ? "Fill" : "Rubber") { session.tool = t }
+                        .buttonStyle(.px(session.tool == t ? .ink : .paper, small: true))
+                        .fixedSize()
                 }
-                Spacer(minLength: 4)
+            }
+            HStack(spacing: 6) {
+                Text("Brush").font(.pxSmall).foregroundStyle(Color.muted)
                 ForEach(1...3, id: \.self) { s in
                     Button {
                         session.size = s

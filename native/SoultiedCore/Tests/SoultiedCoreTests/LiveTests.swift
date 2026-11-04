@@ -60,7 +60,7 @@ final class LiveRulesTests: XCTestCase {
 
     func testRulesMatchTheWebsite() throws {
         guard let games = LettersTests.fx?["live"] as? [Doc] else { throw XCTSkip("no fixtures (set SOULTIED_FIXTURES)") }
-        XCTAssertGreaterThanOrEqual(games.count, 18)
+        XCTAssertGreaterThanOrEqual(games.count, 24)
         var kinds = Set<String>()
         for g in games {
             let kind = g.str("kind")!
@@ -70,11 +70,12 @@ final class LiveRulesTests: XCTestCase {
             case "tug": problem = replay({ Tug(rng: $0) }, g)
             case "rps": problem = replay({ Rps(rng: $0) }, g)
             case "quickdraw": problem = replay({ QuickDraw(rng: $0) }, g)
+            case "kitchen": problem = replay({ _ in Kitchen() }, g)
             default: problem = "unknown game \(kind)"
             }
             if let problem { XCTFail("\(kind) (seed \(g.int("seed") ?? 0)): \(problem)") }
         }
-        XCTAssertEqual(kinds, ["tug", "rps", "quickdraw"])
+        XCTAssertEqual(kinds, ["tug", "rps", "quickdraw", "kitchen"])
     }
 
     func testRulesBits() {
@@ -108,6 +109,36 @@ final class LiveRulesTests: XCTestCase {
         XCTAssertEqual(d.phase, "show")
         XCTAssertEqual(d.score[.a], 1)
         XCTAssertEqual(QuickDraw.Act(["ms": 33.6, "round": 2])?.tap, .ms(34))
+    }
+
+    func testKitchenBurnsAndMisses() throws {
+        let k = Kitchen()
+        var s = k.initial({ 0.25 }, now: 0)
+        XCTAssertEqual(s.chop, .a)
+        XCTAssertEqual(s.orders.count, 2)
+        XCTAssertTrue(s.orders.allSatisfy { $0.dish == .tomatoSoup || $0.dish == .mushroomSoup }, "easy ones first")
+        XCTAssertNil(k.act(s, .b, .take(.onion), now: 3500), "the cook doesn't chop")
+        s = try XCTUnwrap(k.act(s, .a, .take(.onion), now: 3500))
+        for _ in 0..<Kitchen.chops { s = try XCTUnwrap(k.act(s, .a, .chop, now: 3600)) }
+        XCTAssertEqual(s.pass, [.onion])
+        XCTAssertNil(s.board)
+        s = try XCTUnwrap(k.act(s, .b, .add(0), now: 3700))
+        s = try XCTUnwrap(k.act(s, .b, .cook, now: 3800))
+        XCTAssertNil(k.act(s, .b, .serve, now: 4000), "not cooked yet")
+        XCTAssertEqual(Kitchen.potState(s, now: 3800 + Kitchen.cookMs), .done)
+        // left on the stove
+        s = try XCTUnwrap(k.tick(s, now: 3800 + Kitchen.cookMs + Kitchen.burnMs))
+        XCTAssertEqual(s.burnt, 1)
+        XCTAssertEqual(s.news?.kind, "burnt")
+        XCTAssertTrue(s.pot.isEmpty)
+        // nobody served them
+        s = try XCTUnwrap(k.tick(s, now: 3000 + Kitchen.patienceMs))
+        XCTAssertEqual(s.missed, 2)
+        XCTAssertEqual(s.news?.kind, "missed")
+        s = try XCTUnwrap(k.tick(s, now: s.endsAt))
+        XCTAssertTrue(s.over)
+        XCTAssertEqual(k.result(s)?.line, "served 0 orders together")
+        XCTAssertEqual(Kitchen.Act(["t": "add", "i": 1.5]), nil, "a whole number")
     }
 
     func testInvitationAndResult() throws {

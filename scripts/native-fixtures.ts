@@ -17,6 +17,8 @@ import { RPS } from '../src/games/rps';
 import { QUICK } from '../src/games/quickdraw';
 import { COUNTDOWN_MS, type LiveDef, seeded } from '../src/games/live/lobby';
 import { WORDS, brushLine, fillCells, judge, pickChoices } from '../src/games/doodle';
+import { COASTERS } from '../src/games/coasters';
+import { KITCHEN } from '../src/games/kitchen';
 
 const r = rng(20261029);
 const int = (n: number) => Math.floor(r() * n);
@@ -152,7 +154,7 @@ for (const kind of Object.keys(starters) as GameKind[]) {
 type LiveStep = { t: number; op: 'init' | 'tick' | 'act'; seat?: Seat; a?: unknown; changed?: boolean; s: unknown };
 const live: Array<{ kind: string; seed: number; start: number; steps: LiveStep[]; result: unknown }> = [];
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const liveDefs: Record<string, LiveDef<any, any>> = { tug: TUG, rps: RPS, quickdraw: QUICK };
+const liveDefs: Record<string, LiveDef<any, any>> = { tug: TUG, rps: RPS, quickdraw: QUICK, kitchen: KITCHEN };
 const realRandom = Math.random;
 for (const kind of Object.keys(liveDefs)) {
   const def = liveDefs[kind];
@@ -253,6 +255,49 @@ for (let g = 0; g < 12; g++) {
 }
 Date.now = realNow;
 
+// Coasters: the host's steps between two of the demo room's partners (every touch, a sample of the ticks), so the
+// iPhone's table can be checked against the website's, step by step
+type CoasterStep = { op: 'tick' | 'act'; now: number; seat?: Seat; a?: unknown; before: unknown; after: unknown };
+const coasterSteps: CoasterStep[] = [];
+for (let g = 0; g < 3; g++) {
+  const seed = int(2 ** 31);
+  const start = 1_790_000_000_000 + g * 100_000;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let s: any = COASTERS.init(seeded(seed), start);
+  const begin = start + COUNTDOWN_MS;
+  let ticks = 0;
+  for (let t = begin; t < begin + 60_000 && !COASTERS.result(s); t += 2) {
+    const el = t - begin;
+    if (el % 16 === 0) {
+      const n = COASTERS.tick!(s, t);
+      if (ticks++ % 5 === 0 || n.score.a + n.score.b !== s.score.a + s.score.b) coasterSteps.push({ op: 'tick', now: t, before: s, after: n });
+      s = n;
+      if (COASTERS.result(s)) break;
+    }
+    if (el % 90 === 0) {
+      for (const seat of ['a', 'b'] as Seat[]) {
+        const a = COASTERS.bot!(s, seat, t);
+        if (!a) continue;
+        const n = COASTERS.act(s, seat, a, t);
+        coasterSteps.push({ op: 'act', now: t, seat, a, before: s, after: n === s ? null : n });
+        s = n;
+      }
+    }
+  }
+}
+// and some shots at an open goal (the bots above defend too well to score), up to the goal and the serve after
+for (const [x, y, vx, vy] of [[40, 140, 10, 200], [60, 25, -20, -230], [30, 120, 60, 240], [52, 100, 0, 90]]) {
+  const start = 1_790_100_000_000 + x * 1000;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let s: any = COASTERS.init(seeded(x), start);
+  s = { ...s, serveAt: start, puck: { x, y, vx, vy }, mal: { a: { x: 90, y: 150, vx: 0, vy: 0, tx: 90, ty: 150 }, b: { x: 10, y: 10, vx: 0, vy: 0, tx: 10, ty: 10 } }, score: { a: 6, b: 6 } };
+  for (let t = start + 16, k = 0; k < 120 && !COASTERS.result(s); t += 16, k++) {
+    const n = COASTERS.tick!(s, t);
+    coasterSteps.push({ op: 'tick', now: t, before: s, after: n });
+    s = n;
+  }
+}
+
 const out = process.argv[2] || 'native-fixtures.json';
-writeFileSync(out, JSON.stringify({ cards, days, hashes, rngSeq, streaks, demo, same, chapters, games, live, doodle: { judges, brushes, fills, choices, games: doodles } }));
+writeFileSync(out, JSON.stringify({ cards, days, hashes, rngSeq, streaks, demo, same, chapters, games, live, doodle: { judges, brushes, fills, choices, games: doodles }, coasters: coasterSteps }));
 console.log(`wrote ${cards.length} card days, ${streaks.length} streaks, ${demo.length} demo rooms, ${games.length} game moves, ${live.length} live games, ${doodles.length} doodle moves to ${out}`);

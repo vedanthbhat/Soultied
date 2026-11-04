@@ -50,7 +50,7 @@ public let GAMES: [GameKind: GameInfo] = {
 
 /// the games you take turns at, in the order the shelf shows them
 public let TURN_GAMES: [GameKind] = [.fireflies, .boats, .noughts, .fence, .lanterns]
-/// the games you play at the same moment (on soultied.app, for now)
+/// the games you play at the same moment
 public let LIVE_GAMES: [GameKind] = [.tug, .quickdraw, .rps, .doodle, .coasters, .kitchen]
 
 public enum MatchStatus: String, Sendable { case setup, playing, over }
@@ -245,7 +245,7 @@ public enum Play {
         }
     }
 
-    /* ---------- live games: only the invitation is here (they're played on soultied.app for now) ---------- */
+    /* ---------- live games: the invitation and the result (the game itself goes over the live line: see Live.swift) ---------- */
 
     /// an invitation nobody answered, or a game nobody finished, is forgotten after this long
     public static let liveStaleMs: Double = 15 * 60 * 1000
@@ -254,8 +254,8 @@ public enum Play {
 
     public static func isLiveInvite(_ kind: GameKind) -> Bool { kind.info.mode == .live && kind != .doodle }
 
-    /// the games the iPhone plays itself (the others open soultied.app, for now)
-    public static let onIPhone: Set<GameKind> = Set(TURN_GAMES + [.tug, .rps, .quickdraw, .doodle])
+    /// the games the iPhone plays itself (all of them; a game missing here would send you to soultied.app)
+    public static let onIPhone: Set<GameKind> = Set(GameKind.allCases)
 
     public static func stale(_ m: Match, now: Double = Values.nowMs()) -> Bool {
         guard m.status != .over else { return false }

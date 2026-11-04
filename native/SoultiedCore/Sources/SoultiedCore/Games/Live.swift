@@ -432,6 +432,8 @@ public final class LiveSession<R: LiveRules> {
 
     /// a time from the host's clock, on this screen's clock
     public func local(_ t: Double) -> Double { host ? t : t + (guest?.offset ?? 0) }
+    /// a time on this screen's clock, on the host's
+    public func hostTime(_ t: Double) -> Double { host ? t : t - (guest?.offset ?? 0) }
 
     /* ---------- what you can do ---------- */
 

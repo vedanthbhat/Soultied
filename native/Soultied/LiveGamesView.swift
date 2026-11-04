@@ -18,6 +18,10 @@ struct LiveFrame<R: LiveRules, Content: View, Poster: View>: View {
     /// the status while playing
     let playing: Text
     let now: Double
+    /// how the end reads, instead of who won (for the games you play on the same side)
+    var outcome: ((LiveResult) -> Text)? = nil
+    /// what each of you is up to, instead of wins (for the games you play on the same side)
+    var coop: ((Side) -> String)? = nil
     @ViewBuilder var poster: () -> Poster
     @ViewBuilder var content: () -> Content
     @Environment(\.dismiss) private var dismiss
@@ -33,8 +37,13 @@ struct LiveFrame<R: LiveRules, Content: View, Poster: View>: View {
                     Text(title).font(.px(24, 700)).foregroundStyle(Color.paper).lineLimit(1).minimumScaleFactor(0.6)
                 }
                 HStack(spacing: 14) {
-                    PlayerChip(place: place, side: place.mySeat, match: session.raw)
-                    PlayerChip(place: place, side: place.mySeat.other, match: session.raw)
+                    if let coop {
+                        CoopChip(place: place, side: place.mySeat, note: coop(place.mySeat))
+                        CoopChip(place: place, side: place.mySeat.other, note: coop(place.mySeat.other))
+                    } else {
+                        PlayerChip(place: place, side: place.mySeat, match: session.raw)
+                        PlayerChip(place: place, side: place.mySeat.other, match: session.raw)
+                    }
                 }
                 .padding(4)
                 status(stage, partner)
@@ -69,7 +78,7 @@ struct LiveFrame<R: LiveRules, Content: View, Poster: View>: View {
         .background(GameBackdrop())
         .onChange(of: session.end?.line) { _, _ in
             guard let r = session.end else { return }
-            if r.winner == place.mySeat.rawValue { Haptics.success() } else { Haptics.soft() }
+            if r.winner == place.mySeat.rawValue || coop != nil { Haptics.success() } else { Haptics.soft() }
         }
     }
 
@@ -84,6 +93,7 @@ struct LiveFrame<R: LiveRules, Content: View, Poster: View>: View {
         case .play: return session.partnerHere ? playing : say(("\(partner)’s screen has gone quiet. Waiting for them to come back…", false))
         case .over:
             guard let r = session.result else { return say(("That game was stopped. \(howTo)", false)) }
+            if let outcome { return outcome(r) }
             if r.winner == "draw" { return say(("A draw!", true)) }
             if r.winner == place.mySeat.rawValue { return say(("You win!", true), (" You \(r.line).", false)) }
             return say(("\(partner) wins.", true), (" They \(r.line).", false))
@@ -117,8 +127,29 @@ struct LiveFrame<R: LiveRules, Content: View, Poster: View>: View {
     }
 }
 
+/// you and your person, and what each of you is up to (for the games you play on the same side)
+struct CoopChip: View {
+    let place: PlaceModel
+    let side: Side
+    let note: String
+    var body: some View {
+        HStack(spacing: 8) {
+            if let l = place.seatLook(side) { HeadView(look: l, size: 32) } else { Color.paper2.frame(width: 32, height: 32) }
+            VStack(alignment: .leading, spacing: 0) {
+                Text(side == place.mySeat ? "You" : place.seatName(side)).font(.px(14, 700)).foregroundStyle(Color.inkSoft).lineLimit(1).minimumScaleFactor(0.8)
+                Text(note.isEmpty ? " " : note).font(.pxTiny).foregroundStyle(Color.muted).lineLimit(1).minimumScaleFactor(0.7)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity)
+        .pxBox()
+    }
+}
+
 /// holds a game's session for as long as its screen is open, and keeps it moving
-private struct LiveHost<R: LiveRules, Screen: View>: View {
+struct LiveHost<R: LiveRules, Screen: View>: View {
     let place: PlaceModel
     @State private var session: LiveSession<R>
     @State private var now = Values.nowMs()
@@ -155,7 +186,7 @@ private struct LiveHost<R: LiveRules, Screen: View>: View {
 }
 
 /// three little squares for the rounds you've won
-private struct Pips: View {
+struct Pips: View {
     let won: Int
     let of: Int
     var body: some View {
@@ -168,7 +199,7 @@ private struct Pips: View {
 }
 
 /// a big pad you press (it counts the moment your finger lands, not when it lifts)
-private struct PressPad<Label: View>: View {
+struct PressPad<Label: View>: View {
     var enabled = true
     let onPress: () -> Void
     @ViewBuilder var label: () -> Label
