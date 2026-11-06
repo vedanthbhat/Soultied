@@ -21,6 +21,8 @@ import { COASTERS } from '../src/games/coasters';
 import { KITCHEN } from '../src/games/kitchen';
 import { ROOMS } from '../src/escape/rooms';
 import { Scene } from '../src/escape/scene';
+import { RECORD_MS, startFor, whereAt } from '../src/music/records';
+import { parseYouTubeId, parseYouTubeStart } from '../src/watch/youtubeLink';
 
 const r = rng(20261029);
 const int = (n: number) => Math.floor(r() * n);
@@ -316,6 +318,33 @@ for (const room of ROOMS)
         escape.push({ room: room.id, side, step, t, hash: fnv(s.data, fnv(s.emit, 0x811c9dc5)) });
       }
 
+// the record player: where the record is at any moment (from both sides of the start, and many times round),
+// where each track starts, and reading YouTube links
+const record: { where: Array<[number, string, number, string]>; starts: number[][]; links: Array<[string, string | null, number]> } = { where: [], starts: [], links: [] };
+{
+  const r = rng(77);
+  const base = 1_790_000_000_000;
+  for (let i = 0; i < 400; i++) {
+    const startedAt = base + Math.floor(r() * 4e9) - 2e9;
+    const now = i % 7 === 0 ? startedAt + Math.floor(r() * 5) * RECORD_MS / 5 : base + Math.floor(r() * 4e9) - 2e9 + r();
+    const w = whereAt(startedAt, now);
+    // (fractions as text: JSON readers don't all turn a long number back into exactly the same double)
+    record.where.push([startedAt, String(now), w.index, String(w.offset)]);
+  }
+  for (const i of [-7, -1, 0, 1, 2, 3, 4, 5, 6, 11]) record.starts.push([i, base + i, startFor(i, base + i)]);
+  for (const l of [
+    'dQw4w9WgXcQ', ' dQw4w9WgXcQ ', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'youtube.com/watch?v=dQw4w9WgXcQ&t=1m30s',
+    'https://youtu.be/dQw4w9WgXcQ?t=42', 'https://youtu.be/dQw4w9WgXcQ?si=abc&t=2h3m4s', 'https://m.youtube.com/watch?v=dQw4w9WgXcQ&start=75',
+    'https://music.youtube.com/watch?v=dQw4w9WgXcQ&list=RD', 'https://www.youtube.com/shorts/dQw4w9WgXcQ', 'https://www.youtube.com/embed/dQw4w9WgXcQ?start=9',
+    'https://www.youtube.com/live/dQw4w9WgXcQ', 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ', 'https://www.youtube.com/watch?v=short',
+    'https://www.youtube.com/watch?v=&t=5', 'https://www.youtube.com/watch?t=5&v=dQw4w9WgXcQ', 'https://vimeo.com/123456', 'not a link',
+    'https://youtu.be/dQw4w9WgXcQ?t=1m30', 'https://youtu.be/dQw4w9WgXcQ?t=30s1m', 'https://youtu.be/dQw4w9WgXcQ?t=&start=12',
+    'https://youtu.be/dQw4w9WgXcQ?t=1h', 'https://youtu.be/dQw4w9WgXcQ?t=m', 'https://youtu.be/dQw4w9WgXcQ?t=007', 'https://youtu.be/abc',
+    'https://www.youtube.com/playlist?list=PL123', 'https://WWW.YouTube.com/watch?v=dQw4w9WgXcQ', '',
+  ])
+    record.links.push([l, parseYouTubeId(l), parseYouTubeStart(l)]);
+}
+
 const out = process.argv[2] || 'native-fixtures.json';
-writeFileSync(out, JSON.stringify({ cards, days, hashes, rngSeq, streaks, demo, same, chapters, games, live, doodle: { judges, brushes, fills, choices, games: doodles }, coasters: coasterSteps, escape }));
+writeFileSync(out, JSON.stringify({ cards, days, hashes, rngSeq, streaks, demo, same, chapters, games, live, doodle: { judges, brushes, fills, choices, games: doodles }, coasters: coasterSteps, escape, record }));
 console.log(`wrote ${cards.length} card days, ${streaks.length} streaks, ${demo.length} demo rooms, ${games.length} game moves, ${live.length} live games, ${doodles.length} doodle moves to ${out}`);
