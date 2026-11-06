@@ -37,6 +37,7 @@ struct MainView: View {
     @State private var sheet: RoomSheet? = Launch.sheet.flatMap { RoomSheet(rawValue: $0) }
     @State private var lettersStart: LettersTab = .today
     @State private var game: GameKind? = Launch.game.flatMap { GameKind(rawValue: $0) }
+    @State private var escape = Launch.escape
     @Environment(\.verticalSizeClass) private var vertical
 
     private var sideways: Bool { vertical == .compact }
@@ -64,6 +65,7 @@ struct MainView: View {
             Toasts(place: place, onHome: sideways || (tab == .home && sheet == nil), onLetter: { go(.letters) })
                 .padding(.bottom, sideways ? 12 : 84)
         }
+        .fullScreenCover(isPresented: $escape) { EscapeScreen(place: place) }
         .sheet(item: $sheet) { s in
             sheetView(s)
                 .presentationDragIndicator(.visible)
@@ -82,6 +84,7 @@ struct MainView: View {
         func show(_ s: RoomSheet, _ t: AppTab) {
             if asSheet { sheet = s } else { go(t) }
         }
+        Chiptune.shared.room(id)
         switch id {
         case .left, .right:
             let who: String? = id == .left ? place.hostId : place.guestId
@@ -95,7 +98,11 @@ struct MainView: View {
         case .board: show(.wall, .wall)
         case .decor: sheet = .decor
         case .photo: show(.us, .us)
-        case .games, .remote, .door: show(.play, .play)
+        case .games, .remote: show(.play, .play)
+        // the dark door: the escape rooms
+        case .door:
+            Haptics.tap()
+            escape = true
         case .fire, .music: break
         }
     }

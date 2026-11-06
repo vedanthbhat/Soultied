@@ -9,6 +9,7 @@ struct PlayView: View {
     let place: PlaceModel
     @State private var decorating = false
     @State private var open: GameKind?
+    @State private var escaping = false
     @Environment(\.openURL) private var openURL
 
     var body: some View {
@@ -49,16 +50,25 @@ struct PlayView: View {
                 }
                 .pxCard()
 
-                HStack(alignment: .top, spacing: 14) {
-                    GlyphView(glyph: Icons.door, scale: 4)
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Escape rooms").font(.pxHeading).foregroundStyle(Color.inkSoft)
-                        Text("Each of you sees half the clues. Talk it through to get out. Through the little door in the room, on soultied.app for now.")
-                            .font(.pxBody).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
+                Button {
+                    Haptics.tap()
+                    escaping = true
+                } label: {
+                    HStack(alignment: .top, spacing: 14) {
+                        GlyphView(glyph: Icons.door, scale: 4)
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Escape rooms").font(.pxHeading).foregroundStyle(Color.inkSoft)
+                            Text("Four rooms behind the dark door. Each of you sees half the clues, so talk it through to get out. Play on one phone, or each on your own.")
+                                .font(.pxBody).foregroundStyle(Color.muted).multilineTextAlignment(.leading).fixedSize(horizontal: false, vertical: true)
+                            Text("Open the dark door →").font(.px(16, 700)).foregroundStyle(Color.terracottaD)
+                        }
+                        Spacer(minLength: 0)
                     }
+                    .pxCard()
                 }
-                .pxCard()
+                .buttonStyle(.plain)
             }
+            .fullScreenCover(isPresented: $escaping) { EscapeScreen(place: place) }
             .padding(16)
             .padding(.bottom, 100)
         }
