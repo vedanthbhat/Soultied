@@ -36,6 +36,8 @@ public final class PlaceModel {
     public internal(set) var askItems: [String: Ask] = [:]
     /// every game's current match
     public internal(set) var games: [GameKind: Match] = [:]
+    /// the record player (nil until anyone's put a record on, ever)
+    public internal(set) var turntable: TurntableState?
     /// which documents have arrived at least once
     public internal(set) var loaded: Set<String> = []
 
@@ -159,6 +161,10 @@ public final class PlaceModel {
             db.listen(QuerySpec(path("activities"), orderBy: "at", descending: true, limit: 30)) { [weak self] rows in
                 self?.activities = rows.map { Activity(row: $0) }
                 self?.loaded.insert("activities")
+            },
+            db.listen(meta("turntable")) { [weak self] d in
+                self?.turntable = TurntableState(d)
+                self?.loaded.insert("turntable")
             },
         ]
         let t = Timer(timeInterval: 30, repeats: true) { [weak self] _ in self?.tick() }
@@ -593,6 +599,40 @@ public final class PlaceModel {
         }
         demoPartner?.games()
     }
+
+    /* ---------- the record player (src/music/TurntableContext.tsx) ---------- */
+
+    /// a record (or a song) is on, for both of you
+    public var recordOn: Bool { turntable?.isOn(Values.nowMs()) ?? false }
+
+    /// writes the whole record player at once, as the website does
+    private func turn(_ t: TurntableState?) {
+        guard let t else { return }
+        turntable = t
+        let db = self.db, p = meta("turntable")
+        Task {
+            do { try await db.set(p, t.doc, merge: false) } catch { self.failed("record player", error) }
+        }
+    }
+
+    /// put the jazz record on, from the track after the last one heard
+    public func playRecord() { turn(.jazz(turntable, by: me, now: Values.nowMs())) }
+
+    /// put a song from YouTube on instead; what's wrong with the link, if it isn't one
+    public func playSong(_ link: String) -> String? {
+        guard let t = TurntableState.song(link, turntable, by: me, now: Values.nowMs()) else {
+            return "That doesn’t look like a link to a song on YouTube. Try copying it again from Share > Copy link."
+        }
+        turn(t)
+        return nil
+    }
+
+    public func liftNeedle() { turn(turntable?.lifted(by: me, now: Values.nowMs())) }
+    public func nextTrack() { turn(turntable?.skipped(by: me, now: Values.nowMs())) }
+    /// the song's title, once its player knows it (only whoever put it on writes it down)
+    public func songTitle(_ id: String, _ title: String) { turn(turntable?.titled(id, title, me: me, now: Values.nowMs())) }
+    /// the song finished, or can't play here: the needle lifts for both of you
+    public func songEnded(_ id: String) { turn(turntable?.songEnded(id, by: me, now: Values.nowMs())) }
 
     /* ---------- decorating ---------- */
 
