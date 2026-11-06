@@ -245,6 +245,9 @@ final class RecordDeck {
     }
 }
 
+// (only ever used from the main thread: its timer, its player's callbacks and the app's notifications all arrive there)
+extension RecordDeck: @unchecked Sendable {}
+
 /* ---------- on Home: what's on, and its buttons ---------- */
 
 /// The record player's card: what's playing (with the credit the music asks for), or a way to put something on.
@@ -252,7 +255,8 @@ struct RecordCard: View {
     let place: PlaceModel
     /// Home is on screen, so a song from YouTube can play in its player here
     var listening = true
-    var open: () -> Void
+    /// the record player's sheet (none when this card is in it)
+    var open: (() -> Void)? = nil
     @State private var deck = RecordDeck.shared
 
     var body: some View {
@@ -272,7 +276,9 @@ struct RecordCard: View {
     }
 
     private var off: some View {
-        Button(action: open) {
+        Button {
+            open?()
+        } label: {
             HStack(spacing: 12) {
                 GlyphView(glyph: Icons.record, scale: 4)
                 VStack(alignment: .leading, spacing: 2) {
@@ -312,7 +318,7 @@ struct RecordCard: View {
                 place.nextTrack()
             }
             .buttonStyle(.px(.paper, small: true))
-            Button("A song instead", action: open).buttonStyle(.px(.paper, small: true))
+            if let open { Button("A song instead", action: open).buttonStyle(.px(.paper, small: true)) }
             Button("Lift the needle") {
                 Haptics.tap()
                 place.liftNeedle()
@@ -333,7 +339,7 @@ private struct SongCard: View {
     let state: TurntableState
     let song: TurntableState.Song
     let listening: Bool
-    var open: () -> Void
+    var open: (() -> Void)?
     @State private var deck = RecordDeck.shared
     @State private var title: String?
     @State private var error: String?
@@ -374,12 +380,12 @@ private struct SongCard: View {
             if let e = error {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(e).font(.pxSmall).foregroundStyle(Color.thread).fixedSize(horizontal: false, vertical: true)
-                    Button("Pick another", action: open).buttonStyle(.px(.paper, small: true))
+                    if let open { Button("Pick another", action: open).buttonStyle(.px(.paper, small: true)) }
                 }
             }
             VolumeRow()
             HStack(spacing: 8) {
-                Button("Another song", action: open).buttonStyle(.px(.paper, small: true))
+                if let open { Button("Another song", action: open).buttonStyle(.px(.paper, small: true)) }
                 Button("Lift the needle") {
                     Haptics.tap()
                     place.liftNeedle()
@@ -422,16 +428,17 @@ private struct VolumeRow: View {
 
 /// the record's credit, as its licence asks
 struct RecordCredit: View {
-    @Environment(\.openURL) private var openURL
+    /// (made as a plain string first: links written straight into a LocalizedStringKey with \(…) wouldn't be links)
+    private static let line: String = Records.artist + " ([incompetech.com](" + Records.sourceURL.absoluteString + ")) · ["
+        + Records.license + "](" + Records.licenseURL.absoluteString + ")"
 
     var body: some View {
-        HStack(spacing: 4) {
-            Text(Records.artist).font(.pxSmall).foregroundStyle(Color.muted)
-            Button("(incompetech.com)") { openURL(Records.sourceURL) }.font(.pxSmall).foregroundStyle(Color.muted).underline()
-            Text("·").font(.pxSmall).foregroundStyle(Color.muted)
-            Button(Records.license) { openURL(Records.licenseURL) }.font(.pxSmall).foregroundStyle(Color.muted).underline()
-        }
-        .buttonStyle(.plain)
+        // one line of text with its two links, so it wraps between words
+        Text(LocalizedStringKey(Self.line))
+            .font(.pxSmall)
+            .foregroundStyle(Color.muted)
+            .tint(Color.terracottaD)
+            .fixedSize(horizontal: false, vertical: true)
     }
 }
 
@@ -469,7 +476,7 @@ struct RecordSheet: View {
                     Text("Whatever you put on plays for both of you, in sync.").font(.pxBody).foregroundStyle(Color.muted)
                 }
                 if place.recordOn {
-                    RecordCard(place: place, listening: hostsSong, open: {})
+                    RecordCard(place: place, listening: hostsSong)
                 }
                 HStack(spacing: 12) {
                     GlyphView(glyph: Icons.record, scale: 4)
