@@ -27,6 +27,7 @@ struct SoultiedApp: App {
 ///   -tab letters     start on a tab (home, letters, wall, play, us)
 ///   -open me         open a sheet from the room (me, them, letters, wall, decor, play, us)
 ///   -game fireflies  open a game
+///   -escape          open the dark door (the escape rooms)
 enum Launch {
     static let args = ProcessInfo.processInfo.arguments
     static var demo: Bool { args.contains("-demo") }
@@ -45,6 +46,23 @@ enum Launch {
     }
     /// -invite   in the demo room, invite the pretend partner to the live game that's open (for screenshots)
     static var invite: Bool { args.contains("-invite") }
+    private static func value(_ flag: String) -> String? {
+        guard let i = args.firstIndex(of: flag), i + 1 < args.count else { return nil }
+        return args[i + 1]
+    }
+    /// -escape   open the dark door; -escape attic, plus -escapeStep 2 and -escapeOpen clock, a room part way in
+    static var escape: Bool { args.contains("-escape") }
+    static func escapeScene(_ s: EscapeSession) {
+        guard let id = value("-escape").flatMap(RoomId.init), let room = s.rooms.first(where: { $0.id == id }) else { return }
+        s.playHere(id, fromScratch: true)
+        for _ in 0..<(value("-escapeStep").flatMap { Int($0) } ?? 0) {
+            if let p = s.puzzle { s.solve(p.id) }
+        }
+        if let o = room.object(value("-escapeOpen")) {
+            s.viewSide = o.side
+            s.tap(o.side, o.id)
+        }
+    }
 }
 
 struct RootView: View {
