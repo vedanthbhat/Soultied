@@ -633,11 +633,15 @@ struct MapLock: View {
                         session.sound(.wrong)
                         wrong = i
                     } label: {
-                        Text(c)
+                        // a word to a line, made a little smaller when a long one ("Lighthouse") doesn't fit,
+                        // rather than broken in the middle
+                        let words = c.split(separator: " ")
+                        Text(words.joined(separator: "\n"))
                             .font(.px(11, i == start ? 700 : 500))
                             .foregroundStyle(i == start ? Color.cream : Color.inkSoft)
                             .multilineTextAlignment(.center)
-                            .minimumScaleFactor(0.7)
+                            .lineLimit(max(1, words.count))
+                            .minimumScaleFactor(0.55)
                             .padding(3)
                             .frame(maxWidth: .infinity, minHeight: 50)
                             .background(Color(hex: i == start ? "#a84f4b" : wrong == i ? "#c8b089" : "#e6dcc4"))
