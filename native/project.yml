@@ -12,6 +12,7 @@ settings:
   base:
     SWIFT_VERSION: "5.0"
     MARKETING_VERSION: "2.0"
+    # (builds sent to TestFlight are numbered 1000 + the run's number instead; see .github/workflows/native-ios.yml)
     CURRENT_PROJECT_VERSION: "1"
     ENABLE_USER_SCRIPT_SANDBOXING: NO
 
