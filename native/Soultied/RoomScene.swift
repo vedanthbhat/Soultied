@@ -76,6 +76,7 @@ struct RoomScene: View {
         st.wallArt = place.board.art?.pixels
         st.wallNews = place.wallNews != nil
         st.gamesWaiting = !place.gamesWaiting.isEmpty
+        st.music = place.recordOn
         return st
     }
 

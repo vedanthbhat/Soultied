@@ -3,12 +3,15 @@ import SoultiedCore
 
 /*
  * Home: the two of you on the couch at the top (your moods over your heads, the picture over the couch),
- * the touches you can send, and a card each for today's letter, our wall and the streak.
+ * the touches you can send, and a card each for today's letter, our wall, the streak and the record player
+ * (up top while something's playing).
  */
 
 struct HomeView: View {
     let place: PlaceModel
     var paused = false
+    /// Home is what's on screen (a song from YouTube plays in its card only then)
+    var listening = true
     var go: (AppTab) -> Void
     var onRoom: (HotspotId) -> Void
     var openGame: (GameKind) -> Void = { _ in }
@@ -26,11 +29,13 @@ struct HomeView: View {
 
                     VStack(spacing: 18) {
                         touches
+                        if place.recordOn { RecordCard(place: place, listening: listening, open: { onRoom(.music) }) }
                         LetterCard(place: place, open: { go(.letters) })
                         AsksCard(place: place, open: { go(.letters) })
                         GameCard(place: place, open: openGame)
                         WallCard(place: place, open: { go(.wall) })
                         StreakCard(place: place)
+                        if !place.recordOn { RecordCard(place: place, open: { onRoom(.music) }) }
                         CouchCard(place: place, invite: { go(.us) })
                     }
                     .padding(.horizontal, 16)

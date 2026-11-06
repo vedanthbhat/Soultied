@@ -49,7 +49,8 @@ final class Chiptune {
     private func ready() -> Bool {
         if started { return true }
         let session = AVAudioSession.sharedInstance()
-        try? session.setCategory(.ambient, options: [.mixWithOthers])
+        // (while the record player is on, it has the session set for music; leave it be)
+        if session.category != .playback { try? session.setCategory(.ambient, options: [.mixWithOthers]) }
         try? session.setActive(true)
         let out = engine.outputNode.inputFormat(forBus: 0)
         rate = out.sampleRate > 0 ? out.sampleRate : 44_100

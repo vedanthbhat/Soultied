@@ -26,7 +26,7 @@ enum AppTab: String, CaseIterable, Identifiable {
 
 /// what the room can open as a sheet (sideways, or from a tap on the couch)
 enum RoomSheet: String, Identifiable {
-    case me, them, letters, wall, decor, play, us
+    case me, them, letters, wall, decor, play, us, music
     var id: String { rawValue }
 }
 
@@ -50,7 +50,7 @@ struct MainView: View {
             } else {
                 VStack(spacing: 0) {
                     ZStack {
-                        HomeView(place: place, paused: tab != .home || sheet != nil || game != nil, go: go, onRoom: { open($0, sheet: false) }, openGame: { game = $0 })
+                        HomeView(place: place, paused: tab != .home || sheet != nil || game != nil, listening: tab == .home && game == nil && !escape, go: go, onRoom: { open($0, sheet: false) }, openGame: { game = $0 })
                             .opacity(tab == .home ? 1 : 0)
                             .allowsHitTesting(tab == .home)
                         if tab == .letters { LettersView(place: place, start: lettersStart) }
@@ -72,6 +72,14 @@ struct MainView: View {
                 .presentationBackground(Color.paper)
         }
         .fullScreenCover(item: $game) { k in GameScreen(place: place, kind: k) }
+        // the record player: its sound follows the place's record, whichever tab you're on
+        .onAppear {
+            RecordDeck.shared.bind(place)
+            if Launch.demo && Launch.record { place.playRecord() }
+            if Launch.demo, let s = Launch.song { _ = place.playSong(s) }
+        }
+        .onChange(of: place.turntable) { _, _ in RecordDeck.shared.sync() }
+        .onDisappear { RecordDeck.shared.unbind() }
     }
 
     func go(_ t: AppTab) {
@@ -103,7 +111,10 @@ struct MainView: View {
         case .door:
             Haptics.tap()
             escape = true
-        case .fire, .music: break
+        case .music:
+            Haptics.tap()
+            sheet = .music
+        case .fire: break
         }
     }
 
@@ -117,6 +128,7 @@ struct MainView: View {
         case .decor: DecorView(place: place)
         case .play: PlayView(place: place)
         case .us: UsView(app: app, place: place)
+        case .music: RecordSheet(place: place, hostsSong: sideways).presentationDetents([.medium, .large])
         }
     }
 }
