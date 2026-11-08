@@ -31,6 +31,8 @@ final class RecordDeck {
     @ObservationIgnored private var timer: Timer?
     @ObservationIgnored private var fetching: Set<String> = []
     @ObservationIgnored private var awake = true
+    /// quiet while you're watching something together
+    @ObservationIgnored private var hushed = false
     private let ender = Ender()
     /// on its way down to silence (and a pause)
     @ObservationIgnored private var fadingOut = false
@@ -90,6 +92,12 @@ final class RecordDeck {
         player?.volume = Float(volume)
     }
 
+    /// Watch together is open (the record goes quiet, and comes back after)
+    func hush(_ on: Bool) {
+        hushed = on
+        sync()
+    }
+
     func setMuted(_ m: Bool) {
         mutedForMe = m
         UserDefaults.standard.set(m, forKey: Self.mutedKey)
@@ -98,7 +106,7 @@ final class RecordDeck {
 
     /// whether the jazz record should be coming out of this phone right now
     private var wantsRecord: Bool {
-        guard awake, !mutedForMe, let t = place?.turntable else { return false }
+        guard awake, !mutedForMe, !hushed, let t = place?.turntable else { return false }
         return t.isOn(Values.nowMs()) && t.yt == nil
     }
 

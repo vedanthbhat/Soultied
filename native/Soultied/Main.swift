@@ -1,14 +1,15 @@
 import SwiftUI
 import SoultiedCore
 
+/// the tabs along the bottom (the wall opens from the pictures over the couch, and its card on Home)
 enum AppTab: String, CaseIterable, Identifiable {
-    case home, letters, wall, play, us
+    case home, letters, watch, play, us
     var id: String { rawValue }
     var label: String {
         switch self {
         case .home: return "Home"
         case .letters: return "Letters"
-        case .wall: return "Wall"
+        case .watch: return "Watch"
         case .play: return "Play"
         case .us: return "Us"
         }
@@ -17,7 +18,7 @@ enum AppTab: String, CaseIterable, Identifiable {
         switch self {
         case .home: return Icons.home
         case .letters: return Icons.envelope
-        case .wall: return Icons.pin
+        case .watch: return Icons.tv
         case .play: return Icons.play
         case .us: return Icons.us
         }
@@ -26,7 +27,7 @@ enum AppTab: String, CaseIterable, Identifiable {
 
 /// what the room can open as a sheet (sideways, or from a tap on the couch)
 enum RoomSheet: String, Identifiable {
-    case me, them, letters, wall, decor, play, us, music
+    case me, them, letters, wall, decor, play, us, music, watch
     var id: String { rawValue }
 }
 
@@ -38,6 +39,7 @@ struct MainView: View {
     @State private var lettersStart: LettersTab = .today
     @State private var game: GameKind? = Launch.game.flatMap { GameKind(rawValue: $0) }
     @State private var escape = Launch.escape
+    @State private var tour = Tour.shared
     @Environment(\.verticalSizeClass) private var vertical
 
     private var sideways: Bool { vertical == .compact }
@@ -54,7 +56,7 @@ struct MainView: View {
                             .opacity(tab == .home ? 1 : 0)
                             .allowsHitTesting(tab == .home)
                         if tab == .letters { LettersView(place: place, start: lettersStart) }
-                        if tab == .wall { WallView(place: place) }
+                        if tab == .watch { WatchView(place: place) }
                         if tab == .play { PlayView(place: place) }
                         if tab == .us { UsView(app: app, place: place) }
                     }
@@ -80,6 +82,19 @@ struct MainView: View {
         }
         .onChange(of: place.turntable) { _, _ in RecordDeck.shared.sync() }
         .onDisappear { RecordDeck.shared.unbind() }
+        // the first-run tour: what to tap to go where (Tour.swift)
+        .overlayPreferenceValue(TourSpots.self) { spots in
+            Group {
+                if tour.active && !sideways && sheet == nil && game == nil && !escape {
+                    TourOverlay(tour: tour, place: place, spots: spots)
+                }
+            }
+        }
+        .onAppear { tour.offer(place: place) }
+        .onChange(of: place.ready) { _, _ in tour.offer(place: place) }
+        .onChange(of: tour.active) { _, on in
+            if on { tab = .home }
+        }
     }
 
     func go(_ t: AppTab) {
@@ -103,10 +118,15 @@ struct MainView: View {
             Haptics.tap()
             sheet = uid == place.me ? .me : .them
         case .letter: show(.letters, .letters)
-        case .board: show(.wall, .wall)
+        // the pictures over the couch: your wall
+        case .board:
+            Haptics.tap()
+            sheet = .wall
         case .decor: sheet = .decor
         case .photo: show(.us, .us)
-        case .games, .remote: show(.play, .play)
+        case .games: show(.play, .play)
+        // the TV remote on the coffee table: watch together
+        case .remote: show(.watch, .watch)
         // the dark door: the escape rooms
         case .door:
             Haptics.tap()
@@ -129,6 +149,7 @@ struct MainView: View {
         case .play: PlayView(place: place)
         case .us: UsView(app: app, place: place)
         case .music: RecordSheet(place: place, hostsSong: sideways).presentationDetents([.medium, .large])
+        case .watch: WatchView(place: place)
         }
     }
 }
@@ -139,10 +160,11 @@ struct TabBar: View {
     @Binding var tab: AppTab
     let place: PlaceModel
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     private func dot(_ t: AppTab) -> Bool {
         switch t {
         case .letters: return place.partnerHere && (place.letterWaiting || !place.asksView.forMe.isEmpty)
-        case .wall: return place.wallNews != nil
         default: return false
         }
     }
@@ -157,6 +179,8 @@ struct TabBar: View {
                     VStack(spacing: 4) {
                         GlyphView(glyph: t.glyph, scale: 3)
                             .frame(height: 33)
+                            // watching together is the heart of it: the TV glows a little
+                            .background { if t == .watch { TabGlow(still: reduceMotion) } }
                             .overlay(alignment: .topTrailing) {
                                 if dot(t) { Rectangle().fill(Color.thread).frame(width: 9, height: 9).offset(x: 6, y: -2) }
                             }
@@ -167,14 +191,32 @@ struct TabBar: View {
                     .background(tab == t ? Color.paperHi : Color.clear)
                     .overlay(alignment: .top) { Rectangle().fill(tab == t ? Color.terracotta : Color.clear).frame(height: 3) }
                 }
-                .accessibilityLabel(t.label)
+                .accessibilityLabel(t == .watch ? "Watch together" : t.label)
                 .accessibilityAddTraits(tab == t ? .isSelected : [])
+                .anchorPreference(key: TourSpots.self, value: .bounds) { ["tab.\(t.rawValue)": $0] }
             }
         }
         .padding(.horizontal, 6)
         .padding(.top, 2)
         .background(Color.paper.ignoresSafeArea(edges: .bottom))
         .overlay(alignment: .top) { Rectangle().fill(Color.ink).frame(height: PX) }
+    }
+}
+
+/// a soft, slow glow behind the Watch tab's TV
+struct TabGlow: View {
+    var still = false
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 20, paused: still)) { ctx in
+            let p = still ? 0.6 : 0.5 + 0.5 * sin(ctx.date.timeIntervalSinceReferenceDate * 2.1)
+            ZStack {
+                Ellipse().fill(Color.butter.opacity(0.28 + 0.22 * p)).frame(width: 46, height: 36).blur(radius: 9)
+                Ellipse().fill(Color(hex: "#ffe7a3").opacity(0.18 + 0.2 * p)).frame(width: 30, height: 24).blur(radius: 5)
+            }
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 }
 
