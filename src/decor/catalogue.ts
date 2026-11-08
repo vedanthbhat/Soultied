@@ -60,8 +60,8 @@ export const ITEMS: DecorItem[] = [
   item('rug', 'checker', 'Checkerboard', 80, 'Cream and sage squares.'),
   item('rug', 'braided', 'Braided oval', 120, 'A round rug of braided rings.'),
 
-  item('pet', 'ginger', 'Ginger cat', 0, 'Asleep by the fire, as always.'),
-  item('pet', 'none', 'No pet', 0, 'Just the cushion by the hearth.'),
+  item('pet', 'ginger', 'Ginger cat', 0, 'Asleep by the couch, as always.'),
+  item('pet', 'none', 'No pet', 0, 'Just the cushion by the couch.'),
   item('pet', 'tuxedo', 'Tuxedo cat', 150, 'Black and white, very dignified, very asleep.'),
   item('pet', 'bunny', 'White bunny', 180, 'A fluffy loaf with its ears tucked back.'),
   item('pet', 'pug', 'Sleepy pug', 200, 'Snores a little. Worth it.'),

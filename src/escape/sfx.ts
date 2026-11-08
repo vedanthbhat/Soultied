@@ -135,6 +135,12 @@ const SOUNDS: Record<HotspotId, () => void> = {
     tone(988, 0.05, 0, 'triangle', SOFT);
     tone(740, 0.08, 0.05, 'triangle', SOFT * 0.8);
   },
+  // a sleepy purr
+  pet: () => {
+    tone(196, 0.07, 0, 'triangle', SOFT);
+    tone(185, 0.07, 0.08, 'triangle', SOFT * 0.9);
+    tone(196, 0.1, 0.16, 'triangle', SOFT * 0.8);
+  },
   // a little sparkle
   decor: () => {
     tone(1319, 0.06, 0, 'triangle', SOFT * 0.8);

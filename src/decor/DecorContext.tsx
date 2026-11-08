@@ -91,7 +91,7 @@ function announce(slot: SlotId, who: string, item: DecorItem): { title: string; 
     case 'rug':
       return { title: 'A new rug', description: `${who} put down a new rug: ${item.name}.` };
     case 'pet':
-      return { title: 'Someone new by the fire', description: `${who} brought home a ${item.name.toLowerCase()}.` };
+      return { title: 'Someone new by the couch', description: `${who} brought home a ${item.name.toLowerCase()}.` };
     case 'view':
       return { title: 'A new view', description: `${who} changed the view from the window: ${item.name}.` };
     case 'painting':

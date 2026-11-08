@@ -64,7 +64,7 @@ export interface RoomTouch {
 /** how long a touch plays, in seconds */
 export const TOUCH_LEN = 2.8;
 
-export type HotspotId = 'left' | 'right' | 'letter' | 'fire' | 'photo' | 'remote' | 'door' | 'games' | 'music' | 'decor' | 'board';
+export type HotspotId = 'left' | 'right' | 'letter' | 'fire' | 'photo' | 'remote' | 'door' | 'games' | 'music' | 'decor' | 'board' | 'pet';
 
 export interface Hotspot {
   id: HotspotId;
@@ -93,6 +93,8 @@ const TABLE = { x: 205, y: 163, w: 54 };
 const DOOR = { x: 160, y: 64, w: 24 };
 /** the stack of board games on the floor beside the couch */
 const GAMES_STACK = { x: 168, y: 133, w: 14, h: 17 };
+/** the pet's cushion, on the rug in front of the couch's left arm, between the games and the coffee table */
+const PET = { x: 186, y: 153 };
 /** the little side table at the couch's right arm, in front of the lamp, with the record player on it */
 const SIDE_TABLE = { x: 279, y: 130, w: 20 };
 const DECK = { x: 280, y: 125, w: 18 };
@@ -109,6 +111,8 @@ const HOTSPOTS: Hotspot[] = [
   { id: 'decor', x: 109, y: 14, w: 38, h: 28 },
   // the three pictures over the couch: our wall (notes, doodles, photos, memories)
   { id: 'board', x: 190, y: 24, w: 84, h: 32 },
+  // the pet asleep on its cushion: choose who sleeps there
+  { id: 'pet', x: PET.x - 4, y: PET.y - 5, w: 28, h: 15 },
 ];
 
 /* ------------------------------------------------------------------------ */
@@ -1545,9 +1549,6 @@ function drawTurntable(L: Layer, t: number, playing: boolean, hover: boolean) {
   }
 }
 
-/** the cushion by the hearth, and whoever's asleep on it */
-const PET = { x: 118, y: 131 };
-
 const PET_SPRITES: Record<string, { rows: string[]; pal: Record<string, string>; dx: number; dy: number }> = {
   pug: {
     rows: [
@@ -2105,7 +2106,7 @@ export const DECOR_CROPS: Record<SlotId, [number, number, number, number]> = {
   wall: [190, 6, 96, 64],
   couch: [180, 108, 102, 68],
   rug: [88, 124, 84, 56],
-  pet: [102, 114, 54, 36],
+  pet: [170, 132, 54, 36],
   view: [12, 14, 66, 70],
   painting: [104, 10, 48, 32],
   plant: [0, 94, 48, 72],

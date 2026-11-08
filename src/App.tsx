@@ -46,7 +46,7 @@ const DECOR_FOCUS: Record<SlotId, number | undefined> = {
   wall: undefined,
   couch: undefined,
   rug: 200,
-  pet: 128,
+  pet: 196,
   view: 46,
   painting: 128,
   plant: 24,
@@ -221,6 +221,7 @@ const Home: React.FC = () => {
       music: turntable.on ? `Lift the needle${turntable.track ? ` · ${turntable.track.title}` : ''}` : 'Put a record on',
       decor: panel === 'decor' ? 'Choose a painting' : 'Decorate the room',
       board: wallNews && partnerUser ? `${partnerUser.name} pinned ${pinnedWhat} up` : 'Our wall · notes, doodles, photos',
+      pet: 'Your pet · choose who sleeps here',
     };
     const meLabel = `${currentUser.name} · ${myMood ? moodLine(myMood) : 'how are you feeling?'}`;
     const themLabel = (u: UserProfile) => [u.name, theirMood && moodLine(theirMood), 'send a hug'].filter(Boolean).join(' · ');
@@ -243,6 +244,7 @@ const Home: React.FC = () => {
     else if (id === 'games') openPanel('games');
     else if (id === 'music') turntable.toggle();
     else if (id === 'decor') decor.openCatalogue('painting');
+    else if (id === 'pet') decor.openCatalogue('pet');
     else if (id === 'board') openPanel('wall');
     else if (id === 'left' || id === 'right') {
       const who = id === 'left' ? host : guest;
