@@ -161,7 +161,9 @@ jobs:
           shot welcome
           shot home -demo -tab home
           shot letters -demo -tab letters
-          shot wall -demo -tab wall
+          shot wall -demo -open wall
+          shot watch -demo -tab watch
+          shot watch-on -demo -tab watch -watch dQw4w9WgXcQ
           shot play -demo -tab play
           shot us -demo -tab us
           shot mood -demo -open me
@@ -182,6 +184,9 @@ jobs:
           shot escape-map -demo -escape office -escapeStep 4 -escapeOpen map
           shot record -demo -record
           shot record-sheet -demo -record -open music
+          shot tour-you -demo -tour 0
+          shot tour-wall -demo -tour 2
+          shot tour-watch -demo -tour 5
           ls -la "$RUNNER_TEMP/shots"
           echo "dev=$dev" >> "$GITHUB_OUTPUT"
 

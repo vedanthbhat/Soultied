@@ -10,7 +10,6 @@ struct PlayView: View {
     @State private var decorating = false
     @State private var open: GameKind?
     @State private var escaping = false
-    @Environment(\.openURL) private var openURL
 
     var body: some View {
         ScrollView {
@@ -38,17 +37,6 @@ struct PlayView: View {
                 .buttonStyle(.plain)
 
                 GamesShelf(place: place) { open = $0 }
-
-                HStack(alignment: .top, spacing: 14) {
-                    GlyphView(glyph: Icons.tv, scale: 4)
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Watch together").font(.pxHeading).foregroundStyle(Color.inkSoft)
-                        Text("Your shows in sync, with a chat, from a computer. Open soultied.app on your laptops and press the remote on the coffee table.")
-                            .font(.pxBody).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
-                        Button("How it works") { openURL(URL(string: "https://soultied.app/watch/")!) }.buttonStyle(.px(.paper, small: true))
-                    }
-                }
-                .pxCard()
 
                 Button {
                     Haptics.tap()

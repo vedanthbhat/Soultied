@@ -115,6 +115,8 @@ struct UsView: View {
                     Text(p).font(.pxSmall).foregroundStyle(Color(hex: "#7f3835"))
                 }
             }
+            Button("Show me around again") { Tour.shared.start() }
+                .buttonStyle(.px(.paper, small: true))
             HStack(spacing: 16) {
                 Button("Privacy") { openURL(URL(string: "https://soultied.app/privacy/")!) }
                 Button("Terms") { openURL(URL(string: "https://soultied.app/terms/")!) }
