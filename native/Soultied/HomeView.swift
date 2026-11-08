@@ -2,9 +2,11 @@ import SwiftUI
 import SoultiedCore
 
 /*
- * Home: the two of you on the couch at the top (your moods over your heads, the picture over the couch),
- * the touches you can send, and a card each for today's letter, our wall, the streak and the record player
- * (up top while something's playing).
+ * Home: the room, close in on the two of you, fills the first screen: the pictures over the couch (your
+ * wall), the couch with your moods over your heads, the coffee table with today's letter, the record
+ * player. Everything in it can be tapped. Your names sit just under it; scroll down for the touches you can
+ * send and a card each for today's letter, the wall, the streak and the record player (up top while
+ * something's playing).
  */
 
 struct HomeView: View {
@@ -19,33 +21,47 @@ struct HomeView: View {
 
     var body: some View {
         GeometryReader { geo in
-            ScrollView {
-                VStack(spacing: 0) {
-                    header
-                    RoomScene(place: place, couchOnly: true, paused: paused, onTap: onRoom)
-                        .frame(height: couchHeight(width: geo.size.width, scale: displayScale))
-                        .overlay(alignment: .bottom) { nameplates }
-                        .overlay(alignment: .bottom) { Rectangle().fill(Color.ink).frame(height: PX) }
+            ScrollViewReader { scroller in
+                ScrollView {
+                    VStack(spacing: 0) {
+                        header
+                            .id("top")
+                        RoomScene(place: place, couchOnly: true, crop: .home, paused: paused, tourSpots: true, onTap: onRoom)
+                            .frame(height: heroHeight(geo.size))
+                            .overlay(alignment: .bottom) { Rectangle().fill(Color.ink).frame(height: PX) }
+                            .anchorPreference(key: TourSpots.self, value: .bounds) { ["room": $0] }
+                        nameplates
 
-                    VStack(spacing: 18) {
-                        touches
-                        if place.recordOn { RecordCard(place: place, listening: listening, open: { onRoom(.music) }) }
-                        LetterCard(place: place, open: { go(.letters) })
-                        AsksCard(place: place, open: { go(.letters) })
-                        GameCard(place: place, open: openGame)
-                        WallCard(place: place, open: { go(.wall) })
-                        StreakCard(place: place)
-                        if !place.recordOn { RecordCard(place: place, open: { onRoom(.music) }) }
-                        CouchCard(place: place, invite: { go(.us) })
+                        VStack(spacing: 18) {
+                            touches
+                            if place.recordOn { RecordCard(place: place, listening: listening, open: { onRoom(.music) }) }
+                            LetterCard(place: place, open: { go(.letters) })
+                            AsksCard(place: place, open: { go(.letters) })
+                            GameCard(place: place, open: openGame)
+                            WallCard(place: place, open: { onRoom(.board) })
+                            StreakCard(place: place)
+                            if !place.recordOn { RecordCard(place: place, open: { onRoom(.music) }) }
+                            CouchCard(place: place, invite: { go(.us) })
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.top, 22)
+                        .padding(.bottom, 120)
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 18)
-                    .padding(.bottom, 120)
+                }
+                .scrollIndicators(.hidden)
+                // the tour points at things in the room, so start it from the top
+                .onChange(of: Tour.shared.active) { _, on in
+                    if on { scroller.scrollTo("top", anchor: .top) }
                 }
             }
-            .scrollIndicators(.hidden)
         }
         .background(RoomBackground())
+    }
+
+    /// the room fills the first screen, leaving room for your names under it and a peek at what's below
+    private func heroHeight(_ size: CGSize) -> CGFloat {
+        let below: CGFloat = 52 + 58 + 60
+        return RoomCrop.home.viewHeight(width: size.width, maxHeight: max(200, size.height - below), displayScale: displayScale)
     }
 
     private var header: some View {
@@ -74,16 +90,16 @@ struct HomeView: View {
         .padding(.vertical, 10)
     }
 
-    /// the names under the couch: tap yourself for your mood, your person to send a touch
+    /// your names, just under the couch: tap yourself for your mood, your person to send a touch
     private var nameplates: some View {
         let s = place.seats
-        return HStack(alignment: .bottom) {
+        return HStack(alignment: .top, spacing: 10) {
             plate(s.left, place.hostId, .left)
-            Spacer(minLength: 8)
             plate(s.right, place.guestId, .right)
         }
-        .padding(.horizontal, 10)
-        .padding(.bottom, 10)
+        .padding(.horizontal, 12)
+        .padding(.top, 10)
+        .anchorPreference(key: TourSpots.self, value: .bounds) { ["names": $0] }
     }
 
     @ViewBuilder
@@ -107,9 +123,9 @@ struct HomeView: View {
                 }
                 Text(line).font(.px(12)).foregroundStyle(Color.muted).lineLimit(1)
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .frame(maxWidth: 170, alignment: id == .left ? .leading : .trailing)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .frame(maxWidth: .infinity, alignment: id == .left ? .leading : .trailing)
             .pxBox()
         }
         .accessibilityLabel(seat.status == .empty ? "Invite \(place.theirName)" : mine ? "You. \(line)" : "\(seat.name). \(line)")

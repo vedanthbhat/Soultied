@@ -3,19 +3,50 @@ import SoultiedCore
 
 /*
  * The living room, drawn by the same renderer as the website (SoultiedCore's RoomRenderer, checked pixel
- * for pixel against it). On the iPhone's home it's cropped to the couch: the two of you, your moods over
- * your heads, the picture over the couch. Turned sideways, it's the whole room.
+ * for pixel against it). On the iPhone's home it's cropped close around the two of you: the pictures over
+ * the couch (your wall), the couch, and the coffee table with today's letter. Turned sideways, it's the
+ * whole room.
  */
+
+/// which part of the room a cropped view shows (in room pixels), always at a whole number of screen pixels each
+struct RoomCrop {
+    /// the room x to keep in the middle
+    var focusX: CGFloat
+    /// the top of the crop, and how tall it is
+    var top: CGFloat
+    var height: CGFloat
+    /// how many room pixels across it shows, at least
+    var minWidth: CGFloat
+
+    /// the welcome: the couch, a little way back
+    static let couch = RoomCrop(focusX: CGFloat(ROOM_FOCUS_X), top: 34, height: 130, minWidth: 160)
+    /// Home: close in on the two of you, from the pictures over the couch down to the letter on the table
+    static let home = RoomCrop(focusX: 236, top: 14, height: 162, minWidth: 108)
+
+    /// screen pixels per room pixel, for this much space (as big as fits across, and down if there's a limit)
+    func scale(width: CGFloat, height: CGFloat? = nil, displayScale: CGFloat) -> CGFloat {
+        var k = (width * displayScale / minWidth).rounded(.down)
+        if let height { k = min(k, (height * displayScale / self.height + 0.001).rounded(.down)) }
+        return max(1, k)
+    }
+
+    /// how tall the view is, in points
+    func viewHeight(width: CGFloat, maxHeight: CGFloat? = nil, displayScale: CGFloat) -> CGFloat {
+        height * scale(width: width, height: maxHeight, displayScale: displayScale) / displayScale
+    }
+}
 
 struct RoomScene: View {
     let place: PlaceModel
-    /// just the couch (the home screen), or the whole room (sideways)
+    /// cropped (the home screen, the welcome), or the whole room (sideways)
     var couchOnly = true
-    /// how many room pixels across the couch view shows, at least
-    var minWidth: CGFloat = 160
+    /// the part of the room a cropped view shows
+    var crop = RoomCrop.couch
     var paused = false
     /// what to show instead of what's out in the room (trying something on in the catalogue)
     var decor: Decor?
+    /// mark where the things you can tap are, for the first-run tour (Tour.swift)
+    var tourSpots = false
     var onTap: (HotspotId) -> Void = { _ in }
 
     @Environment(\.displayScale) private var displayScale
@@ -27,20 +58,16 @@ struct RoomScene: View {
     @State private var touch: RoomTouch?
     @State private var scootNote: String?
 
-    static let cropTop: CGFloat = 34
-    static let cropHeight: CGFloat = 130
-
     private func now() -> Double { Date().timeIntervalSince(start) }
 
     /// pt per room pixel, and where the room's top-left corner goes
     private func layout(_ size: CGSize) -> (u: CGFloat, x: CGFloat, y: CGFloat, h: CGFloat) {
         let W = max(1, size.width)
         if couchOnly {
-            let k = max(1, (W * displayScale / minWidth).rounded(.down))
-            let u = k / displayScale
-            var x = W / 2 - CGFloat(ROOM_FOCUS_X) * u
+            let u = crop.scale(width: W, height: size.height > 1 ? size.height : nil, displayScale: displayScale) / displayScale
+            var x = W / 2 - crop.focusX * u
             x = min(0, max(W - CGFloat(ROOM_W) * u, x))
-            return (u, x, -Self.cropTop * u, Self.cropHeight * u)
+            return (u, x, -crop.top * u, crop.height * u)
         }
         let H = max(1, size.height)
         let k = max(1, min(W * displayScale / CGFloat(ROOM_W), H * displayScale / CGFloat(ROOM_H)).rounded(.down))
@@ -111,12 +138,30 @@ struct RoomScene: View {
                     onTap(id)
                 }
             )
+            .overlay(alignment: .topLeading) {
+                if tourSpots { spots(L) }
+            }
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityText)
         .onAppear { startScootIfDue() }
         .onChange(of: place.couchLevel) { _, _ in startScootIfDue() }
         .onChange(of: place.playing?.id) { _, _ in playTouch() }
+    }
+
+    /// where you, your person, the wall, the letter and the record player are on screen
+    @ViewBuilder
+    private func spots(_ L: (u: CGFloat, x: CGFloat, y: CGFloat, h: CGFloat)) -> some View {
+        let c = closeness(now()).0
+        ForEach([HotspotId.left, .right, .board, .letter, .music], id: \.self) { id in
+            let h = hotspotRect(id, c)
+            // (placed with position, which moves the view itself, so the tour finds it where it's drawn)
+            Color.clear
+                .frame(width: CGFloat(h.w) * L.u, height: CGFloat(h.h) * L.u)
+                .position(x: L.x + CGFloat(h.x + h.w / 2) * L.u, y: L.y + CGFloat(h.y + h.h / 2) * L.u)
+                .anchorPreference(key: TourSpots.self, value: .bounds) { ["spot.\(id.rawValue)": $0] }
+                .allowsHitTesting(false)
+        }
     }
 
     private var accessibilityText: String {
@@ -145,8 +190,7 @@ struct RoomScene: View {
     }
 }
 
-/// how tall the couch view is for a width (so the home screen can lay itself out)
-func couchHeight(width: CGFloat, scale: CGFloat, minWidth: CGFloat = 160) -> CGFloat {
-    let k = max(1, (width * scale / minWidth).rounded(.down))
-    return RoomScene.cropHeight * k / scale
+/// how tall the welcome's couch view is for a width
+func couchHeight(width: CGFloat, scale: CGFloat) -> CGFloat {
+    RoomCrop.couch.viewHeight(width: width, displayScale: scale)
 }

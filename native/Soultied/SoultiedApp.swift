@@ -24,7 +24,7 @@ struct SoultiedApp: App {
 
 /// Launch options for looking around without signing in (the screenshots GitHub takes of each build):
 ///   -demo            open the demo room
-///   -tab letters     start on a tab (home, letters, wall, play, us)
+///   -tab letters     start on a tab (home, letters, watch, play, us)
 ///   -open me         open a sheet from the room (me, them, letters, wall, decor, play, us, music)
 ///   -game fireflies  open a game
 ///   -escape          open the dark door (the escape rooms)
@@ -50,6 +50,10 @@ enum Launch {
         guard let i = args.firstIndex(of: flag), i + 1 < args.count else { return nil }
         return args[i + 1]
     }
+    /// -watch <link>   in the demo room, put a YouTube video on the TV in Watch together (the screenshots)
+    static var watch: String? { value("-watch") }
+    /// -tour 0   show the first-run tour, at that step (the screenshots; the demo room never shows it otherwise)
+    static var tour: Int? { value("-tour").flatMap { Int($0) } }
     /// -record   in the demo room, put the jazz record on; -song <link>, a song from YouTube instead
     static var record: Bool { args.contains("-record") }
     static var song: String? { value("-song") }
