@@ -29,7 +29,8 @@ struct HomeView: View {
                         RoomScene(place: place, couchOnly: true, crop: .home, paused: paused, tourSpots: true, onTap: onRoom)
                             .frame(height: heroHeight(geo.size))
                             .overlay(alignment: .bottom) { Rectangle().fill(Color.ink).frame(height: PX) }
-                            .anchorPreference(key: TourSpots.self, value: .bounds) { ["room": $0] }
+                            // (added to the spots inside it, which a plain anchorPreference would replace)
+                            .transformAnchorPreference(key: TourSpots.self, value: .bounds) { $0["room"] = $1 }
                         nameplates
 
                         VStack(spacing: 18) {
@@ -99,7 +100,7 @@ struct HomeView: View {
         }
         .padding(.horizontal, 12)
         .padding(.top, 10)
-        .anchorPreference(key: TourSpots.self, value: .bounds) { ["names": $0] }
+        .transformAnchorPreference(key: TourSpots.self, value: .bounds) { $0["names"] = $1 }
     }
 
     @ViewBuilder

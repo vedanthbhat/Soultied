@@ -102,7 +102,10 @@ struct TourOverlay: View {
             let steps = Tour.steps(place)
             let i = min(tour.step, steps.count - 1)
             let st = steps[i]
-            let r = spots[st.spot].map { proxy[$0].insetBy(dx: -6, dy: -6) }
+            // (kept on screen: the record player sits at the room's edge)
+            let r = spots[st.spot].map {
+                proxy[$0].insetBy(dx: -6, dy: -6).intersection(CGRect(origin: .zero, size: proxy.size).insetBy(dx: 3, dy: 3))
+            }.flatMap { $0.isNull || $0.isEmpty ? nil : $0 }
             ZStack(alignment: .topLeading) {
                 // the dim, with a window cut out over the thing
                 Path { p in

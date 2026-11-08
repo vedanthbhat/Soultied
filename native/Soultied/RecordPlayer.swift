@@ -436,9 +436,10 @@ private struct VolumeRow: View {
 
 /// the record's credit, as its licence asks
 struct RecordCredit: View {
-    /// (made as a plain string first: links written straight into a LocalizedStringKey with \(…) wouldn't be links)
+    /// (made as a plain string first: links written straight into a LocalizedStringKey with \(…) wouldn't be links;
+    /// the licence's name keeps together, with no-break spaces)
     private static let line: String = Records.artist + " ([incompetech.com](" + Records.sourceURL.absoluteString + ")) · ["
-        + Records.license + "](" + Records.licenseURL.absoluteString + ")"
+        + Records.license.replacingOccurrences(of: " ", with: "\u{00A0}") + "](" + Records.licenseURL.absoluteString + ")"
 
     var body: some View {
         // one line of text with its two links, so it wraps between words

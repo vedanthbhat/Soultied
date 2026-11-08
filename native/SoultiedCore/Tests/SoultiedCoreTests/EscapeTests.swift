@@ -127,6 +127,9 @@ final class EscapeSessionTests: XCTestCase {
         return d
     }
 
+    // (on the main actor, like the app and the other two-device tests: the in-memory database writes there, so
+    // a test running anywhere else races it)
+    @MainActor
     func testTwoDevicesEscapeTheAttic() async throws {
         guard !EscapeRoom.all.isEmpty else { throw XCTSkip("no escape.json") }
         let db = Demo.backend()
