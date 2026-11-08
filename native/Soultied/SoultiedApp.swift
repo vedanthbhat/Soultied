@@ -52,6 +52,9 @@ enum Launch {
     }
     /// -watch <link>   in the demo room, put a YouTube video on the TV in Watch together (the screenshots)
     static var watch: String? { value("-watch") }
+    /// -service netflix   Watch together starts on Netflix (or prime, youtube); -stream netflix also opens its browser
+    static var service: String? { value("-service") }
+    static var stream: String? { value("-stream") }
     /// -tour 0   show the first-run tour, at that step (the screenshots; the demo room never shows it otherwise)
     static var tour: Int? { value("-tour").flatMap { Int($0) } }
     /// -record   in the demo room, put the jazz record on; -song <link>, a song from YouTube instead

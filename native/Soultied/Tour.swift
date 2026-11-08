@@ -82,7 +82,7 @@ final class Tour {
             TourStep(spot: "spot.board", title: "Your wall", text: "The pictures over the couch are your wall: notes, doodles, photos and memories you leave each other."),
             TourStep(spot: "spot.letter", title: "Today’s letter", text: "Five little questions a day. Answer in secret; the letter opens once you’ve both sealed it."),
             TourStep(spot: "spot.music", title: "The record player", text: "Put a record on, or a song from YouTube, and it plays for both of you, in sync."),
-            TourStep(spot: "tab.watch", title: "Watch together", text: "Put a YouTube video on the TV and it plays for both of you, in sync, with a couch chat. Netflix and Prime work on a laptop with the Soultied extension."),
+            TourStep(spot: "tab.watch", title: "Watch together", text: "Put on YouTube, Netflix or Prime Video and it plays for both of you, in sync, with a chat and the two of you on the couch."),
             TourStep(spot: "tab.play", title: "Play", text: "Games for two, and the escape rooms behind the dark door."),
             TourStep(spot: "tab.letters", title: "Letters", text: "Today’s letter, your 30-day journey, and the questions you ask each other."),
             TourStep(spot: "tab.us", title: "Us", text: "Your place, the invite, your look and your account. You can take this tour again from here."),

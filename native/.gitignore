@@ -1,6 +1,8 @@
 # made before each build (see .github/workflows/native-ios.yml)
 SoultiedCore/Sources/SoultiedCore/Resources/decks.json
 SoultiedCore/Sources/SoultiedCore/Resources/escape.json
+# the Netflix / Prime Video browser's scripts (scripts/native-stream.mjs)
+Stream/
 SoultiedCore/.build/
 *.xcodeproj
 # written by XcodeGen from project.yml

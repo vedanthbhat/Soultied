@@ -40,6 +40,10 @@ targets:
         buildPhase: resources
       - path: ../ios/App/App/Assets.xcassets
         buildPhase: resources
+      # the Netflix / Prime Video browser's scripts: the extension's player, made by scripts/native-stream.mjs
+      - path: Stream
+        buildPhase: resources
+        optional: true
     entitlements:
       path: Soultied/Soultied.entitlements
       properties:
