@@ -165,6 +165,8 @@ button { font: inherit; cursor: pointer; }
 `;
 
 const HINT_PLACE = 'Hold T to talk. Cameras live in your Soultied tab (“Pop out cameras”).';
+/** inside the Soultied iPhone app's own browser (extension/src/ios/shim.ts), where there's no T key and no Soultied tab */
+const IN_APP = !!(globalThis as { __soultiedInApp?: boolean }).__soultiedInApp;
 const HINT_PLUS = 'Unmute to talk, or hold T while muted. Your camera and voice go only to your person.';
 
 const PLUS_ERRORS: Record<string, string> = {
@@ -1223,7 +1225,7 @@ export class Overlay implements EngineUI {
           : `${name} isn’t watching yet`;
     this.leaveBtn.hidden = !party;
     const plus = !!party && this.plusOn;
-    this.hint.textContent = !party ? HINT_PLACE : plus ? HINT_PLUS : '';
+    this.hint.textContent = IN_APP ? '' : !party ? HINT_PLACE : plus ? HINT_PLUS : '';
 
     // banners
     const bs: HTMLElement[] = [];
