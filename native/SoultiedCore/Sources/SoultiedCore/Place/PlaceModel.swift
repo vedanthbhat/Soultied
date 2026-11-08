@@ -576,6 +576,21 @@ public final class PlaceModel {
     /// the line between the two of you for live things (games, for now)
     public func liveChannel(_ topic: String) -> LiveChannel { db.live(path("live/\(topic)/events")) }
 
+    /// Netflix / Prime Video together: the episodes and films you've watched as a pair, and where you left off
+    /// in each show (the website's TogetherLog, in meta/stream)
+    public func watchStreamLog(_ fn: @escaping (Doc?) -> Void) -> Listener { db.listen(meta("stream"), fn) }
+    public func saveWatched(key: String, showKey: String, show: String, episode: String, url: String, pos: Double) {
+        let at = Values.nowMs()
+        save(meta("stream"), [
+            "seen": [key: ["show": show, "episode": episode, "at": at]],
+            "shows": [showKey: ["show": show, "episode": episode, "key": key, "url": url, "pos": pos, "at": at]],
+        ], "watched")
+    }
+    /// a line in what's happened lately ("Watched together: Dark S1:E2 on Netflix.")
+    public func noteWatchedTogether(_ description: String) {
+        activity(Activity.new(.watchedTogether, "Watched together", description))
+    }
+
     /// Doodle Guess's page, as last saved by whoever's drawing
     public func watchDoodleCanvas(_ fn: @escaping (Doc?) -> Void) -> Listener { db.listen(meta("doodle-canvas"), fn) }
     public func saveDoodleCanvas(_ d: Doc) { db.setLater(meta("doodle-canvas"), d, self) }
