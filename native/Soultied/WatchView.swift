@@ -92,11 +92,7 @@ struct WatchView: View {
             RecordDeck.shared.hush(true)
             logListener = place.watchStreamLog { d in streamLog = d ?? [:] }
             deck.use(place)
-            // (the screenshots: the demo's Rohan is on Netflix, for the Join card)
-            if place.isDemo, Launch.args.contains("-partnerWatching"), let them = place.them {
-                let dark: Doc = ["platform": "netflix", "key": "netflix:80100172", "showKey": "netflix-show:dark", "show": "Dark", "episode": "S1:E2 · Lies", "url": "https://www.netflix.com/watch/80100172"]
-                place.liveChannel("stream").send(["type": "hello", "title": dark, "pos": 640, "playing": true, "by": them, "at": Values.nowMs()])
-            }
+            demoPartnerWatching()
             if let v = Launch.service { serviceRaw = v }
             if place.isDemo, let site = Launch.stream.flatMap(StreamSite.init) { streaming = StreamOpen(site: site, url: nil) }
         }
@@ -107,6 +103,11 @@ struct WatchView: View {
             logListener?.stop()
             logListener = nil
             deck.done()
+        }
+        // (the place came round, or your person moved in: the line to their Netflix / Prime player opens)
+        .onChange(of: place.partnerHere) { _, _ in
+            deck.hub?.refresh()
+            demoPartnerWatching()
         }
         .fullScreenCover(item: $streaming) { o in
             StreamView(place: place, site: o.site, start: o.url)
@@ -255,6 +256,15 @@ struct WatchView: View {
                 .buttonStyle(.px(w == service ? .terracotta : .paper, small: true))
                 .accessibilityAddTraits(w == service ? .isSelected : [])
             }
+        }
+    }
+
+    /// (the screenshots: the demo's Rohan is on Netflix, for the Join card)
+    private func demoPartnerWatching() {
+        guard place.isDemo, Launch.args.contains("-partnerWatching"), let them = place.them else { return }
+        let dark: Doc = ["platform": "netflix", "key": "netflix:80100172", "showKey": "netflix-show:dark", "show": "Dark", "episode": "S1:E2 · Lies", "url": "https://www.netflix.com/watch/80100172"]
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+            place.liveChannel("stream").send(["type": "hello", "title": dark, "pos": 640, "playing": true, "by": them, "at": Values.nowMs()])
         }
     }
 
