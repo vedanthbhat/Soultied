@@ -50,6 +50,8 @@ struct WatchView: View {
     @State private var streaming: StreamOpen?
     @State private var streamLog: Doc = [:]
     @State private var logListener: Listener?
+    /// the line your person's Netflix / Prime player talks on (what they're watching, for "Join")
+    @State private var deck = StreamDeck.shared
 
     private var service: WatchService { WatchService(rawValue: serviceRaw) ?? .youtube }
 
@@ -59,6 +61,7 @@ struct WatchView: View {
                 VStack(alignment: .leading, spacing: 14) {
                     DarkHeading(title: "Watch together", sub: service == .youtube ? "YouTube on both your TVs, in sync" : "\(service.name) on both your screens, in sync")
                     picker
+                    joinCard
                     if let s = session {
                         if let site = service.site {
                             WatchRoomView(place: place, session: s, width: max(100, geo.size.width - 32), tv: .idle, showsPlayer: false)
@@ -88,6 +91,12 @@ struct WatchView: View {
             // the record player goes quiet while you watch
             RecordDeck.shared.hush(true)
             logListener = place.watchStreamLog { d in streamLog = d ?? [:] }
+            deck.use(place)
+            // (the screenshots: the demo's Rohan is on Netflix, for the Join card)
+            if place.isDemo, Launch.args.contains("-partnerWatching"), let them = place.them {
+                let dark: Doc = ["platform": "netflix", "key": "netflix:80100172", "showKey": "netflix-show:dark", "show": "Dark", "episode": "S1:E2 · Lies", "url": "https://www.netflix.com/watch/80100172"]
+                place.liveChannel("stream").send(["type": "hello", "title": dark, "pos": 640, "playing": true, "by": them, "at": Values.nowMs()])
+            }
             if let v = Launch.service { serviceRaw = v }
             if place.isDemo, let site = Launch.stream.flatMap(StreamSite.init) { streaming = StreamOpen(site: site, url: nil) }
         }
@@ -97,6 +106,7 @@ struct WatchView: View {
             RecordDeck.shared.hush(false)
             logListener?.stop()
             logListener = nil
+            deck.done()
         }
         .fullScreenCover(item: $streaming) { o in
             StreamView(place: place, site: o.site, start: o.url)
@@ -248,12 +258,35 @@ struct WatchView: View {
         }
     }
 
+    /// your person's on Netflix or Prime Video right now: one tap to sit down next to them
+    @ViewBuilder
+    private var joinCard: some View {
+        if let h = deck.hub, h.partnerWatching, let t = h.partnerTitle, let site = StreamSite(platform: t.str("platform")),
+           let u = StreamHub.watchURL(t) {
+            HStack(spacing: 12) {
+                Rectangle().fill(Color.sage).frame(width: 9, height: 9)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("\(place.theirName) is watching").font(.px(12, 600)).foregroundStyle(Color.muted)
+                    Text("\(StreamHub.label(t)) on \(site.name)").font(.pxBodyBold).foregroundStyle(Color.inkSoft).lineLimit(2)
+                }
+                Spacer(minLength: 4)
+                Button("Join") {
+                    Haptics.tap()
+                    serviceRaw = site.rawValue
+                    streaming = StreamOpen(site: site, url: u)
+                }
+                .buttonStyle(.px(.sage, small: true))
+            }
+            .pxCard()
+        }
+    }
+
     /// Netflix or Prime Video: open it in the app's browser, or pick up a show you were watching together
     private func streamPane(_ site: StreamSite) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 10) {
                 Text("\(site.name), together").font(.pxHeading).foregroundStyle(Color.inkSoft)
-                Text("Pick a show and press play: it plays for \(place.theirName) too, in step, with the chat and the two of you on the couch over it. Turn your phone sideways for the big picture.")
+                Text("Pick a show and press play: it plays for \(place.theirName) too, in step, with the two of you on the couch in the corner and the chat a tap away. It turns sideways by itself when the show starts.")
                     .font(.pxBody)
                     .foregroundStyle(Color.muted)
                     .fixedSize(horizontal: false, vertical: true)
