@@ -29,6 +29,9 @@ on:
       - '.github/native-shots.py'
       - 'scripts/ios-assets.mjs'
       - 'src/letters/**'
+      # (the app's Netflix / Prime Video browser runs the extension's player)
+      - 'extension/src/**'
+      - 'src/stream/**'
       - '.github/workflows/native-ios.yml'
 
 # (a newer push stops a run that's only checking; a run sending a build to TestFlight always finishes)
@@ -68,6 +71,8 @@ jobs:
           node "$RUNNER_TEMP/escape.cjs"
           npx esbuild scripts/native-fixtures.ts --bundle --platform=node --log-level=warning --outfile="$RUNNER_TEMP/fx.cjs"
           node "$RUNNER_TEMP/fx.cjs" "$RUNNER_TEMP/fixtures.json"
+          # the extension's player, for the app's own Netflix / Prime Video browser
+          node scripts/native-stream.mjs
 
       - name: Draw the icon
         run: |
@@ -164,6 +169,9 @@ jobs:
           shot wall -demo -open wall
           shot watch -demo -tab watch
           shot watch-on -demo -tab watch -watch dQw4w9WgXcQ
+          shot watch-netflix -demo -tab watch -service netflix
+          shot stream-netflix -demo -tab watch -service netflix -stream netflix
+          shot stream-prime -demo -tab watch -service prime -stream prime
           shot play -demo -tab play
           shot us -demo -tab us
           shot mood -demo -open me

@@ -7,27 +7,70 @@ import SoultiedCore
  * room as the website, drawn pixel for pixel by SoultiedCore). Paste a YouTube link and it plays on both
  * your TVs, in sync, whether your person is on their phone or on soultied.app. Plus reactions that pop up
  * over your heads, and a couch chat.
+ *
+ * Or Netflix and Prime Video: each opens in the app's own browser, in step with your person (StreamView.swift).
  */
+
+/// what's on: YouTube in the room's TV, or Netflix / Prime Video in the app's browser
+enum WatchService: String, CaseIterable, Identifiable {
+    case youtube, netflix, prime
+    var id: String { rawValue }
+    var name: String {
+        switch self {
+        case .youtube: return "YouTube"
+        case .netflix: return "Netflix"
+        case .prime: return "Prime Video"
+        }
+    }
+    var site: StreamSite? { StreamSite(rawValue: rawValue) }
+}
+
+/// a show you've been watching together on Netflix or Prime Video
+struct StreamShow: Identifiable {
+    let show: String
+    let episode: String
+    let url: URL
+    let at: Double
+    var id: String { url.absoluteString }
+}
+
+/// a site to open, and where
+struct StreamOpen: Identifiable {
+    let site: StreamSite
+    let url: URL?
+    var id: String { site.rawValue + (url?.absoluteString ?? "") }
+}
 
 struct WatchView: View {
     let place: PlaceModel
     @State private var session: WatchSession?
     @State private var link = ""
     @State private var draft = ""
+    @AppStorage("soultied_watch_service") private var serviceRaw = WatchService.youtube.rawValue
+    @State private var streaming: StreamOpen?
+    @State private var streamLog: Doc = [:]
+    @State private var logListener: Listener?
+
+    private var service: WatchService { WatchService(rawValue: serviceRaw) ?? .youtube }
 
     var body: some View {
         GeometryReader { geo in
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
-                    DarkHeading(title: "Watch together", sub: "YouTube on both your TVs, in sync")
+                    DarkHeading(title: "Watch together", sub: service == .youtube ? "YouTube on both your TVs, in sync" : "\(service.name) on both your screens, in sync")
+                    picker
                     if let s = session {
-                        presence(s)
-                        WatchRoomView(place: place, session: s, width: max(100, geo.size.width - 32))
-                        controls(s)
-                        reactions(s)
-                        chat(s)
+                        if let site = service.site {
+                            WatchRoomView(place: place, session: s, width: max(100, geo.size.width - 32), tv: .idle, showsPlayer: false)
+                            streamPane(site)
+                        } else {
+                            presence(s)
+                            WatchRoomView(place: place, session: s, width: max(100, geo.size.width - 32))
+                            controls(s)
+                            reactions(s)
+                            chat(s)
+                        }
                     }
-                    laptops
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 8)
@@ -44,11 +87,19 @@ struct WatchView: View {
             if place.isDemo, let v = Launch.watch { s.putOn(v) }
             // the record player goes quiet while you watch
             RecordDeck.shared.hush(true)
+            logListener = place.watchStreamLog { d in streamLog = d ?? [:] }
+            if let v = Launch.service { serviceRaw = v }
+            if place.isDemo, let site = Launch.stream.flatMap(StreamSite.init) { streaming = StreamOpen(site: site, url: nil) }
         }
         .onDisappear {
             session?.stop()
             session = nil
             RecordDeck.shared.hush(false)
+            logListener?.stop()
+            logListener = nil
+        }
+        .fullScreenCover(item: $streaming) { o in
+            StreamView(place: place, site: o.site, start: o.url)
         }
         .task {
             // keep the two TVs in step
@@ -183,15 +234,78 @@ struct WatchView: View {
         draft = ""
     }
 
-    private var laptops: some View {
-        HStack(alignment: .top, spacing: 12) {
-            GlyphView(glyph: Icons.tv, scale: 3)
-            Text("Netflix and Prime Video: for now, watch them together on a laptop with the Soultied extension.")
-                .font(.pxSmall)
-                .foregroundStyle(Color.paper.opacity(0.75))
-                .fixedSize(horizontal: false, vertical: true)
+    /// YouTube, Netflix or Prime Video
+    private var picker: some View {
+        HStack(spacing: 8) {
+            ForEach(WatchService.allCases) { w in
+                Button(w.name) {
+                    Haptics.tap()
+                    serviceRaw = w.rawValue
+                }
+                .buttonStyle(.px(w == service ? .terracotta : .paper, small: true))
+                .accessibilityAddTraits(w == service ? .isSelected : [])
+            }
         }
-        .padding(.top, 4)
+    }
+
+    /// Netflix or Prime Video: open it in the app's browser, or pick up a show you were watching together
+    private func streamPane(_ site: StreamSite) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("\(site.name), together").font(.pxHeading).foregroundStyle(Color.inkSoft)
+                Text("Pick a show and press play: it plays for \(place.theirName) too, in step, with the chat and the two of you on the couch over it. Turn your phone sideways for the big picture.")
+                    .font(.pxBody)
+                    .foregroundStyle(Color.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button("Open \(site.name)") {
+                    Haptics.tap()
+                    streaming = StreamOpen(site: site, url: nil)
+                }
+                .buttonStyle(.px(.terracotta))
+                Text("You each sign in to your own \(site.name), once, in here. \(place.theirName) can watch on their phone, or on a laptop at soultied.app with the Soultied extension.")
+                    .font(.pxSmall)
+                    .foregroundStyle(Color.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .pxCard()
+
+            let shows = recent(site)
+            if !shows.isEmpty {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Pick up where you left off").font(.pxHeading).foregroundStyle(Color.inkSoft)
+                    ForEach(shows) { s in
+                        Button {
+                            Haptics.tap()
+                            streaming = StreamOpen(site: site, url: s.url)
+                        } label: {
+                            HStack(spacing: 10) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(s.show).font(.pxBodyBold).foregroundStyle(Color.inkSoft).lineLimit(1)
+                                    if !s.episode.isEmpty { Text(s.episode).font(.pxSmall).foregroundStyle(Color.muted).lineLimit(1) }
+                                }
+                                Spacer(minLength: 0)
+                                Text("→").font(.pxBodyBold).foregroundStyle(Color.terracottaD)
+                            }
+                            .padding(10)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .pxBox()
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .pxCard()
+            }
+        }
+    }
+
+    /// the shows you've been watching together on this site, newest first (meta/stream, shared with the website)
+    private func recent(_ site: StreamSite) -> [StreamShow] {
+        let shows = (streamLog["shows"] as? Doc) ?? [:]
+        let all: [StreamShow] = shows.values.compactMap { v in
+            guard let d = v as? Doc, let u = d.str("url").flatMap({ URL(string: $0) }), site.owns(u) else { return nil }
+            return StreamShow(show: d.str("show") ?? "", episode: d.str("episode") ?? "", url: u, at: Values.num(d["at"]) ?? 0)
+        }
+        return Array(all.sorted { $0.at > $1.at }.prefix(4))
     }
 }
 
@@ -202,6 +316,9 @@ struct WatchRoomView: View {
     let session: WatchSession
     /// how wide it's shown, in points
     let width: CGFloat
+    /// what the TV shows instead of the YouTube video (Netflix and Prime play in their own browser)
+    var tv: TvState? = nil
+    var showsPlayer = true
     @Environment(\.displayScale) private var displayScale
     @State private var renderer = WatchRenderer()
     @State private var start = Date()
@@ -212,7 +329,7 @@ struct WatchRoomView: View {
 
     private var state: WatchState {
         let mine: AvatarConfig? = place.myLook, theirs: AvatarConfig? = place.theirLook
-        var st = WatchState(left: session.mySeat == .left ? mine : theirs, right: session.mySeat == .left ? theirs : mine, tv: session.tv)
+        var st = WatchState(left: session.mySeat == .left ? mine : theirs, right: session.mySeat == .left ? theirs : mine, tv: tv ?? session.tv)
         st.reactions = session.reactions
         return st
     }
@@ -237,7 +354,7 @@ struct WatchRoomView: View {
                         .offset(x: ox, y: oy)
                 }
             }
-            if session.videoId != nil {
+            if showsPlayer, session.videoId != nil {
                 YouTubeTVView(session: session)
                     .frame(width: CGFloat(TV_SCREEN.w) * u, height: CGFloat(TV_SCREEN.h) * u)
                     .offset(x: ox + CGFloat(TV_SCREEN.x) * u, y: oy + CGFloat(TV_SCREEN.y) * u)
@@ -247,7 +364,7 @@ struct WatchRoomView: View {
         .clipped()
         .overlay(Rectangle().stroke(Color.ink, lineWidth: 3))
         .accessibilityElement(children: .contain)
-        .accessibilityLabel(session.videoId == nil ? "The TV is off. Paste a YouTube link below to put something on." : "The TV")
+        .accessibilityLabel(!showsPlayer || session.videoId != nil ? "The TV" : "The TV is off. Paste a YouTube link below to put something on.")
     }
 }
 
