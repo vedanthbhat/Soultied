@@ -169,7 +169,7 @@ jobs:
           shot wall -demo -open wall
           shot watch -demo -tab watch
           shot watch-on -demo -tab watch -watch dQw4w9WgXcQ
-          shot watch-netflix -demo -tab watch -service netflix
+          shot watch-netflix -demo -tab watch -service netflix -partnerWatching
           shot stream-netflix -demo -tab watch -service netflix -stream netflix
           shot stream-prime -demo -tab watch -service prime -stream prime
           shot play -demo -tab play

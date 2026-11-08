@@ -78,11 +78,13 @@ const read = (k: string): unknown => {
 };
 // the rating card at the end of a watch party asks for a review on the Chrome Web Store: not here
 const fixed: Record<string, unknown> = { reviewAsked: 1, goodParty: 1 };
+// on a phone the show comes first: the chat panel starts tucked away (the couch's heart opens it)
+const startWith: Record<string, unknown> = { chatOpen: false };
 const local = {
   get(keys: string | string[]) {
     const out: Record<string, unknown> = {};
     for (const k of typeof keys === 'string' ? [keys] : keys) {
-      const v = k in fixed ? fixed[k] : read(k);
+      const v = k in fixed ? fixed[k] : (read(k) ?? startWith[k]);
       if (v !== undefined) out[k] = v;
     }
     return Promise.resolve(out);
@@ -153,6 +155,7 @@ const w = window as unknown as {
   chrome?: unknown;
   __soultiedApp?: (port: number, msg: unknown) => void;
   __soultiedAppGone?: (port: number) => void;
+  __soultiedAppReset?: () => void;
 };
 w.chrome = app;
 // (the player's overlay leaves out what's only for a laptop: hold T to talk, the Soultied tab's cameras)
@@ -162,4 +165,9 @@ w.__soultiedApp = (port, msg) => ports.get(port)?.hear(msg);
 w.__soultiedAppGone = (port) => {
   ports.get(port)?.gone();
   ports.delete(port);
+};
+// the app closed its end (you left Watch together, or it's opening again): every line here reconnects
+w.__soultiedAppReset = () => {
+  for (const p of ports.values()) p.gone();
+  ports.clear();
 };

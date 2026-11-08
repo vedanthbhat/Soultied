@@ -32,6 +32,10 @@ public final class StreamHub {
     @ObservationIgnored public var toPlayer: (Int, Doc) -> Void = { _, _ in }
     /// the player asked to go back to Soultied (its "Open Soultied" button)
     @ObservationIgnored public var onOpenHub: () -> Void = {}
+    /// your person did something (played, paused, reacted, said something): the app's little buzz
+    @ObservationIgnored public var onPartner: (Doc) -> Void = { _ in }
+    /// cut the player's line to the app, so it connects afresh (and says hello to whoever's listening then)
+    @ObservationIgnored public var dropPlayer: () -> Void = {}
 
     /// the player's on a show page and said hello
     public private(set) var playerHere = false
@@ -42,6 +46,10 @@ public final class StreamHub {
     public private(set) var hasVideo = false
     /// what you've watched together (seen, shows)
     public private(set) var log: Doc = ["seen": Doc(), "shows": Doc()]
+    /// what your person's watching (their player says, every so often), where they are, and whether it's playing
+    public private(set) var partnerTitle: Doc?
+    public private(set) var partnerPos: Double = 0
+    public private(set) var partnerPlaying = false
 
     @ObservationIgnored private var line: LiveChannel?
     @ObservationIgnored private var ports: Set<Int> = []
@@ -91,9 +99,12 @@ public final class StreamHub {
         started = false
         // (the player's goodbye, in case the page was closed before it could say it)
         if playerHere { send(["type": "bye", "by": me, "at": clock()]) }
-        for p in ports { toPlayerGone(p) }
+        if !ports.isEmpty { dropPlayer() }
         ports = []
         playerHere = false
+        partnerSeen = 0
+        partnerTitle = nil
+        partnerPlaying = false
         logListener?.stop()
         logListener = nil
         line?.close()
@@ -170,10 +181,6 @@ public final class StreamHub {
         for p in ports { toPlayer(p, s.map { ["kind": "session", "session": $0] } ?? ["kind": "nohub"]) }
     }
 
-    private func toPlayerGone(_ port: Int) {
-        toPlayer(port, ["kind": "nohub"])
-    }
-
     // MARK: - the line to your person
 
     private func openTheLine() {
@@ -195,7 +202,31 @@ public final class StreamHub {
         // (the cameras' own signalling: not on the phone yet)
         if type == "rtc" || type == "media" { return }
         partnerSeen = type == "bye" ? 0 : clock()
+        let pos = e.num("pos")
+        switch type {
+        case "hello", "ping", "state":
+            partnerTitle = e["title"] as? Doc
+            partnerPos = pos ?? partnerPos
+            partnerPlaying = e.bool("playing")
+        case "title":
+            partnerTitle = e["title"] as? Doc
+        case "play", "countdown":
+            partnerPlaying = true
+            partnerPos = pos ?? partnerPos
+        case "pause":
+            partnerPlaying = false
+            partnerPos = pos ?? partnerPos
+        case "seek":
+            partnerPlaying = e.bool("playing")
+            partnerPos = pos ?? partnerPos
+        case "bye", "leave":
+            partnerTitle = nil
+            partnerPlaying = false
+        default:
+            break
+        }
         for p in ports { toPlayer(p, ["kind": "event", "e": e]) }
+        onPartner(e)
     }
 
     // MARK: - what you've watched together
@@ -211,6 +242,13 @@ public final class StreamHub {
         guard !noted.contains(k), let them = place?.them, me < them else { return }
         noted.insert(k)
         place?.noteWatchedTogether("\(Self.label(t)) on \(Self.serviceName(t.str("platform"))).")
+    }
+
+    /// where to send you to watch what they're watching (src/stream/protocol.ts watchUrl: Prime's pages need asking to play)
+    public static func watchURL(_ t: Doc?) -> URL? {
+        guard let t, let u = t.str("url"), !u.isEmpty else { return nil }
+        let full = t.str("platform") == "prime" ? u + (u.contains("?") ? "&" : "?") + "autoplay=1" : u
+        return URL(string: full)
     }
 
     /// "Dark S1:E2" or "The Holdovers" (src/stream/protocol.ts titleLabel)

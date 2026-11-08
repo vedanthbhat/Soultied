@@ -46,10 +46,23 @@ final class StreamHubTests: XCTestCase {
         XCTAssertTrue(b.partnerWatching)
         XCTAssertFalse(a.partnerWatching)
 
+        // what he's watching, as his player says every so often (for "Join Rohan" in the app)
+        var buzzed: [String] = []
+        a.onPartner = { buzzed.append($0.str("type") ?? "") }
+        let dark: Doc = ["platform": "prime", "key": "pv:1", "show": "Dark", "episode": "S1:E2 · Lies", "url": "https://www.primevideo.com/detail/0ABC"]
+        b.fromPlayer(msg(7, ["kind": "send", "e": ["type": "ping", "title": dark, "pos": 640, "playing": true, "by": "b", "at": c.t]]))
+        XCTAssertEqual(a.partnerTitle?.str("show"), "Dark")
+        XCTAssertEqual(a.partnerPos, 640)
+        XCTAssertTrue(a.partnerPlaying)
+        XCTAssertEqual(StreamHub.watchURL(a.partnerTitle)?.absoluteString, "https://www.primevideo.com/detail/0ABC?autoplay=1")
+        b.fromPlayer(msg(7, ["kind": "send", "e": ["type": "pause", "pos": 641, "key": "pv:1", "by": "b", "at": c.t]]))
+        XCTAssertFalse(a.partnerPlaying)
+        XCTAssertEqual(buzzed, ["ping", "pause"])
+
         // his chat reaches her; the cameras' signalling doesn't go to the player
         b.fromPlayer(msg(7, ["kind": "send", "e": ["type": "chat", "id": "c1", "text": "this part!", "by": "b", "at": c.t]]))
         b.fromPlayer(msg(7, ["kind": "send", "e": ["type": "media", "cam": false, "talking": false, "by": "b", "at": c.t]]))
-        XCTAssertEqual(pa.events(1).map { $0.str("type") }, ["chat"])
+        XCTAssertEqual(pa.events(1).map { $0.str("type") }, ["ping", "pause", "chat"])
         XCTAssertTrue(a.partnerWatching)
         c.t += 46_000
         XCTAssertFalse(a.partnerWatching, "quiet for a while: not watching any more")
@@ -63,10 +76,15 @@ final class StreamHubTests: XCTestCase {
         a.fromPlayer(msg(1, ["kind": "startParty", "name": "Aanya"]))
         XCTAssertEqual(pa.kinds(1).last, "partyError")
 
-        // she closes the browser: her player's goodbye still reaches him
+        // she closes the browser: her player's goodbye still reaches him, and her player's line is cut
+        var dropped = 0
+        a.dropPlayer = { dropped += 1 }
         a.stop()
+        XCTAssertEqual(dropped, 1)
+        XCTAssertNil(a.partnerTitle)
         XCTAssertEqual(pb.events(7).last?.str("type"), "bye")
         XCTAssertFalse(b.partnerWatching)
+        XCTAssertNil(b.partnerTitle)
         XCTAssertFalse(a.playerHere)
     }
 
