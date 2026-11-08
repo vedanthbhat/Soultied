@@ -155,11 +155,11 @@ struct RoomScene: View {
         let c = closeness(now()).0
         ForEach([HotspotId.left, .right, .board, .letter, .music], id: \.self) { id in
             let h = hotspotRect(id, c)
-            // (placed with position, which moves the view itself, so the tour finds it where it's drawn)
+            // (marked before it's positioned: a positioned view fills its whole parent, and the mark would too)
             Color.clear
                 .frame(width: CGFloat(h.w) * L.u, height: CGFloat(h.h) * L.u)
-                .position(x: L.x + CGFloat(h.x + h.w / 2) * L.u, y: L.y + CGFloat(h.y + h.h / 2) * L.u)
                 .anchorPreference(key: TourSpots.self, value: .bounds) { ["spot.\(id.rawValue)": $0] }
+                .position(x: L.x + CGFloat(h.x + h.w / 2) * L.u, y: L.y + CGFloat(h.y + h.h / 2) * L.u)
                 .allowsHitTesting(false)
         }
     }

@@ -199,8 +199,9 @@ jobs:
           ls -la "$RUNNER_TEMP/shots"
           echo "dev=$dev" >> "$GITHUB_OUTPUT"
 
+      # (not when a newer push stopped this run: its empty page would replace the last good one)
       - name: Keep the screenshots and the build's messages (on the native-shots branch)
-        if: always()
+        if: ${{ !cancelled() }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: python3 .github/native-shots.py
