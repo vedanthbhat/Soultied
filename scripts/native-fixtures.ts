@@ -23,6 +23,8 @@ import { ROOMS } from '../src/escape/rooms';
 import { Scene } from '../src/escape/scene';
 import { RECORD_MS, startFor, whereAt } from '../src/music/records';
 import { parseYouTubeId, parseYouTubeStart } from '../src/watch/youtubeLink';
+import { renderWatchRoom, type WatchState } from '../src/pixel/watchRoom';
+import { renderCharacterBack } from '../src/pixel/characterBack';
 
 const r = rng(20261029);
 const int = (n: number) => Math.floor(r() * n);
@@ -345,6 +347,57 @@ const record: { where: Array<[number, string, number, string]>; starts: number[]
     record.links.push([l, parseYouTubeId(l), parseYouTubeStart(l)]);
 }
 
+// the watch room (watching together, from behind the couch) and the characters seen from behind, as hashes of
+// their pixels: every hair style, hat, extra and top, both seats, the TV idle, paused and playing, reactions
+// at different ages, and karaoke's microphones
+const looks = (() => {
+  const base = { rendererVersion: 2, height: 'medium', skin: 'wheat', hairStyle: 'long', hairColor: 'cocoa', facialHair: 'none', top: 'sweater', topColor: 'sage', bottom: 'trousers', bottomColor: 'cream', shoes: 'socks', shoesColor: 'terracotta', glasses: 'none', hat: 'none', extra: 'none' };
+  const v = (o: Record<string, string>) => ({ ...base, ...o });
+  return [
+    v({}),
+    v({ hairStyle: 'tousled', hairColor: 'black', skin: 'caramel', height: 'tall', top: 'cardigan', topColor: 'terracotta', extra: 'hoops' }),
+    v({ hairStyle: 'crop', hairColor: 'chestnut', skin: 'chestnut', top: 'hoodie', topColor: 'denim', hat: 'cap' }),
+    v({ hairStyle: 'curls', hairColor: 'auburn', skin: 'porcelain', top: 'turtleneck', topColor: 'mustard', hat: 'beanie', extra: 'hoops' }),
+    v({ hairStyle: 'bob', hairColor: 'honey', skin: 'peach', height: 'short', top: 'shirt', topColor: 'forest', hat: 'clip' }),
+    v({ hairStyle: 'bun', hairColor: 'ash', skin: 'espresso', top: 'kurta', topColor: 'plum', extra: 'scarf' }),
+    v({ hairStyle: 'braid', hairColor: 'lilac', skin: 'wheat', top: 'tee', topColor: 'rose', extra: 'headphones' }),
+    v({ hairStyle: 'hijab', hairColor: 'forest', skin: 'caramel', top: 'sweater', topColor: 'cream' }),
+    v({ hairStyle: 'buzz', hairColor: 'black', skin: 'chestnut', height: 'tall', top: 'hoodie', topColor: 'charcoal', hat: 'beanie', extra: 'headphones' }),
+    v({ hairStyle: 'bald', hairColor: 'cocoa', skin: 'espresso', top: 'shirt', topColor: 'cocoa', extra: 'scarf' }),
+    v({ hairStyle: 'hijab', hairColor: 'nope', skin: 'peach', height: 'short', top: 'cardigan', topColor: 'mustard', hat: 'beanie' }),
+  ];
+})();
+const watch: { backs: Array<{ look: number; lean: number; bob: number; hash: number; headTop: number }>; scenes: Array<{ left: number; right: number; tv: string; t: number; reactions: Array<[string, string, number]>; singing: [boolean, boolean] | null; hash: number }> } = { backs: [], scenes: [] };
+for (let i = 0; i < looks.length; i++)
+  for (const [lean, bob] of [[0, 0], [1, 0], [-1, 1]]) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const r = renderCharacterBack(looks[i] as any, { lean, bob });
+    watch.backs.push({ look: i, lean, bob, hash: fnv(r.buf.data, 0x811c9dc5), headTop: r.headTop });
+  }
+{
+  const now = 1_790_000_000_000;
+  const pairs: Array<[number, number]> = [[0, 1], [2, 3], [4, 5], [6, 7], [8, 9], [10, -1], [-1, 3], [-1, -1], [1, 0]];
+  let n = 0;
+  for (const [l, r] of pairs)
+    for (const tv of ['idle', 'paused', 'playing'] as const)
+      for (const t of [0.4, 3.17]) {
+        n++;
+        const reactions: Array<[string, string, number]> = n % 3 === 0 ? [] : [['heart', 'left', now - 200], ['laugh', 'right', now - 900], ['star', 'left', now - 1500], ['cry', 'right', now - 2500], ['wow', 'right', now + 50]];
+        const singing: [boolean, boolean] | null = n % 5 === 0 ? [true, n % 2 === 0] : null;
+        const state: WatchState = {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          left: { avatar: l >= 0 ? (looks[l] as any) : null },
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          right: { avatar: r >= 0 ? (looks[r] as any) : null },
+          tv,
+          reactions: reactions.map(([kind, seat, t0]) => ({ kind: kind as 'heart', seat: seat as 'left', t0 })),
+          singing: singing ? { left: singing[0], right: singing[1] } : undefined,
+        };
+        const buf = renderWatchRoom(state, t, now);
+        watch.scenes.push({ left: l, right: r, tv, t, reactions, singing, hash: fnv(buf.data, 0x811c9dc5) });
+      }
+}
+
 const out = process.argv[2] || 'native-fixtures.json';
-writeFileSync(out, JSON.stringify({ cards, days, hashes, rngSeq, streaks, demo, same, chapters, games, live, doodle: { judges, brushes, fills, choices, games: doodles }, coasters: coasterSteps, escape, record }));
+writeFileSync(out, JSON.stringify({ cards, days, hashes, rngSeq, streaks, demo, same, chapters, games, live, doodle: { judges, brushes, fills, choices, games: doodles }, coasters: coasterSteps, escape, record, watch: { looks, ...watch } }));
 console.log(`wrote ${cards.length} card days, ${streaks.length} streaks, ${demo.length} demo rooms, ${games.length} game moves, ${live.length} live games, ${doodles.length} doodle moves to ${out}`);
