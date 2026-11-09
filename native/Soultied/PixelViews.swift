@@ -162,9 +162,14 @@ struct DataImage: View {
 
 /* ---------- the dark room around everything ---------- */
 
+/// what's behind every screen: the room's warm dark, or Starlight's sky
 struct RoomBackground: View {
     var body: some View {
-        LinearGradient(colors: [Color(hex: "#24181a"), Color.room], startPoint: .top, endPoint: .bottom).ignoresSafeArea()
+        if Looks.shared.look == .starlight {
+            StarSky()
+        } else {
+            LinearGradient(colors: [Color(hex: "#24181a"), Color.room], startPoint: .top, endPoint: .bottom).ignoresSafeArea()
+        }
     }
 }
 

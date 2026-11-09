@@ -6,6 +6,7 @@ import SoultiedCore
 /*
  * Soultied's look, the same as the website's pixel kit (src/index.css): paper cards with a hard ink edge
  * and notched corners, terracotta and sage buttons, Pixelify Sans everywhere, the dark room around it all.
+ * (The colours come from the look that's on: Cozy, or Starlight's purple night. See Looks.swift.)
  */
 
 extension Color {
@@ -14,32 +15,47 @@ extension Color {
         self.init(.sRGB, red: Double(c.r) / 255, green: Double(c.g) / 255, blue: Double(c.b) / 255, opacity: 1)
     }
 
-    static let ink = Color(hex: "#2b1e1c")
-    static let inkSoft = Color(hex: "#3a2a26")
-    static let muted = Color(hex: "#7a5a48")
-    static let paper = Color(hex: "#f4e8d0")
-    static let paper2 = Color(hex: "#eadbbd")
-    static let paperShade = Color(hex: "#d6c29c")
-    static let paperHi = Color(hex: "#fff8ea")
-    static let paperInput = Color(hex: "#fbf3e2")
-    static let terracotta = Color(hex: "#b8674f")
-    static let terracottaD = Color(hex: "#8f4b3a")
-    static let sage = Color(hex: "#8a9a72")
-    static let sageD = Color(hex: "#6a7856")
-    static let thread = Color(hex: "#a84f4b")
-    static let butter = Color(hex: "#e2b359")
-    static let cream = Color(hex: "#fff4e2")
+    // (the look that's on: Cozy or Starlight, Looks.swift)
+    static var ink: Color { Palette.now.ink }
+    static var inkSoft: Color { Palette.now.inkSoft }
+    static var muted: Color { Palette.now.muted }
+    static var paper: Color { Palette.now.paper }
+    static var paper2: Color { Palette.now.paper2 }
+    static var paperShade: Color { Palette.now.paperShade }
+    static var paperHi: Color { Palette.now.paperHi }
+    static var paperInput: Color { Palette.now.paperInput }
+    static var terracotta: Color { Palette.now.terracotta }
+    static var terracottaD: Color { Palette.now.terracottaD }
+    static var sage: Color { Palette.now.sage }
+    static var sageD: Color { Palette.now.sageD }
+    static var thread: Color { Palette.now.thread }
+    static var butter: Color { Palette.now.butter }
+    static var cream: Color { Palette.now.cream }
     /// the dark around the room
-    static let room = Color(hex: "#1a1214")
-    static let roomBrown = Color(hex: "#1d1512")
-    static let night = Color(hex: "#2a2033")
+    static var room: Color { Palette.now.room }
+    static var roomBrown: Color { Palette.now.roomBrown }
+    static var night: Color { Palette.now.night }
 }
 
 /* ---------- the pixel font ---------- */
 
 enum PixelFont {
+    /// (making a font at a weight is slow enough to show when a screen's drawn: each one's made once)
+    private static var made: [Int: UIFont] = [:]
+    private static let lock = NSLock()
+
     /// Pixelify Sans at a weight (it's a variable font: 400 to 700), with its odd fi/fl ligatures off
     static func ui(_ size: CGFloat, _ weight: CGFloat = 400) -> UIFont {
+        let key = Int((size * 100).rounded()) * 1000 + Int(weight.rounded())
+        lock.lock()
+        defer { lock.unlock() }
+        if let f = made[key] { return f }
+        let f = make(size, weight)
+        if f.familyName == "Pixelify Sans" { made[key] = f }
+        return f
+    }
+
+    private static func make(_ size: CGFloat, _ weight: CGFloat) -> UIFont {
         var attrs: [UIFontDescriptor.AttributeName: Any] = [.name: "PixelifySans-Regular"]
         attrs[UIFontDescriptor.AttributeName(rawValue: kCTFontVariationAttribute as String)] = [0x7767_6874: weight]
         attrs[.featureSettings] = [[UIFontDescriptor.FeatureKey.type: kLigaturesType, UIFontDescriptor.FeatureKey.selector: kCommonLigaturesOffSelector]]
@@ -49,7 +65,15 @@ enum PixelFont {
 }
 
 extension Font {
-    static func px(_ size: CGFloat, _ weight: CGFloat = 400) -> Font { Font(PixelFont.ui(size, weight) as CTFont) }
+    static func px(_ size: CGFloat, _ weight: CGFloat = 400) -> Font {
+        let key = Int((size * 100).rounded()) * 1000 + Int(weight.rounded())
+        if let f = pxMade[key] { return f }
+        let f = Font(PixelFont.ui(size, weight) as CTFont)
+        pxMade[key] = f
+        return f
+    }
+    /// (fonts are asked for in views' bodies, on the main thread)
+    private static var pxMade: [Int: Font] = [:]
     static let pxTitle = px(28, 700)
     static let pxHeading = px(21, 700)
     static let pxBody = px(17)
@@ -151,7 +175,7 @@ enum PixelTone {
         case .terracotta: return .terracotta
         case .sage: return .sage
         case .paper: return .paper
-        case .ink: return Color(hex: "#3a2a26")
+        case .ink: return .inkSoft
         case .night: return Color(hex: "#4a3a5a")
         }
     }
@@ -160,7 +184,7 @@ enum PixelTone {
         case .terracotta: return .terracottaD
         case .sage: return .sageD
         case .paper: return .paperShade
-        case .ink: return Color(hex: "#241816")
+        case .ink: return Palette.now.inkDeep
         case .night: return Color(hex: "#30263d")
         }
     }
@@ -181,8 +205,8 @@ struct PixelButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         let pressed = configuration.isPressed
-        let bg = enabled ? tone.bg : Color(hex: "#b9a98f")
-        let dark = enabled ? tone.dark : Color(hex: "#9a8a70")
+        let bg = enabled ? tone.bg : Palette.now.disabled
+        let dark = enabled ? tone.dark : Palette.now.disabledD
         return configuration.label
             .font(small ? .px(15, 600) : .px(18, 600))
             .foregroundStyle(enabled ? tone.fg : Color.cream.opacity(0.85))

@@ -199,6 +199,15 @@ jobs:
           shot tour-music -demo -tour 5
           shot tour-watch -demo -tour 6
           shot pet -demo -open pet
+          # turned sideways as a show starts: Netflix stays up (it used to close for the room)
+          shot stream-sideways -demo -tab watch -service netflix -stream netflix -sideways
+          # the Starlight look
+          shot star-welcome -theme starlight
+          shot star-home -demo -tab home -theme starlight
+          shot star-letters -demo -tab letters -theme starlight
+          shot star-watch -demo -tab watch -theme starlight
+          shot star-play -demo -tab play -theme starlight
+          shot star-us -demo -tab us -theme starlight
           ls -la "$RUNNER_TEMP/shots"
           echo "dev=$dev" >> "$GITHUB_OUTPUT"
 

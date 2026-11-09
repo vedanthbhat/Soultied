@@ -424,7 +424,7 @@ struct StreamView: View {
 
     private func open() {
         let h = deck.use(place)
-        h.onOpenHub = { dismiss() }
+        h.onOpenHub = { leave() }
         let s = deck.session(for: site, hub: h)
         session = s
         if let start { s.go(start) } else if s.web.url == nil { s.go(site.home) }
@@ -437,6 +437,22 @@ struct StreamView: View {
         try? a.setActive(true)
         // (never longer than a few seconds behind the curtain, even if the site's slow to say it's done)
         DispatchQueue.main.asyncAfter(deadline: .now() + 6) { liftCurtain() }
+        // (the screenshots: turned sideways, as when a show starts)
+        if Launch.args.contains("-sideways") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                turned = true
+                Orientation.request(.landscapeRight)
+            }
+        }
+    }
+
+    /// back to the app: upright first, if the show turned the phone, so the screen behind doesn't flash sideways
+    private func leave() {
+        if turned {
+            turned = false
+            Orientation.request(.portrait)
+        }
+        dismiss()
     }
 
     private func close() {
@@ -511,12 +527,12 @@ struct StreamView: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 7)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(hex: "#2a1f1a"))
+        .background(Palette.now.bar)
     }
 
     private var bar: some View {
         HStack(spacing: 10) {
-            Button("Done") { dismiss() }
+            Button("Done") { leave() }
                 .buttonStyle(.px(.paper, small: true))
             Button {
                 session?.back()

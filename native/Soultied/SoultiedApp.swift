@@ -55,6 +55,8 @@ enum Launch {
     /// -service netflix   Watch together starts on Netflix (or prime, youtube); -stream netflix also opens its browser
     static var service: String? { value("-service") }
     static var stream: String? { value("-stream") }
+    /// -theme starlight   the app's look (cozy or starlight), for the screenshots
+    static var theme: String? { value("-theme") }
     /// -tour 0   show the first-run tour, at that step (the screenshots; the demo room never shows it otherwise)
     static var tour: Int? { value("-tour").flatMap { Int($0) } }
     /// -record   in the demo room, put the jazz record on; -song <link>, a song from YouTube instead
@@ -80,25 +82,30 @@ struct RootView: View {
     @Environment(\.scenePhase) private var phase
     /// the opening: two hearts tied with a thread, and the name (Intro.swift), once each time the app starts
     @State private var intro = !Launch.args.contains("-noIntro")
+    @State private var looks = Looks.shared
 
     var body: some View {
         ZStack {
-            RoomBackground()
-            switch app.phase {
-            case .starting, .finding:
-                Splash()
-            case .signedOut:
-                WelcomeView(app: app)
-            case .needsPlace:
-                SetupView(app: app)
-            case .ready:
-                if let p = app.place {
-                    MainView(app: app, place: p)
-                        .id(p.sid + p.me)
-                } else {
+            // (a new look draws it all again, in the new colours)
+            ZStack {
+                RoomBackground()
+                switch app.phase {
+                case .starting, .finding:
                     Splash()
+                case .signedOut:
+                    WelcomeView(app: app)
+                case .needsPlace:
+                    SetupView(app: app)
+                case .ready:
+                    if let p = app.place {
+                        MainView(app: app, place: p)
+                            .id(p.sid + p.me)
+                    } else {
+                        Splash()
+                    }
                 }
             }
+            .id(looks.look)
             if intro {
                 Intro { intro = false }
                     .zIndex(10)

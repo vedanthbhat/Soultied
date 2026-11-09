@@ -111,6 +111,7 @@ struct WatchView: View {
         }
         .fullScreenCover(item: $streaming) { o in
             StreamView(place: place, site: o.site, start: o.url)
+                .coversTabs()
         }
         .task {
             // keep the two TVs in step
@@ -224,7 +225,7 @@ struct WatchView: View {
                     }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
-                    .background(mine ? Color(hex: "#f1e0c4") : Color.paper2)
+                    .background(mine ? Palette.now.bubbleMine : Color.paper2)
                     if !mine { Spacer(minLength: 40) }
                 }
             }

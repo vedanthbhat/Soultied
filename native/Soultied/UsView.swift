@@ -3,7 +3,7 @@ import UIKit
 import SoultiedCore
 
 /*
- * Us: the two of you, your place, the invite, your look, what's happened lately, and your account.
+ * Us: the two of you, your place, the invite, your look, the app's look, what's happened lately, and your account.
  */
 
 struct UsView: View {
@@ -24,6 +24,7 @@ struct UsView: View {
                 couple
                 if !place.partnerHere { InviteCard(place: place) }
                 you
+                LookPicker()
                 history
                 account
             }

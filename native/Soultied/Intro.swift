@@ -24,7 +24,7 @@ struct Intro: View {
 
     var body: some View {
         ZStack {
-            Color.room.ignoresSafeArea()
+            RoomBackground()
             IntroStars(on: step >= 1 && !reduceMotion)
             VStack(spacing: 26) {
                 tie
