@@ -320,13 +320,19 @@ func staticLayer(_ d: Decor) -> Layer {
     return L
 }
 
+/// One room drawn at a time (the app draws off the main thread, and the drawing keeps a few caches).
+let roomLock = NSLock()
+
 /// Draws the room. Keep one per screen: it reuses its frame.
 public final class RoomRenderer {
     let frame = Layer(ROOM_W, ROOM_H)
     public init() {}
 
-    /// One frame of the room for time `t` (seconds), as RGBA.
+    /// One frame of the room for time `t` (seconds), as RGBA. (Safe from any thread; the frame it returns is
+    /// reused by the next call, so copy it out before drawing again.)
     public func render(_ state: RoomState, _ t: Double) -> PixelBuffer {
+        roomLock.lock()
+        defer { roomLock.unlock() }
         renderRoom(frame, state, t)
         return frame
     }
@@ -416,7 +422,9 @@ public func renderDecorThumb(_ decor: Decor, _ slot: String, _ left: Seat, _ rig
     st.decor = decor
     st.bare = true
     let room = Layer(ROOM_W, ROOM_H)
+    roomLock.lock()
     renderRoom(room, st, 1.3)
+    roomLock.unlock()
     let (x0, y0, w, h) = DECOR_CROPS[slot] ?? (0, 0, ROOM_W, ROOM_H)
     let out = PixelBuffer(w, h)
     for j in 0..<h {

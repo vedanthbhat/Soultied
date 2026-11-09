@@ -65,6 +65,22 @@ final class RecordDeck {
         ]
     }
 
+    /// how many screens are following it (a new look draws the app again, and the new screen can arrive
+    /// before the old one goes: the record keeps playing till the last one's gone)
+    private var following = 0
+
+    /// a screen starts following this place's record player
+    func attach(_ p: PlaceModel) {
+        following += 1
+        bind(p)
+    }
+
+    /// and stops; the last one to go lifts the needle here
+    func detach() {
+        following = max(0, following - 1)
+        if following == 0 { unbind() }
+    }
+
     /// follow this place's record player
     func bind(_ p: PlaceModel) {
         if place !== p {

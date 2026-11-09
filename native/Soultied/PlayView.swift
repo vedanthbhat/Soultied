@@ -28,8 +28,8 @@ struct PlayView: View {
         }
         .scrollIndicators(.hidden)
         .background(RoomBackground())
-        .fullScreenCover(isPresented: $escaping) { EscapeScreen(place: place) }
-        .fullScreenCover(item: $open) { k in GameScreen(place: place, kind: k) }
+        .fullScreenCover(isPresented: $escaping) { EscapeScreen(place: place).coversTabs() }
+        .fullScreenCover(item: $open) { k in GameScreen(place: place, kind: k).coversTabs() }
     }
 }
 

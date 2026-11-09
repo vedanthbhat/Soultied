@@ -15,6 +15,8 @@ struct WelcomeView: View {
     @State private var door = emptyRoomPlace()
     /// the screen settles in a piece at a time (the room, the name, the card, the buttons)
     @State private var shown = 0
+    /// the entrance is over: the fire can start flickering (it holds still while things slide in)
+    @State private var settled = false
     @Environment(\.openURL) private var openURL
     @Environment(\.displayScale) private var displayScale
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -24,7 +26,7 @@ struct WelcomeView: View {
             ScrollView {
                 VStack(spacing: 18) {
                     // the room, like a game's title screen: the name sits on it, over a soft fade into the night
-                    RoomScene(place: door, couchOnly: true, crop: .welcome)
+                    RoomScene(place: door, couchOnly: true, crop: .welcome, paused: !settled)
                         .frame(height: RoomCrop.welcome.viewHeight(width: geo.size.width, displayScale: displayScale))
                         .allowsHitTesting(false)
                         .overlay(alignment: .bottom) {
@@ -87,8 +89,10 @@ struct WelcomeView: View {
                     }
                     .pxCard()
                     .padding(.horizontal, 16)
+                    // (faded as one piece, not each layer of the card on its own)
+                    .compositingGroup()
                     .opacity(shown >= 3 ? 1 : 0)
-                    .offset(y: shown >= 3 || reduceMotion ? 0 : 28)
+                    .offset(y: shown >= 3 || reduceMotion ? 0 : 22)
                 }
                 .padding(.bottom, 30)
             }
@@ -99,9 +103,11 @@ struct WelcomeView: View {
             let wait = max(0, Intro.until.timeIntervalSinceNow)
             if wait > 0 { try? await Task.sleep(nanoseconds: UInt64(wait * 1_000_000_000)) }
             for i in 1...3 {
-                try? await Task.sleep(nanoseconds: i == 1 ? 120_000_000 : 220_000_000)
-                withAnimation(reduceMotion ? .easeOut(duration: 0.3) : .spring(response: 0.5, dampingFraction: 0.82)) { shown = i }
+                try? await Task.sleep(nanoseconds: i == 1 ? 120_000_000 : 200_000_000)
+                withAnimation(reduceMotion ? .easeOut(duration: 0.3) : .timingCurve(0.22, 1, 0.36, 1, duration: 0.6)) { shown = i }
             }
+            try? await Task.sleep(nanoseconds: 650_000_000)
+            settled = true
         }
     }
 
@@ -119,6 +125,7 @@ struct WelcomeView: View {
         }
         .padding(.horizontal, 20)
         .padding(.bottom, 10)
+        .compositingGroup()
         .opacity(shown >= 2 ? 1 : 0)
         .offset(y: shown >= 2 || reduceMotion ? 0 : 12)
     }

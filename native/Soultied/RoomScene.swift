@@ -52,7 +52,7 @@ struct RoomScene: View {
     var onTap: (HotspotId) -> Void = { _ in }
 
     @Environment(\.displayScale) private var displayScale
-    @State private var renderer = RoomRenderer()
+    @State private var painter = RoomPainter()
     @State private var start = Date()
     @State private var fireAt = -100.0
     @State private var scoot: (from: Double, to: Double, at: Double)?
@@ -114,19 +114,11 @@ struct RoomScene: View {
             let L = layout(geo.size)
             TimelineView(.animation(minimumInterval: 1.0 / 12, paused: paused)) { ctx in
                 let t = ctx.date.timeIntervalSince(start)
-                let img = Pixels.image(renderer.render(state(t), t))
-                ZStack(alignment: .topLeading) {
-                    Color.roomBrown
-                    if let img {
-                        Image(decorative: img, scale: 1)
-                            .resizable()
-                            .interpolation(.none)
-                            .frame(width: CGFloat(ROOM_W) * L.u, height: CGFloat(ROOM_H) * L.u)
-                            .offset(x: L.x, y: L.y)
-                    }
-                }
-                .frame(width: geo.size.width, height: couchOnly ? L.h : geo.size.height, alignment: .topLeading)
-                .clipped()
+                // (asks for the frame; it's drawn off the main thread and shows when it's ready)
+                let _ = painter.request(state(t), t)
+                RoomFrame(painter: painter, w: CGFloat(ROOM_W) * L.u, h: CGFloat(ROOM_H) * L.u, x: L.x, y: L.y)
+                    .frame(width: geo.size.width, height: couchOnly ? L.h : geo.size.height, alignment: .topLeading)
+                    .clipped()
             }
             .contentShape(Rectangle())
             .gesture(
@@ -189,6 +181,76 @@ struct RoomScene: View {
         let d = touchDef(p.kind)
         touch = RoomTouch(kind: p.kind.rawValue, together: d.together, from: p.by == place.hostId ? .left : .right, at: now(), glyph: d.glyph)
         if p.by != place.me { Haptics.touch(p.kind) }
+    }
+}
+
+/// The room's frames, drawn off the main thread so nothing moving on screen (a card sliding in, a scroll, a
+/// tab changing) waits on them. The first frame is drawn straight away, so the room never shows up empty; after
+/// that each one goes to the drawing queue and shows when it comes back. If a frame's asked for while one's
+/// still drawing, the newest waits its turn and the rest are skipped.
+@Observable
+final class RoomPainter {
+    /// the newest frame back from the queue
+    private(set) var image: CGImage?
+    /// the newest frame, however it was drawn (the first one never goes through `image`, so asking for it
+    /// mid-update doesn't change what's being watched)
+    @ObservationIgnored private(set) var current: CGImage?
+    @ObservationIgnored private var renderer: RoomRenderer?
+    @ObservationIgnored private var busy = false
+    @ObservationIgnored private var waiting: (RoomState, Double)?
+
+    private static let queue = DispatchQueue(label: "app.soultied.room", qos: .userInitiated)
+
+    func request(_ state: RoomState, _ t: Double) {
+        guard let r = renderer else {
+            let r = RoomRenderer()
+            renderer = r
+            current = Pixels.image(r.render(state, t))
+            return
+        }
+        if busy {
+            waiting = (state, t)
+            return
+        }
+        draw(r, state, t)
+    }
+
+    private func draw(_ r: RoomRenderer, _ state: RoomState, _ t: Double) {
+        busy = true
+        Self.queue.async {
+            let img = Pixels.image(r.render(state, t))
+            DispatchQueue.main.async {
+                self.current = img
+                self.image = img
+                self.busy = false
+                if let w = self.waiting {
+                    self.waiting = nil
+                    self.draw(r, w.0, w.1)
+                }
+            }
+        }
+    }
+}
+
+/// the room's picture, scaled up in whole pixels (on its own, so only it redraws when a frame comes back)
+private struct RoomFrame: View {
+    let painter: RoomPainter
+    let w: CGFloat
+    let h: CGFloat
+    let x: CGFloat
+    let y: CGFloat
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            Color.roomBrown
+            if let img = painter.image ?? painter.current {
+                Image(decorative: img, scale: 1)
+                    .resizable()
+                    .interpolation(.none)
+                    .frame(width: w, height: h)
+                    .offset(x: x, y: y)
+            }
+        }
     }
 }
 

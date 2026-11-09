@@ -34,38 +34,52 @@ enum RoomSheet: String, Identifiable {
 struct MainView: View {
     let app: AppModel
     let place: PlaceModel
-    @State private var tab: AppTab = AppTab(rawValue: Launch.tab ?? "") ?? .home
+    @State private var tab: AppTab = MainView.takeResume() ?? AppTab(rawValue: Launch.tab ?? "") ?? .home
+    /// the tab to come back to when the app's drawn again (after picking a new look in Us)
+    static var resume: AppTab?
+    private static func takeResume() -> AppTab? {
+        defer { resume = nil }
+        return resume
+    }
     @State private var sheet: RoomSheet? = Launch.sheet.flatMap { RoomSheet(rawValue: $0) }
     @State private var lettersStart: LettersTab = .today
     @State private var game: GameKind? = Launch.game.flatMap { GameKind(rawValue: $0) }
     @State private var escape = Launch.escape
     @State private var tour = Tour.shared
+    @State private var covers = Covers.shared
     @Environment(\.verticalSizeClass) private var vertical
 
     private var sideways: Bool { vertical == .compact }
+    /// the phone's sideways with nothing full-screen up: the whole room. (A show playing sideways, or a game,
+    /// keeps the screen; the room only takes over once it's closed.)
+    private var roomSideways: Bool { sideways && covers.up == 0 && game == nil && !escape }
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            if sideways {
+            // the tabs stay put while the room shows sideways, so whatever they have open stays open when the
+            // phone turns (Netflix going sideways used to close it)
+            VStack(spacing: 0) {
+                ZStack {
+                    HomeView(place: place, paused: tab != .home || sheet != nil || game != nil || roomSideways, listening: tab == .home && game == nil && !escape && !roomSideways, go: go, onRoom: { open($0, sheet: false) }, openGame: { game = $0 })
+                        .opacity(tab == .home ? 1 : 0)
+                        .allowsHitTesting(tab == .home)
+                    if tab == .letters { LettersView(place: place, start: lettersStart) }
+                    if tab == .watch { WatchView(place: place) }
+                    if tab == .play { PlayView(place: place) }
+                    if tab == .us { UsView(app: app, place: place) }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                TabBar(tab: $tab, place: place)
+            }
+            .opacity(roomSideways ? 0 : 1)
+            .allowsHitTesting(!roomSideways)
+            .accessibilityHidden(roomSideways)
+            if roomSideways {
                 RoomScene(place: place, couchOnly: false) { open($0, sheet: true) }
                     .ignoresSafeArea()
-            } else {
-                VStack(spacing: 0) {
-                    ZStack {
-                        HomeView(place: place, paused: tab != .home || sheet != nil || game != nil, listening: tab == .home && game == nil && !escape, go: go, onRoom: { open($0, sheet: false) }, openGame: { game = $0 })
-                            .opacity(tab == .home ? 1 : 0)
-                            .allowsHitTesting(tab == .home)
-                        if tab == .letters { LettersView(place: place, start: lettersStart) }
-                        if tab == .watch { WatchView(place: place) }
-                        if tab == .play { PlayView(place: place) }
-                        if tab == .us { UsView(app: app, place: place) }
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    TabBar(tab: $tab, place: place)
-                }
             }
-            Toasts(place: place, onHome: sideways || (tab == .home && sheet == nil), onLetter: { go(.letters) })
-                .padding(.bottom, sideways ? 12 : 84)
+            Toasts(place: place, onHome: roomSideways || (tab == .home && sheet == nil), onLetter: { go(.letters) })
+                .padding(.bottom, roomSideways ? 12 : 84)
         }
         .fullScreenCover(isPresented: $escape) { EscapeScreen(place: place) }
         .sheet(item: $sheet) { s in
@@ -76,12 +90,12 @@ struct MainView: View {
         .fullScreenCover(item: $game) { k in GameScreen(place: place, kind: k) }
         // the record player: its sound follows the place's record, whichever tab you're on
         .onAppear {
-            RecordDeck.shared.bind(place)
+            RecordDeck.shared.attach(place)
             if Launch.demo && Launch.record { place.playRecord() }
             if Launch.demo, let s = Launch.song { _ = place.playSong(s) }
         }
         .onChange(of: place.turntable) { _, _ in RecordDeck.shared.sync() }
-        .onDisappear { RecordDeck.shared.unbind() }
+        .onDisappear { RecordDeck.shared.detach() }
         // the first-run tour: what to tap to go where (Tour.swift)
         .overlayPreferenceValue(TourSpots.self) { spots in
             Group {
@@ -153,10 +167,28 @@ struct MainView: View {
         case .decor: DecorView(place: place)
         case .play: PlayView(place: place)
         case .us: UsView(app: app, place: place)
-        case .music: RecordSheet(place: place, hostsSong: sideways).presentationDetents([.medium, .large])
+        case .music: RecordSheet(place: place, hostsSong: roomSideways).presentationDetents([.medium, .large])
         case .watch: WatchView(place: place)
         case .pet: DecorView(place: place, start: .pet)
         }
+    }
+}
+
+/// how many full-screen things the tabs have up (a show, a game, the escape rooms): while one is, turning the
+/// phone sideways leaves it be, rather than swapping the tabs for the whole room
+@Observable
+final class Covers {
+    static let shared = Covers()
+    private(set) var up = 0
+    func add() { up += 1 }
+    func remove() { up = max(0, up - 1) }
+}
+
+extension View {
+    /// on what a tab puts up full-screen
+    func coversTabs() -> some View {
+        onAppear { Covers.shared.add() }
+            .onDisappear { Covers.shared.remove() }
     }
 }
 
