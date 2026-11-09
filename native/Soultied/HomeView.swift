@@ -77,7 +77,9 @@ struct HomeView: View {
             Button {
                 onRoom(.decor)
             } label: {
+                // the jar of stitches you've earned: spend them on the room
                 HStack(spacing: 6) {
+                    GlyphView(glyph: Icons.brush, scale: 2)
                     GlyphView(glyph: Icons.stitch, scale: 3)
                     Text("\(place.stitches)").font(.px(16, 700)).foregroundStyle(Color.inkSoft)
                 }

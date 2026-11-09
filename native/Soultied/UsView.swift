@@ -14,6 +14,7 @@ struct UsView: View {
     @State private var confirmDelete = false
     @State private var deleteFailed = false
     @State private var soundsOff = Chiptune.shared.muted
+    @State private var decorating = false
     @Environment(\.openURL) private var openURL
 
     var body: some View {
@@ -32,6 +33,7 @@ struct UsView: View {
         .background(RoomBackground())
         .sheet(isPresented: $editingLook) { LookSheet(place: place).presentationBackground(Color.paper) }
         .sheet(isPresented: $editingPlace) { PlaceSheet(place: place).presentationDetents([.medium]).presentationBackground(Color.paper) }
+        .sheet(isPresented: $decorating) { DecorView(place: place).presentationDragIndicator(.visible).presentationBackground(Color.paper) }
         .confirmationDialog("Delete your Soultied account?", isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("Delete my account", role: .destructive) {
                 Task { deleteFailed = !(await app.deleteAccount()) }
@@ -58,7 +60,10 @@ struct UsView: View {
             if let s = place.space {
                 Text("In your little place since \(Day.pretty(s.startKey)) \(s.startKey.prefix(4)) · \(place.streak.together) letters opened together").font(.pxSmall).foregroundStyle(Color.muted)
             }
-            Button("Edit our place") { editingPlace = true }.buttonStyle(.px(.paper, small: true))
+            HStack(spacing: 8) {
+                Button("Edit our place") { editingPlace = true }.buttonStyle(.px(.paper, small: true))
+                Button("Decorate the room") { decorating = true }.buttonStyle(.px(.terracotta, small: true))
+            }
         }
         .pxCard()
     }

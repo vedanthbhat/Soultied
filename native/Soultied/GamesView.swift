@@ -952,63 +952,7 @@ struct BoatsGameView: View {
     }
 }
 
-/* ---------- the games shelf (on the Play tab) ---------- */
-
-struct GamesShelf: View {
-    let place: PlaceModel
-    var open: (GameKind) -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 12) {
-                GlyphView(glyph: Icons.play, scale: 4)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Take turns").font(.pxHeading).foregroundStyle(Color.inkSoft)
-                    Text("Make your move whenever you like; \(place.theirName) takes theirs when they’re next here, on the iPhone or soultied.app.").font(.pxSmall).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            ForEach(TURN_GAMES) { k in row(k) }
-        }
-        .pxCard()
-
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 12) {
-                GlyphView(glyph: Icons.flame, scale: 4)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Play live").font(.pxHeading).foregroundStyle(Color.inkSoft)
-                    Text("For when you’re both here at once: invite \(place.theirName), and play the moment they join, phone or laptop.").font(.pxSmall).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            ForEach(LIVE_GAMES) { k in row(k) }
-        }
-        .pxCard()
-    }
-
-    private func row(_ k: GameKind) -> some View {
-        let line = Play.shelfLine(place.games[k], kind: k, me: place.mySeat, name: place.seatName, now: place.now.timeIntervalSince1970 * 1000)
-        let ready = place.partnerHere || place.isDemo
-        return Button {
-            Haptics.tap()
-            open(k)
-        } label: {
-            HStack(spacing: 12) {
-                GlyphView(glyph: GameArt.icon(k), scale: 3.5).frame(width: 36)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(k.info.name).font(.pxBodyBold).foregroundStyle(Color.inkSoft)
-                    Text(ready ? line.text : "Once \(place.theirName) has joined").font(.pxSmall).foregroundStyle(line.hot ? Color.terracottaD : Color.muted)
-                }
-                Spacer(minLength: 0)
-                if line.hot { Rectangle().fill(Color.thread).frame(width: 10, height: 10) }
-                Text("→").font(.px(18, 700)).foregroundStyle(Color.muted)
-            }
-            .padding(10)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .pxInset()
-        }
-        .buttonStyle(.press)
-        .disabled(!ready)
-    }
-}
+/* ---------- on Home ---------- */
 
 /// on Home: a game that's waiting on you
 struct GameCard: View {
