@@ -201,9 +201,9 @@ struct GameTile: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 7) {
+            VStack(spacing: 5) {
                 Spacer(minLength: 0)
-                GlyphView(glyph: glyph, scale: 4).frame(height: 38)
+                GlyphView(glyph: glyph, scale: 3.5).frame(height: 32)
                 Text(title)
                     .font(.px(12, 700))
                     .foregroundStyle(Color.cream)
@@ -215,7 +215,8 @@ struct GameTile: View {
                 Spacer(minLength: 0)
             }
             .frame(maxWidth: .infinity)
-            .aspectRatio(1.14, contentMode: .fit)
+            // (a little wider than tall, so every game fits on one screen)
+            .aspectRatio(1.38, contentMode: .fit)
             .background(
                 ZStack {
                     NotchedFrame(notch: PX).fill(tag != nil ? Color.butter : Color.ink).padding(-PX)
