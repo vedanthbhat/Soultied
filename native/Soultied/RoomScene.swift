@@ -22,6 +22,8 @@ struct RoomCrop {
     static let couch = RoomCrop(focusX: CGFloat(ROOM_FOCUS_X), top: 34, height: 130, minWidth: 160)
     /// Home: close in on the two of you, from the pictures over the couch down to the letter on the table
     static let home = RoomCrop(focusX: 236, top: 14, height: 162, minWidth: 108)
+    /// the welcome: the couch, with the rug in front of it for the name to sit on
+    static let welcome = RoomCrop(focusX: CGFloat(ROOM_FOCUS_X), top: 30, height: 150, minWidth: 160)
 
     /// screen pixels per room pixel, for this much space (as big as fits across, and down if there's a limit)
     func scale(width: CGFloat, height: CGFloat? = nil, displayScale: CGFloat) -> CGFloat {

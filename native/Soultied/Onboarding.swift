@@ -24,12 +24,12 @@ struct WelcomeView: View {
             ScrollView {
                 VStack(spacing: 18) {
                     // the room, like a game's title screen: the name sits on it, over a soft fade into the night
-                    RoomScene(place: door, couchOnly: true)
-                        .frame(height: couchHeight(width: geo.size.width, scale: displayScale))
+                    RoomScene(place: door, couchOnly: true, crop: .welcome)
+                        .frame(height: RoomCrop.welcome.viewHeight(width: geo.size.width, displayScale: displayScale))
                         .allowsHitTesting(false)
                         .overlay(alignment: .bottom) {
-                            LinearGradient(colors: [.clear, Color.room.opacity(0.92)], startPoint: .top, endPoint: .bottom)
-                                .frame(height: 120)
+                            LinearGradient(colors: [.clear, Color.room.opacity(0.88)], startPoint: .top, endPoint: .bottom)
+                                .frame(height: 96)
                         }
                         .overlay(alignment: .bottomLeading) { title }
                         .opacity(shown >= 1 ? 1 : 0)
