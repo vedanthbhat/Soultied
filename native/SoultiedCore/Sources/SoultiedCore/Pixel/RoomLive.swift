@@ -543,8 +543,8 @@ func drawTurntable(_ L: Layer, _ t: Double, _ playing: Bool, _ hover: Bool) {
     }
 }
 
-/** the cushion by the hearth, and whoever's asleep on it */
-struct PetBox { static let x = 118.0, y = 131.0 }
+/** the pet's cushion, on the rug in front of the couch's left arm, between the games and the coffee table */
+struct PetBox { static let x = 186.0, y = 153.0 }
 
 let PET_SPRITES: [String: (rows: [String], pal: [Character: RGB], dx: Double, dy: Double)] = [
     "pug": ([

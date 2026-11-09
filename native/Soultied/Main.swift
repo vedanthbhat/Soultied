@@ -27,7 +27,7 @@ enum AppTab: String, CaseIterable, Identifiable {
 
 /// what the room can open as a sheet (sideways, or from a tap on the couch)
 enum RoomSheet: String, Identifiable {
-    case me, them, letters, wall, decor, play, us, music, watch
+    case me, them, letters, wall, decor, play, us, music, watch, pet
     var id: String { rawValue }
 }
 
@@ -108,6 +108,7 @@ struct MainView: View {
             if asSheet { sheet = s } else { go(t) }
         }
         Chiptune.shared.room(id)
+        Haptics.tap()
         switch id {
         case .left, .right:
             let who: String? = id == .left ? place.hostId : place.guestId
@@ -123,6 +124,10 @@ struct MainView: View {
             Haptics.tap()
             sheet = .wall
         case .decor: sheet = .decor
+        // the pet on its cushion: choose who sleeps there
+        case .pet:
+            Haptics.soft()
+            sheet = .pet
         case .photo: show(.us, .us)
         case .games: show(.play, .play)
         // the TV remote on the coffee table: watch together
@@ -150,6 +155,7 @@ struct MainView: View {
         case .us: UsView(app: app, place: place)
         case .music: RecordSheet(place: place, hostsSong: sideways).presentationDetents([.medium, .large])
         case .watch: WatchView(place: place)
+        case .pet: DecorView(place: place, start: .pet)
         }
     }
 }
@@ -173,7 +179,10 @@ struct TabBar: View {
         HStack(spacing: 0) {
             ForEach(AppTab.allCases) { t in
                 Button {
-                    if tab != t { Haptics.tap() }
+                    if tab != t {
+                        Haptics.select()
+                        Chiptune.shared.tab(AppTab.allCases.firstIndex(of: t) ?? 0)
+                    }
                     tab = t
                 } label: {
                     VStack(spacing: 4) {

@@ -153,7 +153,7 @@ struct RoomScene: View {
     @ViewBuilder
     private func spots(_ L: (u: CGFloat, x: CGFloat, y: CGFloat, h: CGFloat)) -> some View {
         let c = closeness(now()).0
-        ForEach([HotspotId.left, .right, .board, .letter, .music], id: \.self) { id in
+        ForEach([HotspotId.left, .right, .board, .pet, .letter, .music], id: \.self) { id in
             let h = hotspotRect(id, c)
             // (marked before it's positioned: a positioned view fills its whole parent, and the mark would too)
             Color.clear

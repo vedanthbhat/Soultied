@@ -23,7 +23,7 @@ struct PlayView: View {
                         GlyphView(glyph: Icons.brush, scale: 4)
                         VStack(alignment: .leading, spacing: 6) {
                             Text("Decorate the room").font(.pxHeading).foregroundStyle(Color.inkSoft)
-                            Text("Wallpaper, a new couch, a pet by the fire, the view from the window. You share the jar of stitches: you earn them by showing up.")
+                            Text("Wallpaper, a new couch, a pet by the couch, the view from the window. You share the jar of stitches: you earn them by showing up.")
                                 .font(.pxBody).foregroundStyle(Color.muted).multilineTextAlignment(.leading).fixedSize(horizontal: false, vertical: true)
                             HStack(spacing: 6) {
                                 GlyphView(glyph: Icons.stitch, scale: 3)
@@ -34,7 +34,7 @@ struct PlayView: View {
                     }
                     .pxCard()
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.press)
 
                 GamesShelf(place: place) { open = $0 }
 
@@ -54,7 +54,7 @@ struct PlayView: View {
                     }
                     .pxCard()
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.press)
             }
             .fullScreenCover(isPresented: $escaping) { EscapeScreen(place: place) }
             .padding(16)
@@ -72,10 +72,16 @@ struct PlayView: View {
 
 struct DecorView: View {
     let place: PlaceModel
-    @State private var slot: SlotId = .couch
+    @State private var slot: SlotId
     @State private var trying: DecorItem?
     @State private var short = false
     @Environment(\.displayScale) private var displayScale
+
+    /// `start`: the spot it opens on (tapping the pet opens on the pets)
+    init(place: PlaceModel, start: SlotId = .couch) {
+        self.place = place
+        _slot = State(initialValue: start)
+    }
 
     private var shown: Decor {
         var d = place.decor
@@ -184,6 +190,6 @@ struct DecorView: View {
             .background(trying?.id == item.id && trying?.slot == item.slot ? Color(hex: "#fff1dc") : Color.paperHi)
             .overlay { Rectangle().strokeBorder(placed ? Color.sage : trying == item ? Color.terracotta : Color.paperShade, lineWidth: 3) }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.press)
     }
 }

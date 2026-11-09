@@ -43,7 +43,7 @@ public struct Seat: Sendable {
 }
 
 public enum HotspotId: String, CaseIterable, Sendable {
-    case left, right, letter, fire, photo, remote, door, games, music, decor, board
+    case left, right, letter, fire, photo, remote, door, games, music, decor, board, pet
 }
 
 public struct Hotspot: Sendable {
@@ -168,6 +168,8 @@ let HOTSPOTS: [Hotspot] = [
     Hotspot(id: .decor, x: 109, y: 14, w: 38, h: 28),
     // the three pictures over the couch: our wall (notes, doodles, photos, memories)
     Hotspot(id: .board, x: 190, y: 24, w: 84, h: 32),
+    // the pet asleep on its cushion: choose who sleeps there
+    Hotspot(id: .pet, x: PetBox.x - 4, y: PetBox.y - 5, w: 28, h: 15),
 ]
 
 /// Focal point to keep in view when the screen is narrower than 16:9.
@@ -403,7 +405,7 @@ public let DECOR_CROPS: [String: (Int, Int, Int, Int)] = [
     "wall": (190, 6, 96, 64),
     "couch": (180, 108, 102, 68),
     "rug": (88, 124, 84, 56),
-    "pet": (102, 114, 54, 36),
+    "pet": (170, 132, 54, 36),
     "view": (12, 14, 66, 70),
     "painting": (104, 10, 48, 32),
     "plant": (0, 94, 48, 72),

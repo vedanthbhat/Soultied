@@ -104,8 +104,8 @@ public enum Catalogue {
         i(.rug, "checker", "Checkerboard", 80, "Cream and sage squares."),
         i(.rug, "braided", "Braided oval", 120, "A round rug of braided rings."),
 
-        i(.pet, "ginger", "Ginger cat", 0, "Asleep by the fire, as always."),
-        i(.pet, "none", "No pet", 0, "Just the cushion by the hearth."),
+        i(.pet, "ginger", "Ginger cat", 0, "Asleep by the couch, as always."),
+        i(.pet, "none", "No pet", 0, "Just the cushion by the couch."),
         i(.pet, "tuxedo", "Tuxedo cat", 150, "Black and white, very dignified, very asleep."),
         i(.pet, "bunny", "White bunny", 180, "A fluffy loaf with its ears tucked back."),
         i(.pet, "pug", "Sleepy pug", 200, "Snores a little. Worth it."),
@@ -146,7 +146,7 @@ public enum Catalogue {
         case .wall: return ("New wallpaper", "\(who) put up new wallpaper: \(item.name).")
         case .couch: return ("A new couch", "\(who) got a new couch: \(item.name).")
         case .rug: return ("A new rug", "\(who) put down a new rug: \(item.name).")
-        case .pet: return ("Someone new by the fire", "\(who) brought home a \(item.name.lowercased()).")
+        case .pet: return ("Someone new by the couch", "\(who) brought home a \(item.name.lowercased()).")
         case .view: return ("A new view", "\(who) changed the view from the window: \(item.name).")
         case .painting: return ("A new painting", "\(who) hung a new painting over the fire: \(item.name).")
         case .plant: return ("A new plant", "\(who) brought home a new plant: \(item.name).")
