@@ -13,24 +13,31 @@ private func emptyRoomPlace() -> PlaceModel {
 struct WelcomeView: View {
     let app: AppModel
     @State private var door = emptyRoomPlace()
+    /// the screen settles in a piece at a time (the room, the name, the card, the buttons)
+    @State private var shown = 0
     @Environment(\.openURL) private var openURL
     @Environment(\.displayScale) private var displayScale
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         GeometryReader { geo in
             ScrollView {
-                VStack(spacing: 22) {
+                VStack(spacing: 18) {
+                    // the room, like a game's title screen: the name sits on it, over a soft fade into the night
                     RoomScene(place: door, couchOnly: true)
                         .frame(height: couchHeight(width: geo.size.width, scale: displayScale))
                         .allowsHitTesting(false)
+                        .overlay(alignment: .bottom) {
+                            LinearGradient(colors: [.clear, Color.room.opacity(0.92)], startPoint: .top, endPoint: .bottom)
+                                .frame(height: 120)
+                        }
+                        .overlay(alignment: .bottomLeading) { title }
+                        .opacity(shown >= 1 ? 1 : 0)
 
                     VStack(alignment: .leading, spacing: 14) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("OUR PLACE · FOR TWO").font(.px(12, 600)).kerning(1.6).foregroundStyle(Color.terracottaD)
-                            Text("Soultied").font(.px(40, 700)).foregroundStyle(Color.inkSoft)
-                        }
-                        Text("A shared home for long-distance couples.").font(.px(19, 600)).foregroundStyle(Color.inkSoft)
-                        Text("A daily letter to open together, touches that buzz in their pocket, a wall of notes and photos, and a couch you scoot closer on every day you both show up.")
+                        Text("A shared home for long-distance couples.").font(.px(20, 700)).foregroundStyle(Color.inkSoft)
+                        features
+                        Text("A letter to open together every day, touches that buzz in their pocket, your wall of notes and photos, shows in sync, and a couch you scoot closer on every day you both show up.")
                             .font(.pxBody).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
 
                         if app.pendingJoin != nil {
@@ -80,11 +87,60 @@ struct WelcomeView: View {
                     }
                     .pxCard()
                     .padding(.horizontal, 16)
+                    .opacity(shown >= 3 ? 1 : 0)
+                    .offset(y: shown >= 3 || reduceMotion ? 0 : 28)
                 }
                 .padding(.bottom, 30)
             }
             .scrollBounceBehavior(.basedOnSize)
         }
+        .task {
+            // (after the opening, a beat at a time)
+            let wait = max(0, Intro.until.timeIntervalSinceNow)
+            if wait > 0 { try? await Task.sleep(nanoseconds: UInt64(wait * 1_000_000_000)) }
+            for i in 1...3 {
+                try? await Task.sleep(nanoseconds: i == 1 ? 120_000_000 : 220_000_000)
+                withAnimation(reduceMotion ? .easeOut(duration: 0.3) : .spring(response: 0.5, dampingFraction: 0.82)) { shown = i }
+            }
+        }
+    }
+
+    /// "Soultied", on the room
+    private var title: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 10) {
+                GlyphView(glyph: Icons.heart, scale: 4)
+                Text("OUR PLACE · FOR TWO").font(.px(12, 700)).kerning(1.8).foregroundStyle(Color.butter)
+            }
+            Text("Soultied")
+                .font(.px(48, 700))
+                .foregroundStyle(Color.paper)
+                .shadow(color: Color.thread.opacity(0.7), radius: 0, x: 0, y: 3)
+        }
+        .padding(.horizontal, 20)
+        .padding(.bottom, 10)
+        .opacity(shown >= 2 ? 1 : 0)
+        .offset(y: shown >= 2 || reduceMotion ? 0 : 12)
+    }
+
+    /// what's inside, at a glance
+    private var features: some View {
+        HStack(spacing: 8) {
+            feature(Icons.envelope, "Daily letters")
+            feature(Icons.tv, "Watch together")
+            feature(Icons.play, "Games for two")
+            feature(Icons.couch, "One couch")
+        }
+    }
+
+    private func feature(_ g: Glyph, _ label: String) -> some View {
+        VStack(spacing: 6) {
+            GlyphView(glyph: g, scale: 3).frame(height: 30)
+            Text(label).font(.px(11, 700)).foregroundStyle(Color.inkSoft).multilineTextAlignment(.center).lineLimit(2).minimumScaleFactor(0.8)
+        }
+        .frame(maxWidth: .infinity, minHeight: 74)
+        .padding(.horizontal, 2)
+        .pxInset()
     }
 }
 

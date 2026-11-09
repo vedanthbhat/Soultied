@@ -164,6 +164,7 @@ jobs:
             xcrun simctl io "$dev" screenshot "$RUNNER_TEMP/shots/$name.png"
           }
           shot welcome
+          shot intro -introHold
           shot home -demo -tab home
           shot letters -demo -tab letters
           shot wall -demo -open wall
@@ -194,8 +195,10 @@ jobs:
           shot record-sheet -demo -record -open music
           shot tour-you -demo -tour 0
           shot tour-wall -demo -tour 2
-          shot tour-music -demo -tour 4
-          shot tour-watch -demo -tour 5
+          shot tour-pet -demo -tour 3
+          shot tour-music -demo -tour 5
+          shot tour-watch -demo -tour 6
+          shot pet -demo -open pet
           ls -la "$RUNNER_TEMP/shots"
           echo "dev=$dev" >> "$GITHUB_OUTPUT"
 

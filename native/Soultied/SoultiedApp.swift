@@ -78,6 +78,8 @@ enum Launch {
 struct RootView: View {
     let app: AppModel
     @Environment(\.scenePhase) private var phase
+    /// the opening: two hearts tied with a thread, and the name (Intro.swift), once each time the app starts
+    @State private var intro = !Launch.args.contains("-noIntro")
 
     var body: some View {
         ZStack {
@@ -96,6 +98,10 @@ struct RootView: View {
                 } else {
                     Splash()
                 }
+            }
+            if intro {
+                Intro { intro = false }
+                    .zIndex(10)
             }
         }
         .animation(.easeOut(duration: 0.25), value: app.phase)
