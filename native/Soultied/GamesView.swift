@@ -1005,7 +1005,7 @@ struct GamesShelf: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .pxInset()
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.press)
         .disabled(!ready)
     }
 }
@@ -1030,7 +1030,7 @@ struct GameCard: View {
                 }
                 .pxCard()
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.press)
         }
     }
 }

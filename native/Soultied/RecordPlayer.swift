@@ -297,7 +297,7 @@ struct RecordCard: View {
                 Text("→").font(.px(18, 700)).foregroundStyle(Color.terracottaD)
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.press)
     }
 
     @ViewBuilder

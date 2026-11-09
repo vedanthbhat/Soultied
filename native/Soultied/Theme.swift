@@ -205,7 +205,40 @@ struct PixelButtonStyle: ButtonStyle {
             .padding(PX)
             .offset(y: pressed ? 2 : 0)
             .contentShape(Rectangle())
+            .onChange(of: pressed) { _, down in
+                if down && enabled { Feedback.press() }
+            }
     }
+}
+
+/// Pressing something: a soft tick and a light tap under your finger, kept small (and quiet when the ring
+/// switch is, or Sounds is off in Us).
+enum Feedback {
+    private static var last = Date.distantPast
+    static func press() {
+        let now = Date()
+        guard now.timeIntervalSince(last) > 0.06 else { return }
+        last = now
+        Haptics.tap()
+        Chiptune.shared.tick()
+    }
+}
+
+/// a card or a row you can tap: it gives a little under your finger, with the same tick and tap
+struct PressStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var enabled
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.98 : 1)
+            .animation(.easeOut(duration: 0.08), value: configuration.isPressed)
+            .onChange(of: configuration.isPressed) { _, down in
+                if down && enabled { Feedback.press() }
+            }
+    }
+}
+
+extension ButtonStyle where Self == PressStyle {
+    static var press: PressStyle { PressStyle() }
 }
 
 extension ButtonStyle where Self == PixelButtonStyle {
@@ -238,6 +271,9 @@ struct OptionStyle: ButtonStyle {
             .padding(PX)
             .offset(y: configuration.isPressed ? 2 : 0)
             .contentShape(Rectangle())
+            .onChange(of: configuration.isPressed) { _, down in
+                if down { Feedback.press() }
+            }
     }
 }
 
@@ -328,8 +364,18 @@ struct ChipStyle: ButtonStyle {
 /* ---------- haptics ---------- */
 
 enum Haptics {
-    static func tap() { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
-    static func soft() { UIImpactFeedbackGenerator(style: .soft).impactOccurred() }
+    /// (one tap's worth at a time: a press and the action it starts don't both buzz)
+    private static var last = Date.distantPast
+    private static func once(_ f: () -> Void) {
+        let now = Date()
+        guard now.timeIntervalSince(last) > 0.25 else { return }
+        last = now
+        f()
+    }
+    static func tap() { once { UIImpactFeedbackGenerator(style: .light).impactOccurred() } }
+    static func soft() { once { UIImpactFeedbackGenerator(style: .soft).impactOccurred() } }
+    /// switching between tabs, or picking one of a few
+    static func select() { once { UISelectionFeedbackGenerator().selectionChanged() } }
     static func success() { UINotificationFeedbackGenerator().notificationOccurred(.success) }
     /// a touch from your person: a hug is a long squeeze, a boop a quick tap
     static func touch(_ k: TouchKind) {

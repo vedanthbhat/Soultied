@@ -271,7 +271,7 @@ struct LetterFlowView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .pxInset()
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.press)
             }
             Text(partnerSealed
                 ? "\(place.theirName) has already sealed theirs, so this opens the moment you seal yours."
@@ -815,7 +815,7 @@ struct PastPanel: View {
                             }
                         }
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.press)
                     if open == d.dateKey { RevealView(place: place, day: d, compact: true) }
                 }
                 .pxCard(shadow: false)

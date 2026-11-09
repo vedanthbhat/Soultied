@@ -13,6 +13,7 @@ struct UsView: View {
     @State private var editingPlace = false
     @State private var confirmDelete = false
     @State private var deleteFailed = false
+    @State private var soundsOff = Chiptune.shared.muted
     @Environment(\.openURL) private var openURL
 
     var body: some View {
@@ -115,8 +116,17 @@ struct UsView: View {
                     Text(p).font(.pxSmall).foregroundStyle(Color(hex: "#7f3835"))
                 }
             }
-            Button("Show me around again") { Tour.shared.start() }
+            HStack(spacing: 8) {
+                Button("Show me around again") { Tour.shared.start() }
+                    .buttonStyle(.px(.paper, small: true))
+                // the little sounds when you press things and move around the room (the haptics stay)
+                Button(soundsOff ? "Sounds: off" : "Sounds: on") {
+                    soundsOff.toggle()
+                    Chiptune.shared.muted = soundsOff
+                }
                 .buttonStyle(.px(.paper, small: true))
+                .accessibilityLabel(soundsOff ? "Turn the sounds on" : "Turn the sounds off")
+            }
             HStack(spacing: 16) {
                 Button("Privacy") { openURL(URL(string: "https://soultied.app/privacy/")!) }
                 Button("Terms") { openURL(URL(string: "https://soultied.app/terms/")!) }

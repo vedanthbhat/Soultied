@@ -190,7 +190,7 @@ struct LetterCard: View {
             }
             .pxCard()
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.press)
     }
 }
 
@@ -213,7 +213,7 @@ struct AsksCard: View {
                 }
                 .pxCard()
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.press)
         } else if let a = v.fresh.first {
             Button(action: open) {
                 HStack(spacing: 14) {
@@ -226,7 +226,7 @@ struct AsksCard: View {
                 }
                 .pxCard()
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.press)
         }
     }
 }
@@ -278,7 +278,7 @@ struct WallCard: View {
             }
             .pxCard()
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.press)
     }
 }
 

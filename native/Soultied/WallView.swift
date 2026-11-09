@@ -297,7 +297,7 @@ struct PhotosPanel: View {
                         .compositingGroup()
                         .shadow(color: .black.opacity(0.35), radius: 0, x: 3, y: 3)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.press)
                 }
             }
         }

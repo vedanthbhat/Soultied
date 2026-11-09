@@ -141,6 +141,30 @@ final class Chiptune {
         }
     }
 
+    /* ---------- pressing things ---------- */
+
+    /// a button or a card under your finger: a tiny wooden tick
+    func tick() {
+        tone(1480, 0.016, 0, .triangle, 0.016)
+        tone(2220, 0.012, 0.012, .triangle, 0.008)
+    }
+
+    /// moving between tabs: one note each, from the same five (so Home to Us climbs)
+    func tab(_ i: Int) {
+        let notes = [523.25, 587.33, 659.25, 783.99, 880.0]
+        let f = notes[max(0, min(notes.count - 1, i))]
+        tone(f, 0.06, 0, .triangle, 0.02)
+        tone(f * 1.5, 0.08, 0.045, .triangle, 0.011)
+    }
+
+    /// the app opening: two notes meeting, then a third above them (the thread tying)
+    func hello() {
+        tone(392, 0.16, 0, .triangle, 0.03)
+        tone(523.25, 0.16, 0.12, .triangle, 0.03)
+        tone(783.99, 0.34, 0.3, .triangle, 0.026)
+        tone(1046.5, 0.3, 0.42, .triangle, 0.012)
+    }
+
     /* ---------- the living room: one small sound for each thing you can touch ---------- */
 
     func room(_ id: HotspotId) {
@@ -175,6 +199,11 @@ final class Chiptune {
         case .decor:
             tone(1319, 0.06, 0, .triangle, soft * 0.8)
             tone(1568, 0.09, 0.05, .triangle, soft * 0.8)
+        // a sleepy purr
+        case .pet:
+            tone(196, 0.07, 0, .triangle, soft)
+            tone(185, 0.07, 0.08, .triangle, soft * 0.9)
+            tone(196, 0.1, 0.16, .triangle, soft * 0.8)
         }
     }
 }

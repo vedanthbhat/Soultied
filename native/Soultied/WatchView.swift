@@ -192,7 +192,7 @@ struct WatchView: View {
                         .frame(maxWidth: .infinity, minHeight: 44)
                         .pxBox()
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.press)
                 .accessibilityLabel(reactionName(k))
             }
         }
@@ -333,7 +333,7 @@ struct WatchView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .pxBox()
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.press)
                     }
                 }
                 .pxCard()
