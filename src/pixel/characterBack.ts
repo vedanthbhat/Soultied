@@ -68,8 +68,9 @@ export function renderCharacterBack(cfg: AvatarConfig, frame: BackFrame = {}) {
 
   // --- head ----------------------------------------------------------------
   const hx = cx + lean;
-  const rx = cfg.hairStyle === 'curls' ? 14 : 12;
-  const ry = cfg.hairStyle === 'curls' ? 13.5 : 12.5;
+  const big = cfg.hairStyle === 'afro';
+  const rx = big ? 16 : cfg.hairStyle === 'curls' ? 14 : 12;
+  const ry = big ? 15 : cfg.hairStyle === 'curls' ? 13.5 : 12.5;
   const inHead = (x: number, y: number, rX = rx, rY = ry) => ((x + 0.5 - hx) / rX) ** 2 + ((y + 0.5 - headCy) / rY) ** 2 <= 1;
 
   const style = cfg.hairStyle;
@@ -99,7 +100,7 @@ export function renderCharacterBack(cfg: AvatarConfig, frame: BackFrame = {}) {
         else if (rightSide) c = hair.shadow;
         // strand texture
         if (!top1 && (x * 3 + y) % 7 === 0) c = rightSide ? hair.base : hair.shadow;
-        if (style === 'curls' && (x + y * 2) % 4 === 0) c = hair.light;
+        if ((style === 'curls' || big) && (x + y * 2) % 4 === 0) c = hair.light;
         b.set(x, y, c);
       }
     }
@@ -150,6 +151,16 @@ export function renderCharacterBack(cfg: AvatarConfig, frame: BackFrame = {}) {
     }
     b.rect(hx - 1, BACK_H - 3, 3, 2, '#c4453f'); // tie
   }
+  // pigtails: a bunch either side, tied with red
+  if (style === 'pigtails') {
+    for (const side of [-1, 1]) {
+      const bx = hx + side * (rx + 2);
+      for (let y = -4; y <= 5; y++)
+        for (let x = -3; x <= 3; x++)
+          if ((x / 3.2) ** 2 + (y / 5.5) ** 2 <= 1) b.set(bx + x, headCy + 4 + y, x * side > 1 ? hair.shadow : y < -2 ? hair.light : hair.base);
+      b.rect(bx - 1 - (side > 0 ? 1 : 0), headCy - 1, 3, 2, '#c4453f');
+    }
+  }
   // hijab drapes over the shoulders
   if (style === 'hijab') {
     for (let y = headCy; y < shTop + 7; y++) {
@@ -180,6 +191,64 @@ export function renderCharacterBack(cfg: AvatarConfig, frame: BackFrame = {}) {
     b.hline(hx - 4, headCy - 3, 8, top.shadow);
   } else if (cfg.hat === 'clip') {
     b.rect(hx + 5, headCy - 6, 4, 2, '#d9a441');
+  } else if (cfg.hat === 'party') {
+    // a striped cone, and its pompom
+    const top0 = Math.floor(headCy - ry) - 11;
+    for (let r = 0; r < 12; r++) {
+      const half = 1 + Math.floor(r / 2);
+      for (let x = hx - half; x < hx + half; x++) b.set(x, top0 + r, Math.floor((x - hx + r + 40) / 2) % 2 === 0 ? '#c4453f' : '#f3e7cf');
+    }
+    b.rect(hx - 2, top0 - 3, 4, 3, '#e2b359');
+    b.set(hx - 1, top0 - 3, '#f6d77a');
+  } else if (cfg.hat === 'crown') {
+    const y0 = Math.floor(headCy - ry) - 1;
+    b.rect(hx - 8, y0, 16, 3, '#e2b359');
+    b.hline(hx - 8, y0 + 2, 16, '#b0842f');
+    for (const dx of [-8, -2, 4]) {
+      b.rect(hx + dx, y0 - 3, 3, 3, '#e2b359');
+      b.set(hx + dx + 1, y0 - 4, '#f6d77a');
+    }
+    b.rect(hx - 1, y0 + 1, 2, 1, '#c4453f');
+  } else if (cfg.hat === 'bunny') {
+    const y0 = Math.floor(headCy - ry);
+    for (const dx of [-7, 3]) {
+      b.rect(hx + dx, y0 - 9, 4, 10, '#f3ece0');
+      b.rect(hx + dx + 1, y0 - 8, 2, 7, '#e8a9b0');
+    }
+    for (let x = hx - rx; x <= hx + rx; x++) {
+      const y = Math.round(headCy - Math.sqrt(Math.max(0, 1 - ((x - hx) / rx) ** 2)) * ry);
+      b.set(x, y, '#d98c8c');
+      b.set(x, y + 1, '#d98c8c');
+    }
+  } else if (cfg.hat === 'propeller') {
+    for (let y = Math.floor(headCy - ry - 1); y < headCy - 3; y++)
+      for (let x = hx - rx; x <= hx + rx; x++) {
+        if (!inHead(x, y, rx + 0.5, ry + 0.5)) continue;
+        b.set(x, y, x < hx - 1 ? '#c4453f' : x < hx + 1 ? '#e2b359' : '#4f6fa8');
+      }
+    const y0 = Math.floor(headCy - ry) - 4;
+    b.rect(hx - 1, y0, 2, 3, '#e2b359');
+    b.rect(hx - 9, y0 - 1, 8, 2, '#c4453f');
+    b.rect(hx + 1, y0 - 1, 8, 2, '#4f6fa8');
+  } else if (cfg.hat === 'flowers') {
+    const cols = ['#e8a9b0', '#f0c860', '#fbf5e9', '#e07a5f'];
+    let i = 0;
+    for (let x = hx - rx + 1; x <= hx + rx - 1; x += 3, i++) {
+      const y = Math.round(headCy - Math.sqrt(Math.max(0, 1 - ((x - hx) / rx) ** 2)) * ry) + 1;
+      b.set(x + 1, y + 1, '#6a8f5a');
+      b.rect(x, y - 1, 2, 2, cols[i % cols.length]);
+    }
+  } else if (cfg.hat === 'frog') {
+    for (let y = Math.floor(headCy - ry - 1); y < headCy - 2; y++)
+      for (let x = hx - rx - 1; x <= hx + rx + 1; x++) {
+        if (!inHead(x, y, rx + 1.5, ry + 1)) continue;
+        b.set(x, y, y > headCy - 5 ? '#8bbf68' : x > hx + 4 ? '#4a7236' : '#6a9a4f');
+      }
+    const y0 = Math.floor(headCy - ry) - 4;
+    for (const dx of [-8, 3]) {
+      b.rect(hx + dx, y0, 5, 4, '#6a9a4f');
+      b.hline(hx + dx, y0, 5, '#8bbf68');
+    }
   }
   if (cfg.extra === 'headphones') {
     for (let x = hx - rx; x <= hx + rx; x++) {

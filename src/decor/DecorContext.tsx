@@ -8,6 +8,7 @@ import {
   type SlotId,
   REWARDS,
   balance,
+  cleanPetName,
   boughtKey,
   decorOf,
   earnKey,
@@ -48,6 +49,14 @@ interface DecorValue {
   setSlot: (s: SlotId) => void;
   note: EarnNote | null;
   dismissNote: () => void;
+  /** what the pet that's out is called (null until someone names it) */
+  petName: string | null;
+  /** a new pet, waiting for a name */
+  naming: DecorItem | null;
+  /** ask for a name for this pet (Rename) */
+  askName: (item: DecorItem) => void;
+  /** give the pet waiting for one its name (an empty one leaves it for later) */
+  namePet: (name: string) => void;
 }
 
 const Ctx = createContext<DecorValue | null>(null);
@@ -66,10 +75,11 @@ const merge = (d: DecorDoc, p: Partial<DecorDoc>): DecorDoc => ({
   earned: { ...d.earned, ...p.earned },
   bought: { ...d.bought, ...p.bought },
   placed: { ...d.placed, ...p.placed },
+  petNames: { ...d.petNames, ...p.petNames },
 });
 
 /** The demo room comes with some stitches to spend, so you can try the catalogue straight away. */
-const demoDoc = (): DecorDoc => ({ earned: { welcome: 240 }, bought: {}, placed: {} });
+const demoDoc = (): DecorDoc => ({ earned: { welcome: 240 }, bought: {}, placed: {}, petNames: { ginger: 'Biscuit' } });
 
 const REASON: Record<string, string> = {
   visit: 'you showed up',
@@ -249,8 +259,12 @@ export const DecorProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const open = panel === 'decor';
   const [slot, setSlot] = useState<SlotId>('couch');
   const [trying, setTrying] = useState<DecorItem | null>(null);
+  const [naming, setNaming] = useState<DecorItem | null>(null);
   useEffect(() => {
-    if (!open) setTrying(null);
+    if (!open) {
+      setTrying(null);
+      setNaming(null);
+    }
   }, [open]);
 
   const placed = useMemo(() => decorOf(doc.placed), [doc.placed]);
@@ -258,12 +272,38 @@ export const DecorProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const owns = useCallback((item: DecorItem) => ownsIn(doc, item), [doc]);
 
+  // a new pet gets a name: asked for when it comes home, if it hasn't one yet
+  const askNameIfNew = (item: DecorItem) => {
+    if (item.slot === 'pet' && item.id !== 'none' && !docRef.current.petNames[item.id]) setNaming(item);
+  };
+  const petName = placed.pet !== 'none' ? doc.petNames[placed.pet] || null : null;
+  const namePet = useCallback(
+    (raw: string) => {
+      const item = naming;
+      setNaming(null);
+      const name = cleanPetName(raw);
+      if (!item || !name) return;
+      const before = docRef.current.petNames[item.id];
+      write({ petNames: { [item.id]: name } });
+      if (name !== before)
+        addActivity({
+          type: 'room_decorated',
+          title: before ? 'A new name' : 'A name for the pet',
+          description: before ? `${currentUser.name} renamed ${before} the ${item.name.toLowerCase()}: now it’s ${name}.` : `${currentUser.name} named the ${item.name.toLowerCase()} ${name}.`,
+        });
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [naming, write, currentUser.name]
+  );
+
   const place = useCallback(
     (item: DecorItem) => {
       if (!ownsIn(docRef.current, item)) return;
       write({ placed: { [item.slot]: item.id } });
       setTrying(null);
+      askNameIfNew(item);
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [write]
   );
 
@@ -279,6 +319,7 @@ export const DecorProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       write({ bought: { [boughtKey(item)]: { by: me, at: Date.now(), price: item.price } }, placed: { [item.slot]: item.id } });
       addActivity({ type: 'room_decorated', ...announce(item.slot, currentUser.name, item) });
       setTrying(null);
+      askNameIfNew(item);
       return true;
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -320,8 +361,12 @@ export const DecorProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setNote(null);
         markIntroSeen();
       },
+      petName,
+      naming: open ? naming : null,
+      askName: setNaming,
+      namePet,
     }),
-    [ready, stitches, placed, shown, open, trying, owns, buy, place, slot, openCatalogue, closeCatalogue, note, markIntroSeen]
+    [ready, stitches, placed, shown, open, trying, owns, buy, place, slot, openCatalogue, closeCatalogue, note, markIntroSeen, petName, naming, namePet]
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 };

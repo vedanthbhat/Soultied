@@ -266,6 +266,50 @@ function drawWallpaper(L: Layer, wall: string) {
         }
       return;
     }
+    case 'polka': {
+      // oat with rows of rust polka dots
+      L.rect(0, 0, ROOM_W, FLOOR_Y, '#b8a27e');
+      for (let row = 0, y = top + 4; y < bottom - 2; y += 9, row++)
+        for (let x = row % 2 ? 5 : 0; x < ROOM_W; x += 10) {
+          L.rect(x, y, 3, 2, '#9c5f4a');
+          L.hline(x, y + 2, 3, '#8a5241');
+          L.set(x, y, '#b0735c');
+        }
+      return;
+    }
+    case 'candy': {
+      // dusty pink candy stripes
+      L.rect(0, 0, ROOM_W, FLOOR_Y, '#c49a93');
+      for (let x = 0; x < ROOM_W; x += 10) {
+        L.rect(x, 4, 4, 92, '#b3857f');
+        L.vline(x + 4, 4, 92, '#d2aaa2');
+      }
+      return;
+    }
+    case 'starlit': {
+      // violet night, with pale stars and the odd moon (the app's Starlight look)
+      L.rect(0, 0, ROOM_W, FLOOR_Y, '#3d3660');
+      for (let y = top + 2; y < bottom; y += 5) for (let x = (y / 5) % 2 ? 2 : 0; x < ROOM_W; x += 5) L.set(x, y, '#463e6c');
+      for (let row = 0, y = 10; y < bottom - 4; y += 14, row++)
+        for (let x = row % 2 ? 9 : 1; x < ROOM_W; x += 15) {
+          const sx = x + Math.floor(hash(x * 5 + row * 29) * 4) - 2;
+          const sy = y + Math.floor(hash(x * 11 + row * 17) * 4) - 2;
+          const k = hash(x + row * 53);
+          if (k > 0.86) {
+            // a little crescent moon
+            L.hline(sx, sy - 1, 2, '#e9d9a6');
+            L.set(sx - 1, sy, '#e9d9a6');
+            L.set(sx - 1, sy + 1, '#e9d9a6');
+            L.hline(sx, sy + 2, 2, '#e9d9a6');
+          } else if (k > 0.5) {
+            L.set(sx, sy - 1, '#8d84b0');
+            L.hline(sx - 1, sy, 3, '#8d84b0');
+            L.set(sx, sy + 1, '#8d84b0');
+            L.set(sx, sy, '#efe2b4');
+          } else L.set(sx, sy, '#9a90bd');
+        }
+      return;
+    }
     case 'forest': {
       // dark green scattered with little leaves
       L.rect(0, 0, ROOM_W, FLOOR_Y, '#3c5140');
@@ -836,6 +880,9 @@ const COUCHES: Record<string, CouchLook> = {
   linen: { c: '#d6c3a0', l: '#e6d6b6', d: '#b9a483', dd: '#978265', pillowA: ['#b8674f', '#95513e'], pillowB: [P.sage, P.sageD], dots: P.cream, blanket: RUST },
   navy: { c: '#3e5277', l: '#51678f', d: '#2f405f', dd: '#233049', pillowA: [P.mustard, P.mustardD], pillowB: [P.cream, P.creamD], dots: '#3e5277', blanket: RUST },
   plum: { c: '#7a4a62', l: '#8f5d77', d: '#613a4e', dd: '#4a2c3c', pillowA: [P.mustard, P.mustardD], pillowB: [P.cream, P.creamD], dots: '#7a4a62', blanket: SAGE_THROW },
+  rose: { c: '#c08681', l: '#d39d97', d: '#a26b66', dd: '#82504c', pillowA: [P.cream, P.creamD], pillowB: [P.sage, P.sageD], dots: '#c08681', blanket: SAGE_THROW },
+  teal: { c: '#4f8a83', l: '#65a199', d: '#3d6e68', dd: '#2d524d', pillowA: [P.mustard, P.mustardD], pillowB: [P.cream, P.creamD], dots: '#4f8a83', blanket: RUST },
+  lavender: { c: '#8b78ad', l: '#a090c1', d: '#705e8e', dd: '#55476f', pillowA: [P.cream, P.creamD], pillowB: [P.mustard, P.mustardD], dots: '#8b78ad', blanket: SAGE_THROW },
 };
 
 function drawCouch(L: Layer, look: string) {
@@ -1550,6 +1597,90 @@ function drawTurntable(L: Layer, t: number, playing: boolean, hover: boolean) {
 }
 
 const PET_SPRITES: Record<string, { rows: string[]; pal: Record<string, string>; dx: number; dy: number }> = {
+  hamster: {
+    rows: [
+      '....pp................',
+      '...pPpoooooooo........',
+      '..oOOOOOOOOOOOoo......',
+      '.oOkOOOOOOOOOOOOo.....',
+      'onOOOWWWWWOOOOOOo.....',
+      '.oWWWWWWWWWWWOOOo.....',
+      '..ooooooooooooooo.....',
+    ],
+    pal: { o: '#b9803f', O: '#e0a95c', W: '#fbf1df', k: '#2b2224', n: '#e3a9a9', p: '#e3a9a9', P: '#f3c5c5' },
+    dx: 1,
+    dy: -2,
+  },
+  duck: {
+    rows: [
+      '..........yyyyy.......',
+      '..yyy...yyYYYYYyy.....',
+      '.yYYYy.yYYYYYYYYYy....',
+      'byYkYYyYYYYYYYYYYYy...',
+      'bbYYYYYYYYYYYYYYYYYy..',
+      '..yYYYYYYYYYYYYYYYy...',
+      '...yyyyyyyyyyyyyyy....',
+    ],
+    pal: { y: '#d4a12e', Y: '#f6d55c', b: '#e07a3a', k: '#2b2224' },
+    dx: -1,
+    dy: -2,
+  },
+  frog: {
+    rows: [
+      '.gg..gg...............',
+      'gLkggkLg..............',
+      'gGGGGGGGgggggggg......',
+      'gGGGGGGGGGGGGGGGgg....',
+      'gmmmmmGGGGGGGGGGGGg...',
+      '.gGGGGGGGGGGGGGGGGg...',
+      '..gLLggggggggggLLg....',
+    ],
+    pal: { g: '#3f6630', G: '#79ab58', L: '#a3d27e', k: '#24381c', m: '#24381c' },
+    dx: 0,
+    dy: -2,
+  },
+  sausage: {
+    rows: [
+      '.oo...................',
+      'oOOo.oooooooooooooo...',
+      'OkOOOOOOOOOOOOOOOOOOo.',
+      'OOOOOOOOOOOOOOOOOOOOOt',
+      'nOOOOOOOOOOOOOOOOOOOo.',
+      '.oOOOooooooooooooOOo..',
+      '..ll.............ll...',
+    ],
+    pal: { o: '#6b3f25', O: '#a1653a', k: '#2b2224', n: '#2b2224', t: '#6b3f25', l: '#6b3f25' },
+    dx: -2,
+    dy: -2,
+  },
+  fox: {
+    rows: [
+      '.o.o..................',
+      'oOOOo..ooooooooo......',
+      'OkOOOOoOOOOOOOOOOo.WW.',
+      'WWOOOOOOOOOOOOOOOOOWWW',
+      '.WWWOOOOOOOOOOOOOOoWW.',
+      '..WWWWOOOOOOOOOOOOOo..',
+      '...oooooooooooooooo...',
+    ],
+    pal: { o: '#b5562a', O: '#e07a3a', W: '#fbf1df', k: '#2b2224' },
+    dx: -2,
+    dy: -2,
+  },
+  piglet: {
+    rows: [
+      '..pp..................',
+      '.pPPp.pppppppppp......',
+      'pPkPPPPPPPPPPPPPPp....',
+      'nnPPPPPPPPPPPPPPPPp..c',
+      'nNnPPPPPPPPPPPPPPPPpc.',
+      '.pPPPPPPPPPPPPPPPPp...',
+      '..pppppppppppppppp....',
+    ],
+    pal: { p: '#c47a82', P: '#f0b0b5', k: '#2b2224', n: '#e38e96', N: '#7a3a40', c: '#c47a82' },
+    dx: -2,
+    dy: -2,
+  },
   pug: {
     rows: [
       '.kk.....oooooooo......',
@@ -1647,6 +1778,7 @@ function drawPet(L: Layer, t: number, pet: string) {
     }
   if (pet === 'none') return;
   if (pet === 'tuxedo') drawCatCurl(L, t, '#26201f', '#3b3334', '#3b3334', true);
+  else if (pet === 'smoky') drawCatCurl(L, t, '#5d595e', '#8b878c', '#8b878c', false);
   else if (PET_SPRITES[pet]) {
     const sp = PET_SPRITES[pet];
     const breath = Math.sin(t * 2.2) > 0 ? 1 : 0;

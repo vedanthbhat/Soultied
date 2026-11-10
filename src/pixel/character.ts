@@ -43,6 +43,9 @@ export const CLOTH_COLORS: Swatch[] = [
   { id: 'rose', name: 'Dusty rose', base: '#c98f86', light: '#dba69d', shadow: '#a7706a' },
   { id: 'charcoal', name: 'Charcoal', base: '#4a4548', light: '#605a5d', shadow: '#343033' },
   { id: 'cocoa', name: 'Cocoa', base: '#6b4a3c', light: '#825c4b', shadow: '#4f352b' },
+  { id: 'lilac', name: 'Lilac', base: '#9a86b8', light: '#b19fcc', shadow: '#76648f' },
+  { id: 'sky', name: 'Sky', base: '#7d9fc0', light: '#97b6d3', shadow: '#5d7d9c' },
+  { id: 'coral', name: 'Coral', base: '#dd7a62', light: '#ec947c', shadow: '#b35d48' },
 ];
 
 /* ------------------------------------------------------------------------ */
@@ -60,6 +63,8 @@ export const HAIR_STYLES = [
   { id: 'hijab', name: 'Hijab' },
   { id: 'buzz', name: 'Buzz' },
   { id: 'bald', name: 'Bald' },
+  { id: 'afro', name: 'Big afro' },
+  { id: 'pigtails', name: 'Pigtails' },
 ] as const;
 
 export const FACIAL_HAIR = [
@@ -67,6 +72,7 @@ export const FACIAL_HAIR = [
   { id: 'stubble', name: 'Stubble' },
   { id: 'mustache', name: 'Mustache' },
   { id: 'beard', name: 'Beard' },
+  { id: 'handlebar', name: 'Handlebar' },
 ] as const;
 
 export const TOPS = [
@@ -93,6 +99,7 @@ export const SHOES = [
   { id: 'slippers', name: 'Slippers' },
   { id: 'sneakers', name: 'Sneakers' },
   { id: 'boots', name: 'Boots' },
+  { id: 'bunnies', name: 'Bunny slippers' },
 ] as const;
 
 export const GLASSES = [
@@ -100,6 +107,9 @@ export const GLASSES = [
   { id: 'round', name: 'Round' },
   { id: 'square', name: 'Square' },
   { id: 'gold', name: 'Gold wire' },
+  { id: 'hearts', name: 'Heart specs' },
+  { id: 'shades', name: 'Cool shades' },
+  { id: 'monocle', name: 'Monocle' },
 ] as const;
 
 export const HATS = [
@@ -107,6 +117,12 @@ export const HATS = [
   { id: 'beanie', name: 'Beanie' },
   { id: 'cap', name: 'Cap' },
   { id: 'clip', name: 'Hair clip' },
+  { id: 'party', name: 'Party hat' },
+  { id: 'crown', name: 'Crown' },
+  { id: 'bunny', name: 'Bunny ears' },
+  { id: 'propeller', name: 'Propeller cap' },
+  { id: 'flowers', name: 'Flower crown' },
+  { id: 'frog', name: 'Frog hat' },
 ] as const;
 
 export const EXTRAS = [
@@ -115,6 +131,10 @@ export const EXTRAS = [
   { id: 'headphones', name: 'Headphones' },
   { id: 'hoops', name: 'Gold hoops' },
   { id: 'blanket', name: 'Blanket (sitting)' },
+  { id: 'bowtie', name: 'Bow tie' },
+  { id: 'nose', name: 'Clown nose' },
+  { id: 'freckles', name: 'Freckles' },
+  { id: 'mug', name: 'Mug of tea' },
 ] as const;
 
 export const DEFAULT_AVATAR_A: AvatarConfig = {
@@ -184,22 +204,23 @@ export function normalizeAvatar(raw: unknown, fallback: AvatarConfig = DEFAULT_A
 
 export function randomAvatar(): AvatarConfig {
   const any = <T extends { id: string }>(l: readonly T[]) => l[Math.floor(Math.random() * l.length)].id;
-  const hairStyle = any(HAIR_STYLES);
+  const hairStyle = any(HAIR_STYLES.slice(0, 10));
   return {
     rendererVersion: 2,
     height: (['short', 'medium', 'tall'] as const)[Math.floor(Math.random() * 3)],
     skin: any(SKIN_TONES),
     hairStyle,
     hairColor: hairStyle === 'hijab' ? any(CLOTH_COLORS) : any(HAIR_COLORS.slice(0, 6)),
-    facialHair: Math.random() < 0.3 ? any(FACIAL_HAIR) : 'none',
+    facialHair: Math.random() < 0.3 ? any(FACIAL_HAIR.slice(0, 4)) : 'none',
     top: any(TOPS),
     topColor: any(CLOTH_COLORS),
     bottom: any(BOTTOMS),
     bottomColor: any(CLOTH_COLORS),
-    shoes: any(SHOES),
+    shoes: any(SHOES.slice(0, 4)),
     shoesColor: any(CLOTH_COLORS),
-    glasses: Math.random() < 0.35 ? any(GLASSES.slice(1)) : 'none',
-    hat: Math.random() < 0.2 && hairStyle !== 'hijab' ? any(HATS.slice(1)) : 'none',
+    // (the sillier pieces are there to pick, not to be handed at random)
+    glasses: Math.random() < 0.35 ? any(GLASSES.slice(1, 4)) : 'none',
+    hat: Math.random() < 0.2 && hairStyle !== 'hijab' ? any(HATS.slice(1, 4)) : 'none',
     extra: Math.random() < 0.4 ? any(EXTRAS.slice(1, 4)) : 'none',
   };
 }
@@ -229,8 +250,41 @@ const HEAD = [
 const EYE_L = 3;
 const EYE_R = 8;
 
-/** Front hair (14 wide, starts 1px left of head, `top` rows above head). */
-const HAIR_FRONT: Record<string, { top: number; rows: string[] }> = {
+/** Front hair (14 wide, starts 1px left of head, `top` rows above head; `dx` moves a wider one left). */
+const HAIR_FRONT: Record<string, { top: number; rows: string[]; dx?: number }> = {
+  afro: {
+    top: 6,
+    dx: -2,
+    rows: [
+      '....hhhhhhhhhh....',
+      '..hhhHhhhHhhhhhh..',
+      '.hhHhhHhhhhhHhhhh.',
+      '.hHhhhhhhhhhhhhhh.',
+      'hhhhhHhhhhhHhhhhhh',
+      'hHhhhhhhhhhhhhhhjh',
+      'hhhhhhhhhhhhhhhhjh',
+      'hhhhhjhhhhhhjhhhjh',
+      'hhhj..........jhhh',
+      'hhh............hhh',
+      'hhh............hhh',
+      'hhj............jhh',
+      'hj..............jh',
+      '.h..............h.',
+    ],
+  },
+  pigtails: {
+    top: 2,
+    rows: [
+      '...hhhhhhhh...',
+      '..hHHHhhhhhh..',
+      '.hHHhhhhhhhhh.',
+      'hHHhhhhhhhhhhh',
+      'hHhhhhhhhhhhhh',
+      'hhhjjjjjjjjhhh',
+      'hhj........jhh',
+      'hj..........jh',
+    ],
+  },
   tousled: {
     top: 3,
     rows: [
@@ -373,8 +427,22 @@ const HAIR_FRONT: Record<string, { top: number; rows: string[] }> = {
   bald: { top: 0, rows: [] },
 };
 
-/** Back hair drawn behind head + body (14 wide, same origin as front). */
-const HAIR_BACK: Record<string, { from: number; rows: string[] }> = {
+/** Back hair drawn behind head + body (14 wide, same origin as front; `dx` moves a wider one left). */
+const HAIR_BACK: Record<string, { from: number; rows: string[]; dx?: number }> = {
+  // two bunches, tied with red bands, sticking out either side
+  pigtails: {
+    from: 6,
+    dx: -2,
+    rows: [
+      '.jh............hj.',
+      'hhhr..........rhhh',
+      'hHhh..........hhHh',
+      'hHhh..........hhHh',
+      'hhhj..........jhhh',
+      '.hj............jh.',
+      '.j..............j.',
+    ],
+  },
   long: {
     from: 9, // starts at this row of the front-hair grid
     rows: [
@@ -499,9 +567,12 @@ const GLASSES_ART: Record<string, { rows: string[]; y: number }> = {
   round: { y: 4, rows: ['..ggg..ggg..', '.gw..fgw...g', '.g...f.....g', '..fff..fff..'] },
   square: { y: 4, rows: ['.gggggggggg.', '.gw..ggw..g.', '.f...f.f..f.', '.fffff.ffff.'] },
   gold: { y: 4, rows: ['..GGG..GGG..', '.Gw..GGw..G.', '.G...G.G..G.', '..GGG..GGG..'] },
+  hearts: { y: 4, rows: ['..r.r..r.r..', '.rrRrrrrRrr.', '..rrr..rrr..', '...r....r...'] },
+  shades: { y: 4, rows: ['.gggggggggg.', '.gwkkggwkkg.', '..kkk..kkk..'] },
+  monocle: { y: 4, rows: ['.......GGG..', '......G...G.', '......G...G.', '.......GGGG.', '..........G.', '..........G.'] },
 };
 
-const HAT_ART: Record<string, { rows: string[]; top: number }> = {
+const HAT_ART: Record<string, { rows: string[]; top: number; pal?: Palette }> = {
   beanie: {
     top: 5,
     rows: [
@@ -525,6 +596,36 @@ const HAT_ART: Record<string, { rows: string[]; top: number }> = {
     ],
   },
   clip: { top: 0, rows: ['..........yY..', '..........Yy..'] },
+  party: {
+    top: 9,
+    pal: { a: '#c4453f', b: '#f3e7cf', y: '#e2b359', Y: '#f6d77a' },
+    rows: ['......yy......', '......Yy......', '......bb......', '.....baab.....', '.....aabb.....', '....abbaab....', '....bbaabb....', '...baabbaab...'],
+  },
+  crown: {
+    top: 5,
+    pal: { y: '#e2b359', Y: '#f6d77a', z: '#b0842f', r: '#c4453f', b: '#5d7fb3' },
+    rows: ['..Y...YY...Y..', '..yY.yYYy.Yy..', '..yyyyyyyyyy..', '..yryybbyyry..', '..zzzzzzzzzz..'],
+  },
+  bunny: {
+    top: 8,
+    pal: { w: '#f3ece0', p: '#e8a9b0', b: '#d98c8c' },
+    rows: ['...ww....ww...', '..wppw..wppw..', '..wppw..wppw..', '..wppw..wppw..', '...ww....ww...', '...ww....ww...', '..bbbbbbbbbb..'],
+  },
+  propeller: {
+    top: 8,
+    pal: { r: '#c4453f', b: '#4f6fa8', y: '#e2b359', Y: '#f6d77a', g: '#6a8f5a' },
+    rows: ['..rrrr..bbbb..', '......yy......', '.....rygb.....', '....rrygbb....', '...rrrygbbb...', '..rrrrygbbbb..', '.YYYYYYYYYYYY.'],
+  },
+  flowers: {
+    top: 3,
+    pal: { p: '#e8a9b0', P: '#f6cfd3', y: '#f0c860', w: '#fbf5e9', g: '#6a8f5a', o: '#e07a5f' },
+    rows: ['..p...y...w...', '.pPpgyoygwywg.', 'g.p.g.y.g.w.g.'],
+  },
+  frog: {
+    top: 7,
+    pal: { w: '#fbf5e9', k: '#1f1a1c', g: '#6a9a4f', G: '#8bbf68', d: '#4a7236', m: '#2f4a24' },
+    rows: ['..www....www..', '..wkw....wkw..', '..gGgggggggg..', '.gGggggggggdg.', 'gGgmgggggmggdg', 'gggmmmmmmmggdg', 'GGGGGGGGGGGGGG', 'dddddddddddddd'],
+  },
 };
 
 /* ------------------------------------------------------------------------ */
@@ -570,7 +671,7 @@ export function renderCharacter(cfg: AvatarConfig, pose: Pose, frame: CharacterF
   const headTop = torsoTop - 10;
 
   const skinPal: Palette = { s: skin.base, l: skin.light, d: skin.shadow, b: skin.blush, e: '#2a1e22', m: mix(skin.shadow, '#6a3030', 0.45) };
-  const hairPal: Palette = { h: hair.base, H: hair.light, j: hair.shadow };
+  const hairPal: Palette = { h: hair.base, H: hair.light, j: hair.shadow, r: '#c4453f' };
   const clothPal = (sw: Swatch, inner = '#efe3cb', innerShadow = '#d3c3a3'): Palette => ({
     c: sw.base,
     C: sw.light,
@@ -589,7 +690,7 @@ export function renderCharacter(cfg: AvatarConfig, pose: Pose, frame: CharacterF
 
   // 1. back hair
   const hb = HAIR_BACK[cfg.hairStyle];
-  if (hb) buf.sprite(hb.rows, hairPal, hairX, hairY + hb.from);
+  if (hb) buf.sprite(hb.rows, hairPal, hairX + (hb.dx || 0), hairY + hb.from);
 
   // 2. legs / bottoms
   drawBottoms(buf, cfg, pose, { lapTop, legTop, legLen, shoeTop }, bot, skin);
@@ -654,13 +755,13 @@ export function renderCharacter(cfg: AvatarConfig, pose: Pose, frame: CharacterF
   drawFacialHair(buf, cfg.facialHair, hair, skin, headTop);
 
   // 7. front hair
-  if (hf.rows.length) buf.sprite(hf.rows, hairPal, hairX, hairY);
+  if (hf.rows.length) buf.sprite(hf.rows, hairPal, hairX + (hf.dx || 0), hairY);
 
   // 8. glasses
   const gl = GLASSES_ART[cfg.glasses];
   if (gl) {
     // keep eyes visible through the lenses
-    buf.sprite(gl.rows, { g: '#3a2a26', f: mix('#3a2a26', skin.shadow, 0.55), G: '#c9a24e', w: '#fbf3e4' }, 6, headTop + gl.y);
+    buf.sprite(gl.rows, { g: '#3a2a26', f: mix('#3a2a26', skin.shadow, 0.55), G: '#c9a24e', w: '#fbf3e4', r: '#d9475b', R: '#f08a96', k: '#1f1a1c' }, 6, headTop + gl.y);
     buf.set(6 + EYE_L, eyeY, frame.blink || frame.sleepy ? skin.base : '#2a1e22');
     buf.set(6 + EYE_R, eyeY, frame.blink || frame.sleepy ? skin.base : '#2a1e22');
   }
@@ -671,7 +772,7 @@ export function renderCharacter(cfg: AvatarConfig, pose: Pose, frame: CharacterF
     const hatSw = cfg.hat === 'cap' ? top : CLOTH_COLORS.find((c) => c.id === (cfg.topColor === 'mustard' ? 'terracotta' : 'mustard'))!;
     buf.sprite(
       hat.rows,
-      { t: hatSw.base, T: hatSw.light, r: hatSw.shadow, R: hatSw.base, y: '#d9a441', Y: '#f0c860' },
+      hat.pal || { t: hatSw.base, T: hatSw.light, r: hatSw.shadow, R: hatSw.base, y: '#d9a441', Y: '#f0c860' },
       cfg.hat === 'clip' ? 5 : cfg.hat === 'cap' ? 4 : 5,
       cfg.hat === 'clip' ? headTop + 1 : headTop - hat.top
     );
@@ -700,6 +801,34 @@ export function renderCharacter(cfg: AvatarConfig, pose: Pose, frame: CharacterF
     buf.set(5, headTop + 8, '#b88a30');
     buf.set(18, headTop + 7, '#e2b555');
     buf.set(18, headTop + 8, '#b88a30');
+  } else if (cfg.extra === 'bowtie') {
+    const r = '#a84f4b';
+    const R = '#c4625b';
+    const k = '#7f3835';
+    for (const [x, y, c] of [
+      [9, 1, R], [10, 1, r], [13, 1, r], [14, 1, R],
+      [9, 2, r], [10, 2, r], [11, 2, k], [12, 2, k], [13, 2, r], [14, 2, r],
+      [9, 3, R], [10, 3, r], [13, 3, r], [14, 3, R],
+    ] as const) buf.set(x, torsoTop + y, c);
+  } else if (cfg.extra === 'nose') {
+    buf.rect(11, headTop + 6, 2, 2, '#d33a3a');
+    buf.set(11, headTop + 6, '#f08a80');
+    buf.set(12, headTop + 7, '#a82a2a');
+  } else if (cfg.extra === 'freckles') {
+    const f = mix(skin.shadow, '#7a4a32', 0.5);
+    for (const [x, y] of [[7, 7], [9, 8], [8, 9], [16, 7], [14, 8], [15, 9]] as const) buf.set(x, headTop + y, f);
+  } else if (cfg.extra === 'mug') {
+    // a mug of tea in your hand (on your lap, sitting)
+    const mx = pose === 'sit' ? 14 : 17;
+    const my = pose === 'sit' ? lapTop - 4 : handY - 1;
+    buf.rect(mx, my, 4, 4, '#f3e7cf');
+    buf.hline(mx, my, 4, '#7a4a32');
+    buf.hline(mx, my + 3, 4, '#d3c3a3');
+    buf.rect(mx + 1, my + 1, 2, 2, '#b8674f');
+    buf.set(mx + 4, my + 1, '#d3c3a3');
+    buf.set(mx + 4, my + 2, '#d3c3a3');
+    buf.set(mx + 1, my - 2, '#e9e0d0');
+    buf.set(mx + 2, my - 3, '#e9e0d0');
   }
 
   buf.outline(0.38);
@@ -851,6 +980,18 @@ function drawShoes(buf: PixelBuffer, style: string, sw: Swatch, skin: Swatch, y:
     }
     return;
   }
+  if (style === 'bunnies') {
+    // fluffy white bunnies, ears up
+    for (const x0 of [7, 13]) {
+      buf.rect(x0, y, 4, 2, '#f3ece0');
+      buf.hline(x0, y + 1, 4, '#cfc6b8');
+      buf.set(x0 + 1, y - 1, '#f3ece0');
+      buf.set(x0 + 2, y - 1, '#e8a9b0');
+      buf.set(x0 === 7 ? x0 : x0 + 3, y, '#e8a9b0');
+      buf.set(x0 === 7 ? x0 + 1 : x0 + 2, y, '#3a2a26');
+    }
+    return;
+  }
   if (style === 'boots') {
     for (const x0 of [7, 13]) {
       buf.rect(x0 + 1, y - 2, 3, 2, '#6a4430');
@@ -880,6 +1021,14 @@ function drawFacialHair(buf: PixelBuffer, style: string, hair: Swatch, skin: Swa
     buf.rect(X + 4, headTop + 7, 4, 1, hair.base);
     buf.set(X + 3, headTop + 8, hair.shadow);
     buf.set(X + 8, headTop + 8, hair.shadow);
+  } else if (style === 'handlebar') {
+    // a big one, curled up at the ends
+    buf.rect(X + 3, headTop + 7, 6, 1, hair.base);
+    buf.set(X + 5, headTop + 7, hair.light);
+    buf.set(X + 2, headTop + 7, hair.shadow);
+    buf.set(X + 9, headTop + 7, hair.shadow);
+    buf.set(X + 1, headTop + 6, hair.base);
+    buf.set(X + 10, headTop + 6, hair.base);
   } else if (style === 'beard') {
     for (let y = 7; y <= 11; y++) {
       for (let x = 0; x < 12; x++) {

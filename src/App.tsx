@@ -221,7 +221,7 @@ const Home: React.FC = () => {
       music: turntable.on ? `Lift the needle${turntable.track ? ` · ${turntable.track.title}` : ''}` : 'Put a record on',
       decor: panel === 'decor' ? 'Choose a painting' : 'Decorate the room',
       board: wallNews && partnerUser ? `${partnerUser.name} pinned ${pinnedWhat} up` : 'Our wall · notes, doodles, photos',
-      pet: 'Your pet · choose who sleeps here',
+      pet: decor.petName ? `${decor.petName} · asleep by the couch` : 'Your pet · choose who sleeps here',
     };
     const meLabel = `${currentUser.name} · ${myMood ? moodLine(myMood) : 'how are you feeling?'}`;
     const themLabel = (u: UserProfile) => [u.name, theirMood && moodLine(theirMood), 'send a hug'].filter(Boolean).join(' · ');
@@ -229,7 +229,7 @@ const Home: React.FC = () => {
     if (guest) l.right = guest.id === currentUser.id ? meLabel : themLabel(guest);
     else l.right = `Invite ${space?.partnerPlaceholderName || 'your person'}`;
     return l;
-  }, [welcomeOpen, seatsEmpty, letterBadge, partnerSealed, partnerUser, currentUser, host, guest, space, games.waiting, turntable.on, turntable.track, journeyWaiting, journey.next, journey.unseen, panel, askWaiting, asks.forMe.length, myMood, theirMood, wallNews, pinnedWhat]);
+  }, [welcomeOpen, seatsEmpty, letterBadge, partnerSealed, partnerUser, currentUser, host, guest, space, games.waiting, turntable.on, turntable.track, journeyWaiting, journey.next, journey.unseen, panel, askWaiting, asks.forMe.length, myMood, theirMood, wallNews, pinnedWhat, decor.petName]);
 
   const onHotspot = (id: HotspotId) => {
     roomSound(id);

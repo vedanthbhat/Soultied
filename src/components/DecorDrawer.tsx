@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { useDecor } from '../decor/DecorContext';
-import { REWARDS, SLOTS, type Decor, type DecorItem, type SlotId, itemById, itemsIn } from '../decor/catalogue';
+import { PET_NAME_MAX, REWARDS, SLOTS, type Decor, type DecorItem, type SlotId, itemById, itemsIn } from '../decor/catalogue';
 import { renderDecorThumb, type Seat } from '../pixel/room';
 import { PixelIcon } from './letters/PixelIcon';
 
@@ -45,6 +45,8 @@ export const DecorDrawer: React.FC<{ left: Seat; right: Seat }> = ({ left, right
   const d = useDecor();
   const [hidden, setHidden] = useState(false);
   const [shake, setShake] = useState(0);
+  const [petName, setPetName] = useState('');
+  useEffect(() => setPetName(''), [d.naming?.id]);
   const close = d.closeCatalogue;
 
   useEffect(() => {
@@ -182,17 +184,66 @@ export const DecorDrawer: React.FC<{ left: Seat; right: Seat }> = ({ left, right
           })}
         </div>
 
-        <div className="flex items-center gap-3 flex-wrap px-4 pb-3">
-          <div className="flex-1 min-w-[180px] text-sm leading-snug">
-            <span className="font-semibold">{sel.name}.</span> <span className="text-[var(--muted)]">{sel.blurb}</span>
-          </div>
-          {trying && (
-            <button className="px-link text-sm" onClick={() => d.tryOn(null)}>
-              Back to yours
+        {d.naming ? (
+          // a new pet, and its name
+          <form
+            className="flex items-center gap-2 flex-wrap px-4 pb-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              d.namePet(petName);
+            }}
+          >
+            <label className="text-sm font-semibold" htmlFor="pet-name">
+              What’s the {d.naming.name.toLowerCase()} called?
+            </label>
+            <input
+              id="pet-name"
+              className="px-input flex-1 min-w-[140px] !py-1.5"
+              value={petName}
+              maxLength={PET_NAME_MAX}
+              placeholder="Biscuit"
+              autoFocus
+              onChange={(e) => setPetName(e.target.value)}
+            />
+            <button type="submit" className="px-btn px-btn--small" disabled={!petName.trim()}>
+              Name it
             </button>
-          )}
-          {action}
-        </div>
+            <button type="button" className="px-link text-sm" onClick={() => d.namePet('')}>
+              Later
+            </button>
+          </form>
+        ) : (
+          <div className="flex items-center gap-3 flex-wrap px-4 pb-3">
+            <div className="flex-1 min-w-[180px] text-sm leading-snug">
+              {d.slot === 'pet' && sel.id === placedId && d.petName ? (
+                <>
+                  <span className="font-semibold">{d.petName}, the {sel.name.toLowerCase()}.</span>{' '}
+                  <button className="px-link text-sm" onClick={() => d.askName(sel)}>
+                    Rename
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span className="font-semibold">{sel.name}.</span> <span className="text-[var(--muted)]">{sel.blurb}</span>
+                  {d.slot === 'pet' && sel.id === placedId && sel.id !== 'none' && (
+                    <>
+                      {' '}
+                      <button className="px-link text-sm" onClick={() => d.askName(sel)}>
+                        Give it a name
+                      </button>
+                    </>
+                  )}
+                </>
+              )}
+            </div>
+            {trying && (
+              <button className="px-link text-sm" onClick={() => d.tryOn(null)}>
+                Back to yours
+              </button>
+            )}
+            {action}
+          </div>
+        )}
 
         <div className="px-divider mx-4" />
         <p className="m-0 px-4 py-2.5 text-xs text-[var(--muted)] leading-snug">

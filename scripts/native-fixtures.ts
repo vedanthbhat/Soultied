@@ -365,6 +365,13 @@ const looks = (() => {
     v({ hairStyle: 'buzz', hairColor: 'black', skin: 'chestnut', height: 'tall', top: 'hoodie', topColor: 'charcoal', hat: 'beanie', extra: 'headphones' }),
     v({ hairStyle: 'bald', hairColor: 'cocoa', skin: 'espresso', top: 'shirt', topColor: 'cocoa', extra: 'scarf' }),
     v({ hairStyle: 'hijab', hairColor: 'nope', skin: 'peach', height: 'short', top: 'cardigan', topColor: 'mustard', hat: 'beanie' }),
+    // the sillier pieces, and the newer hair
+    v({ hairStyle: 'afro', hairColor: 'black', skin: 'espresso', top: 'hoodie', topColor: 'coral', hat: 'party' }),
+    v({ hairStyle: 'pigtails', hairColor: 'honey', skin: 'peach', height: 'short', top: 'tee', topColor: 'sky', hat: 'crown' }),
+    v({ hairStyle: 'afro', hairColor: 'auburn', skin: 'caramel', height: 'tall', topColor: 'lilac', hat: 'bunny', extra: 'headphones' }),
+    v({ hairStyle: 'tousled', hairColor: 'cocoa', top: 'shirt', topColor: 'sky', hat: 'propeller' }),
+    v({ hairStyle: 'pigtails', hairColor: 'auburn', top: 'cardigan', topColor: 'rose', hat: 'flowers', extra: 'scarf' }),
+    v({ hairStyle: 'bun', hairColor: 'ash', skin: 'chestnut', top: 'turtleneck', topColor: 'forest', hat: 'frog' }),
   ];
 })();
 const watch: { backs: Array<{ look: number; lean: number; bob: number; hash: number; headTop: number }>; scenes: Array<{ left: number; right: number; tv: string; t: number; reactions: Array<[string, string, number]>; singing: [boolean, boolean] | null; hash: number }> } = { backs: [], scenes: [] };

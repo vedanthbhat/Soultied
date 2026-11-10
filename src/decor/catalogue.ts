@@ -46,6 +46,9 @@ export const ITEMS: DecorItem[] = [
   item('wall', 'midnight', 'Midnight stars', 80, 'Deep blue, with little gold stars all over.'),
   item('wall', 'clay', 'Clay arches', 100, 'Terracotta with a row of soft arches.'),
   item('wall', 'forest', 'Forest leaves', 100, 'Dark green, scattered with leaves.'),
+  item('wall', 'polka', 'Polka dots', 70, 'Oat, with rows of little rust dots.'),
+  item('wall', 'candy', 'Candy stripes', 70, 'Dusty pink stripes, like a sweet shop.'),
+  item('wall', 'starlit', 'Starlit violet', 120, 'A violet night of tiny stars and crescent moons.'),
 
   item('couch', 'terracotta', 'Terracotta', 0, 'The couch you started on.'),
   item('couch', 'sage', 'Sage velvet', 120, 'Soft green velvet, with a terracotta throw.'),
@@ -53,6 +56,9 @@ export const ITEMS: DecorItem[] = [
   item('couch', 'linen', 'Oat linen', 120, 'Pale and calm, with rust and sage cushions.'),
   item('couch', 'navy', 'Navy', 150, 'Deep blue, with mustard and cream cushions.'),
   item('couch', 'plum', 'Plum', 150, 'Rich plum velvet, very cosy.'),
+  item('couch', 'rose', 'Rose', 150, 'Dusty pink, with cream and sage cushions.'),
+  item('couch', 'teal', 'Teal', 150, 'Deep teal velvet and a rust throw.'),
+  item('couch', 'lavender', 'Lavender', 180, 'Soft violet, for starry nights in.'),
 
   item('rug', 'diamond', 'Diamond rug', 0, 'The cream rug with terracotta diamonds.'),
   item('rug', 'moss', 'Moss rug', 50, 'Plain soft green, with a cream border.'),
@@ -66,6 +72,13 @@ export const ITEMS: DecorItem[] = [
   item('pet', 'bunny', 'White bunny', 180, 'A fluffy loaf with its ears tucked back.'),
   item('pet', 'pug', 'Sleepy pug', 200, 'Snores a little. Worth it.'),
   item('pet', 'corgi', 'Corgi', 250, 'Big ears, short legs, deeply asleep.'),
+  item('pet', 'smoky', 'Grey cat', 150, 'A smoky grey curl. Purrs in its sleep.'),
+  item('pet', 'hamster', 'Hamster', 120, 'A round little fluffball, cheeks full.'),
+  item('pet', 'duck', 'Duckling', 160, 'A fuzzy yellow duckling, beak tucked in.'),
+  item('pet', 'frog', 'Frog', 160, 'A very round frog. Do not ask how it got in.'),
+  item('pet', 'sausage', 'Sausage dog', 220, 'Long. Very long. Asleep end to end.'),
+  item('pet', 'fox', 'Fox', 260, 'Curled up under its big white-tipped tail.'),
+  item('pet', 'piglet', 'Piglet', 220, 'Pink, snoring softly, curly tail and all.'),
 
   item('view', 'snow', 'Snowy night', 0, 'Snow falling on the hills, and a moon.'),
   item('view', 'rain', 'Rainy evening', 80, 'Rain against the glass. Best with the fire on.'),
@@ -137,9 +150,15 @@ export interface DecorDoc {
   bought: Record<string, Purchase>;
   /** what's out in the room */
   placed: Partial<Record<SlotId, string>>;
+  /** what you've called each pet you've had ("ginger": "Biscuit") */
+  petNames: Record<string, string>;
 }
 
-export const emptyDecorDoc = (): DecorDoc => ({ earned: {}, bought: {}, placed: {} });
+export const emptyDecorDoc = (): DecorDoc => ({ earned: {}, bought: {}, placed: {}, petNames: {} });
+
+/** how long a pet's name can be */
+export const PET_NAME_MAX = 20;
+export const cleanPetName = (s: string) => s.replace(/\s+/g, ' ').trim().slice(0, PET_NAME_MAX);
 
 export function normalizeDecorDoc(raw: unknown): DecorDoc {
   const x = (raw && typeof raw === 'object' ? raw : {}) as Partial<DecorDoc>;
@@ -149,6 +168,11 @@ export function normalizeDecorDoc(raw: unknown): DecorDoc {
     earned: num(x.earned),
     bought: x.bought && typeof x.bought === 'object' ? (x.bought as Record<string, Purchase>) : {},
     placed: x.placed && typeof x.placed === 'object' ? (x.placed as DecorDoc['placed']) : {},
+    petNames: Object.fromEntries(
+      Object.entries(x.petNames && typeof x.petNames === 'object' ? (x.petNames as Record<string, unknown>) : {})
+        .filter(([, v]) => typeof v === 'string' && cleanPetName(v as string))
+        .map(([k, v]) => [k, cleanPetName(v as string)])
+    ),
   };
 }
 
