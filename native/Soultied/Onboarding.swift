@@ -235,7 +235,7 @@ struct SetupView: View {
                 Button("Back") { step = .choose }.buttonStyle(.px(.paper, small: true))
                 Spacer()
                 Button("Next: your character →") { step = .look }
-                    .buttonStyle(.px(.terracotta))
+                    .buttonStyle(.px(.terracotta, wide: true))
                     .disabled(myName.trimmingCharacters(in: .whitespaces).isEmpty)
             }
         }
@@ -264,7 +264,7 @@ struct SetupView: View {
                         }
                     }
                 }
-                .buttonStyle(.px(.terracotta))
+                .buttonStyle(.px(.terracotta, wide: true))
                 .disabled(app.busy)
             }
         }
@@ -309,14 +309,14 @@ struct SetupView: View {
                 Spacer()
                 if invite == nil {
                     Button(looking ? "Looking…" : "Find the invite") { Task { await find() } }
-                        .buttonStyle(.px(.terracotta))
+                        .buttonStyle(.px(.terracotta, wide: true))
                         .disabled(code.trimmingCharacters(in: .whitespaces).count < 6 || looking)
                 } else {
                     Button("Next: your character →") {
                         look = Wardrobe.defaultB
                         step = .joinLook
                     }
-                    .buttonStyle(.px(.terracotta))
+                    .buttonStyle(.px(.terracotta, wide: true))
                     .disabled(myName.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
             }

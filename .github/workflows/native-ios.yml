@@ -208,6 +208,8 @@ jobs:
           shot star-watch -demo -tab watch -theme starlight
           shot star-play -demo -tab play -theme starlight
           shot star-us -demo -tab us -theme starlight
+          shot star-looks -demo -tab us -theme starlight -looks
+          shot looks -demo -tab us -looks
           ls -la "$RUNNER_TEMP/shots"
           echo "dev=$dev" >> "$GITHUB_OUTPUT"
 

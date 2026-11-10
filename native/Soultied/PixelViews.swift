@@ -183,6 +183,10 @@ struct DarkHeading: View {
             if let sub { Text(sub).font(.pxSmall).foregroundStyle(Color.paper.opacity(0.7)) }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        // Starlight: the moon, up beside the title
+        .overlay(alignment: .topTrailing) {
+            if Looks.shared.look == .starlight { PixelMoon().offset(x: 14, y: -22) }
+        }
     }
 }
 

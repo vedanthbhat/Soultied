@@ -98,19 +98,14 @@ final class Looks {
 
 /* ---------- Starlight's sky ---------- */
 
-/// deep purple going to dusk at the bottom in dithered pixel bands, pixel stars (the same ones on every
-/// screen), and the moon. Drawn once for the screen's size; nothing in it moves.
+/// deep purple going to dusk at the bottom in dithered pixel bands, and pixel stars (the same ones on every
+/// screen). Drawn once for the screen's size; nothing in it moves. (The moon's up beside each screen's title.)
 struct StarSky: View {
-    var moon = true
-
     private static let bands: [(at: CGFloat, color: Color)] = [
         (0, Color(hex: "#1c1f3a")), (0.5, Color(hex: "#232447")), (0.7, Color(hex: "#2b294f")),
         (0.84, Color(hex: "#352d55")), (0.94, Color(hex: "#433259")),
     ]
-    private static let moonCream = Color(hex: "#f4e7c9")
-    private static let moonShade = Color(hex: "#e2cfa8")
-    /// the moon's craters, as (row × 100 + column) from its middle
-    private static let craters: Set<Int> = [-102, -103, -202, -2, -101, 203, 202, 103]
+    fileprivate static let moonCream = Color(hex: "#f4e7c9")
 
     var body: some View {
         Canvas(opaque: true) { ctx, size in
@@ -157,15 +152,31 @@ struct StarSky: View {
                 }
             }
 
-            // the moon, up on the right, in a soft glow
-            guard moon else { return }
-            let r: CGFloat = 18
-            let cx = snap(w - 54), cy = snap(150)
+        }
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
+/// Starlight's moon, in pixels, in a soft glow (beside a screen's title)
+struct PixelMoon: View {
+    var r: CGFloat = 15
+
+    private static let shadeColor = Color(hex: "#e2cfa8")
+    /// the craters, as (row × 100 + column) from the middle
+    private static let craters: Set<Int> = [-102, -103, -202, -2, -101, 203, 202, 103]
+
+    var body: some View {
+        Canvas { ctx, size in
+            let px: CGFloat = 3
+            let cream = StarSky.moonCream
+            let cx = (size.width / 2 / px).rounded() * px, cy = (size.height / 2 / px).rounded() * px
             ctx.fill(
-                Path(ellipseIn: CGRect(x: cx - r * 3.2, y: cy - r * 3.2, width: r * 6.4, height: r * 6.4)),
+                Path(ellipseIn: CGRect(x: cx - r * 2.4, y: cy - r * 2.4, width: r * 4.8, height: r * 4.8)),
                 with: .radialGradient(
-                    Gradient(colors: [Self.moonCream.opacity(0.16), Self.moonCream.opacity(0)]),
-                    center: CGPoint(x: cx, y: cy), startRadius: r, endRadius: r * 3.2
+                    Gradient(colors: [cream.opacity(0.2), cream.opacity(0)]),
+                    center: CGPoint(x: cx, y: cy), startRadius: r * 0.8, endRadius: r * 2.4
                 )
             )
             var disc = Path()
@@ -176,16 +187,16 @@ struct StarSky: View {
                     let dx = (CGFloat(gx) + 0.5) * px, dy = (CGFloat(gy) + 0.5) * px
                     guard dx * dx + dy * dy <= r * r else { continue }
                     let cell = CGRect(x: cx + CGFloat(gx) * px, y: cy + CGFloat(gy) * px, width: px, height: px)
-                    // two craters and a shaded lower-right edge
+                    // two craters, and a shaded lower-right edge
                     let crater = Self.craters.contains(gy * 100 + gx)
                     let rim = (dx + px) * (dx + px) + (dy + px) * (dy + px) > r * r && dx + dy > 0
                     if crater || rim { shade.addRect(cell) } else { disc.addRect(cell) }
                 }
             }
-            ctx.fill(disc, with: .color(Self.moonCream))
-            ctx.fill(shade, with: .color(Self.moonShade))
+            ctx.fill(disc, with: .color(cream))
+            ctx.fill(shade, with: .color(Self.shadeColor))
         }
-        .ignoresSafeArea()
+        .frame(width: r * 5, height: r * 5)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }
@@ -213,15 +224,16 @@ struct LookPicker: View {
         return Button {
             guard !on else { return }
             Haptics.select()
-            // (the app's drawn again in the new colours: come back to Us)
+            // (the app's drawn again in the new colours: come back to Us, with the picker in view)
             MainView.resume = .us
+            MainView.showLooks = true
             withAnimation(.easeInOut(duration: 0.35)) { looks.choose(l) }
         } label: {
             VStack(alignment: .leading, spacing: 7) {
                 // a little picture of it: its backdrop, a card and a button
                 ZStack(alignment: .bottomLeading) {
                     if l == .starlight {
-                        StarSky(moon: false)
+                        StarSky()
                     } else {
                         LinearGradient(colors: [Color(hex: "#3a2620"), p.room], startPoint: .top, endPoint: .bottom)
                     }

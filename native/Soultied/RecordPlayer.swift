@@ -341,13 +341,13 @@ struct RecordCard: View {
                 Haptics.tap()
                 place.nextTrack()
             }
-            .buttonStyle(.px(.paper, small: true))
-            if let open { Button("A song instead", action: open).buttonStyle(.px(.paper, small: true)) }
+            .buttonStyle(.px(.paper, small: true, wide: true))
+            if let open { Button("A song instead", action: open).buttonStyle(.px(.paper, small: true, wide: true)) }
             Button("Lift the needle") {
                 Haptics.tap()
                 place.liftNeedle()
             }
-            .buttonStyle(.px(.paper, small: true))
+            .buttonStyle(.px(.paper, small: true, wide: true))
         }
     }
 
@@ -409,12 +409,12 @@ private struct SongCard: View {
             }
             VolumeRow()
             HStack(spacing: 8) {
-                if let open { Button("Another song", action: open).buttonStyle(.px(.paper, small: true)) }
+                if let open { Button("Another song", action: open).buttonStyle(.px(.paper, small: true, wide: true)) }
                 Button("Lift the needle") {
                     Haptics.tap()
                     place.liftNeedle()
                 }
-                .buttonStyle(.px(.paper, small: true))
+                .buttonStyle(.px(.paper, small: true, wide: true))
             }
         }
         .onAppear {
@@ -545,7 +545,7 @@ struct RecordSheet: View {
                                 dismiss()
                             }
                         }
-                        .buttonStyle(.px(.terracotta, small: true))
+                        .buttonStyle(.px(.terracotta, small: true, wide: true))
                         .disabled(link.trimmingCharacters(in: .whitespaces).isEmpty)
                     }
                 }

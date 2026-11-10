@@ -741,7 +741,7 @@ struct AfterDarkPanel: View {
                     Text("Three extra cards a night that are a little more daring. It stays hidden until **both** of you switch it on, and we never tell \(place.theirName) you did unless they switch it on too.")
                         .font(.pxBody).foregroundStyle(Color(hex: "#efe3cb")).fixedSize(horizontal: false, vertical: true)
                     Toggle(isOn: $adult) { Text("I’m 18 or older").font(.pxBody).foregroundStyle(Color(hex: "#efe3cb")) }.tint(Color.terracotta)
-                    Button("Switch it on for me") { place.setAfterDark(true) }.buttonStyle(.px(.terracotta)).disabled(!adult)
+                    Button("Switch it on for me") { place.setAfterDark(true) }.buttonStyle(.px(.terracotta, wide: true)).disabled(!adult)
                 } else if !place.afterDarkOpen {
                     Text("You’re in. It opens as soon as \(place.theirName) switches it on from their side too. They won’t see that you did.")
                         .font(.pxBody).foregroundStyle(Color(hex: "#efe3cb")).fixedSize(horizontal: false, vertical: true)
@@ -769,8 +769,8 @@ struct AfterDarkPanel: View {
         return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
                 Text("How daring?").font(.pxSmall).foregroundStyle(Color(hex: "#efe3cb"))
-                Button("Flirty") { place.setHeat(1) }.buttonStyle(.px(mine == 1 ? .terracotta : .paper, small: true))
-                Button("Hot") { place.setHeat(2) }.buttonStyle(.px(mine == 2 ? .terracotta : .paper, small: true))
+                Button("Flirty") { place.setHeat(1) }.buttonStyle(.px(mine == 1 ? .terracotta : .paper, small: true, wide: true))
+                Button("Hot") { place.setHeat(2) }.buttonStyle(.px(mine == 2 ? .terracotta : .paper, small: true, wide: true))
             }
             Text(mine >= 2 && place.heat < 2 ? "Hot cards start once \(place.theirName) picks Hot too. Until then, it stays flirty."
                 : mine >= 2 ? "You both picked Hot: two bold cards and a flirty one each night, from the next letter you start."
@@ -831,7 +831,7 @@ struct PastPanel: View {
                         loading = false
                     }
                 }
-                .buttonStyle(.px(.paper, small: true))
+                .buttonStyle(.px(.paper, small: true, wide: true))
                 .disabled(loading)
             }
         }
@@ -860,7 +860,7 @@ struct AskPanel: View {
                 if writing {
                     AskComposer(place: place) { writing = false }
                 } else {
-                    Button("Ask \(place.theirName) something") { writing = true }.buttonStyle(.px(.sage))
+                    Button("Ask \(place.theirName) something") { writing = true }.buttonStyle(.px(.sage, wide: true))
                 }
             }
             .pxCard()
@@ -966,7 +966,7 @@ struct AskForMe: View {
                 place.answerAsk(a, a.options.isEmpty ? AskAnswer(text: text.trimmingCharacters(in: .whitespacesAndNewlines)) : AskAnswer(pick: pick))
                 Haptics.success()
             }
-            .buttonStyle(.px(.terracotta, small: true))
+            .buttonStyle(.px(.terracotta, small: true, wide: true))
             .disabled(a.options.isEmpty ? text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty : pick == nil)
             Text("\(place.theirName) has answered already, so you’ll both see it straight away.").font(.pxTiny).foregroundStyle(Color.muted)
         }
@@ -1005,8 +1005,8 @@ struct AskComposer: View {
             PixelField(placeholder: "Anything at all. What do you want to know?", text: $prompt, limit: ASK_PROMPT_MAX, lines: 2)
             PixelLabel(text: "How they answer")
             HStack(spacing: 8) {
-                Button("In their own words") { withOptions = false; pick = nil }.buttonStyle(.px(withOptions ? .paper : .terracotta, small: true))
-                Button("Pick from answers") { withOptions = true; pick = nil }.buttonStyle(.px(withOptions ? .terracotta : .paper, small: true))
+                Button("In their own words") { withOptions = false; pick = nil }.buttonStyle(.px(withOptions ? .paper : .terracotta, small: true, wide: true))
+                Button("Pick from answers") { withOptions = true; pick = nil }.buttonStyle(.px(withOptions ? .terracotta : .paper, small: true, wide: true))
             }
             if withOptions {
                 ForEach(options.indices, id: \.self) { i in
@@ -1043,7 +1043,7 @@ struct AskComposer: View {
                         Text("Send it to \(place.theirName)")
                     }
                 }
-                .buttonStyle(.px(.terracotta, small: true))
+                .buttonStyle(.px(.terracotta, small: true, wide: true))
                 .disabled(!ready)
                 Button("Cancel", action: done).buttonStyle(.px(.paper, small: true))
             }

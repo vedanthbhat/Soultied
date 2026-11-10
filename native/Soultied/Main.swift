@@ -35,8 +35,10 @@ struct MainView: View {
     let app: AppModel
     let place: PlaceModel
     @State private var tab: AppTab = MainView.takeResume() ?? AppTab(rawValue: Launch.tab ?? "") ?? .home
-    /// the tab to come back to when the app's drawn again (after picking a new look in Us)
+    /// the tab to come back to when the app's drawn again (after picking a new look in Us), and to show the
+    /// picker there
     static var resume: AppTab?
+    static var showLooks = false
     private static func takeResume() -> AppTab? {
         defer { resume = nil }
         return resume
@@ -363,10 +365,10 @@ struct MeSheet: View {
                             place.setMood(nil, "")
                             words = ""
                         }
-                        .buttonStyle(.px(.paper, small: true))
+                        .buttonStyle(.px(.paper, small: true, wide: true))
                     }
                     Spacer()
-                    Button("Change my look") { onLook() }.buttonStyle(.px(.paper, small: true))
+                    Button("Change my look") { onLook() }.buttonStyle(.px(.paper, small: true, wide: true))
                 }
             }
             .padding(20)

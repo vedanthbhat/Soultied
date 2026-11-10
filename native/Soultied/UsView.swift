@@ -18,18 +18,27 @@ struct UsView: View {
     @Environment(\.openURL) private var openURL
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                DarkHeading(title: "Us", sub: place.space?.name)
-                couple
-                if !place.partnerHere { InviteCard(place: place) }
-                you
-                LookPicker()
-                history
-                account
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    DarkHeading(title: "Us", sub: place.space?.name)
+                    couple
+                    if !place.partnerHere { InviteCard(place: place) }
+                    you
+                    LookPicker().id("looks")
+                    history
+                    account
+                }
+                .padding(16)
+                .padding(.bottom, 100)
             }
-            .padding(16)
-            .padding(.bottom, 100)
+            .onAppear {
+                // (after picking a look, or the screenshots: the picker in view)
+                if MainView.showLooks || Launch.args.contains("-looks") {
+                    MainView.showLooks = false
+                    DispatchQueue.main.async { proxy.scrollTo("looks", anchor: .center) }
+                }
+            }
         }
         .background(RoomBackground())
         .sheet(isPresented: $editingLook) { LookSheet(place: place).presentationBackground(Color.paper) }
@@ -62,8 +71,8 @@ struct UsView: View {
                 Text("In your little place since \(Day.pretty(s.startKey)) \(s.startKey.prefix(4)) · \(place.streak.together) letters opened together").font(.pxSmall).foregroundStyle(Color.muted)
             }
             HStack(spacing: 8) {
-                Button("Edit our place") { editingPlace = true }.buttonStyle(.px(.paper, small: true))
-                Button("Decorate the room") { decorating = true }.buttonStyle(.px(.terracotta, small: true))
+                Button("Edit our place") { editingPlace = true }.buttonStyle(.px(.paper, small: true, wide: true))
+                Button("Decorate the room") { decorating = true }.buttonStyle(.px(.terracotta, small: true, wide: true))
             }
         }
         .pxCard()
@@ -79,7 +88,7 @@ struct UsView: View {
                     Text(place.myMood.map { "Feeling \($0.line)" } ?? "No mood up right now").font(.pxSmall).foregroundStyle(Color.muted)
                 }
             }
-            Button("Change my look and name") { editingLook = true }.buttonStyle(.px(.terracotta, small: true))
+            Button("Change my look and name") { editingLook = true }.buttonStyle(.px(.terracotta, small: true, wide: true))
         }
         .pxCard()
     }
@@ -112,10 +121,10 @@ struct UsView: View {
             Text(app.demo ? "The demo room" : "Your account").font(.pxHeading).foregroundStyle(Color.inkSoft)
             if app.demo {
                 Text("This is Aanya and Rohan’s place, made up so you can look around. Nothing here is saved.").font(.pxBody).foregroundStyle(Color.muted)
-                Button(app.user == nil ? "Leave the demo and sign in" : "Back to my place") { app.leaveDemo() }.buttonStyle(.px(.terracotta, small: true))
+                Button(app.user == nil ? "Leave the demo and sign in" : "Back to my place") { app.leaveDemo() }.buttonStyle(.px(.terracotta, small: true, wide: true))
             } else {
                 if let e = app.user?.email { Text("Signed in as \(e)").font(.pxSmall).foregroundStyle(Color.muted) }
-                Button("Sign out") { app.signOut() }.buttonStyle(.px(.paper, small: true))
+                Button("Sign out") { app.signOut() }.buttonStyle(.px(.paper, small: true, wide: true))
                 Button("Delete my account") { confirmDelete = true }
                     .font(.px(14, 600)).foregroundStyle(Color(hex: "#7f3835")).underline()
                 if deleteFailed, let p = app.problem {
@@ -124,13 +133,13 @@ struct UsView: View {
             }
             HStack(spacing: 8) {
                 Button("Show me around again") { Tour.shared.start() }
-                    .buttonStyle(.px(.paper, small: true))
+                    .buttonStyle(.px(.paper, small: true, wide: true))
                 // the little sounds when you press things and move around the room (the haptics stay)
                 Button(soundsOff ? "Sounds: off" : "Sounds: on") {
                     soundsOff.toggle()
                     Chiptune.shared.muted = soundsOff
                 }
-                .buttonStyle(.px(.paper, small: true))
+                .buttonStyle(.px(.paper, small: true, wide: true))
                 .accessibilityLabel(soundsOff ? "Turn the sounds on" : "Turn the sounds off")
             }
             HStack(spacing: 16) {
@@ -155,7 +164,7 @@ struct InviteCard: View {
             Text("Send them the link. They sign in, make their character, and take the empty seat next to you.").font(.pxBody).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
             if place.inviteExpired {
                 Text("This invite has run out.").font(.pxBodyBold).foregroundStyle(Color(hex: "#7f3835"))
-                Button("Make a fresh invite") { place.newInvite() }.buttonStyle(.px(.sage, small: true))
+                Button("Make a fresh invite") { place.newInvite() }.buttonStyle(.px(.sage, small: true, wide: true))
             } else if let code = place.space?.inviteCode, let link = place.inviteLink {
                 Text(code).font(.px(22, 700)).foregroundStyle(Color.inkSoft).textSelection(.enabled)
                     .padding(10).frame(maxWidth: .infinity).pxInset()
@@ -163,13 +172,13 @@ struct InviteCard: View {
                     ShareLink(item: URL(string: link)!, message: Text("Come sit with me on our little couch in Soultied: \(link)")) {
                         Text("Send the invite")
                     }
-                    .buttonStyle(.px(.terracotta, small: true))
+                    .buttonStyle(.px(.terracotta, small: true, wide: true))
                     Button(copied ? "Copied" : "Copy the code") {
                         UIPasteboard.general.string = code
                         copied = true
                         Haptics.tap()
                     }
-                    .buttonStyle(.px(.paper, small: true))
+                    .buttonStyle(.px(.paper, small: true, wide: true))
                 }
                 Text("It works for a week. You can make a fresh one any time.").font(.pxTiny).foregroundStyle(Color.muted)
             }

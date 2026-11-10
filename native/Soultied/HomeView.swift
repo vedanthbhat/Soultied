@@ -45,7 +45,8 @@ struct HomeView: View {
                             CouchCard(place: place, invite: { go(.us) })
                         }
                         .padding(.horizontal, 16)
-                        .padding(.top, 22)
+                        // (close under your names, so the touches show on the first screen, above the tabs)
+                        .padding(.top, 10)
                         .padding(.bottom, 120)
                     }
                 }
@@ -61,7 +62,7 @@ struct HomeView: View {
 
     /// the room fills the first screen, leaving room for your names under it and a peek at what's below
     private func heroHeight(_ size: CGSize) -> CGFloat {
-        let below: CGFloat = 52 + 58 + 60
+        let below: CGFloat = 52 + 58 + 70
         return RoomCrop.home.viewHeight(width: size.width, maxHeight: max(200, size.height - below), displayScale: displayScale)
     }
 
@@ -101,7 +102,7 @@ struct HomeView: View {
             plate(s.right, place.guestId, .right)
         }
         .padding(.horizontal, 12)
-        .padding(.top, 10)
+        .padding(.top, 8)
         .transformAnchorPreference(key: TourSpots.self, value: .bounds) { $0["names"] = $1 }
     }
 
@@ -135,7 +136,7 @@ struct HomeView: View {
     }
 
     private var touches: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             if place.partnerHere {
                 HStack {
                     Text("Send \(place.theirName)").font(.px(16, 700)).foregroundStyle(Color.paper)
@@ -323,7 +324,7 @@ struct StreakCard: View {
                             Text("Mend the streak")
                         }
                     }
-                    .buttonStyle(.px(.terracotta, small: true))
+                    .buttonStyle(.px(.terracotta, small: true, wide: true))
                 }
                 .padding(12)
                 .pxInset()
@@ -367,7 +368,7 @@ struct CouchCard: View {
                 Text(place.togetherToday ? "You were both here today." : "Every day you both open Soultied, you scoot a little closer.").font(.pxTiny).foregroundStyle(Color.muted)
             } else {
                 Text("Send \(place.theirName) the invite, and they’ll take the empty seat next to you.").font(.pxBody).foregroundStyle(Color.muted)
-                Button("Send the invite", action: invite).buttonStyle(.px(.sage, small: true))
+                Button("Send the invite", action: invite).buttonStyle(.px(.sage, small: true, wide: true))
             }
         }
         .pxCard()
