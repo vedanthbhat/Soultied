@@ -64,7 +64,8 @@ struct WatchView: View {
                     joinCard
                     if let s = session {
                         if let site = service.site {
-                            WatchRoomView(place: place, session: s, width: max(100, geo.size.width - 32), tv: .idle, showsPlayer: false)
+                            // (the way in sits on the TV, so it's on the first screen)
+                            WatchRoomView(place: place, session: s, width: max(100, geo.size.width - 32), tv: .idle, showsPlayer: false, onTV: AnyView(openOnTV(site)))
                             streamPane(site)
                         } else {
                             presence(s)
@@ -292,20 +293,35 @@ struct WatchView: View {
         }
     }
 
-    /// Netflix or Prime Video: open it in the app's browser, or pick up a show you were watching together
+    /// a play triangle, for the button on the TV
+    private static let playMark = Glyph(["c...", "cc..", "ccc.", "cccc", "ccc.", "cc..", "c..."], ["c": "#fff4e2"])
+
+    /// on the TV: the way into Netflix or Prime Video
+    private func openOnTV(_ site: StreamSite) -> some View {
+        VStack(spacing: 8) {
+            Text("\(site.name.uppercased()) · TOGETHER").font(.px(11, 700)).kerning(1.2).foregroundStyle(Color.butter)
+            Button {
+                Haptics.tap()
+                streaming = StreamOpen(site: site, url: nil)
+            } label: {
+                HStack(spacing: 8) {
+                    GlyphView(glyph: Self.playMark, scale: 3)
+                    Text("Open \(site.name)")
+                }
+            }
+            .buttonStyle(.px(.terracotta))
+            .accessibilityHint("Pick a show and it plays for \(place.theirName) too")
+        }
+    }
+
+    /// Netflix or Prime Video: how it works, and the shows you were watching together, to pick up again
     private func streamPane(_ site: StreamSite) -> some View {
         VStack(alignment: .leading, spacing: 14) {
-            VStack(alignment: .leading, spacing: 10) {
-                Text("\(site.name), together").font(.pxHeading).foregroundStyle(Color.inkSoft)
-                Text("Pick a show and press play: it plays for \(place.theirName) too, in step, with the two of you on the couch in the corner and the chat a tap away. It turns sideways by itself when the show starts.")
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Pick a show and press play: it plays for \(place.theirName) too, in step, with the two of you on the couch in the corner. It turns sideways by itself when the show starts.")
                     .font(.pxBody)
                     .foregroundStyle(Color.muted)
                     .fixedSize(horizontal: false, vertical: true)
-                Button("Open \(site.name)") {
-                    Haptics.tap()
-                    streaming = StreamOpen(site: site, url: nil)
-                }
-                .buttonStyle(.px(.terracotta))
                 Text("You each sign in to your own \(site.name), once, in here. \(place.theirName) can watch on their phone, or on a laptop at soultied.app with the Soultied extension.")
                     .font(.pxSmall)
                     .foregroundStyle(Color.muted)
@@ -363,6 +379,8 @@ struct WatchRoomView: View {
     /// what the TV shows instead of the YouTube video (Netflix and Prime play in their own browser)
     var tv: TvState? = nil
     var showsPlayer = true
+    /// something to show on the TV's screen instead (the way into Netflix and Prime)
+    var onTV: AnyView? = nil
     @Environment(\.displayScale) private var displayScale
     @State private var renderer = WatchRenderer()
     @State private var start = Date()
@@ -400,6 +418,11 @@ struct WatchRoomView: View {
             }
             if showsPlayer, session.videoId != nil {
                 YouTubeTVView(session: session)
+                    .frame(width: CGFloat(TV_SCREEN.w) * u, height: CGFloat(TV_SCREEN.h) * u)
+                    .offset(x: ox + CGFloat(TV_SCREEN.x) * u, y: oy + CGFloat(TV_SCREEN.y) * u)
+            }
+            if let onTV {
+                onTV
                     .frame(width: CGFloat(TV_SCREEN.w) * u, height: CGFloat(TV_SCREEN.h) * u)
                     .offset(x: ox + CGFloat(TV_SCREEN.x) * u, y: oy + CGFloat(TV_SCREEN.y) * u)
             }

@@ -198,13 +198,13 @@ struct DoodlePanel: View {
                 }
             }
             HStack(spacing: 8) {
-                Button(big ? "Thick pen" : "Thin pen") { big.toggle() }.buttonStyle(.px(.paper, small: true))
-                Button("Undo") { if let last = history.popLast() { px = last } }.buttonStyle(.px(.paper, small: true)).disabled(history.isEmpty)
+                Button(big ? "Thick pen" : "Thin pen") { big.toggle() }.buttonStyle(.px(.paper, small: true, wide: true))
+                Button("Undo") { if let last = history.popLast() { px = last } }.buttonStyle(.px(.paper, small: true, wide: true)).disabled(history.isEmpty)
                 Button("Clear") {
                     history.append(px)
                     px = Doodle.blank()
                 }
-                .buttonStyle(.px(.paper, small: true))
+                .buttonStyle(.px(.paper, small: true, wide: true))
             }
             Toggle(isOn: $hang) { Text("Hang it in the frame over the couch").font(.pxBody).foregroundStyle(Color.inkSoft) }.tint(Color.sage)
             Button("Pin it up for \(place.theirName)") {
@@ -264,7 +264,7 @@ struct PhotosPanel: View {
                             draft = nil
                             caption = ""
                         }
-                        .buttonStyle(.px(.terracotta))
+                        .buttonStyle(.px(.terracotta, wide: true))
                     }
                 }
                 .pxCard()
@@ -275,7 +275,7 @@ struct PhotosPanel: View {
                         Text(busy ? "Opening it…" : "Add a photo")
                     }
                 }
-                .buttonStyle(.px(.terracotta))
+                .buttonStyle(.px(.terracotta, wide: true))
                 .disabled(busy)
             }
 
@@ -393,7 +393,7 @@ struct PhotoViewer: View {
                 }
                 PixelField(placeholder: "A caption", text: $caption, limit: CAPTION_MAX)
                 HStack(spacing: 8) {
-                    Button("Save caption") { place.editPhoto(photo, caption: caption) }.buttonStyle(.px(.paper, small: true)).disabled(caption == photo.caption)
+                    Button("Save caption") { place.editPhoto(photo, caption: caption) }.buttonStyle(.px(.paper, small: true, wide: true)).disabled(caption == photo.caption)
                     Button("Hang it over the couch") {
                         if let ui = UIImage(data: dataURLBytes(big ?? photo.thumb) ?? Data()), var a = PreparedPhoto.art(ui, by: place.me) {
                             a.ref = photo.id
@@ -401,7 +401,7 @@ struct PhotoViewer: View {
                             Haptics.success()
                         }
                     }
-                    .buttonStyle(.px(.sage, small: true))
+                    .buttonStyle(.px(.sage, small: true, wide: true))
                 }
                 Toggle(isOn: Binding(get: { photo.kept }, set: { place.editPhoto(photo, kept: $0) })) {
                     Text("Keep with our memories").font(.pxBody).foregroundStyle(Color.inkSoft)
@@ -411,7 +411,7 @@ struct PhotoViewer: View {
                     place.takeDown(photo)
                     dismiss()
                 }
-                .buttonStyle(.px(.paper, small: true))
+                .buttonStyle(.px(.paper, small: true, wide: true))
             }
             .padding(20)
         }
@@ -461,13 +461,13 @@ struct MemoriesPanel: View {
                             title = ""
                             text = ""
                         }
-                        .buttonStyle(.px(.terracotta, small: true))
+                        .buttonStyle(.px(.terracotta, small: true, wide: true))
                         .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty)
                     }
                 }
                 .pxCard()
             } else {
-                Button("Write down a memory") { adding = true }.buttonStyle(.px(.sage))
+                Button("Write down a memory") { adding = true }.buttonStyle(.px(.sage, wide: true))
             }
 
             VStack(alignment: .leading, spacing: 0) {

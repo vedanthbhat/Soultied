@@ -143,11 +143,15 @@ struct GameFrame<Board: View, Actions: View>: View {
     @ViewBuilder var actions: () -> Actions
     @Environment(\.dismiss) private var dismiss
 
+    /// when you won, while you were watching (a little confetti)
+    @State private var cheer: Date? = nil
+
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
-                HStack {
+                HStack(spacing: 8) {
                     Button("← All games") { dismiss() }.buttonStyle(.px(.paper, small: true))
+                    MusicToggle()
                     Spacer()
                     Text(kind.info.name).font(.px(24, 700)).foregroundStyle(Color.paper).lineLimit(1).minimumScaleFactor(0.7)
                 }
@@ -166,6 +170,7 @@ struct GameFrame<Board: View, Actions: View>: View {
                     .pxBox()
                     .animation(nil, value: match?.seq)
                 board()
+                    .overlay { if let c = cheer { Confetti().id(c).allowsHitTesting(false) } }
                 HStack(spacing: 12) { actions() }
             }
             .padding(16)
@@ -175,11 +180,27 @@ struct GameFrame<Board: View, Actions: View>: View {
         .onChange(of: match?.seq) { _, _ in
             guard let m = match else { return }
             if m.status == .over {
-                if m.winner == place.mySeat.rawValue { Haptics.success() } else { Haptics.soft() }
+                if m.winner == place.mySeat.rawValue {
+                    Haptics.success()
+                    Chiptune.shared.game(.win)
+                    celebrate()
+                } else {
+                    Haptics.soft()
+                    Chiptune.shared.game(m.winner == "draw" ? .draw : .lose)
+                }
             } else if m.updatedBy != place.mySeat {
                 Haptics.soft()
+                Chiptune.shared.game(.theirMove)
+            } else {
+                Chiptune.shared.game(.move)
             }
         }
+    }
+
+    private func celebrate() {
+        let c = Date()
+        cheer = c
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.6) { if cheer == c { cheer = nil } }
     }
 }
 
@@ -188,6 +209,14 @@ struct GameScreen: View {
     let place: PlaceModel
     let kind: GameKind
     var body: some View {
+        screen
+            // a little tune of its own, while it's open
+            .onAppear { GameMusic.shared.start(kind) }
+            .onDisappear { GameMusic.shared.stop() }
+    }
+
+    @ViewBuilder
+    private var screen: some View {
         switch kind {
         case .fireflies: FirefliesGameView(place: place)
         case .noughts: NoughtsGameView(place: place)

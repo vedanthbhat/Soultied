@@ -26,13 +26,19 @@ struct LiveFrame<R: LiveRules, Content: View, Poster: View>: View {
     @ViewBuilder var content: () -> Content
     @Environment(\.dismiss) private var dismiss
 
+    /// the number in the countdown
+    private var count: Int { max(1, Int(((session.startAt - now) / 1000).rounded(.up))) }
+    /// when you won (or, playing on the same side, finished), while you were watching: a little confetti
+    @State private var cheer: Date? = nil
+
     var body: some View {
         let stage = session.stage(now: now)
         let partner = place.theirName
         ScrollView {
             VStack(spacing: 16) {
-                HStack {
+                HStack(spacing: 8) {
                     Button("← All games") { dismiss() }.buttonStyle(.px(.paper, small: true))
+                    MusicToggle()
                     Spacer()
                     Text(title).font(.px(24, 700)).foregroundStyle(Color.paper).lineLimit(1).minimumScaleFactor(0.6)
                 }
@@ -58,17 +64,25 @@ struct LiveFrame<R: LiveRules, Content: View, Poster: View>: View {
                 }
                 ZStack {
                     if session.state != nil && (stage == .count || stage == .play || stage == .over) { content() } else { poster() }
+                    // (a small card over the middle of the board, not a full-width one)
                     if stage == .count {
                         VStack(spacing: 2) {
                             Text("STARTING IN").font(.px(13, 700)).tracking(2).foregroundStyle(Color.muted)
-                            Text("\(max(1, Int(((session.startAt - now) / 1000).rounded(.up))))").font(.px(64, 700)).foregroundStyle(Color.inkSoft)
+                            Text("\(count)").font(.px(64, 700)).foregroundStyle(Color.inkSoft)
+                                .contentTransition(.numericText(countsDown: true))
+                                .animation(.snappy(duration: 0.25), value: count)
                         }
                         .padding(.horizontal, 28)
                         .padding(.vertical, 12)
-                        .pxCard()
+                        .pxBox(.paper, shadow: true)
                         .allowsHitTesting(false)
+                        .transition(.scale(scale: 0.8).combined(with: .opacity))
                     }
+                    if let c = cheer { Confetti().id(c).allowsHitTesting(false) }
                 }
+                // (the board, what's before it and the countdown all share the middle of the screen)
+                .frame(maxWidth: .infinity)
+                .animation(.easeOut(duration: 0.2), value: stage == .count)
                 actions(stage, partner)
             }
             .padding(16)
@@ -78,7 +92,23 @@ struct LiveFrame<R: LiveRules, Content: View, Poster: View>: View {
         .background(GameBackdrop())
         .onChange(of: session.end?.line) { _, _ in
             guard let r = session.end else { return }
-            if r.winner == place.mySeat.rawValue || coop != nil { Haptics.success() } else { Haptics.soft() }
+            if r.winner == place.mySeat.rawValue || coop != nil {
+                Haptics.success()
+                Chiptune.shared.game(.win)
+                let c = Date()
+                cheer = c
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.6) { if cheer == c { cheer = nil } }
+            } else {
+                Haptics.soft()
+                Chiptune.shared.game(r.winner == "draw" ? .draw : .lose)
+            }
+        }
+        // three, two, one... go
+        .onChange(of: stage == .count ? count : 0) { _, n in
+            if n > 0 { Chiptune.shared.game(.count) }
+        }
+        .onChange(of: stage == .play) { _, playing in
+            if playing { Chiptune.shared.game(.go) }
         }
     }
 
@@ -283,6 +313,7 @@ private struct TugBoard: View {
         mine.n = max(mine.n, s.taps[place.mySeat] ?? 0) + 1
         session.act(Tug.Act(taps: mine.n), fast: true)
         UIImpactFeedbackGenerator(style: .light).impactOccurred(intensity: 0.6)
+        Chiptune.shared.game(.tap)
     }
 }
 
@@ -439,6 +470,7 @@ private struct RpsBoard: View {
             .onChange(of: s?.phase == "show" ? s?.round : nil) { _, r in
                 guard r != nil, let w = s?.last?.winner else { return }
                 if w == me { Haptics.success() } else { Haptics.soft() }
+                Chiptune.shared.game(w == me ? .point : .miss)
             }
         }
     }
@@ -523,6 +555,7 @@ private struct QuickDrawBoard: View {
             .onChange(of: s?.phase == "show" ? s?.round : nil) { _, r in
                 guard r != nil, let w = s?.last?.winner else { return }
                 if w == me { Haptics.success() } else { Haptics.soft() }
+                Chiptune.shared.game(w == me ? .point : .miss)
             }
         }
     }
@@ -533,6 +566,7 @@ private struct QuickDrawBoard: View {
         if t >= session.local(s.litAt) {
             litLocal = (s.round, CACurrentMediaTime())
             UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
+            Chiptune.shared.game(.bell)
         }
     }
 

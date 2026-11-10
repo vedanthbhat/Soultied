@@ -116,10 +116,14 @@ struct DoodleGameView: View {
             if Launch.invite, session.demo, phase == "choosing", session.iDraw, let w = session.state?.choices.first { session.choose(w) }
             if phase == "reveal" && was == "drawing" {
                 if st?.rounds.last?.secs != nil { Haptics.success() } else { Haptics.soft() }
+                Chiptune.shared.game(st?.rounds.last?.secs != nil ? .point : .miss)
             }
         }
         .onChange(of: st?.guesses.count) { _, _ in
-            if session.iDraw, let g = st?.guesses.last, g.by != place.mySeat { Haptics.soft() }
+            if session.iDraw, let g = st?.guesses.last, g.by != place.mySeat {
+                Haptics.soft()
+                Chiptune.shared.game(.theirMove)
+            }
         }
     }
 
@@ -291,6 +295,7 @@ struct DoodleGameView: View {
         text = ""
         typing = v != .right
         if v == .right { Haptics.success() } else { Haptics.soft() }
+        Chiptune.shared.game(v == .right ? .point : .miss)
     }
 
     private var tools: some View {

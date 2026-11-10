@@ -157,7 +157,7 @@ private struct CoastersBoard: View {
         LiveFrame(place: place, session: session, title: "Coasters",
                   howTo: "Air hockey on the coffee table. Move your finger on your half to move your coaster, and knock the bottle cap into \(partner)’s goal. First to \(Coasters.toWin).",
                   playing: say(("You \(s?.score[me] ?? 0) · \(s?.score[them] ?? 0) \(partner)", true), (serving ? " · next serve in a moment…" : "", false)), now: now) {
-            table(nil, live: false).frame(maxHeight: 440)
+            table(nil, live: false).frame(height: 440).frame(maxWidth: .infinity)
         } content: {
             VStack(spacing: 10) {
                 HStack {
@@ -166,7 +166,7 @@ private struct CoastersBoard: View {
                     Text("their goal ↑").font(.pxSmall).opacity(0.7)
                 }
                 ZStack {
-                    table(s, live: live).frame(maxHeight: 440)
+                    table(s, live: live).frame(height: 440)
                     if let f = flash, now - f.at < 1000 {
                         Text(f.who == me ? "Goal!" : "\(partner) scores").font(.px(30, 700)).foregroundStyle(Color.inkSoft).padding(.horizontal, 20).padding(.vertical, 8).pxCard()
                     }
@@ -184,10 +184,14 @@ private struct CoastersBoard: View {
                 if goals >= 0 && total > goals, let who = s.lastGoal {
                     flash = (who, now)
                     if who == me { Haptics.success() } else { Haptics.soft() }
+                    Chiptune.shared.game(who == me ? .goal : .miss)
                 }
                 goals = total
             }
-            .onChange(of: s?.hits) { _, _ in UIImpactFeedbackGenerator(style: .light).impactOccurred(intensity: 0.5) }
+            .onChange(of: s?.hits) { _, _ in
+                UIImpactFeedbackGenerator(style: .light).impactOccurred(intensity: 0.5)
+                Chiptune.shared.game(.hit)
+            }
         }
     }
 
@@ -343,12 +347,15 @@ private struct KitchenBoard: View {
                     case "served":
                         toast = ("\(n.dish?.name ?? "That"), served!", now)
                         Haptics.success()
+                        Chiptune.shared.game(.serve)
                     case "wrong":
                         toast = ("That’s not on any ticket. Into the bin it goes.", now)
                         Haptics.soft()
+                        Chiptune.shared.game(.miss)
                     case "burnt":
                         toast = ("Burnt! The pot was left on too long.", now)
                         Haptics.soft()
+                        Chiptune.shared.game(.miss)
                     default:
                         toast = ("A customer gave up on their \(n.dish?.name.lowercased() ?? "order").", now)
                         Haptics.soft()
@@ -408,6 +415,7 @@ private struct KitchenBoard: View {
                     let can = !chopper && live && ing != nil && s.cookStart == nil && s.pot.count < Kitchen.potMax
                     Button {
                         Haptics.tap()
+                        Chiptune.shared.game(.plop)
                         session.act(.add(k))
                     } label: {
                         ZStack {
@@ -431,6 +439,7 @@ private struct KitchenBoard: View {
                 ForEach(Kitchen.Ing.allCases, id: \.self) { ing in
                     Button {
                         Haptics.tap()
+                        Chiptune.shared.game(.pick)
                         session.act(.take(ing))
                     } label: {
                         VStack(spacing: 2) {
@@ -450,6 +459,7 @@ private struct KitchenBoard: View {
             PressPad(enabled: live && s.board != nil, onPress: {
                 guard let b = s.board, b.chops < Kitchen.chops else { return }
                 UIImpactFeedbackGenerator(style: .rigid).impactOccurred(intensity: 0.7)
+                Chiptune.shared.game(.chop)
                 session.act(.chop)
             }) {
                 VStack(spacing: 8) {
@@ -503,6 +513,7 @@ private struct KitchenBoard: View {
                 HStack(spacing: 10) {
                     Button("Cook") {
                         Haptics.tap()
+                        Chiptune.shared.game(.cook)
                         session.act(.cook)
                     }
                     .buttonStyle(.px(.sage))
