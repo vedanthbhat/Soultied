@@ -202,6 +202,7 @@ struct PixelButtonStyle: ButtonStyle {
     var small = false
     var wide = false
     @Environment(\.isEnabled) private var enabled
+    @Environment(\.evenRow) private var even
 
     func makeBody(configuration: Configuration) -> some View {
         let pressed = configuration.isPressed
@@ -214,7 +215,7 @@ struct PixelButtonStyle: ButtonStyle {
             .multilineTextAlignment(.center)
             .padding(.horizontal, small ? 12 : 18)
             .padding(.vertical, small ? 7 : 11)
-            .frame(maxWidth: wide ? .infinity : nil)
+            .frame(maxWidth: wide ? .infinity : nil, maxHeight: wide && even ? .infinity : nil)
             .background(
                 ZStack {
                     NotchedFrame(notch: PX).fill(Color.ink).padding(-PX)
@@ -263,6 +264,21 @@ struct PressStyle: ButtonStyle {
 
 extension ButtonStyle where Self == PressStyle {
     static var press: PressStyle { PressStyle() }
+}
+
+private struct EvenRowKey: EnvironmentKey { static let defaultValue = false }
+extension EnvironmentValues {
+    var evenRow: Bool {
+        get { self[EvenRowKey.self] }
+        set { self[EvenRowKey.self] = newValue }
+    }
+}
+
+extension View {
+    /// a row of wide buttons that all stand as tall as the tallest (when one's words wrap onto two lines)
+    func evenRow() -> some View {
+        environment(\.evenRow, true).fixedSize(horizontal: false, vertical: true)
+    }
 }
 
 extension ButtonStyle where Self == PixelButtonStyle {

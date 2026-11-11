@@ -771,7 +771,7 @@ struct AfterDarkPanel: View {
                 Text("How daring?").font(.pxSmall).foregroundStyle(Color(hex: "#efe3cb"))
                 Button("Flirty") { place.setHeat(1) }.buttonStyle(.px(mine == 1 ? .terracotta : .paper, small: true, wide: true))
                 Button("Hot") { place.setHeat(2) }.buttonStyle(.px(mine == 2 ? .terracotta : .paper, small: true, wide: true))
-            }
+            }.evenRow()
             Text(mine >= 2 && place.heat < 2 ? "Hot cards start once \(place.theirName) picks Hot too. Until then, it stays flirty."
                 : mine >= 2 ? "You both picked Hot: two bold cards and a flirty one each night, from the next letter you start."
                 : "Flirty: suggestive, never explicit. Pick Hot for bolder cards (only if you both do).")
@@ -1007,7 +1007,7 @@ struct AskComposer: View {
             HStack(spacing: 8) {
                 Button("In their own words") { withOptions = false; pick = nil }.buttonStyle(.px(withOptions ? .paper : .terracotta, small: true, wide: true))
                 Button("Pick from answers") { withOptions = true; pick = nil }.buttonStyle(.px(withOptions ? .terracotta : .paper, small: true, wide: true))
-            }
+            }.evenRow()
             if withOptions {
                 ForEach(options.indices, id: \.self) { i in
                     HStack(spacing: 8) {

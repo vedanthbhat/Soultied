@@ -369,7 +369,7 @@ struct MeSheet: View {
                     }
                     Spacer()
                     Button("Change my look") { onLook() }.buttonStyle(.px(.paper, small: true, wide: true))
-                }
+                }.evenRow()
             }
             .padding(20)
         }

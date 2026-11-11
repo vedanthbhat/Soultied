@@ -73,7 +73,7 @@ struct UsView: View {
             HStack(spacing: 8) {
                 Button("Edit our place") { editingPlace = true }.buttonStyle(.px(.paper, small: true, wide: true))
                 Button("Decorate the room") { decorating = true }.buttonStyle(.px(.terracotta, small: true, wide: true))
-            }
+            }.evenRow()
         }
         .pxCard()
     }
@@ -141,7 +141,7 @@ struct UsView: View {
                 }
                 .buttonStyle(.px(.paper, small: true, wide: true))
                 .accessibilityLabel(soundsOff ? "Turn the sounds on" : "Turn the sounds off")
-            }
+            }.evenRow()
             HStack(spacing: 16) {
                 Button("Privacy") { openURL(URL(string: "https://soultied.app/privacy/")!) }
                 Button("Terms") { openURL(URL(string: "https://soultied.app/terms/")!) }
@@ -179,7 +179,7 @@ struct InviteCard: View {
                         Haptics.tap()
                     }
                     .buttonStyle(.px(.paper, small: true, wide: true))
-                }
+                }.evenRow()
                 Text("It works for a week. You can make a fresh one any time.").font(.pxTiny).foregroundStyle(Color.muted)
             }
         }

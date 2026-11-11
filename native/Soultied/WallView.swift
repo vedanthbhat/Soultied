@@ -205,7 +205,7 @@ struct DoodlePanel: View {
                     px = Doodle.blank()
                 }
                 .buttonStyle(.px(.paper, small: true, wide: true))
-            }
+            }.evenRow()
             Toggle(isOn: $hang) { Text("Hang it in the frame over the couch").font(.pxBody).foregroundStyle(Color.inkSoft) }.tint(Color.sage)
             Button("Pin it up for \(place.theirName)") {
                 place.pinDoodle(px, hang: hang)
@@ -402,7 +402,7 @@ struct PhotoViewer: View {
                         }
                     }
                     .buttonStyle(.px(.sage, small: true, wide: true))
-                }
+                }.evenRow()
                 Toggle(isOn: Binding(get: { photo.kept }, set: { place.editPhoto(photo, kept: $0) })) {
                     Text("Keep with our memories").font(.pxBody).foregroundStyle(Color.inkSoft)
                 }

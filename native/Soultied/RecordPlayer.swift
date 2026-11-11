@@ -348,7 +348,7 @@ struct RecordCard: View {
                 place.liftNeedle()
             }
             .buttonStyle(.px(.paper, small: true, wide: true))
-        }
+        }.evenRow()
     }
 
     private func byLine(_ t: TurntableState) -> String? {
@@ -415,7 +415,7 @@ private struct SongCard: View {
                     place.liftNeedle()
                 }
                 .buttonStyle(.px(.paper, small: true, wide: true))
-            }
+            }.evenRow()
         }
         .onAppear {
             // music plays with the ring switch on silent (set before the player starts)

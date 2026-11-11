@@ -256,6 +256,9 @@ struct DecorView: View {
     @State private var slot: SlotId
     @State private var trying: DecorItem?
     @State private var short = false
+    /// a new pet, waiting for its name (or one being renamed)
+    @State private var naming: DecorItem?
+    @State private var petName = ""
     @Environment(\.displayScale) private var displayScale
 
     /// `start`: the spot it opens on (tapping the pet opens on the pets)
@@ -303,6 +306,9 @@ struct DecorView: View {
                         }
                         .padding(4)
                     }
+                    if slot == .pet {
+                        if let n = naming { nameCard(n) } else { petCard }
+                    }
                     LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
                         ForEach(Catalogue.items(in: slot)) { item in itemCard(item) }
                     }
@@ -323,6 +329,8 @@ struct DecorView: View {
                                     Haptics.success()
                                     trying = nil
                                     short = false
+                                    // a new pet gets a name
+                                    if t.slot == .pet && t.id != "none" && place.petName(t.id) == nil { ask(t) }
                                 } else {
                                     short = true
                                 }
@@ -338,6 +346,65 @@ struct DecorView: View {
         }
         .background(Color.paper)
     }
+
+    private func ask(_ item: DecorItem) {
+        petName = place.petName(item.id) ?? ""
+        withAnimation(.easeOut(duration: 0.2)) { naming = item }
+    }
+
+    /// the pet that's out: its name, or a way to give it one
+    @ViewBuilder
+    private var petCard: some View {
+        if let pet = Catalogue.item(.pet, place.decor.pet), pet.id != "none" {
+            HStack(spacing: 10) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(place.petName.map { "\($0), the \(pet.name.lowercased())" } ?? "Your \(pet.name.lowercased())").font(.pxBodyBold).foregroundStyle(Color.inkSoft)
+                    Text(place.petName == nil ? "Asleep by the couch, and still waiting for a name." : "Asleep by the couch.").font(.pxSmall).foregroundStyle(Color.muted)
+                }
+                Spacer(minLength: 0)
+                Button(place.petName == nil ? "Name it" : "Rename") {
+                    Haptics.tap()
+                    ask(pet)
+                }
+                .buttonStyle(.px(.paper, small: true))
+            }
+            .padding(12)
+            .pxInset()
+        }
+    }
+
+    /// what's it called?
+    private func nameCard(_ item: DecorItem) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(place.petName(item.id) == nil ? "Welcome home! What’s the \(item.name.lowercased()) called?" : "A new name for \(place.petName(item.id)!)?")
+                .font(.pxBodyBold).foregroundStyle(Color.inkSoft).fixedSize(horizontal: false, vertical: true)
+            PixelField(placeholder: "Biscuit", text: $petName, limit: DecorDoc.petNameMax)
+                .submitLabel(.done)
+                .onSubmit { save(item) }
+            HStack(spacing: 8) {
+                Button("Later") {
+                    withAnimation(.easeOut(duration: 0.2)) { naming = nil }
+                }
+                .buttonStyle(.px(.paper, small: true, wide: true))
+                Button("Name it") { save(item) }
+                    .buttonStyle(.px(.terracotta, small: true, wide: true))
+                    .disabled(DecorDoc.cleanPetName(petName).isEmpty)
+            }.evenRow()
+        }
+        .padding(12)
+        .pxInset()
+        .transition(.opacity)
+    }
+
+    private func save(_ item: DecorItem) {
+        guard !DecorDoc.cleanPetName(petName).isEmpty else { return }
+        place.namePet(item, petName)
+        Haptics.success()
+        withAnimation(.easeOut(duration: 0.2)) { naming = nil }
+    }
+
+    /// what a pet's called (nothing for the other pieces)
+    private func nameOf(_ item: DecorItem) -> String? { item.slot == .pet ? place.petName(item.id) : nil }
 
     private func itemCard(_ item: DecorItem) -> some View {
         let placed = place.decor[item.slot] == item.id
@@ -358,9 +425,9 @@ struct DecorView: View {
                 Text(item.name).font(.px(14, 700)).foregroundStyle(Color.inkSoft).lineLimit(1)
                 HStack(spacing: 4) {
                     if placed {
-                        Text("In the room").font(.pxTiny).foregroundStyle(Color.sageD)
+                        Text(nameOf(item).map { "\($0) · in the room" } ?? "In the room").font(.pxTiny).foregroundStyle(Color.sageD).lineLimit(1)
                     } else if owned {
-                        Text(item.price == 0 ? "Free" : "Yours").font(.pxTiny).foregroundStyle(Color.sageD)
+                        Text(nameOf(item) ?? (item.price == 0 ? "Free" : "Yours")).font(.pxTiny).foregroundStyle(Color.sageD).lineLimit(1)
                     } else {
                         GlyphView(glyph: Icons.stitch, scale: 2)
                         Text("\(item.price)").font(.px(13, 700)).foregroundStyle(Color.terracottaD)
