@@ -19,6 +19,8 @@ import { RpsGame } from './RpsGame';
 import { CoastersGame } from './CoastersGame';
 import { KitchenGame } from './KitchenGame';
 import type { LiveLobby } from '../../games/live/lobby';
+import { usePlus } from '../../plus/usePlus';
+import { PlusUpsell } from '../PlusUpsell';
 
 interface Shelf {
   id: BoxId;
@@ -79,6 +81,9 @@ const Section: React.FC<{ title: string; note: string; games: Shelf[]; card: (g:
 export const GameShelf: React.FC<{ onExit: () => void; onOpenDoor: () => void; initial?: GameKind | null }> = ({ onExit, onOpenDoor, initial = null }) => {
   const { matches, mySeat, seatName, ready } = useGames();
   const [open, setOpen] = useState<GameKind | null>(initial);
+  const plus = usePlus();
+  /** a Plus game tapped without Plus */
+  const [upsell, setUpsell] = useState<string | null>(null);
   const them: Seat = otherSeat(mySeat);
   const partner = seatName(them);
 
@@ -128,7 +133,11 @@ export const GameShelf: React.FC<{ onExit: () => void; onOpenDoor: () => void; i
         className="px-box text-left border-0 p-4 flex flex-col gap-3 items-start"
         style={{ cursor: disabled ? 'default' : 'pointer', opacity: g.soon ? 0.72 : 1 }}
         disabled={disabled}
-        onClick={() => (g.id === 'door' ? onOpenDoor() : kind && setOpen(kind))}
+        onClick={() => {
+          if (g.id === 'door') onOpenDoor();
+          else if (kind && !plus.canPlay(kind)) setUpsell(g.name);
+          else if (kind) setOpen(kind);
+        }}
       >
         <div className="w-full flex justify-center py-2" style={{ background: '#1d1518' }}>
           <BoxArt id={g.id} scale={4} dim={g.soon} />
@@ -136,6 +145,7 @@ export const GameShelf: React.FC<{ onExit: () => void; onOpenDoor: () => void; i
         <div className="flex items-center gap-2 flex-wrap -mb-1">
           <span className="px-tag">{g.style}</span>
           {g.soon && <span className="px-tag px-tag--night">On the way</span>}
+          {kind && plus.isPlusGame(kind) && !plus.hasPlus && <span className="px-tag px-tag--night">Plus</span>}
           {st?.hot && <span className="px-tag px-tag--sage">{st.text}</span>}
         </div>
         <div className="text-xl font-bold leading-tight">{g.name}</div>
@@ -168,6 +178,13 @@ export const GameShelf: React.FC<{ onExit: () => void; onOpenDoor: () => void; i
         )}
         <Section title="Play together now" note="For when you’re both here: invite your person and play live." games={LIVE} card={card} />
         <Section title="Take turns" note="Make your move and leave it. They’ll take theirs whenever they’re next here." games={TURNS} card={card} />
+        {upsell && (
+          <PlusUpsell
+            heading={`${upsell} is in Soultied Plus`}
+            blurb="Five games are free. Plus opens all of them, and the escape rooms behind the dark door. One of you having it covers you both."
+            onClose={() => setUpsell(null)}
+          />
+        )}
       </div>
     </GameShell>
   );

@@ -600,6 +600,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const heatOf = (s: PersistedState) => {
     const ids = [s.userA.id, s.userB?.id].filter((x): x is string => !!x);
+    // (Hot needs Soultied Plus; without it the cards stay flirty)
+    if (!hasPlus && !demo) return 1;
     return ids.length < 2 ? 1 : Math.max(1, Math.min(...ids.map((id) => s.letters.afterDarkHeat?.[id] || 1)));
   };
   const makeDay = (s: PersistedState, kind: LetterKind, dateKey: string): LetterDay | null =>

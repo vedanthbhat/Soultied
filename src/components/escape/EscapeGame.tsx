@@ -11,6 +11,8 @@ import { SceneView } from './SceneView';
 import { ClueCard } from './ClueCard';
 import { LockPanel } from './LockPanel';
 import { DoorSprite } from './Glyph';
+import { usePlus } from '../../plus/usePlus';
+import { PlusUpsell } from '../PlusUpsell';
 
 type Screen = 'corridor' | 'door' | 'play';
 type Mode = 'here' | 'online';
@@ -58,6 +60,9 @@ export const EscapeGame: React.FC<{ onExit: () => void }> = ({ onExit }) => {
   const [now, setNow] = useState(Date.now());
   const [activeSince, setActiveSince] = useState(Date.now());
   const [wide, setWide] = useState(() => window.innerWidth >= 980);
+  const plus = usePlus();
+  /** a Plus room tapped without Plus */
+  const [upsell, setUpsell] = useState<string | null>(null);
   const [chat, setChat] = useState<ChatMsg[]>([]);
   const [draft, setDraft] = useState('');
   const [endingOpen, setEndingOpen] = useState(false);
@@ -371,6 +376,7 @@ export const EscapeGame: React.FC<{ onExit: () => void }> = ({ onExit }) => {
                 key={r.id}
                 className="px-box text-left border-0 cursor-pointer p-4 flex flex-col gap-3 items-start"
                 onClick={() => {
+                  if (!plus.canEscape(r.id)) return setUpsell(r.title);
                   setRoomId(r.id);
                   setScreen('door');
                 }}
@@ -385,10 +391,18 @@ export const EscapeGame: React.FC<{ onExit: () => void }> = ({ onExit }) => {
                 <div className="leading-snug text-[var(--muted)] -mt-1">{r.tagline}</div>
                 <div className="text-sm font-semibold">{status}</div>
                 {partnerReady === r.id && partnerHere && <span className="px-tag px-tag--sage">{partnerName} is waiting here</span>}
+                {plus.isPlusRoom(r.id) && !plus.hasPlus && <span className="px-tag px-tag--night">Plus</span>}
               </button>
             );
           })}
         </div>
+        {upsell && (
+          <PlusUpsell
+            heading={`${upsell} is in Soultied Plus`}
+            blurb="The attic is free. Plus opens all four rooms, and every game. One of you having it covers you both."
+            onClose={() => setUpsell(null)}
+          />
+        )}
       </div>
     );
   }

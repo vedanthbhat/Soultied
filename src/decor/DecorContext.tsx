@@ -18,6 +18,7 @@ import {
   owns as ownsIn,
   welcomeGift,
 } from './catalogue';
+import { BONUS_STITCHES, bonusKey } from '../plus/rules';
 
 /** "+20 stitches: you showed up, and you're both here today." */
 export interface EarnNote {
@@ -85,6 +86,7 @@ const REASON: Record<string, string> = {
   visit: 'you showed up',
   together: 'you’re both here today',
   letter: 'today’s letter is open',
+  plus: 'this month’s Soultied Plus stitches',
 };
 
 function joinReasons(r: string[]) {
@@ -117,7 +119,7 @@ function announce(slot: SlotId, who: string, item: DecorItem): { title: string; 
  * the two of you (or kept in this browser before you're online).
  */
 export const DecorProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { currentUser, partnerUser, space, setupComplete, today, letters, couchDays, togetherToday, cloudMode, cloudTarget, demo, addActivity, panel, openPanel } =
+  const { currentUser, partnerUser, space, setupComplete, today, letters, couchDays, togetherToday, cloudMode, cloudTarget, demo, addActivity, panel, openPanel, hasPlus } =
     useApp();
   const sid = space?.id || 'solo';
   const me = currentUser.id;
@@ -206,6 +208,8 @@ export const DecorProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const has = (k: string) => k in d.earned || sent.current.has(`${scope}|${k}`);
     const credits: Array<{ key: string; amount: number; why: string }> = [];
     if (!has(earnKey.welcome)) credits.push({ key: earnKey.welcome, amount: welcomeGift(couchDays), why: 'welcome' });
+    // Soultied Plus: bonus stitches once a month (online places only)
+    if (cloudMode && hasPlus && !has(bonusKey(today))) credits.push({ key: bonusKey(today), amount: BONUS_STITCHES, why: 'plus' });
     // the daily ones start once your person has moved in
     if (partnerUser) {
       const visit = earnKey.visit(today, me);
@@ -226,7 +230,7 @@ export const DecorProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setNote({ key: credits.map((c) => c.key).join(','), amount, text });
     markIntroSeen();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, scope, doc.earned, setupComplete, space?.id, partnerUser?.id, me, today, togetherToday, letterOpen, couchDays]);
+  }, [ready, scope, doc.earned, setupComplete, space?.id, partnerUser?.id, me, today, togetherToday, letterOpen, couchDays, cloudMode, hasPlus]);
 
   // someone who hasn't looked at the catalogue yet (your person moving in to a room with stitches already in the jar)
   const introKey = `soultied_decor_intro_${sid}_${me}`;

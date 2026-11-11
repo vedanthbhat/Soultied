@@ -1,17 +1,26 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { useStreamHub } from '../stream/StreamHub';
 import { EXTENSION_STORE_URL, SERVICES, clock, type Platform } from '../stream/protocol';
 import { PlusCard } from './PlusCard';
+import { PlusUpsell } from './PlusUpsell';
+import { usePlus } from '../plus/usePlus';
+import { FREE_NIGHTS } from '../plus/rules';
 
 /** Netflix, Prime Video and the other streaming sites together: set-up, the buttons, and where you left off. */
 export const StreamPanel: React.FC = () => {
   const hub = useStreamHub();
   const { partnerUser, cloudMode, cloudEnabled, hasPlus } = useApp();
   const name = partnerUser?.name || 'your person';
+  const plus = usePlus();
+  const [upsell, setUpsell] = useState(false);
   if (!hub) return null;
 
-  const open = (url: string) => window.open(url, '_blank', 'noopener');
+  // a Netflix / Prime Video night: free three times a month, every night with Plus
+  const open = (url: string) => {
+    if (!plus.takeNight()) return setUpsell(true);
+    window.open(url, '_blank', 'noopener');
+  };
   const recent = Object.values(hub.log.shows)
     .sort((a, b) => b.at - a.at)
     .slice(0, 3);
@@ -74,7 +83,23 @@ export const StreamPanel: React.FC = () => {
               ))}
             . Update the extension if you don’t see Soultied on them yet.
           </p>
+          {!plus.open && (
+            <p className="m-0 text-sm">
+              {plus.night.already
+                ? 'Tonight’s one of your free movie nights: watch as much as you like.'
+                : plus.night.left > 0
+                  ? `${plus.night.left} of ${FREE_NIGHTS} free movie nights left this month. Soultied Plus has every night.`
+                  : `That’s your ${FREE_NIGHTS} free movie nights for this month. Soultied Plus has every night.`}
+            </p>
+          )}
           {partnerUser && !hasPlus && <PlusCard className="shadow-none" />}
+          {upsell && (
+            <PlusUpsell
+              heading="Your free movie nights are used up"
+              blurb={`Netflix and Prime Video together are free ${FREE_NIGHTS} nights a month. Soultied Plus has every night, for both of you.`}
+              onClose={() => setUpsell(false)}
+            />
+          )}
           <ul className="m-0 pl-5 text-sm flex flex-col gap-1">
             <li>Start anything. When {name} opens the same thing, you snap into sync.</li>
             <li>Keep this Soultied tab open while you watch. It carries everything between the two of you.</li>

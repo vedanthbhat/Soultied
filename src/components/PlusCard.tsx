@@ -34,7 +34,9 @@ export const PlusCard: React.FC<{ onClose?: () => void; className?: string; head
     return (
       <div className={`px-box px-shadow px-pop p-4 flex flex-col gap-2 ${className}`} role="status">
         <strong className="text-lg">Soultied Plus is on</strong>
-        <p className="m-0 text-sm leading-snug">Cameras, voice and karaoke are on for you both, until {day(plusUntil)}.</p>
+        <p className="m-0 text-sm leading-snug">
+          Every movie night, cameras, voice and karaoke, every game and escape room: on for you both, until {day(plusUntil)}.
+        </p>
         {onClose && (
           <button className="px-btn px-btn--sage px-btn--small self-start" onClick={onClose}>
             Lovely

@@ -9,6 +9,8 @@ import { PixelIcon } from './PixelIcon';
 import { LetterKind, LetterDay, prettyDate } from '../../letters/engine';
 import { scoreDay } from '../../letters/cards';
 import { useTogether } from '../../together/TogetherContext';
+import { usePlus } from '../../plus/usePlus';
+import { PlusUpsell } from '../PlusUpsell';
 
 export type LettersTab = 'today' | 'journey' | 'ask' | 'afterdark' | 'past';
 
@@ -127,8 +129,17 @@ const LetterView: React.FC<{
 /** Flirty or hot: each of you chooses, and the cards follow whichever of you chose the milder one. */
 const Heat: React.FC<{ partner: UserProfile }> = ({ partner }) => {
   const { myHeat, afterDarkHeat, setAfterDarkHeat } = useApp();
+  const plus = usePlus();
+  const [upsell, setUpsell] = useState(false);
   return (
     <div className="flex flex-col gap-2">
+      {upsell && (
+        <PlusUpsell
+          heading="Hot is in Soultied Plus"
+          blurb="Flirty After dark cards are free. Plus adds the bolder Hot ones, for when you’ve both picked Hot. One of you having it covers you both."
+          onClose={() => setUpsell(false)}
+        />
+      )}
       <div className="flex items-center gap-2 flex-wrap">
         <span className="text-sm opacity-90">How daring?</span>
         {[
@@ -139,15 +150,18 @@ const Heat: React.FC<{ partner: UserProfile }> = ({ partner }) => {
             key={o.h}
             className={`px-btn px-btn--small ${myHeat === o.h ? '' : 'px-btn--paper'}`}
             aria-pressed={myHeat === o.h}
-            onClick={() => setAfterDarkHeat(o.h)}
+            onClick={() => (o.h >= 2 && !plus.open ? setUpsell(true) : setAfterDarkHeat(o.h))}
           >
             {o.label}
+            {o.h >= 2 && !plus.hasPlus && <span className="px-tag px-tag--night ml-2">Plus</span>}
           </button>
         ))}
       </div>
       <p className="m-0 text-sm opacity-80 leading-snug">
         {myHeat >= 2 && afterDarkHeat < 2
-          ? `Hot cards start once ${partner.name} picks Hot too. Until then, it stays flirty.`
+          ? plus.open
+            ? `Hot cards start once ${partner.name} picks Hot too. Until then, it stays flirty.`
+            : 'Hot cards come with Soultied Plus. Until then, it stays flirty.'
           : myHeat >= 2
             ? 'You both picked Hot: two bold cards and a flirty one each night, from the next letter you start.'
             : 'Flirty: suggestive, never explicit. Pick Hot for bolder cards (only if you both do).'}
