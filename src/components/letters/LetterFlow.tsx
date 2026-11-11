@@ -15,6 +15,8 @@ interface Props {
   /** the look-back heading and the seal button */
   title?: string;
   sealLabel?: string;
+  /** an optional line for your person before you seal (kept as the last card's note) */
+  extraLine?: boolean;
   onAnswer: (cardId: string, answer: CardAnswer) => void;
   onSeal: () => void;
 }
@@ -23,7 +25,7 @@ interface Props {
  * One card at a time, then a quick look back and a wax seal. Taps move you
  * on by themselves so the whole letter takes about a minute and a half.
  */
-export const LetterFlow: React.FC<Props> = ({ day, me, partner, night, tag, title, sealLabel, onAnswer, onSeal }) => {
+export const LetterFlow: React.FC<Props> = ({ day, me, partner, night, tag, title, sealLabel, extraLine, onAnswer, onSeal }) => {
   const cards = useMemo(() => cardsOf(day.cardIds), [day.cardIds]);
   const answers = day.by[me.id]?.cards || {};
   const partnerSealed = !!day.by[partner.id]?.sealedAt;
@@ -34,6 +36,9 @@ export const LetterFlow: React.FC<Props> = ({ day, me, partner, night, tag, titl
   const [note, setNote] = useState('');
   /** an answer in your own words, as you type it */
   const [text, setText] = useState('');
+  /** the optional line before sealing */
+  const last = cards[cards.length - 1];
+  const [extra, setExtra] = useState(() => (last && answers[last.id]?.note) || '');
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   const card: Card | undefined = cards[step];
@@ -78,6 +83,23 @@ export const LetterFlow: React.FC<Props> = ({ day, me, partner, night, tag, titl
     if (card.note) return;
     if (card.guess) later(() => setGuessing(true));
     else later(() => go(step + 1));
+  };
+
+  /** keep the optional line (on the last card, as its note) */
+  const saveExtra = () => {
+    if (!extraLine || !last) return;
+    const a = answers[last.id];
+    const v = extra.trim();
+    if (!a || v === (a.note || '')) return;
+    onAnswer(last.id, { ...a, note: v || undefined });
+  };
+
+  /** an open card: answer it out loud on your next call instead */
+  const aloud = () => {
+    if (!card) return;
+    setText('');
+    onAnswer(card.id, { pick: 0, aloud: true });
+    later(() => setStep(step + 1));
   };
 
   const saveNote = () => {
@@ -129,7 +151,15 @@ export const LetterFlow: React.FC<Props> = ({ day, me, partner, night, tag, titl
                   <span className="flex-1 min-w-0 leading-snug">
                     <span className="block text-sm text-[var(--muted)]">{cardTitle(c)}</span>
                     <span className="block font-semibold whitespace-pre-line">
-                      {!a ? '—' : c.style === 'open' ? a.text || '—' : c.style === 'likely' ? (a.pick === 0 ? me.name : partner.name) : c.options[a.pick]}
+                      {!a
+                        ? '—'
+                        : c.style === 'open'
+                          ? a.text || (a.aloud ? 'Saved for your call' : '—')
+                          : c.style === 'likely'
+                            ? a.pick === 0
+                              ? me.name
+                              : partner.name
+                            : c.options[a.pick]}
                       {c.guess && a?.guess != null && (
                         <span className="font-normal text-sm text-[var(--muted)]">
                           {' '}
@@ -137,7 +167,7 @@ export const LetterFlow: React.FC<Props> = ({ day, me, partner, night, tag, titl
                         </span>
                       )}
                     </span>
-                    {a?.note && <span className="block text-sm italic">“{a.note}”</span>}
+                    {a?.note && !(extraLine && c === last) && <span className="block text-sm italic">“{a.note}”</span>}
                   </span>
                   <span className="text-sm text-[var(--terracotta-d)] underline shrink-0">Change</span>
                 </button>
@@ -145,12 +175,34 @@ export const LetterFlow: React.FC<Props> = ({ day, me, partner, night, tag, titl
             );
           })}
         </ol>
+        {extraLine && last && answers[last.id] && (
+          <div className="flex flex-col gap-1.5">
+            <label className="px-label m-0" htmlFor="letter-extra">
+              Add a line for {partner.name} <span className="font-normal">(optional)</span>
+            </label>
+            <input
+              id="letter-extra"
+              className="px-input"
+              value={extra}
+              maxLength={140}
+              onChange={(e) => setExtra(e.target.value)}
+              onBlur={saveExtra}
+              placeholder="Something only they’ll read"
+            />
+          </div>
+        )}
         <p className="text-[var(--muted)] leading-snug m-0">
           {partnerSealed
             ? `${partner.name} has already sealed theirs, so this opens the moment you seal yours.`
             : `Once it’s sealed you can’t change it. It waits on the table until ${partner.name} seals theirs, then you both see everything.`}
         </p>
-        <button className="px-btn self-start text-lg" onClick={onSeal}>
+        <button
+          className="px-btn self-start text-lg"
+          onClick={() => {
+            saveExtra();
+            onSeal();
+          }}
+        >
           <PixelIcon name="seal" scale={2} /> {partnerSealed ? 'Seal it and open together' : sealLabel || 'Seal the letter'}
         </button>
       </div>
@@ -221,6 +273,9 @@ export const LetterFlow: React.FC<Props> = ({ day, me, partner, night, tag, titl
             <span className="text-sm text-[var(--muted)]">
               {partner.name} reads this once you’ve both sealed · {OPEN_MAX - text.length} left
             </span>
+            <button className="px-btn px-btn--paper px-btn--small self-start" onClick={aloud}>
+              Rather say it out loud? Save it for our call
+            </button>
           </div>
         ) : two ? (
           <div className="grid items-center gap-3" style={{ gridTemplateColumns: '1fr auto 1fr' }}>
@@ -285,7 +340,7 @@ export const LetterFlow: React.FC<Props> = ({ day, me, partner, night, tag, titl
         ) : (
           <span className="text-sm text-[var(--muted)]">
             {cards.length > 1
-              ? `${cards.length} cards · ${cards.length > 3 ? 'about two minutes' : 'under a minute'}`
+              ? `${cards.length} cards · ${cards.some((c) => c.style === 'open') ? 'about two minutes' : 'about a minute, all taps'}`
               : card.guess
                 ? `Your answer, then a guess at ${partner.name}’s`
                 : 'One card'}

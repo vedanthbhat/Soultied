@@ -115,6 +115,7 @@ const LetterView: React.FC<{
       me={me}
       partner={partner}
       night={night}
+      extraLine={kind === 'daily'}
       onAnswer={(id, a) => answerCard(kind, today, id, a)}
       onSeal={() => sealLetter(kind, today)}
     />

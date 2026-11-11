@@ -148,6 +148,8 @@ struct LetterFlowView: View {
     @State private var guessMode: (id: String, guess: Bool)?
     @State private var note = ""
     @State private var text = ""
+    /// the optional line before sealing (kept as the last card's note)
+    @State private var extra: String?
 
     private var day: LetterDay { place.letter(kind, key) }
     private var cards: [Card] { Cards.of(day.cardIds) }
@@ -214,6 +216,25 @@ struct LetterFlowView: View {
         if c.guess { later { guessMode = (c.id, true) } } else { later { go(step + 1) } }
     }
 
+    /// daily letters: an optional line for your person before you seal
+    private var extraLine: Bool { kind == .daily }
+
+    private func saveExtra() {
+        guard extraLine, let last = cards.last, var a = answers[last.id], let e = extra else { return }
+        let v = e.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard v != (a.note ?? "") else { return }
+        a.note = v.isEmpty ? nil : v
+        place.answer(kind, key, card: last.id, a)
+    }
+
+    /// an open card: answer it out loud on your next call instead
+    private func aloud(_ c: Card) {
+        Haptics.tap()
+        text = ""
+        place.answer(kind, key, card: c.id, CardAnswer(pick: 0, aloud: true))
+        later { go(step + 1) }
+    }
+
     private func saveNote(_ c: Card) {
         guard var a = answers[c.id] else { return }
         let n = note.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -238,7 +259,7 @@ struct LetterFlowView: View {
 
     private func said(_ c: Card, _ a: CardAnswer?) -> String {
         guard let a else { return "—" }
-        if c.style == .open { return a.text ?? "—" }
+        if c.style == .open { return a.text ?? (a.aloud == true ? "Saved for your call" : "—") }
         if c.style == .likely { return a.pick == 0 ? place.myName : place.theirName }
         return a.pick < c.options.count ? c.options[a.pick] : "—"
     }
@@ -262,7 +283,7 @@ struct LetterFlowView: View {
                             if c.guess, let g = a?.guess, g < c.options.count {
                                 Text("guess for \(place.theirName): \(c.options[g])").font(.pxSmall).foregroundStyle(Color.muted)
                             }
-                            if let n = a?.note { Text("“\(n)”").font(.px(14)).italic().foregroundStyle(Color.inkSoft) }
+                            if let n = a?.note, !(extraLine && c.id == cards.last?.id) { Text("“\(n)”").font(.px(14)).italic().foregroundStyle(Color.inkSoft) }
                         }
                         Spacer(minLength: 0)
                         Text("Change").font(.px(13, 600)).foregroundStyle(Color.terracottaD).underline()
@@ -273,12 +294,21 @@ struct LetterFlowView: View {
                 }
                 .buttonStyle(.press)
             }
+            if extraLine, let last = cards.last, answers[last.id] != nil {
+                VStack(alignment: .leading, spacing: 6) {
+                    PixelLabel(text: "Add a line for \(place.theirName) (optional)")
+                    PixelField(placeholder: "Something only they’ll read", text: Binding(get: { extra ?? answers[last.id]?.note ?? "" }, set: { extra = $0 }), limit: 140)
+                        .submitLabel(.done)
+                        .onSubmit { saveExtra() }
+                }
+            }
             Text(partnerSealed
                 ? "\(place.theirName) has already sealed theirs, so this opens the moment you seal yours."
                 : "Once it’s sealed you can’t change it. It waits on the table until \(place.theirName) seals theirs, then you both see everything.")
                 .font(.pxSmall).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
             Button {
                 saveText()
+                saveExtra()
                 place.seal(kind, key)
                 Haptics.success()
             } label: {
@@ -335,6 +365,8 @@ struct LetterFlowView: View {
             VStack(alignment: .leading, spacing: 6) {
                 PixelField(placeholder: "In your own words", text: $text, limit: OPEN_MAX, lines: 4)
                 Text("\(place.theirName) reads this once you’ve both sealed · \(OPEN_MAX - text.count) left").font(.pxTiny).foregroundStyle(Color.muted)
+                Button("Rather say it out loud? Save it for our call") { aloud(c) }
+                    .buttonStyle(.px(.paper, small: true, wide: true))
             }
         } else if c.options.count == 2 {
             HStack(spacing: 10) {
@@ -370,7 +402,7 @@ struct LetterFlowView: View {
                 }
                 .buttonStyle(.px(.paper, small: true))
             } else {
-                Text(count > 1 ? "\(count) cards · \(count > 3 ? "about two minutes" : "under a minute")" : c.guess ? "Your answer, then a guess at \(place.theirName)’s" : "One card")
+                Text(count > 1 ? "\(count) cards · \(cards.contains { $0.style == .open } ? "about two minutes" : "about a minute, all taps")" : c.guess ? "Your answer, then a guess at \(place.theirName)’s" : "One card")
                     .font(.pxSmall).foregroundStyle(Color.muted)
             }
             Spacer()
@@ -437,7 +469,17 @@ struct RevealView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         PixelTag(text: "Talk about it tonight", night: night)
                         Text(talk.title).font(.pxBodyBold).foregroundStyle(Color.inkSoft)
-                        Text("You said **\(said(talk, a, mine: true))**, \(place.theirName) said **\(said(talk, b, mine: false))**. Ask each other why.").font(.pxSmall).foregroundStyle(Color.inkSoft)
+                        let point = talkPoint(talk, a, b, them: place.theirName)
+                        // (the talking point names both answers itself, except on Flirty and Who's more likely cards)
+                        let both = talk.kind == .flirt || talk.style == .likely || point == nil
+                        Group {
+                            if both {
+                                Text("You said **\(said(talk, a, mine: true))**, \(place.theirName) said **\(said(talk, b, mine: false))**. \(point ?? "Ask each other why.")")
+                            } else {
+                                Text(point ?? "Ask each other why.")
+                            }
+                        }
+                        .font(.pxSmall).foregroundStyle(Color.inkSoft)
                     }
                     .padding(12).frame(maxWidth: .infinity, alignment: .leading).pxInset()
                 } else {
@@ -450,7 +492,7 @@ struct RevealView: View {
 
             ForEach(cards) { c in
                 if let a = mine[c.id], let b = theirs[c.id] {
-                    cardView(c, a, b)
+                    cardView(c, a, b, talking: !compact && tag == nil && c.id != talk?.id)
                 }
             }
         }
@@ -459,12 +501,12 @@ struct RevealView: View {
 
     private func said(_ c: Card, _ x: CardAnswer, mine: Bool) -> String {
         if c.style == .likely { return (x.pick == 0) == mine ? place.myName : place.theirName }
-        if c.style == .open { return x.text ?? "—" }
+        if c.style == .open { return x.text ?? (x.aloud == true ? "Saving this one for your call" : "—") }
         return x.pick < c.options.count ? c.options[x.pick] : "—"
     }
 
     @ViewBuilder
-    private func cardView(_ c: Card, _ a: CardAnswer, _ b: CardAnswer) -> some View {
+    private func cardView(_ c: Card, _ a: CardAnswer, _ b: CardAnswer, talking: Bool = false) -> some View {
         let myLook = place.myLook, theirLook = place.theirLook ?? Wardrobe.defaultB
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -472,10 +514,10 @@ struct RevealView: View {
                 Text(c.title).font(.pxBodyBold).foregroundStyle(Color.inkSoft).fixedSize(horizontal: false, vertical: true)
             }
             if c.style == .open {
-                ForEach([(myLook, a.text ?? "—"), (theirLook, b.text ?? "—")], id: \.1) { look, t in
+                ForEach(Array([(myLook, a), (theirLook, b)].enumerated()), id: \.offset) { i, x in
                     HStack(alignment: .top, spacing: 8) {
-                        HeadView(look: look, size: 26)
-                        Text(t).font(.pxBody).foregroundStyle(Color.inkSoft).fixedSize(horizontal: false, vertical: true)
+                        HeadView(look: x.0, size: 26)
+                        Text(said(c, x.1, mine: i == 0)).font(.pxBody).italic(x.1.text == nil).foregroundStyle(x.1.text == nil ? Color.muted : Color.inkSoft).fixedSize(horizontal: false, vertical: true)
                         Spacer(minLength: 0)
                     }
                     .padding(10).pxInset()
@@ -505,8 +547,9 @@ struct RevealView: View {
                     }
                 }
             }
-            if c.note {
-                ForEach([(myLook, a.note), (theirLook, b.note)].compactMap { x in x.1.map { (x.0, $0) } }, id: \.1) { look, n in
+            if a.note != nil || b.note != nil {
+                ForEach(Array([(myLook, a.note), (theirLook, b.note)].compactMap { x in x.1.map { (x.0, $0) } }.enumerated()), id: \.offset) { _, x in
+                    let (look, n) = x
                     HStack(alignment: .top, spacing: 8) {
                         HeadView(look: look, size: 24)
                         Text("“\(n)”").font(.px(15)).italic().foregroundStyle(Color.inkSoft).fixedSize(horizontal: false, vertical: true)
@@ -514,6 +557,9 @@ struct RevealView: View {
                     }
                     .padding(10).pxInset()
                 }
+            }
+            if talking, let t = talkPoint(c, a, b, them: place.theirName) {
+                Text("Talk: \(t)").font(.pxSmall).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
             }
         }
     }

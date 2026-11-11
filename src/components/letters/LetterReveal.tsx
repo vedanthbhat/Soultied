@@ -3,7 +3,7 @@ import type { UserProfile } from '../../types';
 import { AvatarThumb } from '../PixelAvatarRenderer';
 import { PixelIcon } from './PixelIcon';
 import { KIND_LABEL, LetterDay } from '../../letters/engine';
-import { cardTitle, cardsOf, sameAnswer, scoreDay } from '../../letters/cards';
+import { cardTitle, cardsOf, sameAnswer, scoreDay, talkPoint } from '../../letters/cards';
 
 interface Props {
   day: LetterDay;
@@ -90,10 +90,15 @@ export const LetterReveal: React.FC<Props> = ({ day, me, partner, night, compact
           <span className={`px-tag self-start ${night ? 'px-tag--night' : ''}`}>Talk about it tonight</span>
           <span className="font-semibold leading-snug">{cardTitle(talk)}</span>
           <span className="text-sm leading-snug">
-            You said <strong>{talk.style === 'likely' ? (mine[talk.id].pick === 0 ? me.name : partner.name) : talk.options[mine[talk.id].pick]}</strong>,{' '}
-            {partner.name} said{' '}
-            <strong>{talk.style === 'likely' ? (theirs[talk.id].pick === 0 ? partner.name : me.name) : talk.options[theirs[talk.id].pick]}</strong>. Ask
-            each other why.
+            {/* (the talking point names both answers itself, except on Flirty and Who's more likely cards) */}
+            {(talk.kind === 'flirt' || talk.style === 'likely' || !talkPoint(talk, mine[talk.id], theirs[talk.id], partner.name)) && (
+              <>
+                You said <strong>{talk.style === 'likely' ? (mine[talk.id].pick === 0 ? me.name : partner.name) : talk.options[mine[talk.id].pick]}</strong>,{' '}
+                {partner.name} said{' '}
+                <strong>{talk.style === 'likely' ? (theirs[talk.id].pick === 0 ? partner.name : me.name) : talk.options[theirs[talk.id].pick]}</strong>.{' '}
+              </>
+            )}
+            {talkPoint(talk, mine[talk.id], theirs[talk.id], partner.name) || 'Ask each other why.'}
           </span>
         </div>
       )}
@@ -118,12 +123,14 @@ export const LetterReveal: React.FC<Props> = ({ day, me, partner, night, compact
               {c.style === 'open' ? (
                 <div className="flex flex-col gap-1.5 pl-1">
                   {[
-                    { who: me, text: a.text },
-                    { who: partner, text: b.text },
+                    { who: me, x: a },
+                    { who: partner, x: b },
                   ].map((n) => (
                     <div key={n.who.id} className="px-inset px-3 py-2 flex items-start gap-2">
                       <Head who={n.who} />
-                      <span className="leading-snug whitespace-pre-line">{n.text || '—'}</span>
+                      <span className={`leading-snug whitespace-pre-line ${!n.x.text && n.x.aloud ? 'italic text-[var(--muted)]' : ''}`}>
+                        {n.x.text || (n.x.aloud ? 'Saving this one for your call' : '—')}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -161,7 +168,7 @@ export const LetterReveal: React.FC<Props> = ({ day, me, partner, night, compact
                   </span>
                 </div>
               )}
-              {c.note && (a.note || b.note) && (
+              {(a.note || b.note) && (
                 <div className="flex flex-col gap-1.5 pl-1">
                   {[
                     { who: me, text: a.note },
@@ -176,6 +183,10 @@ export const LetterReveal: React.FC<Props> = ({ day, me, partner, night, compact
                     ))}
                 </div>
               )}
+              {!compact && !tag && c.id !== talk?.id && (() => {
+                const t = talkPoint(c, a, b, partner.name);
+                return t ? <span className="pl-1 text-sm leading-snug text-[var(--muted)]">Talk: {t}</span> : null;
+              })()}
             </li>
           );
         })}
