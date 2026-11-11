@@ -26,7 +26,7 @@ final class WatchSceneTests: XCTestCase {
         let fx = try fixtures()
         let ls = looks(fx)
         let backs = fx["backs"] as! [Doc]
-        XCTAssertEqual(backs.count, 33)
+        XCTAssertEqual(backs.count, 51)
         var bad: [String] = []
         for b in backs {
             let i = b.int("look")!

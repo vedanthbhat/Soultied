@@ -591,8 +591,9 @@ public func renderCharacterBack(_ cfg: AvatarConfig, lean: Double = 0, bob: Doub
 
     // --- head ---
     let hx = cx + lean
-    let rx: Double = cfg.hairStyle == "curls" ? 14 : 12
-    let ry: Double = cfg.hairStyle == "curls" ? 13.5 : 12.5
+    let big = cfg.hairStyle == "afro"
+    let rx: Double = big ? 16 : cfg.hairStyle == "curls" ? 14 : 12
+    let ry: Double = big ? 15 : cfg.hairStyle == "curls" ? 13.5 : 12.5
     func inHead(_ x: Double, _ y: Double, _ rX: Double = rx, _ rY: Double = ry) -> Bool {
         let a = (x + 0.5 - hx) / rX, c = (y + 0.5 - headCy) / rY
         return a * a + c * c <= 1
@@ -627,7 +628,7 @@ public func renderCharacterBack(_ cfg: AvatarConfig, lean: Double = 0, bob: Doub
                 if top1 { c = hair.light } else if rightSide { c = hair.shadow } // rim light from the TV
                 // strand texture
                 if !top1 && (hxx * 3 + hy).truncatingRemainder(dividingBy: 7) == 0 { c = rightSide ? hair.base : hair.shadow }
-                if style == "curls" && (hxx + hy * 2).truncatingRemainder(dividingBy: 4) == 0 { c = hair.light }
+                if (style == "curls" || big) && (hxx + hy * 2).truncatingRemainder(dividingBy: 4) == 0 { c = hair.light }
                 b.S(hxx, hy, c)
             }
         }
@@ -692,6 +693,21 @@ public func renderCharacterBack(_ cfg: AvatarConfig, lean: Double = 0, bob: Doub
         }
         b.R(hx - 1, BH - 3, 3, 2, RGB("#c4453f")) // tie
     }
+    // pigtails: a bunch either side, tied with red
+    if style == "pigtails" {
+        for side in [-1.0, 1.0] {
+            let bx = hx + side * (rx + 2)
+            for yy in -4...5 {
+                for xx in -3...3 {
+                    let a = Double(xx) / 3.2, c = Double(yy) / 5.5
+                    if a * a + c * c <= 1 {
+                        b.S(bx + Double(xx), headCy + 4 + Double(yy), Double(xx) * side > 1 ? hair.shadow : yy < -2 ? hair.light : hair.base)
+                    }
+                }
+            }
+            b.R(bx - 1 - (side > 0 ? 1 : 0), headCy - 1, 3, 2, RGB("#c4453f"))
+        }
+    }
     // hijab drapes over the shoulders
     if style == "hijab" {
         var jy = headCy
@@ -740,6 +756,88 @@ public func renderCharacterBack(_ cfg: AvatarConfig, lean: Double = 0, bob: Doub
         b.HL(hx - 4, headCy - 3, 8, top.shadow)
     } else if cfg.hat == "clip" {
         b.R(hx + 5, headCy - 6, 4, 2, RGB("#d9a441"))
+    } else if cfg.hat == "party" {
+        // a striped cone, and its pompom
+        let top0 = (headCy - ry).rounded(.down) - 11
+        for r in 0..<12 {
+            let half = 1 + Double(r / 2)
+            var x = hx - half
+            while x < hx + half {
+                let k = ((x - hx + Double(r) + 40) / 2).rounded(.down)
+                b.S(x, top0 + Double(r), k.truncatingRemainder(dividingBy: 2) == 0 ? RGB("#c4453f") : RGB("#f3e7cf"))
+                x += 1
+            }
+        }
+        b.R(hx - 2, top0 - 3, 4, 3, RGB("#e2b359"))
+        b.S(hx - 1, top0 - 3, RGB("#f6d77a"))
+    } else if cfg.hat == "crown" {
+        let y0 = (headCy - ry).rounded(.down) - 1
+        b.R(hx - 8, y0, 16, 3, RGB("#e2b359"))
+        b.HL(hx - 8, y0 + 2, 16, RGB("#b0842f"))
+        for dx in [-8.0, -2, 4] {
+            b.R(hx + dx, y0 - 3, 3, 3, RGB("#e2b359"))
+            b.S(hx + dx + 1, y0 - 4, RGB("#f6d77a"))
+        }
+        b.R(hx - 1, y0 + 1, 2, 1, RGB("#c4453f"))
+    } else if cfg.hat == "bunny" {
+        let y0 = (headCy - ry).rounded(.down)
+        for dx in [-7.0, 3] {
+            b.R(hx + dx, y0 - 9, 4, 10, RGB("#f3ece0"))
+            b.R(hx + dx + 1, y0 - 8, 2, 7, RGB("#e8a9b0"))
+        }
+        var px = hx - rx
+        while px <= hx + rx {
+            let q = (px - hx) / rx
+            let py = jsRound(headCy - max(0, 1 - q * q).squareRoot() * ry)
+            b.S(px, py, RGB("#d98c8c"))
+            b.S(px, py + 1, RGB("#d98c8c"))
+            px += 1
+        }
+    } else if cfg.hat == "propeller" {
+        var py = (headCy - ry - 1).rounded(.down)
+        while py < headCy - 3 {
+            var px = hx - rx
+            while px <= hx + rx {
+                if inHead(px, py, rx + 0.5, ry + 0.5) {
+                    b.S(px, py, px < hx - 1 ? RGB("#c4453f") : px < hx + 1 ? RGB("#e2b359") : RGB("#4f6fa8"))
+                }
+                px += 1
+            }
+            py += 1
+        }
+        let y0 = (headCy - ry).rounded(.down) - 4
+        b.R(hx - 1, y0, 2, 3, RGB("#e2b359"))
+        b.R(hx - 9, y0 - 1, 8, 2, RGB("#c4453f"))
+        b.R(hx + 1, y0 - 1, 8, 2, RGB("#4f6fa8"))
+    } else if cfg.hat == "flowers" {
+        let cols = [RGB("#e8a9b0"), RGB("#f0c860"), RGB("#fbf5e9"), RGB("#e07a5f")]
+        var i = 0
+        var px = hx - rx + 1
+        while px <= hx + rx - 1 {
+            let q = (px - hx) / rx
+            let py = jsRound(headCy - max(0, 1 - q * q).squareRoot() * ry) + 1
+            b.S(px + 1, py + 1, RGB("#6a8f5a"))
+            b.R(px, py - 1, 2, 2, cols[i % cols.count])
+            px += 3
+            i += 1
+        }
+    } else if cfg.hat == "frog" {
+        var py = (headCy - ry - 1).rounded(.down)
+        while py < headCy - 2 {
+            var px = hx - rx - 1
+            while px <= hx + rx + 1 {
+                if inHead(px, py, rx + 1.5, ry + 1) {
+                    b.S(px, py, py > headCy - 5 ? RGB("#8bbf68") : px > hx + 4 ? RGB("#4a7236") : RGB("#6a9a4f"))
+                }
+                px += 1
+            }
+            py += 1
+        }
+        let y0 = (headCy - ry).rounded(.down) - 4
+        for dx in [-8.0, 3] {
+            b.R(hx + dx, y0, 5, 4, RGB("#6a9a4f"))
+            b.HL(hx + dx, y0, 5, RGB("#8bbf68"))
+        }
     }
     if cfg.extra == "headphones" {
         var px = hx - rx

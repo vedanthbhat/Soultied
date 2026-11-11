@@ -91,6 +91,69 @@ func drawWallpaper(_ L: Layer, _ wall: String) {
             y0 += 24
             row += 1
         }
+    case "polka":
+        // oat with rows of rust polka dots
+        L.R(0, 0, RW, FLOOR_Y, hx("#b8a27e"))
+        var row = 0.0, y = top + 4
+        while y < bottom - 2 {
+            var x = jm(row, 2) != 0 ? 5.0 : 0.0
+            while x < RW {
+                L.R(x, y, 3, 2, hx("#9c5f4a"))
+                L.HL(x, y + 2, 3, hx("#8a5241"))
+                L.S(x, y, hx("#b0735c"))
+                x += 10
+            }
+            y += 9
+            row += 1
+        }
+    case "candy":
+        // dusty pink candy stripes
+        L.R(0, 0, RW, FLOOR_Y, hx("#c49a93"))
+        var x = 0.0
+        while x < RW {
+            L.R(x, 4, 4, 92, hx("#b3857f"))
+            L.VL(x + 4, 4, 92, hx("#d2aaa2"))
+            x += 10
+        }
+    case "starlit":
+        // violet night, with pale stars and the odd moon (the app's Starlight look)
+        L.R(0, 0, RW, FLOOR_Y, hx("#3d3660"))
+        var y = top + 2
+        while y < bottom {
+            var x = jm(y / 5, 2) != 0 ? 2.0 : 0.0
+            while x < RW {
+                L.S(x, y, hx("#463e6c"))
+                x += 5
+            }
+            y += 5
+        }
+        y = 10
+        var row = 0.0
+        while y < bottom - 4 {
+            var x = jm(row, 2) != 0 ? 9.0 : 1.0
+            while x < RW {
+                let sx = x + fl(hash(x * 5 + row * 29) * 4) - 2
+                let sy = y + fl(hash(x * 11 + row * 17) * 4) - 2
+                let k = hash(x + row * 53)
+                if k > 0.86 {
+                    // a little crescent moon
+                    L.HL(sx, sy - 1, 2, hx("#e9d9a6"))
+                    L.S(sx - 1, sy, hx("#e9d9a6"))
+                    L.S(sx - 1, sy + 1, hx("#e9d9a6"))
+                    L.HL(sx, sy + 2, 2, hx("#e9d9a6"))
+                } else if k > 0.5 {
+                    L.S(sx, sy - 1, hx("#8d84b0"))
+                    L.HL(sx - 1, sy, 3, hx("#8d84b0"))
+                    L.S(sx, sy + 1, hx("#8d84b0"))
+                    L.S(sx, sy, hx("#efe2b4"))
+                } else {
+                    L.S(sx, sy, hx("#9a90bd"))
+                }
+                x += 15
+            }
+            y += 14
+            row += 1
+        }
     case "forest":
         // dark green scattered with little leaves
         L.R(0, 0, RW, FLOOR_Y, hx("#3c5140"))
@@ -708,6 +771,9 @@ let COUCHES: [String: CouchLook] = [
     "linen": CouchLook(c: hx("#d6c3a0"), l: hx("#e6d6b6"), d: hx("#b9a483"), dd: hx("#978265"), pillowA: (hx("#b8674f"), hx("#95513e")), pillowB: (P.sage, P.sageD), dots: P.cream, blanket: RUST),
     "navy": CouchLook(c: hx("#3e5277"), l: hx("#51678f"), d: hx("#2f405f"), dd: hx("#233049"), pillowA: (P.mustard, P.mustardD), pillowB: (P.cream, P.creamD), dots: hx("#3e5277"), blanket: RUST),
     "plum": CouchLook(c: hx("#7a4a62"), l: hx("#8f5d77"), d: hx("#613a4e"), dd: hx("#4a2c3c"), pillowA: (P.mustard, P.mustardD), pillowB: (P.cream, P.creamD), dots: hx("#7a4a62"), blanket: SAGE_THROW),
+    "rose": CouchLook(c: hx("#c08681"), l: hx("#d39d97"), d: hx("#a26b66"), dd: hx("#82504c"), pillowA: (P.cream, P.creamD), pillowB: (P.sage, P.sageD), dots: hx("#c08681"), blanket: SAGE_THROW),
+    "teal": CouchLook(c: hx("#4f8a83"), l: hx("#65a199"), d: hx("#3d6e68"), dd: hx("#2d524d"), pillowA: (P.mustard, P.mustardD), pillowB: (P.cream, P.creamD), dots: hx("#4f8a83"), blanket: RUST),
+    "lavender": CouchLook(c: hx("#8b78ad"), l: hx("#a090c1"), d: hx("#705e8e"), dd: hx("#55476f"), pillowA: (P.cream, P.creamD), pillowB: (P.mustard, P.mustardD), dots: hx("#8b78ad"), blanket: SAGE_THROW),
 ]
 
 func drawCouch(_ L: Layer, _ look: String) {

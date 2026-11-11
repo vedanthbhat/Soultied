@@ -98,14 +98,17 @@ public enum Wardrobe {
         Swatch("rose", "Dusty rose", "#c98f86", "#dba69d", "#a7706a"),
         Swatch("charcoal", "Charcoal", "#4a4548", "#605a5d", "#343033"),
         Swatch("cocoa", "Cocoa", "#6b4a3c", "#825c4b", "#4f352b"),
+        Swatch("lilac", "Lilac", "#9a86b8", "#b19fcc", "#76648f"),
+        Swatch("sky", "Sky", "#7d9fc0", "#97b6d3", "#5d7d9c"),
+        Swatch("coral", "Coral", "#dd7a62", "#ec947c", "#b35d48"),
     ]
 
     public static let hairStyles: [Choice] = [
         Choice("tousled", "Tousled"), Choice("crop", "Side part"), Choice("curls", "Curls"), Choice("bob", "Bob"),
         Choice("long", "Long waves"), Choice("bun", "Top bun"), Choice("braid", "Side braid"), Choice("hijab", "Hijab"),
-        Choice("buzz", "Buzz"), Choice("bald", "Bald"),
+        Choice("buzz", "Buzz"), Choice("bald", "Bald"), Choice("afro", "Big afro"), Choice("pigtails", "Pigtails"),
     ]
-    public static let facialHair: [Choice] = [Choice("none", "None"), Choice("stubble", "Stubble"), Choice("mustache", "Mustache"), Choice("beard", "Beard")]
+    public static let facialHair: [Choice] = [Choice("none", "None"), Choice("stubble", "Stubble"), Choice("mustache", "Mustache"), Choice("beard", "Beard"), Choice("handlebar", "Handlebar")]
     public static let tops: [Choice] = [
         Choice("sweater", "Sweater"), Choice("cardigan", "Cardigan"), Choice("hoodie", "Hoodie"), Choice("shirt", "Shirt"),
         Choice("turtleneck", "Turtleneck"), Choice("tee", "Tee"), Choice("kurta", "Kurta"),
@@ -114,12 +117,20 @@ public enum Wardrobe {
         Choice("trousers", "Trousers"), Choice("jeans", "Jeans"), Choice("joggers", "Joggers"), Choice("pajamas", "Pyjamas"),
         Choice("skirt", "Skirt"), Choice("shorts", "Shorts"),
     ]
-    public static let shoes: [Choice] = [Choice("socks", "Cosy socks"), Choice("slippers", "Slippers"), Choice("sneakers", "Sneakers"), Choice("boots", "Boots")]
-    public static let glasses: [Choice] = [Choice("none", "None"), Choice("round", "Round"), Choice("square", "Square"), Choice("gold", "Gold wire")]
-    public static let hats: [Choice] = [Choice("none", "None"), Choice("beanie", "Beanie"), Choice("cap", "Cap"), Choice("clip", "Hair clip")]
+    public static let shoes: [Choice] = [Choice("socks", "Cosy socks"), Choice("slippers", "Slippers"), Choice("sneakers", "Sneakers"), Choice("boots", "Boots"), Choice("bunnies", "Bunny slippers")]
+    public static let glasses: [Choice] = [
+        Choice("none", "None"), Choice("round", "Round"), Choice("square", "Square"), Choice("gold", "Gold wire"),
+        Choice("hearts", "Heart specs"), Choice("shades", "Cool shades"), Choice("monocle", "Monocle"),
+    ]
+    public static let hats: [Choice] = [
+        Choice("none", "None"), Choice("beanie", "Beanie"), Choice("cap", "Cap"), Choice("clip", "Hair clip"),
+        Choice("party", "Party hat"), Choice("crown", "Crown"), Choice("bunny", "Bunny ears"), Choice("propeller", "Propeller cap"),
+        Choice("flowers", "Flower crown"), Choice("frog", "Frog hat"),
+    ]
     public static let extras: [Choice] = [
         Choice("none", "None"), Choice("scarf", "Red thread scarf"), Choice("headphones", "Headphones"), Choice("hoops", "Gold hoops"),
-        Choice("blanket", "Blanket (sitting)"),
+        Choice("blanket", "Blanket (sitting)"), Choice("bowtie", "Bow tie"), Choice("nose", "Clown nose"), Choice("freckles", "Freckles"),
+        Choice("mug", "Mug of tea"),
     ]
 
     public static let defaultA = AvatarConfig(
@@ -172,21 +183,22 @@ public enum Wardrobe {
     public static func random() -> AvatarConfig {
         func any(_ l: [Choice]) -> String { l.randomElement()!.id }
         func anyS(_ l: [Swatch]) -> String { l.randomElement()!.id }
-        let hairStyle = any(hairStyles)
+        // (the sillier pieces are there to pick, not to be handed at random)
+        let hairStyle = any(Array(hairStyles.prefix(10)))
         return AvatarConfig(
             height: ["short", "medium", "tall"].randomElement()!,
             skin: anyS(skinTones),
             hairStyle: hairStyle,
             hairColor: hairStyle == "hijab" ? anyS(clothColors) : anyS(Array(hairColors.prefix(6))),
-            facialHair: Double.random(in: 0..<1) < 0.3 ? any(facialHair) : "none",
+            facialHair: Double.random(in: 0..<1) < 0.3 ? any(Array(facialHair.prefix(4))) : "none",
             top: any(tops),
             topColor: anyS(clothColors),
             bottom: any(bottoms),
             bottomColor: anyS(clothColors),
-            shoes: any(shoes),
+            shoes: any(Array(shoes.prefix(4))),
             shoesColor: anyS(clothColors),
-            glasses: Double.random(in: 0..<1) < 0.35 ? any(Array(glasses.dropFirst())) : "none",
-            hat: Double.random(in: 0..<1) < 0.2 && hairStyle != "hijab" ? any(Array(hats.dropFirst())) : "none",
+            glasses: Double.random(in: 0..<1) < 0.35 ? any(Array(glasses[1..<4])) : "none",
+            hat: Double.random(in: 0..<1) < 0.2 && hairStyle != "hijab" ? any(Array(hats[1..<4])) : "none",
             extra: Double.random(in: 0..<1) < 0.4 ? any(Array(extras[1..<4])) : "none"
         )
     }
@@ -215,7 +227,34 @@ private let HEAD = [
 private let EYE_L = 3
 private let EYE_R = 8
 
-private let HAIR_FRONT: [String: (top: Int, rows: [String])] = [
+/// front hair: 14 wide, a pixel left of the head, `top` rows above it (`dx` moves a wider one left)
+private let HAIR_FRONT: [String: (top: Int, rows: [String], dx: Int)] = [
+    "afro": (6, [
+        "....hhhhhhhhhh....",
+        "..hhhHhhhHhhhhhh..",
+        ".hhHhhHhhhhhHhhhh.",
+        ".hHhhhhhhhhhhhhhh.",
+        "hhhhhHhhhhhHhhhhhh",
+        "hHhhhhhhhhhhhhhhjh",
+        "hhhhhhhhhhhhhhhhjh",
+        "hhhhhjhhhhhhjhhhjh",
+        "hhhj..........jhhh",
+        "hhh............hhh",
+        "hhh............hhh",
+        "hhj............jhh",
+        "hj..............jh",
+        ".h..............h.",
+    ], -2),
+    "pigtails": (2, [
+        "...hhhhhhhh...",
+        "..hHHHhhhhhh..",
+        ".hHHhhhhhhhhh.",
+        "hHHhhhhhhhhhhh",
+        "hHhhhhhhhhhhhh",
+        "hhhjjjjjjjjhhh",
+        "hhj........jhh",
+        "hj..........jh",
+    ], 0),
     "tousled": (3, [
         "....hhh.hh....",
         "..hhHHhhHhhh..",
@@ -226,7 +265,7 @@ private let HAIR_FRONT: [String: (top: Int, rows: [String])] = [
         "hhj..jhhj..jhh",
         "hh.........jhh",
         "hj...........h",
-    ]),
+    ], 0),
     "crop": (2, [
         "...hhhhhhhh...",
         "..hHHHHhhhhh..",
@@ -236,7 +275,7 @@ private let HAIR_FRONT: [String: (top: Int, rows: [String])] = [
         "hhhhhjj....jhh",
         "hj.........jhh",
         "h............h",
-    ]),
+    ], 0),
     "curls": (4, [
         "...hH.hHh.Hh..",
         "..hHhhHhhhhHh.",
@@ -249,7 +288,7 @@ private let HAIR_FRONT: [String: (top: Int, rows: [String])] = [
         "hh..........hh",
         "hj..........jh",
         "h............h",
-    ]),
+    ], 0),
     "bob": (2, [
         "...hhhhhhhh...",
         "..hHHHhhhhhh..",
@@ -263,7 +302,7 @@ private let HAIR_FRONT: [String: (top: Int, rows: [String])] = [
         "hhj........jhh",
         "hhj........jhh",
         "hj..........jh",
-    ]),
+    ], 0),
     "long": (2, [
         "...hhhhhhhh...",
         "..hHHHhhhhhh..",
@@ -277,7 +316,7 @@ private let HAIR_FRONT: [String: (top: Int, rows: [String])] = [
         "hhj........jhh",
         "hhj........jhh",
         "hj..........jh",
-    ]),
+    ], 0),
     "bun": (7, [
         ".....hhhh.....",
         "....hHHhhh....",
@@ -291,7 +330,7 @@ private let HAIR_FRONT: [String: (top: Int, rows: [String])] = [
         "hhhhjj..jjhhhh",
         "hhj........jhh",
         "hj..........jh",
-    ]),
+    ], 0),
     "braid": (2, [
         "...hhhhhhhh...",
         "..hHHHhhhhhh..",
@@ -305,7 +344,7 @@ private let HAIR_FRONT: [String: (top: Int, rows: [String])] = [
         "...........hhj",
         "...........jhh",
         "...........hhj",
-    ]),
+    ], 0),
     "hijab": (3, [
         "....hhhhhh....",
         "..hhHHHhhhhh..",
@@ -321,17 +360,28 @@ private let HAIR_FRONT: [String: (top: Int, rows: [String])] = [
         "hHhhj....jhhhj",
         "hHhhhhhhhhhhhj",
         "jhhhhhHHhhhhjj",
-    ]),
+    ], 0),
     "buzz": (1, [
         "..jjjjjjjjjj..",
         ".jhjhjhjhjhjj.",
         ".jjhjhjhjhjhj.",
         ".j..........j.",
-    ]),
-    "bald": (0, []),
+    ], 0),
+    "bald": (0, [], 0),
 ]
 
-private let HAIR_BACK: [String: (from: Int, rows: [String])] = [
+/// back hair, behind the head and body (same origin as the front; `dx` moves a wider one left)
+private let HAIR_BACK: [String: (from: Int, rows: [String], dx: Int)] = [
+    // two bunches, tied with red bands, sticking out either side
+    "pigtails": (6, [
+        ".jh............hj.",
+        "hhhr..........rhhh",
+        "hHhh..........hhHh",
+        "hHhh..........hhHh",
+        "hhhj..........jhhh",
+        ".hj............jh.",
+        ".j..............j.",
+    ], -2),
     "long": (9, [
         "jhh........hhj",
         "jhh........hhj",
@@ -342,17 +392,17 @@ private let HAIR_BACK: [String: (from: Int, rows: [String])] = [
         ".hhj......jhh.",
         ".jh........hj.",
         "..j........j..",
-    ]),
-    "bob": (10, ["jhh........hhj", "jhhj......jhhj", ".jj........jj."]),
+    ], 0),
+    "bob": (10, ["jhh........hhj", "jhhj......jhhj", ".jj........jj."], 0),
     "hijab": (12, [
         "jhhhhhhhhhhhhj",
         "jhhhhhhhhhhhhj",
         "jhhhhhhhhhhhhj",
         ".jhhhhhhhhhhj.",
         "..jjhhhhhhjj..",
-    ]),
-    "braid": (11, ["...........hhj", "...........jhh", "...........hhj", "...........jhh", "...........hjj", "...........Hh."]),
-    "curls": (10, ["hj..........jh", "hh..........hh", ".j..........j."]),
+    ], 0),
+    "braid": (11, ["...........hhj", "...........jhh", "...........hhj", "...........jhh", "...........hjj", "...........Hh."], 0),
+    "curls": (10, ["hj..........jh", "hh..........hh", ".j..........j."], 0),
 ]
 
 private let TOPS_ART: [String: [String]] = [
@@ -439,9 +489,12 @@ private let GLASSES_ART: [String: (rows: [String], y: Int)] = [
     "round": (["..ggg..ggg..", ".gw..fgw...g", ".g...f.....g", "..fff..fff.."], 4),
     "square": ([".gggggggggg.", ".gw..ggw..g.", ".f...f.f..f.", ".fffff.ffff."], 4),
     "gold": (["..GGG..GGG..", ".Gw..GGw..G.", ".G...G.G..G.", "..GGG..GGG.."], 4),
+    "hearts": (["..r.r..r.r..", ".rrRrrrrRrr.", "..rrr..rrr..", "...r....r..."], 4),
+    "shades": ([".gggggggggg.", ".gwkkggwkkg.", "..kkk..kkk.."], 4),
+    "monocle": ([".......GGG..", "......G...G.", "......G...G.", ".......GGGG.", "..........G.", "..........G."], 4),
 ]
 
-private let HAT_ART: [String: (rows: [String], top: Int)] = [
+private let HAT_ART: [String: (rows: [String], top: Int, pal: Palette?)] = [
     "beanie": ([
         ".....tTt......",
         "....tttttt....",
@@ -450,15 +503,33 @@ private let HAT_ART: [String: (rows: [String], top: Int)] = [
         "tTtttttttttttt",
         "rRrRrRrRrRrRrR",
         "rrrrrrrrrrrrrr",
-    ], 5),
+    ], 5, nil),
     "cap": ([
         "....tTTttt....",
         "..tTTtttttttt.",
         ".tTttttttttttt",
         "tTttttttttttttr",
         "rrrrrrrrrrrrrrrrr",
-    ], 3),
-    "clip": (["..........yY..", "..........Yy.."], 0),
+    ], 3, nil),
+    "clip": (["..........yY..", "..........Yy.."], 0, nil),
+    "party": ([
+        "......yy......", "......Yy......", "......bb......", ".....baab.....", ".....aabb.....", "....abbaab....", "....bbaabb....", "...baabbaab...",
+    ], 9, ["a": RGB("#c4453f"), "b": RGB("#f3e7cf"), "y": RGB("#e2b359"), "Y": RGB("#f6d77a")]),
+    "crown": ([
+        "..Y...YY...Y..", "..yY.yYYy.Yy..", "..yyyyyyyyyy..", "..yryybbyyry..", "..zzzzzzzzzz..",
+    ], 5, ["y": RGB("#e2b359"), "Y": RGB("#f6d77a"), "z": RGB("#b0842f"), "r": RGB("#c4453f"), "b": RGB("#5d7fb3")]),
+    "bunny": ([
+        "...ww....ww...", "..wppw..wppw..", "..wppw..wppw..", "..wppw..wppw..", "...ww....ww...", "...ww....ww...", "..bbbbbbbbbb..",
+    ], 8, ["w": RGB("#f3ece0"), "p": RGB("#e8a9b0"), "b": RGB("#d98c8c")]),
+    "propeller": ([
+        "..rrrr..bbbb..", "......yy......", ".....rygb.....", "....rrygbb....", "...rrrygbbb...", "..rrrrygbbbb..", ".YYYYYYYYYYYY.",
+    ], 8, ["r": RGB("#c4453f"), "b": RGB("#4f6fa8"), "y": RGB("#e2b359"), "Y": RGB("#f6d77a"), "g": RGB("#6a8f5a")]),
+    "flowers": ([
+        "..p...y...w...", ".pPpgyoygwywg.", "g.p.g.y.g.w.g.",
+    ], 3, ["p": RGB("#e8a9b0"), "P": RGB("#f6cfd3"), "y": RGB("#f0c860"), "w": RGB("#fbf5e9"), "g": RGB("#6a8f5a"), "o": RGB("#e07a5f")]),
+    "frog": ([
+        "..www....www..", "..wkw....wkw..", "..gGgggggggg..", ".gGggggggggdg.", "gGgmgggggmggdg", "gggmmmmmmmggdg", "GGGGGGGGGGGGGG", "dddddddddddddd",
+    ], 7, ["w": RGB("#fbf5e9"), "k": RGB("#1f1a1c"), "g": RGB("#6a9a4f"), "G": RGB("#8bbf68"), "d": RGB("#4a7236"), "m": RGB("#2f4a24")]),
 ]
 
 public enum Pose: Sendable { case stand, sit }
@@ -511,7 +582,7 @@ public func renderCharacter(_ cfg: AvatarConfig, _ pose: Pose, _ frame: Characte
     let headTop = torsoTop - 10
 
     let skinPal: Palette = ["s": skin.base, "l": skin.light, "d": skin.shadow, "b": skin.blush, "e": INK_EYE, "m": mix(skin.shadow, RGB("#6a3030"), 0.45)]
-    let hairPal: Palette = ["h": hair.base, "H": hair.light, "j": hair.shadow]
+    let hairPal: Palette = ["h": hair.base, "H": hair.light, "j": hair.shadow, "r": RGB("#c4453f")]
     func clothPal(_ sw: Swatch, _ inner: RGB, _ innerShadow: RGB) -> Palette {
         ["c": sw.base, "C": sw.light, "k": sw.shadow, "K": sw.shadow, "i": inner, "I": innerShadow, "s": skin.base, "l": skin.light, "d": skin.shadow]
     }
@@ -521,7 +592,7 @@ public func renderCharacter(_ cfg: AvatarConfig, _ pose: Pose, _ frame: Characte
     let hairY = headTop - hf.top
 
     // 1. back hair
-    if let hb = HAIR_BACK[cfg.hairStyle] { buf.sprite(hb.rows, hairPal, hairX, hairY + hb.from) }
+    if let hb = HAIR_BACK[cfg.hairStyle] { buf.sprite(hb.rows, hairPal, hairX + hb.dx, hairY + hb.from) }
 
     // 2. legs / bottoms
     drawBottoms(buf, cfg, pose, lapTop: lapTop, legTop: legTop, legLen: legLen, sw: bot, skin: skin)
@@ -580,11 +651,11 @@ public func renderCharacter(_ cfg: AvatarConfig, _ pose: Pose, _ frame: Characte
     drawFacialHair(buf, cfg.facialHair, hair, skin, headTop)
 
     // 7. front hair
-    if !hf.rows.isEmpty { buf.sprite(hf.rows, hairPal, hairX, hairY) }
+    if !hf.rows.isEmpty { buf.sprite(hf.rows, hairPal, hairX + hf.dx, hairY) }
 
     // 8. glasses
     if let gl = GLASSES_ART[cfg.glasses] {
-        let pal: Palette = ["g": RGB("#3a2a26"), "f": mix(RGB("#3a2a26"), skin.shadow, 0.55), "G": RGB("#c9a24e"), "w": RGB("#fbf3e4")]
+        let pal: Palette = ["g": RGB("#3a2a26"), "f": mix(RGB("#3a2a26"), skin.shadow, 0.55), "G": RGB("#c9a24e"), "w": RGB("#fbf3e4"), "r": RGB("#d9475b"), "R": RGB("#f08a96"), "k": RGB("#1f1a1c")]
         buf.sprite(gl.rows, pal, 6, headTop + gl.y)
         buf.set(6 + EYE_L, eyeY, closed ? skin.base : INK_EYE)
         buf.set(6 + EYE_R, eyeY, closed ? skin.base : INK_EYE)
@@ -593,7 +664,7 @@ public func renderCharacter(_ cfg: AvatarConfig, _ pose: Pose, _ frame: Characte
     // 9. hats
     if let hat = HAT_ART[cfg.hat] {
         let hatSw = cfg.hat == "cap" ? top : Wardrobe.clothColors.first { $0.id == (cfg.topColor == "mustard" ? "terracotta" : "mustard") }!
-        let pal: Palette = ["t": hatSw.base, "T": hatSw.light, "r": hatSw.shadow, "R": hatSw.base, "y": RGB("#d9a441"), "Y": RGB("#f0c860")]
+        let pal: Palette = hat.pal ?? ["t": hatSw.base, "T": hatSw.light, "r": hatSw.shadow, "R": hatSw.base, "y": RGB("#d9a441"), "Y": RGB("#f0c860")]
         buf.sprite(hat.rows, pal, cfg.hat == "clip" ? 5 : cfg.hat == "cap" ? 4 : 5, cfg.hat == "clip" ? headTop + 1 : headTop - hat.top)
     }
 
@@ -617,6 +688,33 @@ public func renderCharacter(_ cfg: AvatarConfig, _ pose: Pose, _ frame: Characte
         buf.set(5, headTop + 8, RGB("#b88a30"))
         buf.set(18, headTop + 7, RGB("#e2b555"))
         buf.set(18, headTop + 8, RGB("#b88a30"))
+    } else if cfg.extra == "bowtie" {
+        let r = RGB("#a84f4b"), R = RGB("#c4625b"), k = RGB("#7f3835")
+        let bow: [(Int, Int, RGB)] = [
+            (9, 1, R), (10, 1, r), (13, 1, r), (14, 1, R),
+            (9, 2, r), (10, 2, r), (11, 2, k), (12, 2, k), (13, 2, r), (14, 2, r),
+            (9, 3, R), (10, 3, r), (13, 3, r), (14, 3, R),
+        ]
+        for (x, y, c) in bow { buf.set(x, torsoTop + y, c) }
+    } else if cfg.extra == "nose" {
+        buf.rect(11, headTop + 6, 2, 2, RGB("#d33a3a"))
+        buf.set(11, headTop + 6, RGB("#f08a80"))
+        buf.set(12, headTop + 7, RGB("#a82a2a"))
+    } else if cfg.extra == "freckles" {
+        let f = mix(skin.shadow, RGB("#7a4a32"), 0.5)
+        for (x, y) in [(7, 7), (9, 8), (8, 9), (16, 7), (14, 8), (15, 9)] { buf.set(x, headTop + y, f) }
+    } else if cfg.extra == "mug" {
+        // a mug of tea in your hand (on your lap, sitting)
+        let mx = pose == .sit ? 14 : 17
+        let my = pose == .sit ? lapTop - 4 : handY - 1
+        buf.rect(mx, my, 4, 4, RGB("#f3e7cf"))
+        buf.hline(mx, my, 4, RGB("#7a4a32"))
+        buf.hline(mx, my + 3, 4, RGB("#d3c3a3"))
+        buf.rect(mx + 1, my + 1, 2, 2, RGB("#b8674f"))
+        buf.set(mx + 4, my + 1, RGB("#d3c3a3"))
+        buf.set(mx + 4, my + 2, RGB("#d3c3a3"))
+        buf.set(mx + 1, my - 2, RGB("#e9e0d0"))
+        buf.set(mx + 2, my - 3, RGB("#e9e0d0"))
     }
 
     buf.outline(darken: 0.38)
@@ -760,6 +858,18 @@ private func drawShoes(_ buf: PixelBuffer, _ style: String, _ sw: Swatch, _ y: I
         }
         return
     }
+    if style == "bunnies" {
+        // fluffy white bunnies, ears up
+        for x0 in [7, 13] {
+            buf.rect(x0, y, 4, 2, RGB("#f3ece0"))
+            buf.hline(x0, y + 1, 4, RGB("#cfc6b8"))
+            buf.set(x0 + 1, y - 1, RGB("#f3ece0"))
+            buf.set(x0 + 2, y - 1, RGB("#e8a9b0"))
+            buf.set(x0 == 7 ? x0 : x0 + 3, y, RGB("#e8a9b0"))
+            buf.set(x0 == 7 ? x0 + 1 : x0 + 2, y, RGB("#3a2a26"))
+        }
+        return
+    }
     if style == "boots" {
         for x0 in [7, 13] {
             buf.rect(x0 + 1, y - 2, 3, 2, RGB("#6a4430"))
@@ -786,6 +896,14 @@ private func drawFacialHair(_ buf: PixelBuffer, _ style: String, _ hair: Swatch,
         buf.rect(X + 4, headTop + 7, 4, 1, hair.base)
         buf.set(X + 3, headTop + 8, hair.shadow)
         buf.set(X + 8, headTop + 8, hair.shadow)
+    } else if style == "handlebar" {
+        // a big one, curled up at the ends
+        buf.rect(X + 3, headTop + 7, 6, 1, hair.base)
+        buf.set(X + 5, headTop + 7, hair.light)
+        buf.set(X + 2, headTop + 7, hair.shadow)
+        buf.set(X + 9, headTop + 7, hair.shadow)
+        buf.set(X + 1, headTop + 6, hair.base)
+        buf.set(X + 10, headTop + 6, hair.base)
     } else if style == "beard" {
         for y in 7...11 {
             for x in 0..<12 {

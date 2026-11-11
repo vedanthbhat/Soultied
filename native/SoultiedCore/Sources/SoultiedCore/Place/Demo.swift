@@ -37,7 +37,7 @@ public enum Demo {
             "together": [-6, -4, -1].map { Day.add(today, $0) },
             "shown": [me: 3, them: 3],
         ])
-        db.seed("\(p)/meta/decor", ["earned": ["welcome": 240], "bought": Doc(), "placed": Doc()])
+        db.seed("\(p)/meta/decor", ["earned": ["welcome": 240], "bought": Doc(), "placed": Doc(), "petNames": ["ginger": "Biscuit"]])
         db.seed("\(p)/meta/moods", ["by": [them: ["mood": "missing", "text": "counting the days", "at": nowMs - 2 * 3600e3]], "seen": Doc()])
         db.seed("\(p)/meta/touch", ["items": Doc(), "seen": Doc()])
         db.seed("\(p)/meta/board", ["last": [them: ["at": nowMs - 3 * 3600e3, "kind": "doodle"]], "seen": Doc(), "art": Doodle.art(Doodle.demo, ref: "note-demo-2", by: them, at: nowMs).doc])

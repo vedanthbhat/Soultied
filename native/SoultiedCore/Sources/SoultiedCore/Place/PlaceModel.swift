@@ -701,6 +701,25 @@ public final class PlaceModel {
         if owns(i) { save(meta("decor"), ["placed": [i.slot.rawValue: i.id]], "decor") }
     }
 
+    /// what the pet that's out is called (nil until someone names it)
+    public var petName: String? { decor.pet == "none" ? nil : decorDoc.petNames[decor.pet] }
+    public func petName(_ id: String) -> String? { decorDoc.petNames[id] }
+
+    /// give a pet its name, or a new one
+    public func namePet(_ i: DecorItem, _ raw: String) {
+        let name = DecorDoc.cleanPetName(raw)
+        guard i.slot == .pet, i.id != "none", !name.isEmpty else { return }
+        let before = decorDoc.petNames[i.id]
+        guard name != before else { return }
+        save(meta("decor"), ["petNames": [i.id: name]], "decor")
+        let what = i.name.lowercased()
+        if let before {
+            activity(.new(.roomDecorated, "A new name", "\(myName) renamed \(before) the \(what): now it’s \(name)."))
+        } else {
+            activity(.new(.roomDecorated, "A name for the pet", "\(myName) named the \(what) \(name)."))
+        }
+    }
+
     /* ---------- you two ---------- */
 
     public func setLook(_ a: AvatarConfig) {

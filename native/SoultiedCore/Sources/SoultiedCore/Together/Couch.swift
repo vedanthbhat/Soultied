@@ -90,6 +90,9 @@ public enum Catalogue {
         i(.wall, "midnight", "Midnight stars", 80, "Deep blue, with little gold stars all over."),
         i(.wall, "clay", "Clay arches", 100, "Terracotta with a row of soft arches."),
         i(.wall, "forest", "Forest leaves", 100, "Dark green, scattered with leaves."),
+        i(.wall, "polka", "Polka dots", 70, "Oat, with rows of little rust dots."),
+        i(.wall, "candy", "Candy stripes", 70, "Dusty pink stripes, like a sweet shop."),
+        i(.wall, "starlit", "Starlit violet", 120, "A violet night of tiny stars and crescent moons."),
 
         i(.couch, "terracotta", "Terracotta", 0, "The couch you started on."),
         i(.couch, "sage", "Sage velvet", 120, "Soft green velvet, with a terracotta throw."),
@@ -97,6 +100,9 @@ public enum Catalogue {
         i(.couch, "linen", "Oat linen", 120, "Pale and calm, with rust and sage cushions."),
         i(.couch, "navy", "Navy", 150, "Deep blue, with mustard and cream cushions."),
         i(.couch, "plum", "Plum", 150, "Rich plum velvet, very cosy."),
+        i(.couch, "rose", "Rose", 150, "Dusty pink, with cream and sage cushions."),
+        i(.couch, "teal", "Teal", 150, "Deep teal velvet and a rust throw."),
+        i(.couch, "lavender", "Lavender", 180, "Soft violet, for starry nights in."),
 
         i(.rug, "diamond", "Diamond rug", 0, "The cream rug with terracotta diamonds."),
         i(.rug, "moss", "Moss rug", 50, "Plain soft green, with a cream border."),
@@ -110,6 +116,13 @@ public enum Catalogue {
         i(.pet, "bunny", "White bunny", 180, "A fluffy loaf with its ears tucked back."),
         i(.pet, "pug", "Sleepy pug", 200, "Snores a little. Worth it."),
         i(.pet, "corgi", "Corgi", 250, "Big ears, short legs, deeply asleep."),
+        i(.pet, "smoky", "Grey cat", 150, "A smoky grey curl. Purrs in its sleep."),
+        i(.pet, "hamster", "Hamster", 120, "A round little fluffball, cheeks full."),
+        i(.pet, "duck", "Duckling", 160, "A fuzzy yellow duckling, beak tucked in."),
+        i(.pet, "frog", "Frog", 160, "A very round frog. Do not ask how it got in."),
+        i(.pet, "sausage", "Sausage dog", 220, "Long. Very long. Asleep end to end."),
+        i(.pet, "fox", "Fox", 260, "Curled up under its big white-tipped tail."),
+        i(.pet, "piglet", "Piglet", 220, "Pink, snoring softly, curly tail and all."),
 
         i(.view, "snow", "Snowy night", 0, "Snow falling on the hills, and a moon."),
         i(.view, "rain", "Rainy evening", 80, "Rain against the glass. Best with the fire on."),
@@ -166,8 +179,18 @@ public struct DecorDoc: Sendable, Equatable {
     public var earned: [String: Int] = [:]
     public var bought: [String: Purchase] = [:]
     public var placed: [String: String] = [:]
+    /// what you've called each pet you've had ("ginger": "Biscuit")
+    public var petNames: [String: String] = [:]
 
     public init() {}
+
+    /// how long a pet's name can be (the website's PET_NAME_MAX)
+    public static let petNameMax = 20
+    /// spaces squeezed, trimmed, and cut to length (the website's cleanPetName)
+    public static func cleanPetName(_ s: String) -> String {
+        let squeezed = s.split(whereSeparator: { $0.isWhitespace }).joined(separator: " ")
+        return String(squeezed.prefix(petNameMax))
+    }
 
     public init(_ raw: Doc?) {
         let r = raw ?? [:]
@@ -177,6 +200,9 @@ public struct DecorDoc: Sendable, Equatable {
             bought[k] = Purchase(by: p.str("by") ?? "", at: p.num("at") ?? 0, price: p.int("price") ?? 0)
         }
         placed = r.map("placed").compactMapValues { $0 as? String }
+        for (k, v) in r.map("petNames") {
+            if let s = v as? String { let n = Self.cleanPetName(s); if !n.isEmpty { petNames[k] = n } }
+        }
     }
 
     public var balance: Int { earned.values.reduce(0, +) - bought.values.reduce(0) { $0 + $1.price } }

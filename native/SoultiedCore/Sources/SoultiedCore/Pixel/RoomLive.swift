@@ -547,6 +547,60 @@ func drawTurntable(_ L: Layer, _ t: Double, _ playing: Bool, _ hover: Bool) {
 struct PetBox { static let x = 186.0, y = 153.0 }
 
 let PET_SPRITES: [String: (rows: [String], pal: [Character: RGB], dx: Double, dy: Double)] = [
+    "hamster": ([
+        "....pp................",
+        "...pPpoooooooo........",
+        "..oOOOOOOOOOOOoo......",
+        ".oOkOOOOOOOOOOOOo.....",
+        "onOOOWWWWWOOOOOOo.....",
+        ".oWWWWWWWWWWWOOOo.....",
+        "..ooooooooooooooo.....",
+    ], ["o": hx("#b9803f"), "O": hx("#e0a95c"), "W": hx("#fbf1df"), "k": hx("#2b2224"), "n": hx("#e3a9a9"), "p": hx("#e3a9a9"), "P": hx("#f3c5c5")], 1, -2),
+    "duck": ([
+        "..........yyyyy.......",
+        "..yyy...yyYYYYYyy.....",
+        ".yYYYy.yYYYYYYYYYy....",
+        "byYkYYyYYYYYYYYYYYy...",
+        "bbYYYYYYYYYYYYYYYYYy..",
+        "..yYYYYYYYYYYYYYYYy...",
+        "...yyyyyyyyyyyyyyy....",
+    ], ["y": hx("#d4a12e"), "Y": hx("#f6d55c"), "b": hx("#e07a3a"), "k": hx("#2b2224")], -1, -2),
+    "frog": ([
+        ".gg..gg...............",
+        "gLkggkLg..............",
+        "gGGGGGGGgggggggg......",
+        "gGGGGGGGGGGGGGGGgg....",
+        "gmmmmmGGGGGGGGGGGGg...",
+        ".gGGGGGGGGGGGGGGGGg...",
+        "..gLLggggggggggLLg....",
+    ], ["g": hx("#3f6630"), "G": hx("#79ab58"), "L": hx("#a3d27e"), "k": hx("#24381c"), "m": hx("#24381c")], 0, -2),
+    "sausage": ([
+        ".oo...................",
+        "oOOo.oooooooooooooo...",
+        "OkOOOOOOOOOOOOOOOOOOo.",
+        "OOOOOOOOOOOOOOOOOOOOOt",
+        "nOOOOOOOOOOOOOOOOOOOo.",
+        ".oOOOooooooooooooOOo..",
+        "..ll.............ll...",
+    ], ["o": hx("#6b3f25"), "O": hx("#a1653a"), "k": hx("#2b2224"), "n": hx("#2b2224"), "t": hx("#6b3f25"), "l": hx("#6b3f25")], -2, -2),
+    "fox": ([
+        ".o.o..................",
+        "oOOOo..ooooooooo......",
+        "OkOOOOoOOOOOOOOOOo.WW.",
+        "WWOOOOOOOOOOOOOOOOOWWW",
+        ".WWWOOOOOOOOOOOOOOoWW.",
+        "..WWWWOOOOOOOOOOOOOo..",
+        "...oooooooooooooooo...",
+    ], ["o": hx("#b5562a"), "O": hx("#e07a3a"), "W": hx("#fbf1df"), "k": hx("#2b2224")], -2, -2),
+    "piglet": ([
+        "..pp..................",
+        ".pPPp.pppppppppp......",
+        "pPkPPPPPPPPPPPPPPp....",
+        "nnPPPPPPPPPPPPPPPPp..c",
+        "nNnPPPPPPPPPPPPPPPPpc.",
+        ".pPPPPPPPPPPPPPPPPp...",
+        "..pppppppppppppppp....",
+    ], ["p": hx("#c47a82"), "P": hx("#f0b0b5"), "k": hx("#2b2224"), "n": hx("#e38e96"), "N": hx("#7a3a40"), "c": hx("#c47a82")], -2, -2),
     "pug": ([
         ".kk.....oooooooo......",
         "kOOk..ooOOOOOOOOoo....",
@@ -631,6 +685,8 @@ func drawPet(_ L: Layer, _ t: Double, _ pet: String) {
     if pet == "none" { return }
     if pet == "tuxedo" {
         drawCatCurl(L, t, hx("#26201f"), hx("#3b3334"), hx("#3b3334"), true)
+    } else if pet == "smoky" {
+        drawCatCurl(L, t, hx("#5d595e"), hx("#8b878c"), hx("#8b878c"), false)
     } else if let sp = PET_SPRITES[pet] {
         let breath: Double = sin(t * 2.2) > 0 ? 1 : 0
         // the back rises and falls; the head stays put
