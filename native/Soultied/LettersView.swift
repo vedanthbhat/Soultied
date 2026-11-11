@@ -816,9 +816,13 @@ struct AfterDarkPanel: View {
             HStack(spacing: 8) {
                 Text("How daring?").font(.pxSmall).foregroundStyle(Color(hex: "#efe3cb"))
                 Button("Flirty") { place.setHeat(1) }.buttonStyle(.px(mine == 1 ? .terracotta : .paper, small: true, wide: true))
-                Button("Hot") { place.setHeat(2) }.buttonStyle(.px(mine == 2 ? .terracotta : .paper, small: true, wide: true))
+                // (Hot comes with Soultied Plus)
+                Button(place.hasPlus || place.isDemo ? "Hot" : "Hot · Plus") {
+                    if place.plusOpen { place.setHeat(2) } else { PlusGate.shared.show(.hot) }
+                }
+                .buttonStyle(.px(mine == 2 ? .terracotta : .paper, small: true, wide: true))
             }.evenRow()
-            Text(mine >= 2 && place.heat < 2 ? "Hot cards start once \(place.theirName) picks Hot too. Until then, it stays flirty."
+            Text(mine >= 2 && place.heat < 2 ? (place.plusOpen ? "Hot cards start once \(place.theirName) picks Hot too. Until then, it stays flirty." : "Hot cards come with Soultied Plus. Until then, it stays flirty.")
                 : mine >= 2 ? "You both picked Hot: two bold cards and a flirty one each night, from the next letter you start."
                 : "Flirty: suggestive, never explicit. Pick Hot for bolder cards (only if you both do).")
                 .font(.pxTiny).foregroundStyle(Color(hex: "#efe3cb").opacity(0.8)).fixedSize(horizontal: false, vertical: true)

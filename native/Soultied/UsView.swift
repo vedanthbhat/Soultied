@@ -25,6 +25,7 @@ struct UsView: View {
                     couple
                     if !place.partnerHere { InviteCard(place: place) }
                     you
+                    PlusCardView(place: place)
                     LookPicker().id("looks")
                     history
                     account

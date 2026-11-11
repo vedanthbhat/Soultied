@@ -17,8 +17,8 @@ struct PlayView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 DarkHeading(title: "Play", sub: "Games for two, and the rooms behind the dark door")
-                UpNextCard(place: place) { open = $0 }
-                GameGrid(place: place, open: { open = $0 }, escape: {
+                UpNextCard(place: place) { play($0) }
+                GameGrid(place: place, open: { play($0) }, escape: {
                     Haptics.tap()
                     escaping = true
                 })
@@ -30,6 +30,11 @@ struct PlayView: View {
         .background(RoomBackground())
         .fullScreenCover(isPresented: $escaping) { EscapeScreen(place: place).coversTabs() }
         .fullScreenCover(item: $open) { k in GameScreen(place: place, kind: k).coversTabs() }
+    }
+
+    /// a game, or (for one that's in Plus, without it) the Plus sheet
+    private func play(_ k: GameKind) {
+        if place.canPlay(k) { open = k } else { PlusGate.shared.show(.game(k.info.name)) }
     }
 }
 
@@ -183,7 +188,8 @@ struct GameGrid: View {
     private func tile(_ k: GameKind) -> some View {
         let line = Play.shelfLine(place.games[k], kind: k, me: place.mySeat, name: place.seatName, now: place.now.timeIntervalSince1970 * 1000)
         let tag: String? = !ready || !line.hot ? nil : Play.isLiveInvite(k) || k == .doodle ? "JOIN" : "YOUR MOVE"
-        return GameTile(title: k.info.name, glyph: GameArt.icon(k), color: GameColors.of(k), tag: tag) { open(k) }
+        // (a game that's in Plus says so, when the place doesn't have it)
+        return GameTile(title: k.info.name, glyph: GameArt.icon(k), color: GameColors.of(k), tag: tag, plus: !place.hasPlus && !PlusRules.freeGames.contains(k)) { open(k) }
             .disabled(!ready)
             .opacity(ready ? 1 : 0.55)
             .accessibilityHint(ready ? line.text : "Once \(place.theirName) has joined")
@@ -196,6 +202,8 @@ struct GameTile: View {
     let glyph: Glyph
     let color: Color
     var tag: String?
+    /// in Soultied Plus (a small tag in the corner)
+    var plus = false
     var action: () -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -240,12 +248,21 @@ struct GameTile: View {
                         .background(Color.thread)
                         .overlay(Rectangle().stroke(Color.ink, lineWidth: 2))
                         .offset(x: -6, y: 6)
+                } else if plus {
+                    Text("PLUS")
+                        .font(.px(8, 700))
+                        .kerning(0.6)
+                        .foregroundStyle(Color.butter)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 1)
+                        .background(Color.ink.opacity(0.75))
+                        .offset(x: -5, y: 5)
                 }
             }
             .shadow(color: tag != nil && !reduceMotion ? Color.butter.opacity(0.35) : .clear, radius: 8)
         }
         .buttonStyle(.press)
-        .accessibilityLabel(tag.map { "\(title), \($0.lowercased())" } ?? title)
+        .accessibilityLabel(tag.map { "\(title), \($0.lowercased())" } ?? (plus ? "\(title), in Soultied Plus" : title))
     }
 }
 

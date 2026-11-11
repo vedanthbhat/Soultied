@@ -64,6 +64,8 @@ enum Launch {
     static var song: String? { value("-song") }
     /// -escape   open the dark door; -escape attic, plus -escapeStep 2 and -escapeOpen clock, a room part way in
     static var escape: Bool { args.contains("-escape") }
+    /// open the Soultied Plus sheet (screenshots)
+    static var plus: Bool { args.contains("-plus") }
     static func escapeScene(_ s: EscapeSession) {
         guard let id = value("-escape").flatMap(RoomId.init), let room = s.rooms.first(where: { $0.id == id }) else { return }
         s.playHere(id, fromScratch: true)

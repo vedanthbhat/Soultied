@@ -62,7 +62,9 @@ struct MainView: View {
             // phone turns (Netflix going sideways used to close it)
             VStack(spacing: 0) {
                 ZStack {
-                    HomeView(place: place, paused: tab != .home || sheet != nil || game != nil || roomSideways, listening: tab == .home && game == nil && !escape && !roomSideways, go: go, onRoom: { open($0, sheet: false) }, openGame: { game = $0 })
+                    HomeView(place: place, paused: tab != .home || sheet != nil || game != nil || roomSideways, listening: tab == .home && game == nil && !escape && !roomSideways, go: go, onRoom: { open($0, sheet: false) }, openGame: { k in
+                        if place.canPlay(k) { game = k } else { PlusGate.shared.show(.game(k.info.name)) }
+                    })
                         .opacity(tab == .home ? 1 : 0)
                         .allowsHitTesting(tab == .home)
                     if tab == .letters { LettersView(place: place, start: lettersStart) }
@@ -71,6 +73,8 @@ struct MainView: View {
                     if tab == .us { UsView(app: app, place: place) }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                // Soultied Plus, when something under the tabs asks for it (Plus.swift)
+                .plusSheet(place)
                 TabBar(tab: $tab, place: place)
             }
             .opacity(roomSideways ? 0 : 1)
@@ -93,6 +97,8 @@ struct MainView: View {
         // the record player: its sound follows the place's record, whichever tab you're on
         .onAppear {
             RecordDeck.shared.attach(place)
+            PlusStore.shared.start(place)
+            if Launch.plus { PlusGate.shared.reason = .plain }
             if Launch.demo && Launch.record { place.playRecord() }
             if Launch.demo, let s = Launch.song { _ = place.playSong(s) }
         }

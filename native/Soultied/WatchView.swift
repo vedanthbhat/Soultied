@@ -285,12 +285,17 @@ struct WatchView: View {
                 Button("Join") {
                     Haptics.tap()
                     serviceRaw = site.rawValue
-                    streaming = StreamOpen(site: site, url: u)
+                    watch(site, u)
                 }
                 .buttonStyle(.px(.sage, small: true))
             }
             .pxCard()
         }
+    }
+
+    /// Netflix or Prime Video: a movie night (three a month are free; Plus has every night)
+    private func watch(_ site: StreamSite, _ url: URL?) {
+        if place.takeNight() { streaming = StreamOpen(site: site, url: url) } else { PlusGate.shared.show(.nights) }
     }
 
     /// a play triangle, for the button on the TV
@@ -302,7 +307,7 @@ struct WatchView: View {
             Text("\(site.name.uppercased()) · TOGETHER").font(.px(11, 700)).kerning(1.2).foregroundStyle(Color.butter)
             Button {
                 Haptics.tap()
-                streaming = StreamOpen(site: site, url: nil)
+                watch(site, nil)
             } label: {
                 HStack(spacing: 8) {
                     GlyphView(glyph: Self.playMark, scale: 3)
@@ -326,6 +331,20 @@ struct WatchView: View {
                     .font(.pxSmall)
                     .foregroundStyle(Color.muted)
                     .fixedSize(horizontal: false, vertical: true)
+                if !place.plusOpen {
+                    let n = place.night
+                    Button {
+                        PlusGate.shared.show(.plain)
+                    } label: {
+                        Text(n.already ? "Tonight’s one of your free movie nights: watch as much as you like."
+                            : n.left > 0 ? "\(n.left) of \(PlusRules.freeNights) free movie nights left this month. Plus has every night →"
+                            : "That’s your \(PlusRules.freeNights) free movie nights this month. Plus has every night →")
+                            .font(.px(13, 600))
+                            .foregroundStyle(Color.terracottaD)
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
             }
             .pxCard()
 
@@ -336,7 +355,7 @@ struct WatchView: View {
                     ForEach(shows) { s in
                         Button {
                             Haptics.tap()
-                            streaming = StreamOpen(site: site, url: s.url)
+                            watch(site, s.url)
                         } label: {
                             HStack(spacing: 10) {
                                 VStack(alignment: .leading, spacing: 2) {

@@ -10,6 +10,8 @@ import SoultiedCore
 struct EscapeScreen: View {
     let place: PlaceModel
     @State private var session: EscapeSession
+    /// a room that's in Plus, tapped without it
+    @State private var plusReason: PlusReason?
     @Environment(\.dismiss) private var dismiss
 
     init(place: PlaceModel) {
@@ -29,7 +31,10 @@ struct EscapeScreen: View {
                 .padding(24)
             } else {
                 switch session.screen {
-                case .corridor: EscapeCorridor(session: session, onExit: { dismiss() })
+                case .corridor:
+                    EscapeCorridor(session: session, onExit: { dismiss() }, locked: { !place.canEscape($0.id) }, plus: !place.hasPlus) { r in
+                        plusReason = .room(r.title)
+                    }
                 case .door: EscapeDoor(session: session, place: place)
                 case .play: EscapeRoomView(session: session, place: place, onExit: { dismiss() })
                 }
@@ -49,6 +54,11 @@ struct EscapeScreen: View {
             session.stop()
         }
         .onChange(of: place.partnerHere) { _, _ in session.start() }
+        .sheet(item: $plusReason) { r in
+            PlusSheet(place: place, reason: r)
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Color.paper)
+        }
         // keeps the clock, the holding and the pings going
         .task {
             while !Task.isCancelled {
@@ -78,6 +88,11 @@ private struct PresenceChip: View {
 struct EscapeCorridor: View {
     let session: EscapeSession
     let onExit: () -> Void
+    /// a room that needs Soultied Plus (and the place doesn't have it)
+    var locked: (EscapeRoom) -> Bool = { _ in false }
+    /// show which rooms are in Plus
+    var plus = false
+    var onLocked: (EscapeRoom) -> Void = { _ in }
 
     var body: some View {
         ScrollView {
@@ -103,9 +118,9 @@ struct EscapeCorridor: View {
                     ForEach(session.rooms) { r in
                         Button {
                             Haptics.tap()
-                            session.goToDoor(r.id)
+                            if locked(r) { onLocked(r) } else { session.goToDoor(r.id) }
                         } label: {
-                            DoorCard(room: r, session: session)
+                            DoorCard(room: r, session: session, plus: plus && !PlusRules.freeRooms.contains(r.id))
                         }
                         .buttonStyle(.plain)
                     }
@@ -120,6 +135,8 @@ struct EscapeCorridor: View {
 private struct DoorCard: View {
     let room: EscapeRoom
     let session: EscapeSession
+    /// in Soultied Plus
+    var plus = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -137,6 +154,10 @@ private struct DoorCard: View {
             if session.partnerReady == room.id && session.partnerHere {
                 Text("\(session.partnerName) is waiting here").font(.px(12, 700)).foregroundStyle(Color.cream)
                     .padding(.horizontal, 6).padding(.vertical, 3).background(Color.sageD)
+            }
+            if plus {
+                Text("PLUS").font(.px(11, 700)).kerning(0.6).foregroundStyle(Color.butter)
+                    .padding(.horizontal, 6).padding(.vertical, 2).background(Color.ink)
             }
             Spacer(minLength: 0)
         }
