@@ -36,6 +36,9 @@ targets:
       # (the icon's picture is drawn by scripts/ios-assets.mjs before a build)
       - path: ../public/fonts/PixelifySans-Variable.ttf
         buildPhase: resources
+      # the record's Night in Venice, for the first tour (so it plays straight away, even offline)
+      - path: ../public/audio/night-in-venice.mp3
+        buildPhase: resources
       - path: ../ios/App/App/GoogleService-Info.plist
         buildPhase: resources
       - path: ../ios/App/App/Assets.xcassets

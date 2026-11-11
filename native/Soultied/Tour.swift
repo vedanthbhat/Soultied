@@ -1,3 +1,4 @@
+import AVFoundation
 import SwiftUI
 import SoultiedCore
 
@@ -5,7 +6,7 @@ import SoultiedCore
  * The first time you open your place: a short tour of what to tap to go where. The screen dims, a window
  * opens over one thing at a time (you on the couch, your person, the wall, today's letter, the record
  * player, then the tabs along the bottom), with a line about what it does. Once per phone; Skip ends it,
- * and Us > Show me around again brings it back.
+ * and Us > Show me around again brings it back. Night in Venice plays softly while it runs (see TourMusic).
  */
 
 /// where things are on screen, for the tour ("spot.left", "spot.board", "tab.watch"...)
@@ -40,18 +41,21 @@ final class Tour {
             if !active {
                 step = max(0, n)
                 active = true
+                TourMusic.shared.start()
             }
             return
         }
         guard !active, place.ready, !place.isDemo, !UserDefaults.standard.bool(forKey: Self.doneKey) else { return }
         step = 0
         active = true
+        TourMusic.shared.start()
     }
 
     /// Us > Show me around again
     func start() {
         step = 0
         active = true
+        TourMusic.shared.start()
     }
 
     func next(of count: Int) {
@@ -63,6 +67,7 @@ final class Tour {
     func finish() {
         active = false
         UserDefaults.standard.set(true, forKey: Self.doneKey)
+        TourMusic.shared.stop()
     }
 
     /// the tour, for this place: you, your person (or their empty seat), the room's things, then the tabs
@@ -81,8 +86,8 @@ final class Tour {
         s += [
             TourStep(spot: "spot.board", title: "Your wall", text: "The pictures over the couch are your wall: notes, doodles, photos and memories you leave each other."),
             TourStep(spot: "spot.pet", title: place.petName.map { "\($0), your pet" } ?? "Your pet", text: "Asleep on its cushion by the couch. Tap it to choose who sleeps there (a cat, a pug, a duckling, a frog…) and give them a name."),
-            TourStep(spot: "spot.letter", title: "Today’s letter", text: "Five little questions a day. Answer in secret; the letter opens once you’ve both sealed it."),
-            TourStep(spot: "spot.music", title: "The record player", text: "Put a record on, or a song from YouTube, and it plays for both of you, in sync."),
+            TourStep(spot: "spot.letter", title: "Today’s letter", text: "Five quick questions a day, all taps. Answer in secret; it opens once you’ve both sealed it, with something to talk about."),
+            TourStep(spot: "spot.music", title: "The record player", text: "Hear that? Put a record on, or a song from YouTube, and it plays for both of you, in sync."),
             TourStep(spot: "tab.watch", title: "Watch together", text: "Put on YouTube, Netflix or Prime Video and it plays for both of you, in sync, with a chat and the two of you on the couch."),
             TourStep(spot: "tab.play", title: "Play", text: "Games for two, and the escape rooms behind the dark door."),
             TourStep(spot: "tab.letters", title: "Letters", text: "Today’s letter, your 30-day journey, and the questions you ask each other."),
@@ -97,6 +102,7 @@ struct TourOverlay: View {
     let tour: Tour
     let place: PlaceModel
     let spots: [String: Anchor<CGRect>]
+    @State private var music = TourMusic.shared
 
     var body: some View {
         GeometryReader { proxy in
@@ -157,6 +163,19 @@ struct TourOverlay: View {
             }
             Text(st.title).font(.pxHeading).foregroundStyle(Color.inkSoft)
             Text(st.text).font(.pxBody).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
+            if music.playing {
+                HStack(spacing: 8) {
+                    Text("♪ Night in Venice · Kevin MacLeod (CC BY 4.0)").font(.pxTiny).foregroundStyle(Color.muted).lineLimit(1).minimumScaleFactor(0.8)
+                    Spacer(minLength: 4)
+                    Button("Music off") {
+                        Haptics.tap()
+                        music.turnOff()
+                    }
+                    .font(.px(13, 600))
+                    .foregroundStyle(Color.terracottaD)
+                    .accessibilityLabel("Turn the tour’s music off")
+                }
+            }
             HStack(spacing: 8) {
                 if i > 0 {
                     Button("Back") {
@@ -177,3 +196,55 @@ struct TourOverlay: View {
         .pxBox(.paper, shadow: true)
     }
 }
+
+/* ---------- a little music for the first tour ---------- */
+
+/// Night in Venice (from the record), softly, while the tour runs: on this phone only, so the shared record player
+/// isn't touched. It follows the ring/silent switch, stays quiet if something else is already playing, fades
+/// out when the tour ends, and Music off on the tour's card keeps it off for good.
+@Observable
+final class TourMusic {
+    static let shared = TourMusic()
+
+    /// sound is coming out of this phone
+    private(set) var playing = false
+    @ObservationIgnored private var player: AVAudioPlayer?
+
+    private static let offKey = "soultied_tour_music_off"
+    private init() {}
+
+    func start() {
+        guard player == nil, !UserDefaults.standard.bool(forKey: Self.offKey) else { return }
+        // not over the record player, a song, or the person's own music
+        let deck = RecordDeck.shared
+        let s = AVAudioSession.sharedInstance()
+        guard !deck.hearing, !deck.songHearing, !s.secondaryAudioShouldBeSilencedHint else { return }
+        guard let url = Bundle.main.url(forResource: "night-in-venice", withExtension: "mp3"), let p = try? AVAudioPlayer(contentsOf: url) else { return }
+        if s.category != .playback { try? s.setCategory(.ambient, options: [.mixWithOthers]) }
+        try? s.setActive(true)
+        p.volume = 0
+        p.prepareToPlay()
+        p.play()
+        p.setVolume(0.45, fadeDuration: 2.5)
+        player = p
+        playing = true
+    }
+
+    /// the tour's over: fade away
+    func stop(fade: Double = 1.5) {
+        guard let p = player else { return }
+        playing = false
+        player = nil
+        p.setVolume(0, fadeDuration: fade)
+        DispatchQueue.main.asyncAfter(deadline: .now() + fade + 0.1) { p.stop() }
+    }
+
+    /// Music off: now, and next time too
+    func turnOff() {
+        UserDefaults.standard.set(true, forKey: Self.offKey)
+        stop(fade: 0.6)
+    }
+}
+
+// (only ever used from the main thread)
+extension TourMusic: @unchecked Sendable {}
