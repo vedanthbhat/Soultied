@@ -46,7 +46,7 @@ final class PlusStore {
         p.plusForSale = !products.isEmpty
         if updates == nil {
             updates = Task { [weak self] in
-                for await r in Transaction.updates { await self?.handle(r) }
+                for await r in StoreKit.Transaction.updates { await self?.handle(r) }
             }
         }
         Task {
@@ -103,7 +103,7 @@ final class PlusStore {
         defer { busy = false }
         try? await AppStore.sync()
         var found = false
-        for await r in Transaction.currentEntitlements {
+        for await r in StoreKit.Transaction.currentEntitlements {
             if await handle(r, force: true) { found = true }
         }
         if !found && !(place?.hasPlus ?? false) { problem = "There’s no Soultied Plus on this Apple ID to restore." }
@@ -112,13 +112,13 @@ final class PlusStore {
     /// what this Apple ID has now, sent on if the place doesn't know about it yet
     @MainActor
     func refresh() async {
-        for await r in Transaction.currentEntitlements { await handle(r) }
+        for await r in StoreKit.Transaction.currentEntitlements { await handle(r) }
     }
 
     /// a transaction from the App Store: checked, sent to the server, then finished
     @MainActor
     @discardableResult
-    private func handle(_ r: VerificationResult<Transaction>, force: Bool = false) async -> Bool {
+    private func handle(_ r: VerificationResult<StoreKit.Transaction>, force: Bool = false) async -> Bool {
         guard case .verified(let t) = r, Self.ids.contains(t.productID) else { return false }
         guard t.revocationDate == nil, let ends = t.expirationDate, ends > Date() else {
             await t.finish()
