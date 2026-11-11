@@ -38,6 +38,8 @@ public final class PlaceModel {
     public internal(set) var games: [GameKind: Match] = [:]
     /// the record player (nil until anyone's put a record on, ever)
     public internal(set) var turntable: TurntableState?
+    /// Soultied Plus's counters: the Netflix / Prime Video nights you've had
+    public internal(set) var plusDoc = PlusDoc()
     /// which documents have arrived at least once
     public internal(set) var loaded: Set<String> = []
 
@@ -166,6 +168,10 @@ public final class PlaceModel {
                 self?.turntable = TurntableState(d)
                 self?.loaded.insert("turntable")
             },
+            db.listen(meta("plus")) { [weak self] d in
+                self?.plusDoc = PlusDoc(d)
+                self?.loaded.insert("plus")
+            },
         ]
         let t = Timer(timeInterval: 30, repeats: true) { [weak self] _ in self?.tick() }
         RunLoop.main.add(t, forMode: .common)
@@ -283,7 +289,8 @@ public final class PlaceModel {
 
     /* ---------- letters ---------- */
 
-    public var heat: Int { letters.heat([hostId, guestId].compactMap { $0 }) }
+    /// After dark's heat: Hot needs Soultied Plus (without it, the cards stay flirty)
+    public var heat: Int { min(letters.heat([hostId, guestId].compactMap { $0 }), plusOpen ? 2 : 1) }
     public var afterDarkOpen: Bool { letters.afterDarkOpen(me, them) }
     public var afterDarkMine: Bool { letters.afterDarkOn[me] == true }
     public var startKey: String { space?.startKey ?? today }
@@ -649,6 +656,37 @@ public final class PlaceModel {
     /// the song finished, or can't play here: the needle lifts for both of you
     public func songEnded(_ id: String) { turn(turntable?.songEnded(id, by: me, now: Values.nowMs())) }
 
+    /* ---------- Soultied Plus ---------- */
+
+    /// this place has Soultied Plus (bought by either of you, on the App Store or the website)
+    public var hasPlus: Bool { space?.hasPlus ?? false }
+    /// when it runs to (ms), if it has it
+    public var plusUntil: Double? { space?.plusUntil }
+    /// Plus can be bought here (the App Store's plans have loaded): until then nothing's locked
+    public var plusForSale = false
+    /// what Plus opens is open: with Plus, in the demo room (so everything can be tried), and while it can't be bought
+    public var plusOpen: Bool { hasPlus || isDemo || !plusForSale }
+
+    public func canPlay(_ k: GameKind) -> Bool { plusOpen || PlusRules.freeGames.contains(k) }
+    public func canEscape(_ room: RoomId) -> Bool { plusOpen || PlusRules.freeRooms.contains(room) }
+
+    /// tonight, as a Netflix / Prime Video night
+    public var night: NightCheck { nightCheck(plusDoc, today: today, plus: plusOpen) }
+
+    /// starting Netflix or Prime Video: counts tonight as one of the month's free nights (false when they're used up)
+    @discardableResult
+    public func takeNight() -> Bool {
+        let n = night
+        guard n.ok else { return false }
+        if !plusOpen && !n.already {
+            var d = plusDoc
+            d.nights[PlusRules.month(today), default: []].insert(today)
+            plusDoc = d
+            save(meta("plus"), ["nights": [PlusRules.month(today): [today: true]]], "movie night")
+        }
+        return true
+    }
+
     /* ---------- decorating ---------- */
 
     public var decor: Decor { decorDoc.decor }
@@ -660,6 +698,7 @@ public final class PlaceModel {
         func has(_ k: String) -> Bool { d.earned[k] != nil || earnSent.contains(k) }
         var credits: [(String, Int, String)] = []
         if !has(DecorDoc.earnWelcome) { credits.append((DecorDoc.earnWelcome, Catalogue.welcomeGift(couch.together.count), "welcome")) }
+        if hasPlus && !has(PlusRules.bonusKey(today)) { credits.append((PlusRules.bonusKey(today), PlusRules.bonusStitches, "this month’s Soultied Plus stitches")) }
         if partnerHere {
             let v = DecorDoc.earnVisit(today, me)
             if !has(v) { credits.append((v, Catalogue.visit, "you showed up")) }

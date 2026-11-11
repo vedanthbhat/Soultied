@@ -32,6 +32,24 @@ The page at **soultied.app/plus/** picks Razorpay or Dodo from where you are (yo
    - **Variables:** `DODO_MODE` (`test` or `live`), `DODO_PRODUCT_MONTH` and `DODO_PRODUCT_YEAR` (the `pdt_…` ids). Optional: `PLUS_MONTH_PAISE` (default `14900`, ₹149) and `PLUS_YEAR_PAISE` (default `119900`, ₹1,199).
 6. Run *Actions → Deploy to Firebase → Run workflow* (it also runs on any change here). When it's green, soultied.app/plus/ takes payments.
 
+## Plus in the iPhone app (App Store subscriptions)
+
+Two more functions, with no keys of their own: `plusApple` (the app sends Apple's signed transaction after a purchase or renewal; the function checks Apple's signature, back to Apple Root CA - G3, and gives the place Plus until the period ends) and `appleNotify` (Apple's own messages about renewals and refunds). The logic is in `apple.js`. A subscription is remembered in `appleSubs/{original transaction id}` (only the server can read it), so one subscription can't be claimed by two accounts. The app locks nothing until the App Store's plans load, so nothing changes for testers before the products below exist.
+
+Once, in App Store Connect (only the account holder can do the first two):
+
+1. **Agreements, Tax, and Banking**: accept the **Paid Applications** agreement, and add the bank account and tax forms. Products don't load in the app until it's active.
+2. *(Recommended)* Enrol in the **App Store Small Business Program**, so Apple keeps 15% instead of 30%.
+3. **Soultied → Subscriptions**: create a subscription group "Soultied Plus" with two auto-renewable subscriptions:
+   - `app.soultied.plus.year`, "Soultied Plus (yearly)", 1 year, $29.99 (India: ₹1,199)
+   - `app.soultied.plus.month`, "Soultied Plus (monthly)", 1 month, $3.99 (India: ₹149)
+   - For each: a display name and description ("Every movie night, every game and room, After dark's Hot cards and monthly stitches, for both of you"), a review screenshot (the `plus` shot on the native-shots branch), and an **introductory offer**: free trial, 1 week, new subscribers, all countries.
+4. **Soultied → App Information → App Store Server Notifications**: Version 2, the same URL for Production and Sandbox: `https://asia-south1-soultied-c1543.cloudfunctions.net/appleNotify`
+5. **App Privacy**: add **Purchases** (purchase history), linked to the user, used for App Functionality, not for tracking.
+6. Send the subscriptions for review **with** the next app version (the first ones have to go together).
+
+Testing: TestFlight purchases use the sandbox and cost nothing; a year renews every hour there. Check `appleSubs` and the place's `plus` in Firestore afterwards.
+
 ## Testing it
 
 - Razorpay test mode: pay with Razorpay's test cards or UPI `success@razorpay`.

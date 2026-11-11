@@ -6,6 +6,11 @@
  *               POST {plan, provider: 'dodo'}: a Dodo Payments checkout page (anywhere else)
  *   plusCode    POST {orderId, paymentId?, signature?} (or just {paymentId}),
  *               or {provider: 'dodo', paymentId}: the code for a paid order
+ *   plusApple   POST {sid, jws} from the iPhone app, signed in (Authorization: Bearer <Firebase ID token)):
+ *               an App Store subscription's signed transaction; once it checks out, the place has Plus
+ *               until the subscription's period ends
+ *   appleNotify POST from Apple (App Store Server Notifications, version 2): renewals push Plus's end
+ *               date on, refunds take it away
  *
  * Keys live in Google's Secret Manager (RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET and
  * DODO_API_KEY); the GitHub Action that deploys this puts them there ("unset" for a
@@ -18,7 +23,9 @@ import { FieldValue, getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { logger } from 'firebase-functions';
 import { defineInt, defineSecret, defineString } from 'firebase-functions/params';
 import { onRequest } from 'firebase-functions/v2/https';
+import { getAuth } from 'firebase-admin/auth';
 import { dodoApi, PlusError, plusService, razorpayApi } from './plus.js';
+import { APPLE, AppleError, checkTransaction, verifyAppleJws } from './apple.js';
 
 initializeApp();
 
@@ -144,4 +151,91 @@ export const plusCode = onRequest(OPTS, (req, res) => {
       signature: String(b.signature || ''),
     }),
   );
+});
+
+/* ---------- Plus from the App Store (the iPhone app) ---------- */
+
+/** no secrets needed: Apple's signatures are checked against Apple's root certificate */
+const APPLE_OPTS = { region: 'asia-south1', maxInstances: 5, memory: '256MiB', timeoutSeconds: 30 };
+
+/**
+ * A checked subscription, for a place: remembered under its original transaction (so one subscription can't
+ * be claimed by somebody else's account too), and the place has Plus until its period ends (a longer Plus the
+ * place already has stays).
+ */
+async function plusFromApple(sid, uid, t) {
+  const db = getFirestore();
+  const space = db.collection('spaces').doc(sid);
+  const sub = db.collection('appleSubs').doc(t.originalTransactionId);
+  return db.runTransaction(async (tx) => {
+    const [s, b] = await Promise.all([tx.get(space), tx.get(sub)]);
+    if (!s.exists || !(s.data().members || []).includes(uid)) throw new AppleError('place', 403);
+    if (b.exists && b.data().uid !== uid) throw new AppleError('taken', 409);
+    const cur = s.data().plus?.until?.toMillis?.() ?? 0;
+    tx.set(
+      sub,
+      { uid, sid, plan: t.plan, expires: Timestamp.fromMillis(t.expires), environment: t.environment, updatedAt: FieldValue.serverTimestamp() },
+      { merge: true },
+    );
+    if (t.expires > cur) {
+      tx.update(space, { plus: { by: uid, until: Timestamp.fromMillis(t.expires), store: 'apple', plan: t.plan, tx: t.originalTransactionId } });
+    }
+    return { ok: true, until: Math.max(cur, t.expires) };
+  });
+}
+
+export const plusApple = onRequest(APPLE_OPTS, async (req, res) => {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'method' });
+  try {
+    const token = String(req.get('authorization') || '').replace(/^Bearer\s+/i, '');
+    const who = await getAuth()
+      .verifyIdToken(token)
+      .catch(() => {
+        throw new AppleError('signin', 401);
+      });
+    const sid = String(req.body?.sid || '');
+    if (!sid) throw new AppleError('place', 400);
+    const t = checkTransaction(verifyAppleJws(req.body?.jws), { uid: who.uid });
+    return res.json(await plusFromApple(sid, who.uid, t));
+  } catch (e) {
+    if (e instanceof AppleError) return res.status(e.status).json({ error: e.code });
+    logger.error('Plus from the App Store', e);
+    return res.status(502).json({ error: 'failed' });
+  }
+});
+
+/** App Store Server Notifications (version 2): set this function's address for both Production and Sandbox. */
+export const appleNotify = onRequest(APPLE_OPTS, async (req, res) => {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'method' });
+  try {
+    const n = verifyAppleJws(req.body?.signedPayload);
+    const info = n.data?.signedTransactionInfo ? verifyAppleJws(n.data.signedTransactionInfo) : null;
+    if (!info || info.bundleId !== APPLE.bundleId) return res.json({ ok: true, ignored: true });
+    const db = getFirestore();
+    const original = String(info.originalTransactionId || '');
+    const sub = await db.collection('appleSubs').doc(original).get();
+    // (a subscription the app hasn't told us about yet: it will, the next time it's opened)
+    if (!sub.exists) return res.json({ ok: true, unknown: true });
+    const { sid, uid } = sub.data();
+    const space = db.collection('spaces').doc(sid);
+    const type = String(n.notificationType || '');
+    const expires = Number(info.expiresDate) || 0;
+    await db.runTransaction(async (tx) => {
+      const s = await tx.get(space);
+      if (!s.exists) return;
+      const p = s.data().plus || {};
+      const cur = p.until?.toMillis?.() ?? 0;
+      const ours = p.store === 'apple' && p.tx === original;
+      if (type === 'REFUND' || type === 'REVOKE' || info.revocationDate) {
+        if (ours && cur > Date.now()) tx.update(space, { 'plus.until': Timestamp.fromMillis(Date.now()) });
+      } else if (expires > cur && expires > Date.now()) {
+        tx.update(space, { plus: { by: uid, until: Timestamp.fromMillis(expires), store: 'apple', plan: APPLE.products[info.productId] || 'month', tx: original } });
+      }
+      tx.set(sub.ref, { expires: Timestamp.fromMillis(expires), last: type, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+    });
+    return res.json({ ok: true });
+  } catch (e) {
+    logger.warn('App Store notification', e?.code || e);
+    return res.status(e instanceof AppleError ? 400 : 500).json({ error: e?.code || 'failed' });
+  }
 });

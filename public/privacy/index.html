@@ -47,7 +47,7 @@ footer { display: flex; gap: 8px 18px; flex-wrap: wrap; justify-content: center;
 <a class="home" href="/">← Soultied</a>
 <article class="card">
 <h1>Soultied privacy policy</h1>
-<p class="date">Last updated: 24 October 2026</p>
+<p class="date">Last updated: 11 November 2026</p>
 <p>Soultied is a small shared place online for two people in a long-distance relationship, plus a browser extension for watching Netflix and Prime Video together. This page explains what each part handles, where it goes, and how to delete it. It is written by the person who builds Soultied, Vedanth Bhat. Questions or requests: <a href="mailto:hello@soultied.app">hello@soultied.app</a>.</p>
 <p>The short version: what you put in your private Soultied place is shared with your person. There are no ads and nothing is sold. Optional analytics on the public watch-party information pages are explained below; your private place, letters, chats and Plus purchases are excluded.</p>
 <h2 id="website-analytics">Optional analytics on public pages</h2>
@@ -84,6 +84,8 @@ footer { display: flex; gap: 8px 18px; flex-wrap: wrap; justify-content: center;
 <p><strong>The payment.</strong> In India, Plus is paid through Razorpay; everywhere else, through Dodo Payments, which is the merchant of record for those sales. They collect what they need to take the payment (such as your email, your card or UPI details and, for Dodo, your billing country) under their own privacy policies. Soultied never receives your card or bank details.</p>
 <p><strong>What Soultied keeps.</strong> Soultied's server (Firebase Cloud Functions, Google Cloud, Mumbai region) asks Razorpay or Dodo whether your payment went through, then stores, in the same Cloud Firestore database: the payment and order numbers, the plan, when it ends, a fingerprint (SHA-256) of your code rather than the code itself, and the anonymous ID of each browser (up to three) that added the code. A separate record, which only Soultied's server can read, keeps the code with its order number so it can show it to you again if you lose it.</p>
 <p><strong>On your computer.</strong> The extension keeps your code and its end date in its storage, and the Plus page remembers codes bought in that browser in its local storage.</p>
+<p><strong>In the iPhone app.</strong> Plus in the app is bought from Apple, through the App Store; Apple handles the payment under its own privacy policy, and Soultied never sees your payment details or Apple ID. When you subscribe or your subscription renews, the app sends Soultied's server Apple's signed receipt for it. The server checks Apple's signature, then stores in Cloud Firestore: which plan it is, its transaction numbers, when it ends, and which place and account it belongs to, so Plus is on for both of you. Apple also tells Soultied's server when a subscription renews, is cancelled or is refunded.</p>
+<p><strong>Movie nights.</strong> Without Plus, Netflix and Prime Video together are free three nights a month. Your place keeps the dates of those nights (just the dates) to count them.</p>
 <h2>Who else sees your data</h2>
 <ul>
   <li><strong>Your person</strong>, who shares your place or your watch party. A watch party's link shows whoever opens it who started it and what's on.</li>
