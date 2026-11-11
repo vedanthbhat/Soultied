@@ -16,11 +16,42 @@ final class LettersTests: XCTestCase {
 
     func testDecks() {
         XCTAssertEqual(Cards.mismatches(), [])
-        XCTAssertEqual(Cards.count, 1319)
+        XCTAssertEqual(Cards.count, 1637)
         XCTAssertEqual(Journey.days, 30)
         XCTAssertEqual(Cards.chapters.reduce(0) { $0 + $1.days }, 30)
         XCTAssertEqual(Cards.card("tot-0")?.title, "Tea or Coffee?")
         XCTAssertEqual(Cards.card("lk-0")?.style, .likely)
+        XCTAssertEqual(Cards.card("fl-0")?.kind, .flirt)
+        XCTAssertNotNil(Cards.card("fl-0")?.talk)
+        XCTAssertEqual(Cards.card("tk-0")?.options, ["Agree", "Disagree"])
+        XCTAssertEqual(Cards.card("tk-0")?.guess, true)
+    }
+
+    /// every daily letter is five cards answered with a tap; nothing has to be typed
+    func testDailyIsAllTaps() {
+        for n in 0..<60 {
+            let ids = Shuffle.cardsFor(.daily, coupleId: "c\(n % 7)", dateKey: Day.add("2026-11-11", n), startKey: "2026-10-01")
+            let cards = Cards.of(ids)
+            XCTAssertEqual(cards.count, 5)
+            XCTAssertEqual(cards.map(\.kind), [.tot, .know, .likely, .flirt, .take])
+            XCTAssertFalse(cards.contains { $0.style == .open })
+        }
+    }
+
+    /// an open card can be saved for your call instead of typed, and both apps say what to talk about
+    func testAloudAndTalk() {
+        let open = Card(id: "hot-0", kind: .hot, style: .open, prompt: "Tell me", options: [])
+        XCTAssertFalse(Cards.isAnswered(open, CardAnswer(pick: 0)))
+        XCTAssertTrue(Cards.isAnswered(open, CardAnswer(pick: 0, aloud: true)))
+        XCTAssertEqual(CardAnswer(pick: 0, aloud: true).doc["aloud"] as? Bool, true)
+        XCTAssertEqual(CardAnswer(["pick": 0, "aloud": true] as Doc)?.aloud, true)
+        XCTAssertEqual(talkPoint(open, CardAnswer(pick: 0, aloud: true), CardAnswer(pick: 0, text: "x"), them: "Rohan"), "Saved for your call: answer it out loud, Rohan first.")
+        let take = Cards.card("tk-0")!
+        XCTAssertEqual(talkPoint(take, CardAnswer(pick: 0, guess: 1), CardAnswer(pick: 1, guess: 0), them: "Rohan"), "You agree, Rohan doesn’t. One minute each to win the other over.")
+        let lk = Cards.card("lk-0")!
+        XCTAssertEqual(talkPoint(lk, CardAnswer(pick: 0), CardAnswer(pick: 1), them: "Rohan"), "You both say it’s you. Tell the story that proves it.")
+        let fl = Cards.card("fl-0")!
+        XCTAssertEqual(talkPoint(fl, CardAnswer(pick: 0), CardAnswer(pick: 2), them: "Rohan"), fl.talk)
     }
 
     func testHashAndRng() throws {

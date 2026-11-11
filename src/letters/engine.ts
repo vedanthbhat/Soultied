@@ -1,9 +1,10 @@
 import { JOURNEY, JOURNEY_DAYS } from './deckJourney';
 
 /**
- * Daily letters: five cards a day (This or That, Know Me, Who's more likely,
- * Daily Connect or Far apart, and one In your words), plus an opt-in After
- * dark set of three (flirty, or hot when you've both chosen it).
+ * Daily letters: five cards a day, every one answered with a tap (This or That,
+ * Know Me, Who's more likely, a Flirty one and a Hot take), plus an opt-in After
+ * dark set of three (flirty, or hot when you've both chosen it). Typing is never
+ * needed: when a letter opens, each card says what to talk about.
  *
  * Which cards a couple gets on a date is worked out from the couple's id and
  * the date, so both phones agree without asking a server. Each person's
@@ -18,7 +19,7 @@ import { JOURNEY, JOURNEY_DAYS } from './deckJourney';
  * both sealed.
  */
 
-export type CardKind = 'tot' | 'know' | 'connect' | 'spicy' | 'journey' | 'open' | 'likely' | 'distance' | 'hot';
+export type CardKind = 'tot' | 'know' | 'connect' | 'spicy' | 'journey' | 'open' | 'likely' | 'distance' | 'hot' | 'flirt' | 'take';
 export type LetterKind = 'daily' | 'afterDark' | 'journey';
 
 /**
@@ -40,6 +41,8 @@ export interface Card {
   /** a different label (and length) for the note */
   noteLabel?: string;
   noteMax?: number;
+  /** what to say or ask once the letter opens (Flirty cards have their own) */
+  talk?: string;
 }
 
 export interface CardAnswer {
@@ -49,6 +52,8 @@ export interface CardAnswer {
   note?: string;
   /** an open card's answer, in your own words */
   text?: string;
+  /** an open card saved to answer out loud, on your next call, instead of typing it */
+  aloud?: boolean;
 }
 
 /** how long an answer in your own words can be */
@@ -102,6 +107,8 @@ export const KIND_LABEL: Record<CardKind, string> = {
   likely: 'Who’s more likely',
   distance: 'Far apart',
   hot: 'After dark · hot',
+  flirt: 'Flirty',
+  take: 'Hot take',
 };
 
 /* ---------- dates (YYYY-MM-DD, each person's local calendar) ---------- */
@@ -150,11 +157,13 @@ export const DECK_SIZES: Record<Exclude<CardKind, 'journey'>, number> = {
   tot: 220,
   know: 220,
   connect: 120,
-  spicy: 160,
-  hot: 100,
+  spicy: 189,
+  hot: 144,
   distance: 120,
   open: 200,
   likely: 149,
+  flirt: 123,
+  take: 122,
 };
 
 /** card ids are the deck's prefix and the card's place in it ("tot-12") */
@@ -168,6 +177,8 @@ export const ID_PREFIX: Record<CardKind, string> = {
   open: 'open',
   likely: 'lk',
   journey: 'jr',
+  flirt: 'fl',
+  take: 'tk',
 };
 
 const ID_LISTS = new Map<CardKind, string[]>();
@@ -243,15 +254,13 @@ export function cardsFor(kind: LetterKind, coupleId: string, dateKey: string, st
     if (heat >= 2) return [...pick(idsOf('hot'), 2, `${coupleId}:hot`, day), ...pick(idsOf('spicy'), 1, `${coupleId}:ad`, day)];
     return pick(idsOf('spicy'), 3, `${coupleId}:ad`, day);
   }
-  // the fourth card takes turns: Daily connect one day, Far apart the next
-  const half = Math.floor(day / 2);
-  const fourth = ((day % 2) + 2) % 2 === 0 ? pick(idsOf('connect'), 1, `${coupleId}:con`, half) : pick(idsOf('distance'), 1, `${coupleId}:far`, half);
+  // all five answered with a tap (Daily connect, Far apart and In your words stay for the letters already written)
   return [
     ...pick(idsOf('tot'), 1, `${coupleId}:tot`, day),
     ...pick(idsOf('know'), 1, `${coupleId}:know`, day),
     ...pick(idsOf('likely'), 1, `${coupleId}:lk`, day),
-    ...fourth,
-    ...pick(idsOf('open'), 1, `${coupleId}:open`, day),
+    ...pick(idsOf('flirt'), 1, `${coupleId}:fl`, day),
+    ...pick(idsOf('take'), 1, `${coupleId}:tk`, day),
   ];
 }
 

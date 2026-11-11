@@ -1,13 +1,13 @@
 import Foundation
 
 /*
- * Daily letters (src/letters/engine.ts): five cards a day, plus an opt-in After dark set of three, and the
+ * Daily letters (src/letters/engine.ts): five cards a day, all answered with a tap, plus an opt-in After dark set of three, and the
  * 30 days of knowing each other. Which cards a couple gets on a date is worked out from the couple's id and
  * the date, exactly as the website does, so a phone and a laptop always agree.
  */
 
 public enum CardKind: String, CaseIterable, Sendable {
-    case tot, know, connect, spicy, journey, open, likely, distance, hot
+    case tot, know, connect, spicy, journey, open, likely, distance, hot, flirt, take
 }
 
 public enum LetterKind: String, CaseIterable, Sendable {
@@ -33,6 +33,8 @@ public let KIND_LABEL: [CardKind: String] = [
     .likely: "Who’s more likely",
     .distance: "Far apart",
     .hot: "After dark · hot",
+    .flirt: "Flirty",
+    .take: "Hot take",
 ]
 
 /// how long an answer in your own words can be
@@ -130,12 +132,13 @@ extension Int {
 
 /// how many cards each deck has (the website's DECK_SIZES; Cards checks the decks agree)
 public let DECK_SIZES: [CardKind: Int] = [
-    .tot: 220, .know: 220, .connect: 120, .spicy: 160, .hot: 100, .distance: 120, .open: 200, .likely: 149,
+    .tot: 220, .know: 220, .connect: 120, .spicy: 189, .hot: 144, .distance: 120, .open: 200, .likely: 149, .flirt: 123, .take: 122,
 ]
 
 /// card ids are the deck's prefix and the card's place in it ("tot-12")
 public let ID_PREFIX: [CardKind: String] = [
     .tot: "tot", .know: "know", .connect: "con", .spicy: "ad", .hot: "hot", .distance: "far", .open: "open", .likely: "lk", .journey: "jr",
+    .flirt: "fl", .take: "tk",
 ]
 
 public enum Shuffle {
@@ -213,10 +216,9 @@ public enum Shuffle {
             if heat >= 2 { return pick(.hot, 2, "\(coupleId):hot", day) + pick(.spicy, 1, "\(coupleId):ad", day) }
             return pick(.spicy, 3, "\(coupleId):ad", day)
         }
-        // the fourth card takes turns: Daily connect one day, Far apart the next
-        let half = day.floorDiv(2)
-        let fourth = ((day % 2) + 2) % 2 == 0 ? pick(.connect, 1, "\(coupleId):con", half) : pick(.distance, 1, "\(coupleId):far", half)
-        return pick(.tot, 1, "\(coupleId):tot", day) + pick(.know, 1, "\(coupleId):know", day) + pick(.likely, 1, "\(coupleId):lk", day) + fourth + pick(.open, 1, "\(coupleId):open", day)
+        // all five answered with a tap (Daily connect, Far apart and In your words stay for the letters already written)
+        return pick(.tot, 1, "\(coupleId):tot", day) + pick(.know, 1, "\(coupleId):know", day) + pick(.likely, 1, "\(coupleId):lk", day)
+            + pick(.flirt, 1, "\(coupleId):fl", day) + pick(.take, 1, "\(coupleId):tk", day)
     }
 }
 

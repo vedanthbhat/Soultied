@@ -17,6 +17,8 @@ const { HOT } = await deck('deckHot');
 const { DISTANCE } = await deck('deckDistance');
 const { OPEN } = await deck('deckOpen');
 const { LIKELY } = await deck('deckLikely');
+const { FLIRT } = await deck('deckFlirt');
+const { TAKES, TAKE_OPTIONS } = await deck('deckTakes');
 const { JOURNEY, JOURNEY_DAYS } = await deck('deckJourney');
 
 const cards = [];
@@ -34,6 +36,8 @@ AFTER_DARK.forEach((x, i) => fromTuple(x, `ad-${i}`, 'spicy', { guess: false, no
 HOT.forEach((x, i) => fromTuple(x, `hot-${i}`, 'hot', { guess: false, note: false }));
 DISTANCE.forEach((x, i) => fromTuple(x, `far-${i}`, 'distance', { guess: true, note: false }));
 OPEN.forEach((x, i) => fromTuple(x, `open-${i}`, 'open', { guess: false, note: false }));
+FLIRT.forEach((x, i) => add({ id: `fl-${i}`, kind: 'flirt', prompt: x.q || 'This or that?', options: [...x.o], guess: false, note: false, talk: x.talk }));
+TAKES.forEach((take, i) => add({ id: `tk-${i}`, kind: 'take', prompt: take, options: [...TAKE_OPTIONS], guess: true, note: false }));
 LIKELY.forEach((ending, i) =>
   add({ id: `lk-${i}`, kind: 'likely', style: 'likely', prompt: `Who’s more likely to ${ending}?`, options: ['Me', 'You'], guess: false, note: false })
 );

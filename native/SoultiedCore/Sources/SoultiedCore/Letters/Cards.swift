@@ -18,8 +18,10 @@ public struct Card: Sendable, Identifiable, Decodable {
     /// a different label (and length) for the note
     public let noteLabel: String?
     public let noteMax: Int?
+    /// what to say or ask once the letter opens (Flirty cards have their own)
+    public let talk: String?
 
-    public init(id: String, kind: CardKind, style: CardStyle = .choice, prompt: String, options: [String], guess: Bool = false, note: Bool = false, noteLabel: String? = nil, noteMax: Int? = nil) {
+    public init(id: String, kind: CardKind, style: CardStyle = .choice, prompt: String, options: [String], guess: Bool = false, note: Bool = false, noteLabel: String? = nil, noteMax: Int? = nil, talk: String? = nil) {
         self.id = id
         self.kind = kind
         self.style = style
@@ -29,6 +31,7 @@ public struct Card: Sendable, Identifiable, Decodable {
         self.note = note
         self.noteLabel = noteLabel
         self.noteMax = noteMax
+        self.talk = talk
     }
 
     /// "Chai or coffee?" reads better than a generic "This or that?" once answered.
@@ -50,12 +53,15 @@ public struct CardAnswer: Sendable, Equatable {
     public var note: String?
     /// an open card's answer, in your own words
     public var text: String?
+    /// an open card saved to answer out loud, on your next call, instead of typing it
+    public var aloud: Bool?
 
-    public init(pick: Int, guess: Int? = nil, note: String? = nil, text: String? = nil) {
+    public init(pick: Int, guess: Int? = nil, note: String? = nil, text: String? = nil, aloud: Bool? = nil) {
         self.pick = pick
         self.guess = guess
         self.note = note
         self.text = text
+        self.aloud = aloud
     }
 
     public init?(_ d: Doc) {
@@ -64,6 +70,7 @@ public struct CardAnswer: Sendable, Equatable {
         guess = d.int("guess")
         note = d.str("note")
         text = d.str("text")
+        aloud = d["aloud"] as? Bool
     }
 
     /// as the website writes it (fields left out rather than null)
@@ -72,6 +79,7 @@ public struct CardAnswer: Sendable, Equatable {
         if let g = guess { d["guess"] = g }
         if let n = note, !n.isEmpty { d["note"] = n }
         if let t = text { d["text"] = t }
+        if aloud == true { d["aloud"] = true }
         return d
     }
 
@@ -122,7 +130,8 @@ public enum Cards {
 
     public static func isAnswered(_ card: Card, _ a: CardAnswer?) -> Bool {
         guard let a else { return false }
-        if card.style == .open { return !(a.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        // in your own words, or saved for your call
+        if card.style == .open { return !(a.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || a.aloud == true }
         if card.guess && a.guess == nil { return false }
         return true
     }
@@ -170,7 +179,7 @@ public func scoreDay(_ day: LetterDay, me: String, them: String) -> Score {
             if b.guess == a.pick { s.theirGuesses.right += 1 }
         }
     }
-    let depth: [CardKind: Int] = [.journey: -1, .connect: 0, .distance: 0, .open: 0, .spicy: 1, .hot: 1, .know: 2, .likely: 2, .tot: 3]
+    let depth: [CardKind: Int] = [.journey: -1, .connect: 0, .distance: 0, .open: 0, .spicy: 1, .hot: 1, .take: 1, .flirt: 2, .know: 2, .likely: 2, .tot: 3]
     // a stable sort, as Array.prototype.sort is
     splits.sort { x, y in
         let dx = depth[x.1.kind]!, dy = depth[y.1.kind]!
@@ -180,4 +189,40 @@ public func scoreDay(_ day: LetterDay, me: String, them: String) -> Score {
     }
     s.talkAbout = splits.first?.1.id
     return s
+}
+
+/* ---------- what to talk about ---------- */
+
+/// One thing to say or ask about a card once the letter's open, from what you both answered (the website's
+/// talkPoint). `a` is yours, `b` is theirs; `them` is their name. Nil when there's nothing to add.
+public func talkPoint(_ c: Card, _ a: CardAnswer, _ b: CardAnswer, them: String) -> String? {
+    func opt(_ i: Int?) -> String {
+        let k = i ?? 0
+        return k >= 0 && k < c.options.count ? c.options[k] : ""
+    }
+    let same = Cards.sameAnswer(c, a, b)
+    let saved = a.aloud == true || b.aloud == true
+    switch c.kind {
+    case .flirt:
+        return c.talk ?? "Ask \(them) why “\(opt(b.pick))”."
+    case .take:
+        if same { return a.pick == 0 ? "You both agree. What’s the one exception you’d make?" : "You both disagree. What would change your minds?" }
+        return a.pick == 0
+            ? "You agree, \(them) doesn’t. One minute each to win the other over."
+            : "\(them) agrees, you don’t. One minute each to win the other over."
+    case .likely:
+        if !same { return "You each think it’s the other. One example each, then decide." }
+        return a.pick == 0 ? "You both say it’s you. Tell the story that proves it." : "You both say it’s \(them). Ask \(them) for the story."
+    case .know:
+        if a.guess == b.pick && b.guess == a.pick { return "You read each other perfectly. Ask what gave it away." }
+        if a.guess != b.pick { return "You guessed “\(opt(a.guess))”, \(them) said “\(opt(b.pick))”. Ask what you missed." }
+        return "\(them) guessed “\(opt(b.guess))”. Tell them why it’s “\(opt(a.pick))”."
+    case .tot:
+        return same ? "Both “\(opt(a.pick))”. Was that ever in doubt?" : "“\(opt(a.pick))” or “\(opt(b.pick))”: one sentence each to win the other over."
+    case .spicy, .hot:
+        if c.style == .open { return saved ? "Saved for your call: answer it out loud, \(them) first." : nil }
+        return same ? "Both “\(opt(a.pick))”. Noted. Bring it up on your next call." : "You said “\(opt(a.pick))”, \(them) said “\(opt(b.pick))”. Meet in the middle?"
+    default:
+        return c.style == .open && saved ? "Saved for your call: answer it out loud, \(them) first." : nil
+    }
 }

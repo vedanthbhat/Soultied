@@ -7,6 +7,8 @@ import { OPEN } from './deckOpen';
 import { LIKELY } from './deckLikely';
 import { DISTANCE } from './deckDistance';
 import { HOT } from './deckHot';
+import { FLIRT } from './deckFlirt';
+import { TAKES, TAKE_OPTIONS } from './deckTakes';
 import {
   type Card,
   type CardAnswer,
@@ -43,6 +45,8 @@ const IDS: Record<CardKind, string[]> = {
   likely: [],
   distance: [],
   hot: [],
+  flirt: [],
+  take: [],
 };
 const add = (c: Omit<Card, 'style'> & { style?: CardStyle }) => {
   const card: Card = { style: 'choice', ...c };
@@ -68,6 +72,8 @@ AFTER_DARK.forEach((x, i) => fromTuple(x, `ad-${i}`, 'spicy', { guess: false, no
 HOT.forEach((x, i) => fromTuple(x, `hot-${i}`, 'hot', { guess: false, note: false }));
 DISTANCE.forEach((x, i) => fromTuple(x, `far-${i}`, 'distance', { guess: true, note: false }));
 OPEN.forEach((x, i) => fromTuple(x, `open-${i}`, 'open', { guess: false, note: false }));
+FLIRT.forEach((x, i) => add({ id: `fl-${i}`, kind: 'flirt', prompt: x.q || 'This or that?', options: [...x.o], guess: false, note: false, talk: x.talk }));
+TAKES.forEach((take, i) => add({ id: `tk-${i}`, kind: 'take', prompt: take, options: [...TAKE_OPTIONS], guess: true, note: false }));
 LIKELY.forEach((ending, i) =>
   add({ id: `lk-${i}`, kind: 'likely', style: 'likely', prompt: `Who’s more likely to ${ending}?`, options: ['Me', 'You'], guess: false, note: false }),
 );
@@ -103,7 +109,8 @@ export const cardTitle = (c: Card) =>
 
 export function isAnswered(card: Card, a?: CardAnswer) {
   if (!a || a.pick == null) return false;
-  if (card.style === 'open') return !!a.text?.trim();
+  // in your own words, or saved for your call
+  if (card.style === 'open') return !!a.text?.trim() || !!a.aloud;
   if (card.guess && a.guess == null) return false;
   return true;
 }
@@ -165,6 +172,8 @@ export function scoreDay(day: LetterDay, me: string, them: string): Score {
     open: 0,
     spicy: 1,
     hot: 1,
+    take: 1,
+    flirt: 2,
     know: 2,
     likely: 2,
     tot: 3,
@@ -172,6 +181,42 @@ export function scoreDay(day: LetterDay, me: string, them: string): Score {
   splits.sort((x, y) => depth[x.kind] - depth[y.kind] || y.options.length - x.options.length);
   s.talkAbout = splits[0]?.id || null;
   return s;
+}
+
+/* ---------- what to talk about ---------- */
+
+/**
+ * One thing to say or ask about a card once the letter's open, from what you both answered.
+ * `a` is yours, `b` is theirs; `them` is their name. Null when there's nothing to add.
+ */
+export function talkPoint(c: Card, a: CardAnswer, b: CardAnswer, them: string): string | null {
+  const opt = (i?: number) => c.options[i ?? 0] ?? '';
+  const same = sameAnswer(c, a, b);
+  switch (c.kind) {
+    case 'flirt':
+      return c.talk || `Ask ${them} why “${opt(b.pick)}”.`;
+    case 'take':
+      if (same) return a.pick === 0 ? 'You both agree. What’s the one exception you’d make?' : 'You both disagree. What would change your minds?';
+      return a.pick === 0
+        ? `You agree, ${them} doesn’t. One minute each to win the other over.`
+        : `${them} agrees, you don’t. One minute each to win the other over.`;
+    case 'likely':
+      if (!same) return 'You each think it’s the other. One example each, then decide.';
+      return a.pick === 0 ? 'You both say it’s you. Tell the story that proves it.' : `You both say it’s ${them}. Ask ${them} for the story.`;
+    case 'know':
+      if (a.guess === b.pick && b.guess === a.pick) return 'You read each other perfectly. Ask what gave it away.';
+      if (a.guess !== b.pick) return `You guessed “${opt(a.guess)}”, ${them} said “${opt(b.pick)}”. Ask what you missed.`;
+      return `${them} guessed “${opt(b.guess)}”. Tell them why it’s “${opt(a.pick)}”.`;
+    case 'tot':
+      return same ? `Both “${opt(a.pick)}”. Was that ever in doubt?` : `“${opt(a.pick)}” or “${opt(b.pick)}”: one sentence each to win the other over.`;
+    case 'spicy':
+    case 'hot':
+      if (c.style === 'open') return a.aloud || b.aloud ? `Saved for your call: answer it out loud, ${them} first.` : null;
+      return same ? `Both “${opt(a.pick)}”. Noted. Bring it up on your next call.` : `You said “${opt(a.pick)}”, ${them} said “${opt(b.pick)}”. Meet in the middle?`;
+    default:
+      if (c.style === 'open' && (a.aloud || b.aloud)) return `Saved for your call: answer it out loud, ${them} first.`;
+      return null;
+  }
 }
 
 /* ---------- demo room history ---------- */
