@@ -67,6 +67,8 @@ public struct BoardDoc: Sendable, Equatable {
     /// when each of you last looked at the wall (their clock)
     public var seen: [String: Double] = [:]
     public var art: WallArt?
+    /// the last doodle each of you pinned up (note id; for your person's home-screen widget)
+    public var drew: [String: (id: String, at: Double)] = [:]
 
     public init() {}
 
@@ -78,10 +80,15 @@ public struct BoardDoc: Sendable, Equatable {
         }
         seen = numbers(r.map("seen"))
         art = WallArt(r["art"])
+        for (uid, v) in r.map("drew") {
+            guard let x = v as? Doc, let id = x.str("id"), let at = x.num("at") else { continue }
+            drew[uid] = (id, at)
+        }
     }
 
     public static func == (a: BoardDoc, b: BoardDoc) -> Bool {
         a.seen == b.seen && a.art == b.art && a.last.mapValues { "\($0.at)\($0.kind)" } == b.last.mapValues { "\($0.at)\($0.kind)" }
+            && a.drew.mapValues { "\($0.id)\($0.at)" } == b.drew.mapValues { "\($0.id)\($0.at)" }
     }
 
     /// something your person pinned up since you last looked
@@ -93,8 +100,11 @@ public struct BoardDoc: Sendable, Equatable {
 
 /* ---------- doodles ---------- */
 
-public let DOODLE_W = 48
-public let DOODLE_H = 36
+/// a doodle is 96 × 72, one hex digit a pixel. (The first ones were 48 × 36: they're still read, each pixel drawn 2 × 2.)
+public let DOODLE_W = 96
+public let DOODLE_H = 72
+public let OLD_DOODLE_W = 48
+public let OLD_DOODLE_H = 36
 /// index 0 is the paper; the rest are the pens
 public let DOODLE_PAL = [
     "#fbf3e2", "#3a2a26", "#fffaf0", "#c4453f", "#ef8f88", "#e07b39", "#d99a2b", "#f2d66b",
@@ -104,30 +114,58 @@ public let DOODLE_PAL = [
 public enum Doodle {
     public static func blank() -> [UInt8] { Array(repeating: 0, count: DOODLE_W * DOODLE_H) }
 
+    private static func hexOnly(_ s: String) -> Bool { s.utf8.allSatisfy { (48...57).contains($0) || (97...102).contains($0) } }
+
+    /// today's size, or the first, smaller one
     public static func isDoodle(_ s: String?) -> Bool {
-        guard let s, s.count == DOODLE_W * DOODLE_H else { return false }
-        return s.allSatisfy { ("0"..."9").contains($0) || ("a"..."f").contains($0) }
+        guard let s else { return false }
+        let n = s.utf8.count
+        return (n == DOODLE_W * DOODLE_H || n == OLD_DOODLE_W * OLD_DOODLE_H) && hexOnly(s)
+    }
+
+    /// today's size only
+    public static func isFull(_ s: String?) -> Bool {
+        guard let s else { return false }
+        return s.utf8.count == DOODLE_W * DOODLE_H && hexOnly(s)
     }
 
     public static func encode(_ px: [UInt8]) -> String { String(px.map { Character(String($0 & 15, radix: 16)) }) }
-    public static func decode(_ s: String) -> [UInt8] { s.map { UInt8(String($0), radix: 16) ?? 0 } }
+    public static func decode(_ s: String) -> [UInt8] { full(s).map { UInt8(String($0), radix: 16) ?? 0 } }
 
-    /// halved for the frame: each 2×2 block takes its most-used ink (the paper only if it's all paper)
-    public static func art(_ s: String, ref: String, by: String, at: Double = Values.nowMs()) -> WallArt {
-        let px = Array(s)
-        var out = ""
-        for y in 0..<ART_H {
-            for x in 0..<ART_W {
-                var order: [Character] = []
-                var n: [Character: Int] = [:]
-                for (dx, dy) in [(0, 0), (1, 0), (0, 1), (1, 1)] {
-                    let c = px[(y * 2 + dy) * DOODLE_W + x * 2 + dx]
-                    if c != "0" {
-                        if n[c] == nil { order.append(c) }
-                        n[c, default: 0] += 1
+    /// any doodle at today's size (each pixel of an old, small one made 2 × 2)
+    public static func full(_ s: String) -> String {
+        let px = Array(s.utf8)
+        if px.count == DOODLE_W * DOODLE_H { return s }
+        var out = [UInt8]()
+        out.reserveCapacity(DOODLE_W * DOODLE_H)
+        for y in 0..<DOODLE_H {
+            for x in 0..<DOODLE_W {
+                let i = (y >> 1) * OLD_DOODLE_W + (x >> 1)
+                out.append(i < px.count ? px[i] : 48)
+            }
+        }
+        return String(decoding: out, as: UTF8.self)
+    }
+
+    /// shrunk by a whole number: each f × f block takes its most-used ink (the paper only if it's all paper), so a fine line survives
+    static func shrink(_ s: String, w: Int, f: Int) -> String {
+        let px = Array(s.utf8)
+        let h = px.count / w
+        var out = [UInt8]()
+        for y in 0..<(h / f) {
+            for x in 0..<(w / f) {
+                var order: [UInt8] = []
+                var n: [UInt8: Int] = [:]
+                for dy in 0..<f {
+                    for dx in 0..<f {
+                        let c = px[(y * f + dy) * w + x * f + dx]
+                        if c != 48 {
+                            if n[c] == nil { order.append(c) }
+                            n[c, default: 0] += 1
+                        }
                     }
                 }
-                var best: Character = "0"
+                var best: UInt8 = 48
                 var most = 0
                 for c in order where n[c]! > most {
                     best = c
@@ -136,18 +174,27 @@ public enum Doodle {
                 out.append(best)
             }
         }
-        return WallArt(pal: DOODLE_PAL, px: out, kind: .doodle, ref: ref, by: by, at: at)
+        return String(decoding: out, as: UTF8.self)
+    }
+
+    /// at the first, smaller size (what's kept in `doodle`, for an app from before; today's apps read `hd`)
+    public static func small(_ s: String) -> String { shrink(full(s), w: DOODLE_W, f: DOODLE_W / OLD_DOODLE_W) }
+
+    /// shrunk for the frame over the couch
+    public static func art(_ s: String, ref: String, by: String, at: Double = Values.nowMs()) -> WallArt {
+        WallArt(pal: DOODLE_PAL, px: shrink(full(s), w: DOODLE_W, f: DOODLE_W / ART_W), kind: .doodle, ref: ref, by: by, at: at)
     }
 
     /// a little doodle drawn from rows of characters (for the demo room's wall)
     static func sketch(_ rows: [String], _ key: [Character: UInt8], _ ox: Int, _ oy: Int) -> String {
-        var a = blank()
+        // (drawn on the first, smaller paper, then made today's size)
+        var a = [UInt8](repeating: 0, count: OLD_DOODLE_W * OLD_DOODLE_H)
         for (j, row) in rows.enumerated() {
             for (i, ch) in row.enumerated() {
-                if let k = key[ch], oy + j < DOODLE_H, ox + i < DOODLE_W { a[(oy + j) * DOODLE_W + ox + i] = k }
+                if let k = key[ch], oy + j < OLD_DOODLE_H, ox + i < OLD_DOODLE_W { a[(oy + j) * OLD_DOODLE_W + ox + i] = k }
             }
         }
-        return encode(a)
+        return full(encode(a))
     }
 
     /// Rohan's doodle in the demo: a cup of tea and a heart, with steam.
@@ -185,7 +232,7 @@ public struct Note: Sendable, Identifiable, Equatable {
     public var by: String
     public var kind: PinKind
     public var text: String
-    /// 48 × 36, one hex digit a pixel (see DOODLE_PAL)
+    /// 96 × 72, one hex digit a pixel (see DOODLE_PAL). Saved as `hd`, with a 48 × 36 copy in `doodle` for apps from before.
     public var doodle: String
     public var paper: Int
     public var at: Double
@@ -199,7 +246,7 @@ public struct Note: Sendable, Identifiable, Equatable {
         guard let n = raw, let by = n.str("by") else { return nil }
         let kind: PinKind = n.str("kind") == "doodle" ? .doodle : .text
         let text = String((n.str("text") ?? "").prefix(NOTE_MAX))
-        let doodle = Doodle.isDoodle(n.str("doodle")) ? n.str("doodle")! : ""
+        let doodle = Doodle.isFull(n.str("hd")) ? n.str("hd")! : Doodle.isDoodle(n.str("doodle")) ? Doodle.full(n.str("doodle")!) : ""
         if kind == .text ? text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty : doodle.isEmpty { return nil }
         self.id = id
         self.by = by
@@ -218,7 +265,7 @@ public struct Note: Sendable, Identifiable, Equatable {
     }
 
     public static func new(by: String, doodle: String) -> (id: String, doc: Doc) {
-        (Values.newKey("note-"), ["by": by, "kind": "doodle", "doodle": doodle, "paper": 0, "at": Values.nowMs(), "loved": Doc(), "kept": false])
+        (Values.newKey("note-"), ["by": by, "kind": "doodle", "doodle": Doodle.small(doodle), "hd": Doodle.full(doodle), "paper": 0, "at": Values.nowMs(), "loved": Doc(), "kept": false])
     }
 }
 

@@ -25,6 +25,7 @@ import { RECORD_MS, startFor, whereAt } from '../src/music/records';
 import { parseYouTubeId, parseYouTubeStart } from '../src/watch/youtubeLink';
 import { renderWatchRoom, type WatchState } from '../src/pixel/watchRoom';
 import { renderCharacterBack } from '../src/pixel/characterBack';
+import { DEMO_DOODLE, OLD_DOODLE_H, OLD_DOODLE_W, DOODLE_H, DOODLE_W, doodleArt, fullDoodle, smallDoodle } from '../src/together/board';
 
 const r = rng(20261029);
 const int = (n: number) => Math.floor(r() * n);
@@ -405,6 +406,27 @@ for (let i = 0; i < looks.length; i++)
       }
 }
 
+// doodles on the wall: made today's size, shrunk for apps from before and for the frame over the couch
+const wallDoodles: Array<{ px: string; full: string; small: string; art: string }> = [];
+for (let k = 0; k < 24; k++) {
+  const [w, h] = k % 3 ? [DOODLE_W, DOODLE_H] : [OLD_DOODLE_W, OLD_DOODLE_H];
+  const a = new Array<string>(w * h).fill('0');
+  // a few strokes and a few lone dots, in a few inks
+  for (let n = 0, m = 3 + int(30); n < m; n++) {
+    const ink = (1 + int(15)).toString(16);
+    let x = int(w);
+    let y = int(h);
+    for (let t = 0, len = int(k % 2 ? 40 : 3); t < len; t++) {
+      a[y * w + x] = ink;
+      x = Math.max(0, Math.min(w - 1, x + int(3) - 1));
+      y = Math.max(0, Math.min(h - 1, y + int(3) - 1));
+    }
+  }
+  const px = a.join('');
+  wallDoodles.push({ px, full: fullDoodle(px), small: smallDoodle(px), art: doodleArt(px, 'n', 'u').px });
+}
+wallDoodles.push({ px: DEMO_DOODLE, full: fullDoodle(DEMO_DOODLE), small: smallDoodle(DEMO_DOODLE), art: doodleArt(DEMO_DOODLE, 'n', 'u').px });
+
 const out = process.argv[2] || 'native-fixtures.json';
-writeFileSync(out, JSON.stringify({ cards, days, hashes, rngSeq, streaks, demo, same, chapters, games, live, doodle: { judges, brushes, fills, choices, games: doodles }, coasters: coasterSteps, escape, record, watch: { looks, ...watch } }));
+writeFileSync(out, JSON.stringify({ cards, days, hashes, rngSeq, streaks, demo, same, chapters, games, live, doodle: { judges, brushes, fills, choices, games: doodles }, coasters: coasterSteps, escape, record, watch: { looks, ...watch }, wall: { doodles: wallDoodles } }));
 console.log(`wrote ${cards.length} card days, ${streaks.length} streaks, ${demo.length} demo rooms, ${games.length} game moves, ${live.length} live games, ${doodles.length} doodle moves to ${out}`);

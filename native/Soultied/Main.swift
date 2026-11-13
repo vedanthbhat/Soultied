@@ -28,6 +28,8 @@ enum AppTab: String, CaseIterable, Identifiable {
 /// what the room can open as a sheet (sideways, or from a tap on the couch)
 enum RoomSheet: String, Identifiable {
     case me, them, letters, wall, decor, play, us, music, watch, pet
+    /// the wall, open at the doodle pad or the photos (a tap on a home-screen widget)
+    case doodle, photos
     var id: String { rawValue }
 }
 
@@ -49,6 +51,7 @@ struct MainView: View {
     @State private var escape = Launch.escape
     @State private var tour = Tour.shared
     @State private var covers = Covers.shared
+    @State private var widgetLink = WidgetLink.shared
     @Environment(\.verticalSizeClass) private var vertical
 
     private var sideways: Bool { vertical == .compact }
@@ -114,9 +117,19 @@ struct MainView: View {
         }
         .onAppear { tour.offer(place: place) }
         .onChange(of: place.ready) { _, _ in tour.offer(place: place) }
+        // the home-screen widgets: keep them up to date, and open what a tap on one asks for (WidgetBridge.swift)
+        .modifier(WidgetSync(place: place, link: widgetLink, open: openFromWidget))
         .onChange(of: tour.active) { _, on in
             if on { tab = .home }
         }
+    }
+
+    private func openFromWidget() {
+        guard let t = widgetLink.open else { return }
+        widgetLink.open = nil
+        game = nil
+        escape = false
+        sheet = t == .photos ? .photos : .doodle
     }
 
     func go(_ t: AppTab) {
@@ -172,6 +185,8 @@ struct MainView: View {
         case .them: ThemSheet(place: place).presentationDetents([.height(360), .medium])
         case .letters: LettersView(place: place, start: .today)
         case .wall: WallView(place: place)
+        case .doodle: WallView(place: place, start: .doodle)
+        case .photos: WallView(place: place, start: .photos)
         case .decor: DecorView(place: place)
         case .play: PlayView(place: place)
         case .us: UsView(app: app, place: place)

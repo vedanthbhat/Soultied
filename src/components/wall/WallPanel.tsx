@@ -17,6 +17,7 @@ import {
   demoMemories,
   demoNotes,
   doodleArt,
+  doodleFields,
   normalizeMemories,
   normalizeNote,
   normalizePhoto,
@@ -444,8 +445,8 @@ export const WallPanel: React.FC<{ initialTab?: WallTab }> = ({ initialTab = 'no
           onCancel={() => setTab('notes')}
           onSend={(px, hang) => {
             const id = newKey('note-');
-            notes.put(id, { by: currentUser.id, kind: 'doodle', doodle: px, paper: 0, at: Date.now(), loved: {}, kept: false });
-            pinned('doodle');
+            notes.put(id, { by: currentUser.id, kind: 'doodle', ...doodleFields(px), paper: 0, at: Date.now(), loved: {}, kept: false });
+            pinned('doodle', id);
             if (hang) hangArt(doodleArt(px, id, currentUser.id));
             setTab('notes');
           }}

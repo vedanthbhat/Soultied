@@ -131,14 +131,14 @@ struct ArtView: View {
     }
 }
 
-/// a 48 × 36 doodle
+/// a doodle (96 × 72; an old 48 × 36 one is drawn twice as big). `scale` is points a pixel.
 struct DoodleView: View {
     let px: String
-    var scale: CGFloat = 4
+    var scale: CGFloat = 2
     var body: some View {
         let pal = DOODLE_PAL.map { RGB($0) }
         var data = [UInt8](repeating: 255, count: DOODLE_W * DOODLE_H * 4)
-        for (i, ch) in px.enumerated() where i < DOODLE_W * DOODLE_H {
+        for (i, ch) in Doodle.full(px).enumerated() where i < DOODLE_W * DOODLE_H {
             let c = pal[min(15, Int(String(ch), radix: 16) ?? 0)]
             data[i * 4] = c.r
             data[i * 4 + 1] = c.g

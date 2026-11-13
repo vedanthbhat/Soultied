@@ -263,7 +263,7 @@ struct WallCard: View {
                     if let n = latest {
                         VStack(alignment: .leading, spacing: 4) {
                             if n.kind == .doodle {
-                                DoodleView(px: n.doodle, scale: 1.5)
+                                DoodleView(px: n.doodle, scale: 0.75)
                             } else {
                                 Text(n.text).font(.pxBody).foregroundStyle(Color.inkSoft).lineLimit(4).multilineTextAlignment(.leading)
                             }

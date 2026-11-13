@@ -267,8 +267,44 @@ final class ModelTests: XCTestCase {
         XCTAssertNotNil(WallArt(a.doc), "it reads back as the website would")
         let d = Doodle.art(Doodle.demo, ref: "n", by: "u")
         XCTAssertEqual(d.px.count, ART_W * ART_H)
-        XCTAssertTrue(d.px.contains("3"), "the heart's red survives halving")
+        XCTAssertTrue(d.px.contains("3"), "the heart's red survives shrinking")
+        XCTAssertEqual(Doodle.demo.count, DOODLE_W * DOODLE_H)
+        XCTAssertEqual(Doodle.small(Doodle.demo).count, OLD_DOODLE_W * OLD_DOODLE_H)
+        XCTAssertEqual(Doodle.full(Doodle.small(Doodle.demo)), Doodle.demo, "the demo was drawn small, so it goes there and back")
         XCTAssertEqual(Icons.envelope.rgba().count, 15 * 11 * 4)
+    }
+
+    func testDoodleSizes() throws {
+        // a note from an app from before: 48 × 36, read at today's size
+        let old = String(repeating: "0", count: 47) + "3" + String(repeating: "0", count: OLD_DOODLE_W * OLD_DOODLE_H - 48)
+        let n = try XCTUnwrap(Note(id: "note-a", ["by": "u", "kind": "doodle", "doodle": old, "at": 1.0]))
+        XCTAssertEqual(n.doodle.count, DOODLE_W * DOODLE_H)
+        let px = Array(n.doodle)
+        XCTAssertEqual(px[93], "0")
+        XCTAssertEqual(px[94], "3")
+        XCTAssertEqual(px[95], "3")
+        XCTAssertEqual(px[DOODLE_W + 95], "3")
+        // today's: `hd` wins, and `doodle` keeps a small copy for apps from before
+        var fine = Doodle.blank()
+        for x in 10..<80 { fine[40 * DOODLE_W + x] = 9 }
+        let made = Note.new(by: "u", doodle: Doodle.encode(fine))
+        XCTAssertEqual((made.doc["hd"] as? String)?.count, DOODLE_W * DOODLE_H)
+        XCTAssertEqual((made.doc["doodle"] as? String)?.count, OLD_DOODLE_W * OLD_DOODLE_H)
+        XCTAssertTrue((made.doc["doodle"] as? String)?.contains("9") ?? false, "a one-pixel line survives the small copy")
+        let back = try XCTUnwrap(Note(id: made.id, made.doc))
+        XCTAssertEqual(back.doodle, Doodle.encode(fine))
+        XCTAssertNil(Note(id: "note-b", ["by": "u", "kind": "doodle", "doodle": "123", "at": 1.0]))
+        // the same as the website, pixel for pixel
+        guard let wall = LettersTests.fx?["wall"] as? Doc, let all = wall["doodles"] as? [Doc] else { throw XCTSkip("no fixtures (set SOULTIED_FIXTURES)") }
+        XCTAssertEqual(all.count, 25)
+        for d in all {
+            let px = d["px"] as! String
+            XCTAssertTrue(Doodle.isDoodle(px))
+            XCTAssertEqual(Doodle.full(px), d["full"] as? String)
+            XCTAssertEqual(Doodle.small(px), d["small"] as? String)
+            XCTAssertEqual(Doodle.art(px, ref: "n", by: "u").px, d["art"] as? String)
+        }
+        XCTAssertEqual(all.last?["px"] as? String, Doodle.demo)
     }
 
     func testTouchSummaryAndDecor() {

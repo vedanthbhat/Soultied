@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { DOODLE_H, DOODLE_PAL, DOODLE_W } from '../../together/wall';
+import { DOODLE_H, DOODLE_PAL, DOODLE_W, fullDoodle } from '../../together/wall';
 
-/** A doodle (48 × 36, one hex digit a pixel), drawn crisp at any size. */
+/** A doodle (96 × 72, one hex digit a pixel; an old 48 × 36 one is drawn twice as big), crisp at any size. */
 export const DoodleImage: React.FC<{ px: string; width?: number | string; className?: string; label?: string }> = ({ px, width = '100%', className = '', label }) => {
   const ref = useRef<HTMLCanvasElement | null>(null);
   useEffect(() => {
@@ -25,7 +25,8 @@ export const DoodleImage: React.FC<{ px: string; width?: number | string; classN
 
 const rgb = DOODLE_PAL.map((h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)]);
 
-function paint(g: CanvasRenderingContext2D, px: string | Uint8Array) {
+function paint(g: CanvasRenderingContext2D, raw: string | Uint8Array) {
+  const px = typeof raw === 'string' ? fullDoodle(raw) : raw;
   const img = g.createImageData(DOODLE_W, DOODLE_H);
   for (let i = 0; i < DOODLE_W * DOODLE_H; i++) {
     const k = typeof px === 'string' ? parseInt(px[i] || '0', 16) : px[i];
@@ -39,6 +40,14 @@ function paint(g: CanvasRenderingContext2D, px: string | Uint8Array) {
 }
 
 type Tool = 'pen' | 'eraser' | 'fill';
+
+/** the pen's tip, in pixels across */
+const SIZES = [
+  [1, 'Fine'],
+  [2, 'Medium'],
+  [4, 'Thick'],
+] as const;
+type Size = (typeof SIZES)[number][0];
 
 const NAMES = ['Paper', 'Ink', 'White', 'Red', 'Pink', 'Orange', 'Mustard', 'Yellow', 'Sage', 'Green', 'Sky', 'Blue', 'Lilac', 'Brown', 'Peach', 'Grey'];
 
@@ -54,7 +63,7 @@ export const DoodlePad: React.FC<{
   const last = useRef<[number, number] | null>(null);
   const [tool, setTool] = useState<Tool>('pen');
   const [ink, setInk] = useState(1);
-  const [size, setSize] = useState<1 | 2>(1);
+  const [size, setSize] = useState<Size>(2);
   const [hang, setHang] = useState(true);
   const [empty, setEmpty] = useState(true);
   const [, bump] = useState(0);
@@ -72,10 +81,12 @@ export const DoodlePad: React.FC<{
   };
   const dab = (x: number, y: number) => {
     const v = tool === 'eraser' ? 0 : ink;
+    // (centred on the pen, so a thick line runs where you drew it)
+    const o = Math.floor((size - 1) / 2);
     for (let j = 0; j < size; j++)
       for (let i = 0; i < size; i++) {
-        const xx = x + i;
-        const yy = y + j;
+        const xx = x + i - o;
+        const yy = y + j - o;
         if (xx >= 0 && yy >= 0 && xx < DOODLE_W && yy < DOODLE_H) pix.current[yy * DOODLE_W + xx] = v;
       }
   };
@@ -151,7 +162,7 @@ export const DoodlePad: React.FC<{
           width={DOODLE_W}
           height={DOODLE_H}
           className="pixelated block touch-none cursor-crosshair shadow-[0_0_0_3px_#3a2a26]"
-          style={{ width: 'min(100%, 432px)', aspectRatio: `${DOODLE_W} / ${DOODLE_H}`, height: 'auto' }}
+          style={{ width: 'min(100%, 480px)', aspectRatio: `${DOODLE_W} / ${DOODLE_H}`, height: 'auto' }}
           aria-label="Your doodle. Draw with the mouse or your finger."
           onPointerDown={down}
           onPointerMove={move}
@@ -168,9 +179,9 @@ export const DoodlePad: React.FC<{
             ))}
           </div>
           <div className="flex gap-1.5 flex-wrap" role="group" aria-label="Pen size">
-            {([1, 2] as const).map((s) => (
+            {SIZES.map(([s, name]) => (
               <button key={s} type="button" className={`px-btn px-btn--small ${size === s ? '' : 'px-btn--paper'}`} aria-pressed={size === s} onClick={() => setSize(s)}>
-                {s === 1 ? 'Fine' : 'Thick'}
+                {name}
               </button>
             ))}
           </div>

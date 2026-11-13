@@ -40,7 +40,7 @@ public enum Demo {
         db.seed("\(p)/meta/decor", ["earned": ["welcome": 240], "bought": Doc(), "placed": Doc(), "petNames": ["ginger": "Biscuit"]])
         db.seed("\(p)/meta/moods", ["by": [them: ["mood": "missing", "text": "counting the days", "at": nowMs - 2 * 3600e3]], "seen": Doc()])
         db.seed("\(p)/meta/touch", ["items": Doc(), "seen": Doc()])
-        db.seed("\(p)/meta/board", ["last": [them: ["at": nowMs - 3 * 3600e3, "kind": "doodle"]], "seen": Doc(), "art": Doodle.art(Doodle.demo, ref: "note-demo-2", by: them, at: nowMs).doc])
+        db.seed("\(p)/meta/board", ["last": [them: ["at": nowMs - 3 * 3600e3, "kind": "doodle"]], "seen": Doc(), "art": Doodle.art(Doodle.demo, ref: "note-demo-2", by: them, at: nowMs).doc, "drew": [them: ["id": "note-demo-2", "at": nowMs - 3 * 3600e3]]])
         db.seed("\(p)/meta/note-demo-0", ["by": me, "kind": "text", "text": "Left you a playlist for the train. Track 4 is us.", "paper": 1, "at": nowMs - 2 * 86400e3, "loved": [them: nowMs - 2 * 86400e3 + 600e3], "kept": false])
         db.seed("\(p)/meta/note-demo-1", ["by": them, "kind": "text", "text": "Twelve days. I’ve started packing in my head.", "paper": 0, "at": nowMs - 26 * 3600e3, "loved": Doc(), "kept": true])
         db.seed("\(p)/meta/note-demo-2", ["by": them, "kind": "doodle", "doodle": Doodle.demo, "paper": 0, "at": nowMs - 3 * 3600e3, "loved": Doc(), "kept": false])

@@ -12,7 +12,7 @@
  * marks it gone.
  */
 
-import { ART_H, ART_W, DEMO_DOODLE, type WallArt, isDoodle } from './board';
+import { ART_H, ART_W, DEMO_DOODLE, DOODLE_H, DOODLE_W, type WallArt, fullDoodle, isDoodle, smallDoodle } from './board';
 
 export * from './board';
 
@@ -27,7 +27,7 @@ export interface Note {
   by: string;
   kind: NoteKind;
   text: string;
-  /** 48 × 36, one hex digit a pixel (see DOODLE_PAL) */
+  /** 96 × 72, one hex digit a pixel (see DOODLE_PAL). Saved as `hd`, with a 48 × 36 copy in `doodle` for apps from before. */
   doodle: string;
   paper: number;
   at: number;
@@ -40,11 +40,11 @@ export interface Note {
 
 export function normalizeNote(id: string, raw: unknown): Note | null {
   if (!raw || typeof raw !== 'object') return null;
-  const n = raw as Partial<Note> & { gone?: unknown };
+  const n = raw as Partial<Note> & { gone?: unknown; hd?: unknown };
   if (typeof n.by !== 'string') return null;
   const kind: NoteKind = n.kind === 'doodle' ? 'doodle' : 'text';
   const text = typeof n.text === 'string' ? n.text.slice(0, NOTE_MAX) : '';
-  const doodle = isDoodle(n.doodle) ? n.doodle : '';
+  const doodle = typeof n.hd === 'string' && n.hd.length === DOODLE_W * DOODLE_H && isDoodle(n.hd) ? n.hd : isDoodle(n.doodle) ? fullDoodle(n.doodle) : '';
   if (kind === 'text' ? !text.trim() : !doodle) return null;
   const loved: Record<string, number> = {};
   if (n.loved && typeof n.loved === 'object') for (const [uid, at] of Object.entries(n.loved)) if (typeof at === 'number') loved[uid] = at;
@@ -61,6 +61,9 @@ export function normalizeNote(id: string, raw: unknown): Note | null {
     gone: !!n.gone,
   };
 }
+
+/** what to save for a doodle note: today's size, and a small copy that apps from before can read */
+export const doodleFields = (px: string) => ({ doodle: smallDoodle(px), hd: fullDoodle(px) });
 
 /* ---------- photos ---------- */
 

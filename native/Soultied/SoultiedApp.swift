@@ -14,10 +14,18 @@ struct SoultiedApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootView(app: app)
-                .onOpenURL { url in
-                    if !GIDSignIn.sharedInstance.handle(url) { app.handle(url: url) }
+            Group {
+                if let w = Launch.widgets {
+                    WidgetGallery(which: w)
+                } else {
+                    RootView(app: app)
                 }
+            }
+            .onOpenURL { url in
+                // (soultied://doodle and soultied://photos: a tap on a home-screen widget)
+                if WidgetLink.shared.handle(url) { return }
+                if !GIDSignIn.sharedInstance.handle(url) { app.handle(url: url) }
+            }
         }
     }
 }
@@ -66,6 +74,8 @@ enum Launch {
     static var escape: Bool { args.contains("-escape") }
     /// open the Soultied Plus sheet (screenshots)
     static var plus: Bool { args.contains("-plus") }
+    /// -widgets doodle (or board, empty)   the home-screen widgets, drawn by the app (screenshots)
+    static var widgets: String? { args.contains("-widgets") ? (value("-widgets") ?? "doodle") : nil }
     static func escapeScene(_ s: EscapeSession) {
         guard let id = value("-escape").flatMap(RoomId.init), let room = s.rooms.first(where: { $0.id == id }) else { return }
         s.playHere(id, fromScratch: true)
@@ -119,6 +129,10 @@ struct RootView: View {
         }
         .onChange(of: phase) { _, now in
             if now == .active { app.place?.heartbeat() }
+        }
+        // signed out, or out of the place: the home-screen widgets go back to asking you to open the app
+        .onChange(of: app.phase) { _, now in
+            if now == .signedOut || now == .needsPlace { WidgetBridge.signedOut() }
         }
     }
 }

@@ -212,6 +212,11 @@ jobs:
           shot looks -demo -tab us -looks
           # Soultied Plus: the sheet that sells it
           shot plus -demo -plus
+          # the doodle pad (finer now), and the home-screen widgets as the app draws them
+          shot wall-doodle -demo -open doodle
+          shot widgets -widgets doodle
+          shot widgets-board -widgets board
+          shot widgets-empty -widgets empty
           ls -la "$RUNNER_TEMP/shots"
           echo "dev=$dev" >> "$GITHUB_OUTPUT"
 
@@ -281,6 +286,8 @@ jobs:
             echo "### What the app is allowed to do (entitlements)"
             echo '```'
             codesign -d --entitlements - "$RUNNER_TEMP/Soultied.xcarchive/Products/Applications/Soultied.app" 2>&1 | grep -v "^Executable=" | head -30 || true
+            echo "and its home-screen widgets:"
+            codesign -d --entitlements - "$RUNNER_TEMP/Soultied.xcarchive/Products/Applications/Soultied.app/PlugIns/SoultiedWidget.appex" 2>&1 | grep -v "^Executable=" | head -20 || true
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 

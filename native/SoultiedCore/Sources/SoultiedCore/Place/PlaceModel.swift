@@ -486,7 +486,13 @@ public final class PlaceModel {
         if let n = wallNews { save(meta("board"), ["seen": [me: n.at]], "wall") }
     }
 
-    private func pinned(_ kind: PinKind) { save(meta("board"), ["last": [me: ["at": Values.nowMs(), "kind": kind.rawValue]]], "wall") }
+    private func pinned(_ kind: PinKind, ref: String? = nil) {
+        let at = Values.nowMs()
+        var d: Doc = ["last": [me: ["at": at, "kind": kind.rawValue]]]
+        // (your person's home-screen widget looks here for your latest doodle)
+        if kind == .doodle, let ref { d["drew"] = [me: ["id": ref, "at": at]] }
+        save(meta("board"), d, "wall")
+    }
 
     public func pinNote(_ text: String, paper: Int) {
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -501,7 +507,7 @@ public final class PlaceModel {
         let s = Doodle.encode(px)
         let n = Note.new(by: me, doodle: s)
         db.setLater(meta(n.id), n.doc, self)
-        pinned(.doodle)
+        pinned(.doodle, ref: n.id)
         if hang { hangArt(Doodle.art(s, ref: n.id, by: me)) }
     }
 

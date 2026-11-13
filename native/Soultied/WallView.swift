@@ -23,7 +23,12 @@ enum WallTab: String, CaseIterable, Identifiable {
 
 struct WallView: View {
     let place: PlaceModel
-    @State private var tab: WallTab = .notes
+    @State private var tab: WallTab
+
+    init(place: PlaceModel, start: WallTab = .notes) {
+        self.place = place
+        _tab = State(initialValue: start)
+    }
 
     var body: some View {
         ScrollView {
@@ -117,7 +122,7 @@ struct NoteView: View {
         VStack(alignment: .leading, spacing: 8) {
             Rectangle().fill(Color(hex: "#c4453f")).frame(width: 10, height: 10).frame(maxWidth: .infinity)
             if note.kind == .doodle {
-                DoodleView(px: note.doodle, scale: 3)
+                DoodleView(px: note.doodle, scale: 1.5)
                     .frame(maxWidth: .infinity)
                     .scaleEffect(0.95)
             } else {
@@ -163,9 +168,12 @@ struct DoodlePanel: View {
     var pinned: () -> Void
     @State private var px = Doodle.blank()
     @State private var ink: UInt8 = 1
-    @State private var big = false
+    /// the pen's tip, in pixels across
+    @State private var size = 2
     @State private var hang = true
     @State private var history: [[UInt8]] = []
+    /// where the pen last was, while a stroke's going (so a quick stroke is a line, not a trail of dots)
+    @State private var pen: (x: Int, y: Int)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -176,9 +184,18 @@ struct DoodlePanel: View {
                     .gesture(
                         DragGesture(minimumDistance: 0)
                             .onChanged { v in
-                                if v.translation == .zero { history.append(px); if history.count > 30 { history.removeFirst() } }
-                                paint(v.location, cell)
+                                let at = (x: Int((v.location.x / cell).rounded(.down)), y: Int((v.location.y / cell).rounded(.down)))
+                                if let from = pen {
+                                    line(from, at)
+                                } else {
+                                    // a new stroke: something to undo back to
+                                    history.append(px)
+                                    if history.count > 30 { history.removeFirst() }
+                                    stamp(at.x, at.y)
+                                }
+                                pen = at
                             }
+                            .onEnded { _ in pen = nil }
                     )
             }
             .aspectRatio(CGFloat(DOODLE_W) / CGFloat(DOODLE_H), contentMode: .fit)
@@ -198,7 +215,9 @@ struct DoodlePanel: View {
                 }
             }
             HStack(spacing: 8) {
-                Button(big ? "Thick pen" : "Thin pen") { big.toggle() }.buttonStyle(.px(.paper, small: true, wide: true))
+                Button(size == 1 ? "Fine pen" : size == 2 ? "Medium pen" : "Thick pen") { size = size == 1 ? 2 : size == 2 ? 4 : 1 }
+                    .buttonStyle(.px(.paper, small: true, wide: true))
+                    .accessibilityHint("Changes how thick the pen draws")
                 Button("Undo") { if let last = history.popLast() { px = last } }.buttonStyle(.px(.paper, small: true, wide: true)).disabled(history.isEmpty)
                 Button("Clear") {
                     history.append(px)
@@ -220,12 +239,27 @@ struct DoodlePanel: View {
         .pxCard()
     }
 
-    private func paint(_ p: CGPoint, _ cell: CGFloat) {
-        let x = Int(p.x / cell), y = Int(p.y / cell)
-        let r = big ? 1 : 0
-        for dy in -r...r {
-            for dx in -r...r {
-                let xx = x + dx, yy = y + dy
+    /// every cell between where the pen was and where it is now (the finger moves faster than the screen reports it)
+    private func line(_ a: (x: Int, y: Int), _ b: (x: Int, y: Int)) {
+        var x = a.x, y = a.y
+        let dx = abs(b.x - a.x), dy = -abs(b.y - a.y)
+        let sx = a.x < b.x ? 1 : -1, sy = a.y < b.y ? 1 : -1
+        var err = dx + dy
+        while true {
+            stamp(x, y)
+            if x == b.x && y == b.y { break }
+            let e2 = 2 * err
+            if e2 >= dy { err += dy; x += sx }
+            if e2 <= dx { err += dx; y += sy }
+        }
+    }
+
+    /// the pen's tip on one cell (centred on it, so a thick line runs where you drew it)
+    private func stamp(_ x: Int, _ y: Int) {
+        let o = (size - 1) / 2
+        for dy in 0..<size {
+            for dx in 0..<size {
+                let xx = x + dx - o, yy = y + dy - o
                 if xx >= 0, yy >= 0, xx < DOODLE_W, yy < DOODLE_H { px[yy * DOODLE_W + xx] = ink }
             }
         }
@@ -486,7 +520,7 @@ struct MemoriesPanel: View {
                                     DataImage(url: p.thumb).frame(height: 120).clipped()
                                 }
                                 if m.kind == .note, let n = place.notes.first(where: { $0.id == m.id }), n.kind == .doodle {
-                                    DoodleView(px: n.doodle, scale: 2)
+                                    DoodleView(px: n.doodle, scale: 1)
                                 }
                             }
                             .pxCard(shadow: false)

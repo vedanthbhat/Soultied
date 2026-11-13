@@ -8,3 +8,5 @@ SoultiedCore/.build/
 # written by XcodeGen from project.yml
 Soultied/Info.plist
 Soultied/Soultied.entitlements
+SoultiedWidget/Info.plist
+SoultiedWidget/SoultiedWidget.entitlements
