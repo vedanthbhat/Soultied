@@ -23,6 +23,11 @@ for sc in spec["scenes"] as! [[String: Any]] {
     var st = RoomState(left: seat(s["left"]), right: seat(s["right"]))
     st.letterUnread = s["letterUnread"] as? Bool ?? false
     st.fire = (s["fire"] as? Double) ?? 0.6
+    st.flame = s["flame"] as? Int ?? 2
+    if let lg = s["logs"] as? [String: Bool] {
+        st.logLeft = lg["left"] ?? false
+        st.logRight = lg["right"] ?? false
+    }
     st.hover = (s["hover"] as? String).flatMap { HotspotId(rawValue: $0) }
     st.closeness = (s["closeness"] as? Double) ?? 0
     st.scooting = s["scooting"] as? Bool ?? false

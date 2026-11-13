@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { COUCH_STEPS, couchLine } from '../couch';
+import { COUCH_STEPS, FIRE_NAMES, couchLine } from '../couch';
 import { PixelAvatarRenderer } from './PixelAvatarRenderer';
 import { PixelIcon, SpriteName } from './letters/PixelIcon';
 import { scoreDay } from '../letters/cards';
@@ -16,7 +16,7 @@ const Stat: React.FC<{ icon: SpriteName; value: string; label: string }> = ({ ic
 );
 
 export const UsPage: React.FC = () => {
-  const { space, currentUser, partnerUser, activities, streak, letters, updateSpaceDetails, openPanel, couchLevel } = useApp();
+  const { space, currentUser, partnerUser, activities, streak, letters, updateSpaceDetails, openPanel, couchLevel, fire } = useApp();
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(space?.name || '');
   const [since, setSince] = useState(space?.togetherSince || '');
@@ -130,6 +130,13 @@ export const UsPage: React.FC = () => {
         <Stat icon="heart" value={sync === null ? '—' : `${sync}%`} label="In sync" />
         {partnerUser && (
           <Stat icon="couch" value={couchLevel >= COUCH_STEPS ? 'Side by side' : `${couchLevel} of ${COUCH_STEPS}`} label="Closer on the couch" />
+        )}
+        {partnerUser && (
+          <Stat
+            icon={fire.level ? 'flame' : 'flameOut'}
+            value={fire.level ? `${fire.streak} ${fire.streak === 1 ? 'day' : 'days'}` : 'Embers'}
+            label={fire.level ? `${FIRE_NAMES[fire.level]}, both here` : 'Both show up to light it'}
+          />
         )}
       </div>
       {partnerUser && <p className="m-0 -mt-1 text-sm text-[var(--muted)]">{couchLine(couchLevel, partnerUser.name)}</p>}

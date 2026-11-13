@@ -109,6 +109,11 @@ public struct RoomState {
     public var letterUnread = false
     /// 0..1 fire intensity: stoked on a tap
     public var fire = 0.6
+    /// how many days in a row you've both shown up, as a fire: 0 embers, 1 a small flame, 2 steady, 3 roaring (see CouchState.fire)
+    public var flame = 2
+    /// whose log is on the fire today (each of you adds one when you show up)
+    public var logLeft = false
+    public var logRight = false
     public var hover: HotspotId? = nil
     /// how close the two sit: 0 = the two ends, 1 = side by side
     public var closeness = 0.0
@@ -149,7 +154,10 @@ public func seatXs(_ closeness: Double = 0) -> (left: Double, right: Double) {
     return (COUCH_MID - d, COUCH_MID + d)
 }
 
-struct FireBox { static let x = 128.0, cx = 128.0, openX = 114.0, openW = 29.0, openY = 78.0, openB = 116.0 }
+// the fireplace is on the back wall, behind the couch, so the fire burns between the two of you
+struct FireBox { static let x = 232.0, cx = 232.0, openX = 218.0, openW = 29.0, openY = 78.0, openB = 116.0 }
+/// how far the fireplace's arch cuts in, on its top five rows
+let FIRE_ARCH: [Double] = [9, 5, 3, 2, 1]
 struct TableBox { static let x = 205.0, y = 163.0, w = 54.0 }
 struct DoorBox { static let x = 160.0, y = 64.0, w = 24.0 }
 struct GamesBox { static let x = 168.0, y = 133.0, w = 14.0, h = 17.0 }
@@ -159,15 +167,16 @@ struct DeckBox { static let x = 280.0, y = 125.0, w = 18.0 }
 let HOTSPOTS: [Hotspot] = [
     Hotspot(id: .letter, x: TableBox.x + 19, y: TableBox.y - 9, w: 18, h: 12),
     Hotspot(id: .fire, x: FireBox.openX, y: FireBox.openY, w: FireBox.openW, h: FireBox.openB - FireBox.openY),
-    Hotspot(id: .photo, x: 138, y: 43, w: 12, h: 12),
+    Hotspot(id: .photo, x: 200, y: 43, w: 12, h: 12),
     Hotspot(id: .remote, x: TableBox.x + 36, y: TableBox.y - 4, w: 10, h: 6),
     Hotspot(id: .music, x: SideTableBox.x - 1, y: DeckBox.y - 10, w: SideTableBox.w + 2, h: 151 - (DeckBox.y - 10)),
     Hotspot(id: .door, x: DoorBox.x - 1, y: DoorBox.y - 2, w: DoorBox.w + 2, h: FLOOR_Y - DoorBox.y + 2),
     Hotspot(id: .games, x: GamesBox.x - 1, y: GamesBox.y - 2, w: GamesBox.w + 2, h: GamesBox.h + 2),
-    // the painting over the mantel: decorate the room
+    // the painting over the sideboard: decorate the room
     Hotspot(id: .decor, x: 109, y: 14, w: 38, h: 28),
-    // the three pictures over the couch: our wall (notes, doodles, photos, memories)
-    Hotspot(id: .board, x: 190, y: 24, w: 84, h: 32),
+    // the picture over the mantel, and the two beside the chimney: our wall (notes, doodles, photos, memories)
+    Hotspot(id: .board, x: 214, y: 24, w: 34, h: 26),
+    Hotspot(id: .board, x: 263, y: 20, w: 47, h: 28),
     // the pet asleep on its cushion: choose who sleeps there
     Hotspot(id: .pet, x: PetBox.x - 4, y: PetBox.y - 5, w: 28, h: 15),
 ]
@@ -304,6 +313,7 @@ func staticLayer(_ d: Decor) -> Layer {
     drawFloor(L)
     drawWindow(L, d.view)
     drawFireplace(L)
+    drawSideboard(L)
     drawGallery(L)
     drawDarkDoor(L)
     drawBookshelf(L)
@@ -343,7 +353,7 @@ func renderRoom(_ L: Layer, _ state: RoomState, _ t: Double) {
     L.copyFrom(staticLayer(d))
     drawPainting(L, d.painting, state)
     drawWallArt(L, state, t)
-    drawFire(L, t, state.fire)
+    drawFire(L, t, state.fire, state)
     drawDoorGlow(L, t, state.hover == .door)
     drawCandles(L, t)
     drawWeather(L, t, d.view)
@@ -403,12 +413,12 @@ func renderRoom(_ L: Layer, _ state: RoomState, _ t: Double) {
     drawLetter(L, t, state.letterUnread, state.hover == .letter)
     drawPlant(L, d.plant)
 
-    applyLighting(L, t, state.fire)
+    applyLighting(L, t, state.fire, state)
 }
 
 /// The room with `decor` in it, cropped to a spot (the catalogue's little pictures).
 public let DECOR_CROPS: [String: (Int, Int, Int, Int)] = [
-    "wall": (190, 6, 96, 64),
+    "wall": (56, 6, 96, 64),
     "couch": (180, 108, 102, 68),
     "rug": (88, 124, 84, 56),
     "pet": (170, 132, 54, 36),

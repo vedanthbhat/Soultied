@@ -39,6 +39,23 @@ public struct CouchState: Sendable, Equatable {
         return (true, both && !already)
     }
 
+    /// The fire behind the couch: how many days in a row you've both shown up (counting today once you both have,
+    /// and up to yesterday until then), and how it burns. A missed day lets it die down to embers; it never goes out.
+    /// 0 embers, 1 a small flame (1 or 2 days), 2 steady (3 to 6), 3 roaring (a week or more).
+    public func fire(today: String) -> (streak: Int, level: Int) {
+        let days = Set(together)
+        var day = days.contains(today) ? today : Day.add(today, -1)
+        var streak = 0
+        while days.contains(day) {
+            streak += 1
+            day = Day.add(day, -1)
+        }
+        return (streak, streak >= 7 ? 3 : streak >= 3 ? 2 : streak >= 1 ? 1 : 0)
+    }
+
+    /// what the fire is, in words
+    public static let fireNames = ["Embers", "A small flame", "A steady fire", "A roaring fire"]
+
     public static func line(_ level: Int, partnerName: String) -> String {
         if level >= COUCH_STEPS { return "Side by side with \(partnerName). Keep showing up and stay cosy." }
         let left = COUCH_STEPS - level
@@ -131,12 +148,12 @@ public enum Catalogue {
         i(.view, "city", "City lights", 150, "A skyline, its windows going on and off."),
         i(.view, "aurora", "Northern lights", 250, "Green lights rippling over the snow."),
 
-        i(.painting, "dusk", "Dusk hills", 0, "The warm landscape over the mantel."),
+        i(.painting, "dusk", "Dusk hills", 0, "The warm landscape over the sideboard."),
         i(.painting, "sea", "Seaside", 60, "A little boat on a calm sea."),
         i(.painting, "peaks", "Moonlit peaks", 80, "Snowy mountains under a full moon."),
         i(.painting, "flowers", "Flowers in a vase", 80, "A still life in warm colours."),
         i(.painting, "shapes", "Shapes", 100, "Sun, arch and hill, in blocks of colour."),
-        i(.painting, "us", "A portrait of you two", 200, "The two of you, framed over the fire."),
+        i(.painting, "us", "A portrait of you two", 200, "The two of you, framed over the sideboard."),
 
         i(.plant, "monstera", "Big leafy plant", 0, "The one in the corner."),
         i(.plant, "snake", "Snake plant", 40, "Tall striped leaves. Impossible to kill."),
@@ -161,7 +178,7 @@ public enum Catalogue {
         case .rug: return ("A new rug", "\(who) put down a new rug: \(item.name).")
         case .pet: return ("Someone new by the couch", "\(who) brought home a \(item.name.lowercased()).")
         case .view: return ("A new view", "\(who) changed the view from the window: \(item.name).")
-        case .painting: return ("A new painting", "\(who) hung a new painting over the fire: \(item.name).")
+        case .painting: return ("A new painting", "\(who) hung a new painting: \(item.name).")
         case .plant: return ("A new plant", "\(who) brought home a new plant: \(item.name).")
         }
     }

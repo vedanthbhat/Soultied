@@ -34,8 +34,9 @@ public enum Demo {
         db.seed("\(p)/meta/letters", ["afterDarkOn": [them: true], "journeyStart": st.journeyStart ?? today, "repairs": [String](), "afterDarkHeat": Doc()])
         db.seed("\(p)/meta/couch", [
             "seen": [me: Day.add(today, -1), them: Day.add(today, -1)],
-            "together": [-6, -4, -1].map { Day.add(today, $0) },
-            "shown": [me: 3, them: 3],
+            // four days together so far, the last three in a row (a steady fire)
+            "together": [-6, -3, -2, -1].map { Day.add(today, $0) },
+            "shown": [me: 4, them: 4],
         ])
         db.seed("\(p)/meta/decor", ["earned": ["welcome": 240], "bought": Doc(), "placed": Doc(), "petNames": ["ginger": "Biscuit"]])
         db.seed("\(p)/meta/moods", ["by": [them: ["mood": "missing", "text": "counting the days", "at": nowMs - 2 * 3600e3]], "seen": Doc()])

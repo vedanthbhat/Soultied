@@ -272,6 +272,11 @@ public final class PlaceModel {
     public var couchLevel: Int { couch.level }
     public var couchShown: Int { couch.shown[me] ?? 0 }
     public var togetherToday: Bool { couch.together.contains(today) }
+    /// the fire behind the couch: the days in a row you've both shown up, and how it burns (0 embers … 3 roaring);
+    /// until your person moves in, it just burns steady
+    public var fire: (streak: Int, level: Int) { partnerHere ? couch.fire(today: today) : (0, 2) }
+    /// whether someone's been in today (each of you puts a log on the fire)
+    public func hereToday(_ uid: String?) -> Bool { uid.map { couch.seen[$0] == today } ?? false }
 
     private func checkIn() {
         guard let w = couch.checkIn(me: me, partner: them, today: today) else { return }

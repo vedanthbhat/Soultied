@@ -25,6 +25,10 @@ export interface RoomState {
   letterUnread: boolean;
   /** 0..1 fire intensity, lets us "stoke" the fire on click */
   fire: number;
+  /** how many days in a row you've both shown up, as a fire: 0 embers, 1 a small flame, 2 steady, 3 roaring (see fireOf in couch.ts) */
+  flame?: number;
+  /** whose log is on the fire today (each of you adds one when you show up) */
+  logs?: { left: boolean; right: boolean };
   /** highlight a hotspot (hover) */
   hover?: HotspotId | null;
   /** how close the two sit on the couch: 0 = the two ends, 1 = side by side (fractional mid-scoot) */
@@ -88,7 +92,10 @@ export function seatXs(closeness = 0) {
   const d = Math.round(SEAT_FAR + (SEAT_NEAR - SEAT_FAR) * c);
   return { left: COUCH_MID - d, right: COUCH_MID + d };
 }
-const FIRE = { x: 128, cx: 128, openX: 114, openW: 29, openY: 78, openB: 116 };
+// the fireplace is on the back wall, behind the couch, so the fire burns between the two of you
+const FIRE = { x: 232, cx: 232, openX: 218, openW: 29, openY: 78, openB: 116 };
+/** how far the fireplace's arch cuts in, on its top five rows */
+const ARCH = [9, 5, 3, 2, 1];
 const TABLE = { x: 205, y: 163, w: 54 };
 const DOOR = { x: 160, y: 64, w: 24 };
 /** the stack of board games on the floor beside the couch */
@@ -102,15 +109,16 @@ const DECK = { x: 280, y: 125, w: 18 };
 const HOTSPOTS: Hotspot[] = [
   { id: 'letter', x: TABLE.x + 19, y: TABLE.y - 9, w: 18, h: 12 },
   { id: 'fire', x: FIRE.openX, y: FIRE.openY, w: FIRE.openW, h: FIRE.openB - FIRE.openY },
-  { id: 'photo', x: 138, y: 43, w: 12, h: 12 },
+  { id: 'photo', x: 200, y: 43, w: 12, h: 12 },
   { id: 'remote', x: TABLE.x + 36, y: TABLE.y - 4, w: 10, h: 6 },
   { id: 'music', x: SIDE_TABLE.x - 1, y: DECK.y - 10, w: SIDE_TABLE.w + 2, h: 151 - (DECK.y - 10) },
   { id: 'door', x: DOOR.x - 1, y: DOOR.y - 2, w: DOOR.w + 2, h: FLOOR_Y - DOOR.y + 2 },
   { id: 'games', x: GAMES_STACK.x - 1, y: GAMES_STACK.y - 2, w: GAMES_STACK.w + 2, h: GAMES_STACK.h + 2 },
-  // the painting over the mantel: decorate the room
+  // the painting over the sideboard: decorate the room
   { id: 'decor', x: 109, y: 14, w: 38, h: 28 },
-  // the three pictures over the couch: our wall (notes, doodles, photos, memories)
-  { id: 'board', x: 190, y: 24, w: 84, h: 32 },
+  // the picture over the mantel, and the two beside the chimney: our wall (notes, doodles, photos, memories)
+  { id: 'board', x: 214, y: 24, w: 34, h: 26 },
+  { id: 'board', x: 263, y: 20, w: 47, h: 28 },
   // the pet asleep on its cushion: choose who sleeps there
   { id: 'pet', x: PET.x - 4, y: PET.y - 5, w: 28, h: 15 },
 ];
@@ -548,22 +556,24 @@ function drawBricks(L: Layer, x0: number, y0: number, w: number, h: number) {
 }
 
 function drawFireplace(L: Layer) {
-  // chimney breast
-  drawBricks(L, 100, 5, 56, FLOOR_Y - 5);
-  L.vline(100, 5, FLOOR_Y - 5, P.brickD);
-  L.vline(155, 5, FLOOR_Y - 5, '#6d3c2e');
-  // (the painting above the mantel is drawPainting, since it can change)
+  // chimney breast, on the back wall behind the couch
+  const cx = FIRE.cx;
+  const x0 = cx - 28;
+  drawBricks(L, x0, 5, 56, FLOOR_Y - 5);
+  L.vline(x0, 5, FLOOR_Y - 5, P.brickD);
+  L.vline(x0 + 55, 5, FLOOR_Y - 5, '#6d3c2e');
+  // (the picture over the mantel is our wall's: drawGallery and drawWallArt)
   // mantel shelf
-  L.rect(94, 54, 68, 6, P.mantel);
-  L.hline(94, 54, 68, P.mantelL);
-  L.hline(94, 59, 68, P.mantelD);
-  L.rect(96, 60, 64, 2, P.mantelD);
+  L.rect(x0 - 6, 54, 68, 6, P.mantel);
+  L.hline(x0 - 6, 54, 68, P.mantelL);
+  L.hline(x0 - 6, 59, 68, P.mantelD);
+  L.rect(x0 - 4, 60, 64, 2, P.mantelD);
   // stone surround
-  L.rect(104, 62, 48, FLOOR_Y - 62, P.stone);
-  L.vline(104, 62, FLOOR_Y - 62, P.stoneL);
-  L.vline(151, 62, FLOOR_Y - 62, P.stoneD);
+  L.rect(x0 + 4, 62, 48, FLOOR_Y - 62, P.stone);
+  L.vline(x0 + 4, 62, FLOOR_Y - 62, P.stoneL);
+  L.vline(x0 + 51, 62, FLOOR_Y - 62, P.stoneD);
   for (let y = 66; y < FLOOR_Y; y += 7)
-    for (let x = 106 + ((y / 7) % 2) * 4; x < 150; x += 9) {
+    for (let x = x0 + 6 + ((y / 7) % 2) * 4; x < x0 + 50; x += 9) {
       L.hline(x, y, 6, P.stoneD);
       L.set(x, y - 1, P.stoneL);
     }
@@ -571,7 +581,7 @@ function drawFireplace(L: Layer) {
   const { openX: ox, openW: ow, openY: oy, openB: ob } = FIRE;
   for (let j = oy; j < ob; j++) {
     const t = j - oy;
-    const inset = t < 5 ? [9, 5, 3, 2, 1][t] : 0;
+    const inset = t < 5 ? ARCH[t] : 0;
     L.rect(ox + inset, j, ow - inset * 2, 1, P.soot);
     // keystone edge
     L.set(ox + inset - 1, j, P.stoneDD);
@@ -582,50 +592,72 @@ function drawFireplace(L: Layer) {
   // back bricks inside, very dark
   for (let y = oy + 8; y < ob - 4; y += 4)
     for (let x = ox + 3 + ((y / 4) % 2) * 3; x < ox + ow - 4; x += 6) L.hline(x, y, 4, P.sootL);
-  // hearth slab
-  L.rect(96, 116, 64, 6, P.stone);
-  L.hline(96, 116, 64, P.stoneL);
-  L.hline(96, 121, 64, P.stoneDD);
-  L.vline(96, 116, 6, P.stoneL);
-  L.vline(159, 116, 6, P.stoneDD);
+  // hearth slab (the couch hides most of it)
+  L.rect(x0 - 4, 116, 64, 6, P.stone);
+  L.hline(x0 - 4, 116, 64, P.stoneL);
+  L.hline(x0 - 4, 121, 64, P.stoneDD);
+  L.vline(x0 - 4, 116, 6, P.stoneL);
+  L.vline(x0 + 59, 116, 6, P.stoneDD);
   // grate
   L.rect(ox + 5, ob - 3, ow - 10, 1, '#2a2020');
   for (let x = ox + 6; x < ox + ow - 6; x += 3) L.vline(x, ob - 6, 3, '#3a2c2a');
 
-  // mantel decor: candles (flames animate later), photo, plant, books
-  L.rect(98, 46, 3, 8, '#efe3cb');
-  L.vline(100, 46, 8, '#cdbf9f');
-  L.rect(103, 49, 3, 5, '#efe3cb');
-  L.vline(105, 49, 5, '#cdbf9f');
-  // photo frame (the two of you)
-  L.rect(137, 42, 14, 12, P.woodD);
-  L.rect(138, 43, 12, 10, '#e6d6b8');
-  L.rect(139, 44, 10, 8, '#c6a489');
-  // books
-  L.rect(122, 44, 3, 10, '#7a5068');
-  L.rect(125, 46, 3, 8, '#4f6583');
-  L.rect(128, 45, 3, 9, P.mustard);
-  L.hline(122, 44, 3, '#936580');
-  // trailing plant
-  L.rect(153, 48, 6, 6, P.pot);
-  L.vline(158, 48, 6, P.potD);
-  const leaves = [
-    [152, 46], [154, 45], [156, 46], [158, 45], [159, 47], [160, 50], [161, 53], [161, 56], [160, 59], [162, 61],
-    [151, 47], [155, 44],
-  ];
-  for (const [lx, ly] of leaves) {
-    L.set(lx, ly, P.leaf);
-    L.set(lx + 1, ly, P.leafL);
+  // on the mantel: a photo of you two at one end, two candles (their flames animate later) at the other
+  L.rect(x0 - 5, 42, 14, 12, P.woodD);
+  L.rect(x0 - 4, 43, 12, 10, '#e6d6b8');
+  L.rect(x0 - 3, 44, 10, 8, '#c6a489');
+  L.rect(x0 + 46, 49, 3, 5, '#efe3cb');
+  L.vline(x0 + 48, 49, 5, '#cdbf9f');
+  L.rect(x0 + 51, 46, 3, 8, '#efe3cb');
+  L.vline(x0 + 53, 46, 8, '#cdbf9f');
+}
+
+/** Where the fireplace used to be: a sideboard under the painting, with books, a sprig in a jar and a lamp. */
+function drawSideboard(L: Layer) {
+  // centred under the painting, with a little room before the door
+  const x = 103;
+  const w = 50;
+  const top = 98;
+  // legs
+  L.rect(x + 3, FLOOR_Y - 3, 3, 3, P.woodD);
+  L.rect(x + w - 6, FLOOR_Y - 3, 3, 3, P.woodD);
+  // body, and two doors with brass knobs
+  L.rect(x, top + 3, w, FLOOR_Y - 3 - (top + 3), P.wood);
+  L.vline(x, top + 3, FLOOR_Y - 3 - (top + 3), P.woodL);
+  L.vline(x + w - 1, top + 3, FLOOR_Y - 3 - (top + 3), P.woodD);
+  for (const dx of [3, w / 2 + 1]) {
+    L.rect(x + dx, top + 6, w / 2 - 4, FLOOR_Y - 3 - (top + 9), P.woodD);
+    L.rect(x + dx + 1, top + 7, w / 2 - 6, FLOOR_Y - 3 - (top + 11), P.wood);
   }
-  // firewood basket beside hearth
-  L.rect(80, 104, 15, 13, '#8a6a45');
-  for (let y = 105; y < 116; y += 2) L.hline(80, y, 15, '#6f5234');
-  L.hline(80, 104, 15, '#a3825a');
-  for (const [lx, ly] of [[81, 100], [85, 99], [89, 101], [83, 102]]) {
-    L.rect(lx, ly, 6, 3, '#7a4f33');
-    L.set(lx, ly + 1, '#c9a27a');
-    L.set(lx + 5, ly + 1, '#c9a27a');
+  L.set(x + w / 2 - 3, top + 12, P.brassL);
+  L.set(x + w / 2 + 3, top + 12, P.brassL);
+  // top
+  L.rect(x - 2, top, w + 4, 3, P.woodL);
+  L.hline(x - 2, top, w + 4, mix(P.woodL, '#ffffff', 0.15));
+  L.hline(x - 2, top + 2, w + 4, P.woodD);
+  // books lying flat
+  L.rect(x + 3, top - 3, 14, 3, '#7a5068');
+  L.hline(x + 3, top - 3, 14, '#936580');
+  L.rect(x + 5, top - 6, 11, 3, '#4f6583');
+  L.hline(x + 5, top - 6, 11, '#6a80a0');
+  L.rect(x + 4, top - 8, 12, 2, P.mustard);
+  // a sprig in a little jar
+  L.rect(x + 21, top - 5, 4, 5, '#c4dcef');
+  L.hline(x + 21, top - 5, 4, '#e6f0f8');
+  for (const [lx, ly] of [[22, -7], [23, -9], [24, -11], [21, -10], [25, -8], [23, -12]]) L.set(x + lx, top + ly, P.leaf);
+  // the lamp: brass stand, glowing shade
+  const lx = x + w - 9;
+  L.rect(lx - 3, top - 2, 7, 2, P.brass);
+  L.vline(lx, top - 10, 8, P.brass);
+  for (let j = 0; j < 9; j++) {
+    const half = 3 + Math.floor(j / 2.5);
+    for (let i = -half; i <= half; i++) {
+      const edge = i === -half || i === half || j === 8;
+      L.glow(lx + i, top - 19 + j, edge ? '#e8c787' : j < 2 ? '#fbeec8' : '#f6e0a8');
+    }
   }
+  L.rect(lx - 4, top - 20, 9, 1, '#d6b577');
+  L.unglow(lx - 4, top - 20, 9, 1);
 }
 
 function drawGallery(L: Layer) {
@@ -635,7 +667,7 @@ function drawGallery(L: Layer) {
     for (let j = 2; j < h - 2; j++) for (let i = 2; i < w - 2; i++) L.set(x + i, y + j, paint(i - 2, j - 2));
   };
   // botanical print
-  frame(192, 30, 18, 24, (i, j) => {
+  frame(266, 22, 18, 24, (i, j) => {
     const stem = i === 6 && j > 3;
     const leaf = (Math.abs(i - 6) === 2 && j % 5 === 2) || (Math.abs(i - 6) === 3 && j % 5 === 3);
     return stem || leaf ? P.sageD : '#efe3cb';
@@ -659,7 +691,7 @@ function drawGallery(L: Layer) {
     return (i + j) % 2 ? '#e8d9bc' : '#eadcc0';
   });
   // abstract sun
-  frame(252, 32, 20, 16, (i, j) => {
+  frame(289, 30, 20, 16, (i, j) => {
     const d = (i - 8) ** 2 + (j - 12) ** 2;
     if (d < 30) return P.mustard;
     return j > 9 ? P.couch : '#e9d7b7';
@@ -1117,6 +1149,7 @@ function staticLayer(d: Decor): Layer {
   drawFloor(L);
   drawWindow(L, d.view);
   drawFireplace(L);
+  drawSideboard(L);
   drawGallery(L);
   drawDarkDoor(L);
   drawBookshelf(L);
@@ -1136,8 +1169,18 @@ function staticLayer(d: Decor): Layer {
 
 const FIRE_COLS = ['#fff4c2', '#ffd36b', '#f7a23e', '#e66a2c', '#b8402a'];
 
-function drawFire(L: Layer, t: number, intensity: number) {
-  const { openX: ox, openW: ow, openB: ob } = FIRE;
+/** the fire at each strength: how tall the flames, how far its light reaches, its glow, sparks, and the room's dark */
+const FLAMES = [
+  { h: 0, light: 0.6, halo: 0.25, sparks: 0, amb: [0.3, 0.3, 0.47] },
+  { h: 10, light: 0.82, halo: 0.6, sparks: 1, amb: [0.34, 0.33, 0.48] },
+  { h: 22.8, light: 1, halo: 1, sparks: 5, amb: [0.38, 0.36, 0.5] },
+  { h: 31, light: 1.17, halo: 1.3, sparks: 10, amb: [0.41, 0.38, 0.49] },
+] as const;
+const flameOf = (state: RoomState) => FLAMES[Math.max(0, Math.min(3, Math.floor(state.flame ?? 2)))];
+
+function drawFire(L: Layer, t: number, intensity: number, state: RoomState) {
+  const lv = flameOf(state);
+  const { openX: ox, openW: ow, openY: oy, openB: ob } = FIRE;
   const base = ob - 6;
   // logs
   L.rect(ox + 6, base, ow - 12, 3, '#4a2e20');
@@ -1145,18 +1188,37 @@ function drawFire(L: Layer, t: number, intensity: number) {
   L.rect(ox + 9, base - 2, 11, 3, '#3a2418');
   L.set(ox + 6, base + 1, '#c9a27a');
   L.set(ox + ow - 7, base + 1, '#c9a27a');
-  // embers
-  for (let i = ox + 7; i < ox + ow - 7; i++) {
-    if (hash(i * 3 + Math.floor(t * 6)) > 0.55) L.glow(i, base + 2, hash(i + t) > 0.5 ? '#ff8a3d' : '#e0582a');
+  // a log for each of you, when you've shown up today (yours on your side)
+  const logs = state.logs;
+  if (logs?.left) {
+    L.rect(ox + 5, base - 3, 10, 2, '#7a4f33');
+    L.hline(ox + 5, base - 3, 10, '#946446');
+    L.set(ox + 5, base - 2, '#c9a27a');
   }
-  // flames: a column height field that wobbles
+  if (logs?.right) {
+    L.rect(ox + ow - 15, base - 4, 10, 2, '#7a4f33');
+    L.hline(ox + ow - 15, base - 4, 10, '#946446');
+    L.set(ox + ow - 6, base - 3, '#c9a27a');
+  }
+  // embers (thick and glowing when that's all there is)
+  const low = lv.h === 0;
+  for (let i = ox + 7; i < ox + ow - 7; i++) {
+    if (hash(i * 3 + Math.floor(t * 6)) > (low ? 0.2 : 0.55)) L.glow(i, base + 2, hash(i + t) > 0.5 ? '#ff8a3d' : '#e0582a');
+    if (low && hash(i * 7 + 3) > 0.45) L.glow(i, base, hash(i * 5) > 0.5 ? '#c4452a' : '#e0582a');
+  }
+  // flames: a column height field that wobbles (a poke at the embers makes a little flare)
   const cx = ox + ow / 2;
-  const maxH = 18 + intensity * 8;
-  for (let i = ox + 6; i < ox + ow - 6; i++) {
-    const d = Math.abs(i - cx) / (ow / 2 - 6);
+  const maxH = lv.h + (intensity - 0.6) * (low ? 20 : 8);
+  const pad = lv.h > 30 ? 4 : 6;
+  for (let i = ox + pad; i < ox + ow - pad && maxH > 0; i++) {
+    const d = Math.abs(i - cx) / (ow / 2 - pad);
     const wob =
       Math.sin(t * 9 + i * 0.9) * 2.2 + Math.sin(t * 13.7 + i * 1.7) * 1.4 + (hash(i * 13 + Math.floor(t * 10)) - 0.5) * 3;
-    const hgt = Math.max(0, maxH * (1 - d * d) + wob);
+    // (a roaring fire fills the opening, but stays under the arch)
+    const edge = Math.min(i - ox, ox + ow - 1 - i);
+    let top = oy;
+    while (top - oy < 5 && ARCH[top - oy] > edge) top++;
+    const hgt = Math.min(base - top - 1, Math.max(0, maxH * (1 - d * d) + wob));
     for (let j = 0; j < hgt; j++) {
       const r = j / hgt; // 0 bottom -> 1 tip
       const k = r < 0.25 ? 0 : r < 0.45 ? 1 : r < 0.7 ? 2 : r < 0.9 ? 3 : 4;
@@ -1165,7 +1227,7 @@ function drawFire(L: Layer, t: number, intensity: number) {
     }
   }
   // sparks
-  for (let s = 0; s < 5; s++) {
+  for (let s = 0; s < lv.sparks; s++) {
     const life = (t * 0.9 + s * 0.21) % 1;
     const sx = cx + Math.sin(s * 12.3 + t * 2) * 8;
     const sy = base - 10 - life * 26;
@@ -1175,8 +1237,8 @@ function drawFire(L: Layer, t: number, intensity: number) {
 
 function drawCandles(L: Layer, t: number) {
   for (const [cx, cy] of [
-    [99, 45],
-    [104, 48],
+    [FIRE.cx + 24, 45],
+    [FIRE.cx + 19, 48],
   ]) {
     const f = Math.sin(t * 11 + cx) > 0.3 ? 1 : 0;
     L.glow(cx, cy - 1 - f, '#fff4c2');
@@ -1256,7 +1318,7 @@ function drawWeather(L: Layer, t: number, view: string) {
   }
 }
 
-/** The picture over the mantel. */
+/** The painting over the sideboard. */
 function drawPainting(L: Layer, painting: string, state: RoomState) {
   const px = 111, py = 16, pw = 34, ph = 24;
   L.rect(px - 2, py - 2, pw + 4, ph + 4, P.mantelD);
@@ -1824,8 +1886,8 @@ function drawPhotoPortrait(L: Layer, state: RoomState) {
     L.rect(x, 47, 4, 2, skinPx);
     L.rect(x - 1, 49, 6, 3, topPx);
   };
-  put(state.left, 140);
-  put(state.right, 145);
+  put(state.left, 202);
+  put(state.right, 207);
 }
 
 function pickColor(b: PixelBuffer, x: number, y: number) {
@@ -2042,13 +2104,14 @@ interface Light {
   k: number;
 }
 
-const AMBIENT: [number, number, number] = [0.38, 0.36, 0.5];
 let DIST: Float32Array[] | null = null;
 const LIGHTS: Light[] = [
   { x: FIRE.cx, y: 100, r: 190, c: [1.08, 0.72, 0.44], k: 1 },
   { x: 290, y: 66, r: 115, c: [0.95, 0.78, 0.52], k: 0.85 },
   { x: 45, y: 50, r: 70, c: [0.42, 0.5, 0.72], k: 0.55 },
-  { x: 101, y: 44, r: 30, c: [0.9, 0.6, 0.35], k: 0.5 },
+  { x: FIRE.cx + 22, y: 44, r: 30, c: [0.9, 0.6, 0.35], k: 0.5 },
+  // the lamp on the sideboard, so the side of the room away from the fire isn't left in the dark
+  { x: 144, y: 84, r: 78, c: [0.98, 0.8, 0.55], k: 0.72 },
 ];
 
 function lightDistances() {
@@ -2066,10 +2129,11 @@ function lightDistances() {
   return DIST;
 }
 
-function applyLighting(L: Layer, t: number, fire: number) {
+function applyLighting(L: Layer, t: number, fire: number, state: RoomState) {
+  const lv = flameOf(state);
   const dist = lightDistances();
   const flick = 1 + Math.sin(t * 7.3) * 0.025 + Math.sin(t * 17.1) * 0.02 + (hash(Math.floor(t * 12)) - 0.5) * 0.03;
-  const radii = LIGHTS.map((l, i) => l.r * (i === 0 ? flick * (0.85 + fire * 0.25) : i === 3 ? flick : 1));
+  const radii = LIGHTS.map((l, i) => l.r * (i === 0 ? flick * (lv.light - 0.15 + fire * 0.25) : i === 3 ? flick : 1));
   const levels = 5;
   const d = L.data;
   for (let y = 0; y < ROOM_H; y++) {
@@ -2092,9 +2156,9 @@ function applyLighting(L: Layer, t: number, fire: number) {
         tg += l.c[1] * v;
         tb += l.c[2] * v;
       }
-      let r = AMBIENT[0];
-      let g = AMBIENT[1];
-      let b = AMBIENT[2];
+      let r = lv.amb[0];
+      let g = lv.amb[1];
+      let b = lv.amb[2];
       if (tot > 0) {
         const th = (BAYER4[y & 3][x & 3] - 0.5) * 0.24;
         const qv = Math.floor(tot * levels + 0.5 + th) / levels;
@@ -2122,8 +2186,9 @@ function applyLighting(L: Layer, t: number, fire: number) {
         d[q + 2] = Math.min(255, d[q + 2] + col[2] * v);
       }
   };
-  halo(FIRE.cx, 104, 26, [255, 150, 60], 0.35 * flick * (0.7 + fire * 0.4));
+  halo(FIRE.cx, 104, 26, [255, 150, 60], 0.35 * flick * (0.7 + fire * 0.4) * lv.halo);
   halo(290, 66, 16, [255, 214, 140], 0.28);
+  halo(144, 84, 10, [255, 214, 140], 0.22);
 }
 
 /* ------------------------------------------------------------------------ */
@@ -2137,7 +2202,7 @@ export function renderRoom(state: RoomState, t: number): PixelBuffer {
   L.copyFrom(staticLayer(d));
   drawPainting(L, d.painting, state);
   drawWallArt(L, state, t);
-  drawFire(L, t, state.fire);
+  drawFire(L, t, state.fire, state);
   drawDoorGlow(L, t, state.hover === 'door');
   drawCandles(L, t);
   drawWeather(L, t, d.view);
@@ -2200,7 +2265,7 @@ export function renderRoom(state: RoomState, t: number): PixelBuffer {
   drawLetter(L, t, state.letterUnread, state.hover === 'letter');
   drawForeground(L, d.plant);
 
-  applyLighting(L, t, state.fire);
+  applyLighting(L, t, state.fire, state);
   return L;
 }
 
@@ -2235,7 +2300,7 @@ void hex;
 
 /** The part of the room each spot's thumbnail shows: x, y, w, h. */
 export const DECOR_CROPS: Record<SlotId, [number, number, number, number]> = {
-  wall: [190, 6, 96, 64],
+  wall: [56, 6, 96, 64],
   couch: [180, 108, 102, 68],
   rug: [88, 124, 84, 56],
   pet: [170, 132, 54, 36],

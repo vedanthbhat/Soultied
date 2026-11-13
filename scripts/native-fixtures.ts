@@ -24,6 +24,9 @@ import { Scene } from '../src/escape/scene';
 import { RECORD_MS, startFor, whereAt } from '../src/music/records';
 import { parseYouTubeId, parseYouTubeStart } from '../src/watch/youtubeLink';
 import { renderWatchRoom, type WatchState } from '../src/pixel/watchRoom';
+import { renderRoom, type RoomState } from '../src/pixel/room';
+import { START_DECOR } from '../src/decor/catalogue';
+import { fireOf, type CouchState } from '../src/couch';
 import { renderCharacterBack } from '../src/pixel/characterBack';
 import { DEMO_DOODLE, OLD_DOODLE_H, OLD_DOODLE_W, DOODLE_H, DOODLE_W, doodleArt, fullDoodle, smallDoodle } from '../src/together/board';
 
@@ -427,6 +430,71 @@ for (let k = 0; k < 24; k++) {
 }
 wallDoodles.push({ px: DEMO_DOODLE, full: fullDoodle(DEMO_DOODLE), small: smallDoodle(DEMO_DOODLE), art: doodleArt(DEMO_DOODLE, 'n', 'u').px });
 
+// the living room, as hashes of its pixels: the fire at every strength (with your logs on it, and poked), the two
+// of you near and far, a few decors, a picture on the wall, touches, moods, and things hovered
+type RoomScene = { left: number; right: number; leftStatus?: string; rightStatus?: string; t: number; hash?: number; [k: string]: unknown };
+const roomScenes: RoomScene[] = [];
+{
+  const heart = { rows: ['.##.##.', '#h#####', '#######', '.#####.', '..###..', '...#...'], pal: { '#': '#d9534f', h: '#f3a19c' } };
+  const five = { rows: ['y..y..y', '.y.y.y.', '..yyy..', 'yyywyyy', '..yyy..', '.y.y.y.', 'y..y..y'], pal: { y: '#d99a2b', w: '#fff1c9' } };
+  const art = doodleArt(DEMO_DOODLE, 'n', 'u');
+  const wallArt = { w: art.w, h: art.h, pal: art.pal, px: art.px };
+  const scenes: RoomScene[] = [
+    { left: 0, right: 1, t: 1.3 },
+    { left: 1, right: 2, t: 2.7, letterUnread: true, music: true, gamesWaiting: true, hover: 'door', fire: 0.9, closeness: 0.5, decor: { wall: 'blush', view: 'rain', rug: 'kilim', couch: 'navy', pet: 'pug', painting: 'sea', plant: 'fern' } },
+    { left: 3, right: 4, rightStatus: 'away', t: 5.1, closeness: 1, moodLeft: heart, wallNews: true, wallArt, decor: { wall: 'midnight', view: 'aurora', rug: 'braided', couch: 'plum', pet: 'corgi', painting: 'peaks', plant: 'cactus' } },
+    { left: 5, right: 6, t: 7.9, closeness: 0.3, moodRight: heart, touch: { kind: 'hug', together: true, from: 'left', at: 6.9, glyph: heart } },
+    { left: 7, right: -1, t: 3.3, hover: 'right', decor: { wall: 'clay', view: 'blossom', rug: 'moss', couch: 'mustard', pet: 'tuxedo', painting: 'us', plant: 'snake' } },
+    { left: 8, right: 9, rightStatus: 'offline', t: 11.45, hover: 'board', letterUnread: true, heartAt: 10.5, closeness: 0.8, scooting: true, decor: { wall: 'gingham', view: 'summer', rug: 'diamond', couch: 'sage', pet: 'none', painting: 'shapes', plant: 'monstera' } },
+    { left: 11, right: 12, t: 20.2, closeness: 0.2, touch: { kind: 'highfive', together: true, from: 'right', at: 19.4, glyph: five }, hover: 'music', music: true },
+    { left: 13, right: 14, t: 1.3, bare: true, decor: { wall: 'forest', couch: 'plum' } },
+    // the fire
+    { left: 0, right: 1, t: 2.1, flame: 0 },
+    { left: 0, right: 1, t: 4.4, flame: 0, fire: 1, logs: { left: true, right: false } },
+    { left: 15, right: 16, t: 3.3, flame: 1, logs: { left: false, right: true }, wallArt },
+    { left: 2, right: 3, t: 6.25, flame: 2, logs: { left: true, right: true }, hover: 'fire' },
+    { left: 4, right: 5, t: 8.8, flame: 3, logs: { left: true, right: true }, closeness: 1 },
+    { left: 6, right: -1, t: 12.05, flame: 3, fire: 1, hover: 'photo' },
+    { left: 0, right: 1, t: 0.37, flame: 3, fire: 0.75, decor: { view: 'rain', wall: 'midnight' } },
+  ];
+  const seat = (l: number, status = 'online') => (l >= 0 ? { avatar: looks[l], name: 'x', status } : { avatar: null, name: '', status: 'empty' });
+  for (const sc of scenes) {
+    const st = {
+      left: seat(sc.left, sc.leftStatus),
+      right: seat(sc.right, sc.rightStatus),
+      letterUnread: !!sc.letterUnread,
+      fire: sc.fire ?? 0.6,
+      flame: sc.flame,
+      logs: sc.logs,
+      hover: sc.hover ?? null,
+      closeness: sc.closeness ?? 0,
+      scooting: !!sc.scooting,
+      heartAt: sc.heartAt ?? -1,
+      gamesWaiting: !!sc.gamesWaiting,
+      music: !!sc.music,
+      decor: { ...START_DECOR, ...(sc.decor as object) },
+      bare: !!sc.bare,
+      moods: { left: sc.moodLeft || null, right: sc.moodRight || null },
+      touch: sc.touch || null,
+      wallArt: sc.wallArt || null,
+      wallNews: !!sc.wallNews,
+    } as unknown as RoomState;
+    roomScenes.push({ ...sc, hash: fnv(renderRoom(st, sc.t).data, 0x811c9dc5) });
+  }
+}
+
+// how the fire burns: the days in a row you've both been here, seen from different days
+const fires: Array<{ together: string[]; today: string; streak: number; level: number }> = [];
+{
+  const t0 = '2026-02-26';
+  const runs: number[][] = [[], [0], [-1], [-2], [0, -1], [-1, -2, -3], [0, -1, -2], [-1, -2, -3, -4, -5, -6], [0, -1, -2, -3, -4, -5, -6], [-1, -2, -3, -4, -5, -6, -7, -9], [0, -2, -3, -4], [3, 2, 1, 0, -1], [-30, -29, -1, 0], [0, -1, -2, -3, -4, -5, -6, -7, -8, -9, -10, -11, -12, -13, -14, -15, -16, -17, -18, -19, -20, -21, -22, -23, -24, -25, -26, -27, -28, -29, -30, -31, -32, -33, -34, -35, -36, -37, -38, -39, -40]];
+  for (const r of runs)
+    for (const today of [t0, '2026-03-01', '2024-03-01', '2026-01-01']) {
+      const c: CouchState = { seen: {}, together: r.map((n) => addDays(today, n)).sort(), shown: {} };
+      fires.push({ together: c.together, today, ...fireOf(c, today) });
+    }
+}
+
 const out = process.argv[2] || 'native-fixtures.json';
-writeFileSync(out, JSON.stringify({ cards, days, hashes, rngSeq, streaks, demo, same, chapters, games, live, doodle: { judges, brushes, fills, choices, games: doodles }, coasters: coasterSteps, escape, record, watch: { looks, ...watch }, wall: { doodles: wallDoodles } }));
+writeFileSync(out, JSON.stringify({ cards, days, hashes, rngSeq, streaks, demo, same, chapters, games, live, doodle: { judges, brushes, fills, choices, games: doodles }, coasters: coasterSteps, escape, record, watch: { looks, ...watch }, wall: { doodles: wallDoodles }, room: { scenes: roomScenes, fires } }));
 console.log(`wrote ${cards.length} card days, ${streaks.length} streaks, ${demo.length} demo rooms, ${games.length} game moves, ${live.length} live games, ${doodles.length} doodle moves to ${out}`);

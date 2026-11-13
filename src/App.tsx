@@ -13,7 +13,7 @@ import type { Seat, HotspotId } from './pixel/room';
 import type { UserProfile } from './types';
 import type { GameKind, Match } from './games/types';
 import { prettyDate } from './letters/engine';
-import { COUCH_STEPS } from './couch';
+import { COUCH_STEPS, FIRE_NAMES } from './couch';
 import { StreamChip, StreamHubProvider } from './stream/StreamHub';
 import { GamesProvider, useGames } from './games/GamesContext';
 import { GAMES, otherSeat } from './games/types';
@@ -139,7 +139,7 @@ const BACK: Record<TouchKind, string> = {
 
 const Home: React.FC = () => {
   const { setupComplete, currentUser, partnerUser, space, panel, openPanel, letterBadge, getLetter, today, journey } = useApp();
-  const { couchLevel, couchShown, markCouchShown, cloudStatus, demo } = useApp();
+  const { couchLevel, couchShown, markCouchShown, cloudStatus, demo, fire, hereToday } = useApp();
   const games = useGames();
   const turntable = useTurntable();
   const decor = useDecor();
@@ -209,7 +209,11 @@ const Home: React.FC = () => {
                   ? `Day ${journey.unseen} of your 30 days is open ✉`
                   : `Day ${journey.next} of your 30 days ✉`
                 : 'Letters',
-      fire: 'Poke the fire',
+      fire: !partnerUser
+        ? 'Poke the fire'
+        : fire.level === 0
+          ? 'Embers · both show up today to light it again'
+          : `${FIRE_NAMES[fire.level]} · ${fire.streak} ${fire.streak === 1 ? 'day' : 'days'} in a row`,
       photo: 'Us',
       remote: 'Watch something together',
       door: 'The dark door',
@@ -229,7 +233,7 @@ const Home: React.FC = () => {
     if (guest) l.right = guest.id === currentUser.id ? meLabel : themLabel(guest);
     else l.right = `Invite ${space?.partnerPlaceholderName || 'your person'}`;
     return l;
-  }, [welcomeOpen, seatsEmpty, letterBadge, partnerSealed, partnerUser, currentUser, host, guest, space, games.waiting, turntable.on, turntable.track, journeyWaiting, journey.next, journey.unseen, panel, askWaiting, asks.forMe.length, myMood, theirMood, wallNews, pinnedWhat, decor.petName]);
+  }, [welcomeOpen, seatsEmpty, letterBadge, partnerSealed, partnerUser, currentUser, host, guest, space, games.waiting, turntable.on, turntable.track, journeyWaiting, journey.next, journey.unseen, panel, askWaiting, asks.forMe.length, myMood, theirMood, wallNews, pinnedWhat, decor.petName, fire.level, fire.streak]);
 
   const onHotspot = (id: HotspotId) => {
     roomSound(id);
@@ -404,6 +408,8 @@ const Home: React.FC = () => {
         moods={roomMoods}
         wallArt={welcomeOpen ? null : board.art}
         wallNews={!welcomeOpen && !!wallNews}
+        flame={welcomeOpen ? 2 : fire.level}
+        logs={welcomeOpen || !partnerUser ? undefined : { left: hereToday(host?.id), right: hereToday(guest?.id) }}
         touch={playTouch}
         pop={seatPop}
         scoot={scootGo}

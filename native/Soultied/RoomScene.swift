@@ -88,12 +88,27 @@ struct RoomScene: View {
         return (s.from + (s.to - s.from) * e, true)
     }
 
-    private func state(_ t: Double) -> RoomState {
+    /// how the fire's burning (worked out once per change, not every frame), and whose log is on it today
+    private struct Hearth {
+        var level = 2
+        var left = false
+        var right = false
+    }
+
+    private var hearth: Hearth {
+        guard place.partnerHere else { return Hearth() }
+        return Hearth(level: place.fire.level, left: place.hereToday(place.hostId), right: place.hereToday(place.guestId))
+    }
+
+    private func state(_ t: Double, _ h: Hearth) -> RoomState {
         let seats = place.seats
         var st = RoomState(left: seats.left, right: seats.right)
         st.decor = decor ?? place.decor
         st.letterUnread = place.letterWaiting
         st.fire = 0.6 + 0.4 * max(0, 1 - (t - fireAt) / 6)
+        st.flame = h.level
+        st.logLeft = h.left
+        st.logRight = h.right
         let (c, moving) = closeness(t)
         st.closeness = c
         st.scooting = moving
@@ -112,10 +127,11 @@ struct RoomScene: View {
     var body: some View {
         GeometryReader { geo in
             let L = layout(geo.size)
+            let h = hearth
             TimelineView(.animation(minimumInterval: 1.0 / 12, paused: paused)) { ctx in
                 let t = ctx.date.timeIntervalSince(start)
                 // (asks for the frame; it's drawn off the main thread and shows when it's ready)
-                let _ = painter.request(state(t), t)
+                let _ = painter.request(state(t, h), t)
                 RoomFrame(painter: painter, w: CGFloat(ROOM_W) * L.u, h: CGFloat(ROOM_H) * L.u, x: L.x, y: L.y)
                     .frame(width: geo.size.width, height: couchOnly ? L.h : geo.size.height, alignment: .topLeading)
                     .clipped()
@@ -161,7 +177,9 @@ struct RoomScene: View {
     private var accessibilityText: String {
         let s = place.seats
         if s.right.status == .empty { return "\(s.left.name) on the couch, saving a seat for \(place.theirName)." }
-        return "\(s.left.name) and \(s.right.name) on the couch."
+        let f = place.fire
+        let fire = f.level == 0 ? "the fire behind them down to embers" : "\(CouchState.fireNames[f.level].lowercased()) behind them, \(f.streak) \(f.streak == 1 ? "day" : "days") in a row"
+        return "\(s.left.name) and \(s.right.name) on the couch, \(fire)."
     }
 
     private func startScootIfDue() {

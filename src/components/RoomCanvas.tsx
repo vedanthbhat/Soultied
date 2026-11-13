@@ -34,6 +34,10 @@ interface Props {
   wallArt?: RoomState['wallArt'];
   /** your person pinned something new to the wall */
   wallNews?: boolean;
+  /** how the fire's burning: 0 embers, 1 a small flame, 2 steady, 3 roaring */
+  flame?: number;
+  /** whose log is on the fire today */
+  logs?: { left: boolean; right: boolean };
   /** a little card that opens over one of the two seats */
   pop?: { at: 'left' | 'right'; node: React.ReactNode; onClose: () => void } | null;
 }
@@ -156,6 +160,8 @@ export const RoomCanvas: React.FC<Props> = ({
   pop,
   wallArt = null,
   wallNews = false,
+  flame = 2,
+  logs,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [fit, setFit] = useState<Fit>(() => computeFit(window.innerWidth, window.innerHeight, focusX));
@@ -179,6 +185,8 @@ export const RoomCanvas: React.FC<Props> = ({
   stateRef.current.moods = moods;
   stateRef.current.wallArt = wallArt;
   stateRef.current.wallNews = wallNews;
+  stateRef.current.flame = flame;
+  stateRef.current.logs = logs;
 
   // a touch plays once, from the moment it arrives (in the room's own clock); one that comes in
   // while another is still playing waits its turn

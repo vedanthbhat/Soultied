@@ -87,12 +87,12 @@ export const ITEMS: DecorItem[] = [
   item('view', 'city', 'City lights', 150, 'A skyline, its windows going on and off.'),
   item('view', 'aurora', 'Northern lights', 250, 'Green lights rippling over the snow.'),
 
-  item('painting', 'dusk', 'Dusk hills', 0, 'The warm landscape over the mantel.'),
+  item('painting', 'dusk', 'Dusk hills', 0, 'The warm landscape over the sideboard.'),
   item('painting', 'sea', 'Seaside', 60, 'A little boat on a calm sea.'),
   item('painting', 'peaks', 'Moonlit peaks', 80, 'Snowy mountains under a full moon.'),
   item('painting', 'flowers', 'Flowers in a vase', 80, 'A still life in warm colours.'),
   item('painting', 'shapes', 'Shapes', 100, 'Sun, arch and hill, in blocks of colour.'),
-  item('painting', 'us', 'A portrait of you two', 200, 'The two of you, framed over the fire.'),
+  item('painting', 'us', 'A portrait of you two', 200, 'The two of you, framed over the sideboard.'),
 
   item('plant', 'monstera', 'Big leafy plant', 0, 'The one in the corner.'),
   item('plant', 'snake', 'Snake plant', 40, 'Tall striped leaves. Impossible to kill.'),

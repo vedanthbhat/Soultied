@@ -18,7 +18,7 @@ import {
   todayKey,
   addDays,
 } from '../letters/engine';
-import { CouchState, checkIn, couchLevel, emptyCouch, normalizeCouch } from '../couch';
+import { CouchState, checkIn, couchLevel, emptyCouch, fireOf, normalizeCouch } from '../couch';
 
 /** the questions themselves load with the letters, not at the front door */
 type Cards = typeof import('../letters/cards');
@@ -110,6 +110,10 @@ interface AppContextType {
   couchDays: number;
   /** you've both been here today */
   togetherToday: boolean;
+  /** the fire behind the couch: the days in a row you've both shown up, and how it burns (0 embers … 3 roaring) */
+  fire: { streak: number; level: number };
+  /** whether someone's been in today (each of you puts a log on the fire) */
+  hereToday: (userId: string | null | undefined) => boolean;
   /** the closeness I last watched happen; below couchLevel means there's a scoot to show me */
   couchShown: number;
   markCouchShown: (level: number) => void;
@@ -229,11 +233,12 @@ function demoState(demoLetters: Cards['demoLetters']): PersistedState {
       createdAt,
     },
     letters: demoLetters('space-demo', createdAt.slice(0, 10), 'user-aanya', 'user-rohan', todayKey()),
-    // three days together so far; Rohan hasn't been in today, so switching to him scoots you closer
+    // four days together so far, the last three in a row (a steady fire); Rohan hasn't been in today, so
+    // switching to him scoots you closer
     couch: {
       seen: { 'user-aanya': addDays(todayKey(), -1), 'user-rohan': addDays(todayKey(), -1) },
-      together: [-6, -4, -1].map((n) => addDays(todayKey(), n)),
-      shown: { 'user-aanya': 3, 'user-rohan': 3 },
+      together: [-6, -3, -2, -1].map((n) => addDays(todayKey(), n)),
+      shown: { 'user-aanya': 4, 'user-rohan': 4 },
     },
     activities: [
       { id: 'act-1', type: 'question_revealed', title: 'Letter opened together', description: 'In sync on 4 of 5.', timestamp: 'Yesterday' },
@@ -1052,6 +1057,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         couchLevel: couchLevel(eff.couch),
         couchDays: eff.couch.together.length,
         togetherToday: eff.couch.together.includes(today),
+        // (until your person moves in, the fire just burns steady)
+        fire: partnerUser ? fireOf(eff.couch, today) : { streak: 0, level: 2 },
+        hereToday: (id: string | null | undefined) => !!id && eff.couch.seen[id] === today,
         couchShown: eff.couch.shown[currentUser.id] ?? 0,
         markCouchShown,
         letterBadge,

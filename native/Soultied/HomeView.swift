@@ -348,6 +348,36 @@ struct StreakCard: View {
 
 /* ---------- scooting closer ---------- */
 
+/// the fire behind the couch: how it's burning, and what keeps it going
+struct FireLine: View {
+    let place: PlaceModel
+
+    var body: some View {
+        let f = place.fire
+        HStack(alignment: .top, spacing: 12) {
+            GlyphView(glyph: f.level > 0 ? Icons.flame : Icons.flameOut, scale: 3)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(f.level == 0 ? "Embers" : "\(CouchState.fireNames[f.level]) · \(f.streak) \(f.streak == 1 ? "day" : "days") in a row")
+                    .font(.pxBody).foregroundStyle(Color.inkSoft)
+                Text(line(f)).font(.pxTiny).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private func line(_ f: (streak: Int, level: Int)) -> String {
+        if !place.togetherToday {
+            return f.level == 0
+                ? "It never goes out. Once \(place.theirName) opens Soultied today too, it lights again."
+                : "Your log’s on. Once \(place.theirName) opens Soultied today too, the fire keeps going."
+        }
+        if f.streak < 3 { return "You both put a log on today. \(3 - f.streak) more \(3 - f.streak == 1 ? "day" : "days") in a row and it burns steady." }
+        if f.streak < 7 { return "You both put a log on today. \(7 - f.streak) more \(7 - f.streak == 1 ? "day" : "days") in a row and it roars." }
+        return "You both put a log on today. It’s roaring: keep it going."
+    }
+}
+
 struct CouchCard: View {
     let place: PlaceModel
     var invite: () -> Void
@@ -366,6 +396,7 @@ struct CouchCard: View {
                     }
                 }
                 Text(place.togetherToday ? "You were both here today." : "Every day you both open Soultied, you scoot a little closer.").font(.pxTiny).foregroundStyle(Color.muted)
+                FireLine(place: place).padding(.top, 6)
             } else {
                 Text("Send \(place.theirName) the invite, and they’ll take the empty seat next to you.").font(.pxBody).foregroundStyle(Color.muted)
                 Button("Send the invite", action: invite).buttonStyle(.px(.sage, small: true, wide: true))

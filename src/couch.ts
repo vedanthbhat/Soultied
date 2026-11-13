@@ -6,6 +6,8 @@
  * Kept as plain data so the backend can store the same shape later.
  */
 
+import { addDays } from './letters/engine';
+
 export const COUCH_STEPS = 7;
 
 export interface CouchState {
@@ -48,3 +50,22 @@ export function couchLine(level: number, partnerName: string) {
   const left = COUCH_STEPS - level;
   return `${left} more ${left === 1 ? 'day' : 'days'} of you both showing up and you’ll be sitting side by side.`;
 }
+
+/**
+ * The fire behind the couch: how many days in a row you've both shown up (counting today once you both have, and
+ * up to yesterday until then), and how it burns. A missed day lets it die down to embers; it never goes out.
+ * 0 embers, 1 a small flame (1 or 2 days), 2 steady (3 to 6), 3 roaring (a week or more).
+ */
+export function fireOf(c: CouchState, today: string): { streak: number; level: number } {
+  const days = new Set(c.together);
+  let day = days.has(today) ? today : addDays(today, -1);
+  let streak = 0;
+  while (days.has(day)) {
+    streak++;
+    day = addDays(day, -1);
+  }
+  return { streak, level: streak >= 7 ? 3 : streak >= 3 ? 2 : streak >= 1 ? 1 : 0 };
+}
+
+/** what the fire is, in words */
+export const FIRE_NAMES = ['Embers', 'A small flame', 'A steady fire', 'A roaring fire'];

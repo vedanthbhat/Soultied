@@ -107,7 +107,7 @@ function announce(slot: SlotId, who: string, item: DecorItem): { title: string; 
     case 'view':
       return { title: 'A new view', description: `${who} changed the view from the window: ${item.name}.` };
     case 'painting':
-      return { title: 'A new painting', description: `${who} hung a new painting over the fire: ${item.name}.` };
+      return { title: 'A new painting', description: `${who} hung a new painting: ${item.name}.` };
     default:
       return { title: 'A new plant', description: `${who} brought home a new plant: ${item.name}.` };
   }

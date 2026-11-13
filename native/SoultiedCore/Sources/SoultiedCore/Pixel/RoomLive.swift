@@ -75,8 +75,23 @@ func drawDoorGlow(_ L: Layer, _ t: Double, _ hover: Bool) {
 
 let FIRE_COLS = [hx("#fff4c2"), hx("#ffd36b"), hx("#f7a23e"), hx("#e66a2c"), hx("#b8402a")]
 
-func drawFire(_ L: Layer, _ t: Double, _ intensity: Double) {
-    let ox = FireBox.openX, ow = FireBox.openW, ob = FireBox.openB
+/// the fire at each strength: how tall the flames, how far its light reaches, its glow, sparks, and the room's dark
+struct FlameLevel {
+    let h: Double, light: Double, halo: Double
+    let sparks: Int
+    let amb: (Double, Double, Double)
+}
+let FLAMES: [FlameLevel] = [
+    FlameLevel(h: 0, light: 0.6, halo: 0.25, sparks: 0, amb: (0.3, 0.3, 0.47)),
+    FlameLevel(h: 10, light: 0.82, halo: 0.6, sparks: 1, amb: (0.34, 0.33, 0.48)),
+    FlameLevel(h: 22.8, light: 1, halo: 1, sparks: 5, amb: (0.38, 0.36, 0.5)),
+    FlameLevel(h: 31, light: 1.17, halo: 1.3, sparks: 10, amb: (0.41, 0.38, 0.49)),
+]
+func flameOf(_ state: RoomState) -> FlameLevel { FLAMES[max(0, min(3, state.flame))] }
+
+func drawFire(_ L: Layer, _ t: Double, _ intensity: Double, _ state: RoomState) {
+    let lv = flameOf(state)
+    let ox = FireBox.openX, ow = FireBox.openW, oy = FireBox.openY, ob = FireBox.openB
     let base = ob - 6
     // logs
     L.R(ox + 6, base, ow - 12, 3, hx("#4a2e20"))
@@ -84,20 +99,38 @@ func drawFire(_ L: Layer, _ t: Double, _ intensity: Double) {
     L.R(ox + 9, base - 2, 11, 3, hx("#3a2418"))
     L.S(ox + 6, base + 1, hx("#c9a27a"))
     L.S(ox + ow - 7, base + 1, hx("#c9a27a"))
-    // embers
+    // a log for each of you, when you've shown up today (yours on your side)
+    if state.logLeft {
+        L.R(ox + 5, base - 3, 10, 2, hx("#7a4f33"))
+        L.HL(ox + 5, base - 3, 10, hx("#946446"))
+        L.S(ox + 5, base - 2, hx("#c9a27a"))
+    }
+    if state.logRight {
+        L.R(ox + ow - 15, base - 4, 10, 2, hx("#7a4f33"))
+        L.HL(ox + ow - 15, base - 4, 10, hx("#946446"))
+        L.S(ox + ow - 6, base - 3, hx("#c9a27a"))
+    }
+    // embers (thick and glowing when that's all there is)
+    let low = lv.h == 0
     var i = ox + 7
     while i < ox + ow - 7 {
-        if hash(i * 3 + fl(t * 6)) > 0.55 { L.G(i, base + 2, hash(i + t) > 0.5 ? hx("#ff8a3d") : hx("#e0582a")) }
+        if hash(i * 3 + fl(t * 6)) > (low ? 0.2 : 0.55) { L.G(i, base + 2, hash(i + t) > 0.5 ? hx("#ff8a3d") : hx("#e0582a")) }
+        if low && hash(i * 7 + 3) > 0.45 { L.G(i, base, hash(i * 5) > 0.5 ? hx("#c4452a") : hx("#e0582a")) }
         i += 1
     }
-    // flames: a column height field that wobbles
+    // flames: a column height field that wobbles (a poke at the embers makes a little flare)
     let cx = ox + ow / 2
-    let maxH = 18 + intensity * 8
-    i = ox + 6
-    while i < ox + ow - 6 {
-        let d = abs(i - cx) / (ow / 2 - 6)
+    let maxH = lv.h + (intensity - 0.6) * (low ? 20 : 8)
+    let pad: Double = lv.h > 30 ? 4 : 6
+    i = ox + pad
+    while i < ox + ow - pad && maxH > 0 {
+        let d = abs(i - cx) / (ow / 2 - pad)
         let wob = sin(t * 9 + i * 0.9) * 2.2 + sin(t * 13.7 + i * 1.7) * 1.4 + (hash(i * 13 + fl(t * 10)) - 0.5) * 3
-        let hgt = max(0, maxH * (1 - d * d) + wob)
+        // (a roaring fire fills the opening, but stays under the arch)
+        let edge = min(i - ox, ox + ow - 1 - i)
+        var top = oy
+        while top - oy < 5 && FIRE_ARCH[Int(top - oy)] > edge { top += 1 }
+        let hgt = min(base - top - 1, max(0, maxH * (1 - d * d) + wob))
         var j = 0.0
         while j < hgt {
             let r = j / hgt // 0 bottom -> 1 tip
@@ -109,7 +142,7 @@ func drawFire(_ L: Layer, _ t: Double, _ intensity: Double) {
         i += 1
     }
     // sparks
-    for si in 0..<5 {
+    for si in 0..<lv.sparks {
         let s = Double(si)
         let life = jm(t * 0.9 + s * 0.21, 1)
         let sx = cx + sin(s * 12.3 + t * 2) * 8
@@ -119,7 +152,7 @@ func drawFire(_ L: Layer, _ t: Double, _ intensity: Double) {
 }
 
 func drawCandles(_ L: Layer, _ t: Double) {
-    for (cx, cy) in [(99.0, 45.0), (104, 48)] {
+    for (cx, cy) in [(FireBox.cx + 24, 45.0), (FireBox.cx + 19, 48)] {
         let f: Double = sin(t * 11 + cx) > 0.3 ? 1 : 0
         L.G(cx, cy - 1 - f, hx("#fff4c2"))
         L.G(cx, cy, hx("#ffd36b"))
@@ -208,7 +241,7 @@ func drawWeather(_ L: Layer, _ t: Double, _ view: String) {
     }
 }
 
-/** The picture over the mantel. */
+/** The painting over the sideboard. */
 func drawPainting(_ L: Layer, _ painting: String, _ state: RoomState) {
     let px = 111.0, py = 16.0, pw = 34.0, ph = 24.0
     L.R(px - 2, py - 2, pw + 4, ph + 4, P.mantelD)
@@ -749,8 +782,8 @@ func drawPhotoPortrait(_ L: Layer, _ state: RoomState) {
         L.R(x, 47, 4, 2, skinPx)
         L.R(x - 1, 49, 6, 3, topPx)
     }
-    put(state.left, 140)
-    put(state.right, 145)
+    put(state.left, 202)
+    put(state.right, 207)
 }
 
 /// a seated person's frames are the same every time for the same look, so they're kept
@@ -989,12 +1022,13 @@ struct Light {
     let k: Double
 }
 
-let AMBIENT = (0.38, 0.36, 0.5)
 let LIGHTS: [Light] = [
     Light(x: FireBox.cx, y: 100, r: 190, c: (1.08, 0.72, 0.44), k: 1),
     Light(x: 290, y: 66, r: 115, c: (0.95, 0.78, 0.52), k: 0.85),
     Light(x: 45, y: 50, r: 70, c: (0.42, 0.5, 0.72), k: 0.55),
-    Light(x: 101, y: 44, r: 30, c: (0.9, 0.6, 0.35), k: 0.5),
+    Light(x: FireBox.cx + 22, y: 44, r: 30, c: (0.9, 0.6, 0.35), k: 0.5),
+    // the lamp on the sideboard, so the side of the room away from the fire isn't left in the dark
+    Light(x: 144, y: 84, r: 78, c: (0.98, 0.8, 0.55), k: 0.72),
 ]
 
 /// how far each pixel is from each light (kept as 32-bit floats, as the website does)
@@ -1010,9 +1044,10 @@ let DIST: [[Float]] = LIGHTS.map { l in
     return a
 }
 
-func applyLighting(_ L: Layer, _ t: Double, _ fire: Double) {
+func applyLighting(_ L: Layer, _ t: Double, _ fire: Double, _ state: RoomState) {
+    let lv = flameOf(state)
     let flick = 1 + sin(t * 7.3) * 0.025 + sin(t * 17.1) * 0.02 + (hash(fl(t * 12)) - 0.5) * 0.03
-    let radii = LIGHTS.enumerated().map { i, l in l.r * (i == 0 ? flick * (0.85 + fire * 0.25) : i == 3 ? flick : 1) }
+    let radii = LIGHTS.enumerated().map { i, l in l.r * (i == 0 ? flick * (lv.light - 0.15 + fire * 0.25) : i == 3 ? flick : 1) }
     let levels = 5.0
     L.data.withUnsafeMutableBufferPointer { d in
         L.emit.withUnsafeBufferPointer { emit in
@@ -1033,7 +1068,7 @@ func applyLighting(_ L: Layer, _ t: Double, _ fire: Double) {
                         tg += l.c.1 * v
                         tb += l.c.2 * v
                     }
-                    var r = AMBIENT.0, g = AMBIENT.1, b = AMBIENT.2
+                    var r = lv.amb.0, g = lv.amb.1, b = lv.amb.2
                     if tot > 0 {
                         let th = (BAYER4[y & 3][x & 3] - 0.5) * 0.24
                         let qv = fl(tot * levels + 0.5 + th) / levels
@@ -1069,7 +1104,8 @@ func applyLighting(_ L: Layer, _ t: Double, _ fire: Double) {
                 y += 1
             }
         }
-        halo(FireBox.cx, 104, 26, (255, 150, 60), 0.35 * flick * (0.7 + fire * 0.4))
+        halo(FireBox.cx, 104, 26, (255, 150, 60), 0.35 * flick * (0.7 + fire * 0.4) * lv.halo)
         halo(290, 66, 16, (255, 214, 140), 0.28)
+        halo(144, 84, 10, (255, 214, 140), 0.22)
     }
 }

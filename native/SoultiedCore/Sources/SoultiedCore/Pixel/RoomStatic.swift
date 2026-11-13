@@ -462,23 +462,26 @@ func drawBricks(_ L: Layer, _ x0: Double, _ y0: Double, _ w: Double, _ h: Double
 }
 
 func drawFireplace(_ L: Layer) {
-    // chimney breast
-    drawBricks(L, 100, 5, 56, FLOOR_Y - 5)
-    L.VL(100, 5, FLOOR_Y - 5, P.brickD)
-    L.VL(155, 5, FLOOR_Y - 5, hx("#6d3c2e"))
+    // chimney breast, on the back wall behind the couch
+    let cx = FireBox.cx
+    let x0 = cx - 28
+    drawBricks(L, x0, 5, 56, FLOOR_Y - 5)
+    L.VL(x0, 5, FLOOR_Y - 5, P.brickD)
+    L.VL(x0 + 55, 5, FLOOR_Y - 5, hx("#6d3c2e"))
+    // (the picture over the mantel is our wall's: drawGallery and drawWallArt)
     // mantel shelf
-    L.R(94, 54, 68, 6, P.mantel)
-    L.HL(94, 54, 68, P.mantelL)
-    L.HL(94, 59, 68, P.mantelD)
-    L.R(96, 60, 64, 2, P.mantelD)
+    L.R(x0 - 6, 54, 68, 6, P.mantel)
+    L.HL(x0 - 6, 54, 68, P.mantelL)
+    L.HL(x0 - 6, 59, 68, P.mantelD)
+    L.R(x0 - 4, 60, 64, 2, P.mantelD)
     // stone surround
-    L.R(104, 62, 48, FLOOR_Y - 62, P.stone)
-    L.VL(104, 62, FLOOR_Y - 62, P.stoneL)
-    L.VL(151, 62, FLOOR_Y - 62, P.stoneD)
+    L.R(x0 + 4, 62, 48, FLOOR_Y - 62, P.stone)
+    L.VL(x0 + 4, 62, FLOOR_Y - 62, P.stoneL)
+    L.VL(x0 + 51, 62, FLOOR_Y - 62, P.stoneD)
     var y = 66.0
     while y < FLOOR_Y {
-        var x = 106 + jm(y / 7, 2) * 4
-        while x < 150 {
+        var x = x0 + 6 + jm(y / 7, 2) * 4
+        while x < x0 + 50 {
             L.HL(x, y, 6, P.stoneD)
             L.S(x, y - 1, P.stoneL)
             x += 9
@@ -490,7 +493,7 @@ func drawFireplace(_ L: Layer) {
     var j = oy
     while j < ob {
         let t = Int(j - oy)
-        let inset: Double = t < 5 ? [9, 5, 3, 2, 1][t] : 0
+        let inset: Double = t < 5 ? FIRE_ARCH[t] : 0
         L.R(ox + inset, j, ow - inset * 2, 1, P.soot)
         // keystone edge
         L.S(ox + inset - 1, j, P.stoneDD)
@@ -509,12 +512,12 @@ func drawFireplace(_ L: Layer) {
         }
         y += 4
     }
-    // hearth slab
-    L.R(96, 116, 64, 6, P.stone)
-    L.HL(96, 116, 64, P.stoneL)
-    L.HL(96, 121, 64, P.stoneDD)
-    L.VL(96, 116, 6, P.stoneL)
-    L.VL(159, 116, 6, P.stoneDD)
+    // hearth slab (the couch hides most of it)
+    L.R(x0 - 4, 116, 64, 6, P.stone)
+    L.HL(x0 - 4, 116, 64, P.stoneL)
+    L.HL(x0 - 4, 121, 64, P.stoneDD)
+    L.VL(x0 - 4, 116, 6, P.stoneL)
+    L.VL(x0 + 59, 116, 6, P.stoneDD)
     // grate
     L.R(ox + 5, ob - 3, ow - 10, 1, hx("#2a2020"))
     var gx = ox + 6
@@ -523,41 +526,65 @@ func drawFireplace(_ L: Layer) {
         gx += 3
     }
 
-    // mantel decor: candles (flames animate later), photo, plant, books
-    L.R(98, 46, 3, 8, hx("#efe3cb"))
-    L.VL(100, 46, 8, hx("#cdbf9f"))
-    L.R(103, 49, 3, 5, hx("#efe3cb"))
-    L.VL(105, 49, 5, hx("#cdbf9f"))
-    // photo frame (the two of you)
-    L.R(137, 42, 14, 12, P.woodD)
-    L.R(138, 43, 12, 10, hx("#e6d6b8"))
-    L.R(139, 44, 10, 8, hx("#c6a489"))
-    // books
-    L.R(122, 44, 3, 10, hx("#7a5068"))
-    L.R(125, 46, 3, 8, hx("#4f6583"))
-    L.R(128, 45, 3, 9, P.mustard)
-    L.HL(122, 44, 3, hx("#936580"))
-    // trailing plant
-    L.R(153, 48, 6, 6, P.pot)
-    L.VL(158, 48, 6, P.potD)
-    let leaves: [(Double, Double)] = [(152, 46), (154, 45), (156, 46), (158, 45), (159, 47), (160, 50), (161, 53), (161, 56), (160, 59), (162, 61), (151, 47), (155, 44)]
-    for (lx, ly) in leaves {
-        L.S(lx, ly, P.leaf)
-        L.S(lx + 1, ly, P.leafL)
+    // on the mantel: a photo of you two at one end, two candles (their flames animate later) at the other
+    L.R(x0 - 5, 42, 14, 12, P.woodD)
+    L.R(x0 - 4, 43, 12, 10, hx("#e6d6b8"))
+    L.R(x0 - 3, 44, 10, 8, hx("#c6a489"))
+    L.R(x0 + 46, 49, 3, 5, hx("#efe3cb"))
+    L.VL(x0 + 48, 49, 5, hx("#cdbf9f"))
+    L.R(x0 + 51, 46, 3, 8, hx("#efe3cb"))
+    L.VL(x0 + 53, 46, 8, hx("#cdbf9f"))
+}
+
+/// Where the fireplace used to be: a sideboard under the painting, with books, a sprig in a jar and a lamp.
+func drawSideboard(_ L: Layer) {
+    // centred under the painting, with a little room before the door
+    let x = 103.0
+    let w = 50.0
+    let top = 98.0
+    // legs
+    L.R(x + 3, FLOOR_Y - 3, 3, 3, P.woodD)
+    L.R(x + w - 6, FLOOR_Y - 3, 3, 3, P.woodD)
+    // body, and two doors with brass knobs
+    L.R(x, top + 3, w, FLOOR_Y - 3 - (top + 3), P.wood)
+    L.VL(x, top + 3, FLOOR_Y - 3 - (top + 3), P.woodL)
+    L.VL(x + w - 1, top + 3, FLOOR_Y - 3 - (top + 3), P.woodD)
+    for dx in [3, w / 2 + 1] {
+        L.R(x + dx, top + 6, w / 2 - 4, FLOOR_Y - 3 - (top + 9), P.woodD)
+        L.R(x + dx + 1, top + 7, w / 2 - 6, FLOOR_Y - 3 - (top + 11), P.wood)
     }
-    // firewood basket beside hearth
-    L.R(80, 104, 15, 13, hx("#8a6a45"))
-    var by = 105.0
-    while by < 116 {
-        L.HL(80, by, 15, hx("#6f5234"))
-        by += 2
+    L.S(x + w / 2 - 3, top + 12, P.brassL)
+    L.S(x + w / 2 + 3, top + 12, P.brassL)
+    // top
+    L.R(x - 2, top, w + 4, 3, P.woodL)
+    L.HL(x - 2, top, w + 4, mix(P.woodL, hx("#ffffff"), 0.15))
+    L.HL(x - 2, top + 2, w + 4, P.woodD)
+    // books lying flat
+    L.R(x + 3, top - 3, 14, 3, hx("#7a5068"))
+    L.HL(x + 3, top - 3, 14, hx("#936580"))
+    L.R(x + 5, top - 6, 11, 3, hx("#4f6583"))
+    L.HL(x + 5, top - 6, 11, hx("#6a80a0"))
+    L.R(x + 4, top - 8, 12, 2, P.mustard)
+    // a sprig in a little jar
+    L.R(x + 21, top - 5, 4, 5, hx("#c4dcef"))
+    L.HL(x + 21, top - 5, 4, hx("#e6f0f8"))
+    for (lx, ly) in [(22.0, -7.0), (23, -9), (24, -11), (21, -10), (25, -8), (23, -12)] { L.S(x + lx, top + ly, P.leaf) }
+    // the lamp: brass stand, glowing shade
+    let lx = x + w - 9
+    L.R(lx - 3, top - 2, 7, 2, P.brass)
+    L.VL(lx, top - 10, 8, P.brass)
+    for ji in 0..<9 {
+        let j = Double(ji)
+        let half = 3 + fl(j / 2.5)
+        var i = -half
+        while i <= half {
+            let edge = i == -half || i == half || ji == 8
+            L.G(lx + i, top - 19 + j, edge ? hx("#e8c787") : ji < 2 ? hx("#fbeec8") : hx("#f6e0a8"))
+            i += 1
+        }
     }
-    L.HL(80, 104, 15, hx("#a3825a"))
-    for (lx, ly) in [(81.0, 100.0), (85, 99), (89, 101), (83, 102)] {
-        L.R(lx, ly, 6, 3, hx("#7a4f33"))
-        L.S(lx, ly + 1, hx("#c9a27a"))
-        L.S(lx + 5, ly + 1, hx("#c9a27a"))
-    }
+    L.R(lx - 4, top - 20, 9, 1, hx("#d6b577"))
+    L.UG(lx - 4, top - 20, 9, 1)
 }
 
 func drawGallery(_ L: Layer) {
@@ -567,7 +594,7 @@ func drawGallery(_ L: Layer) {
         for j in 2..<(Int(h) - 2) { for i in 2..<(Int(w) - 2) { L.S(x + Double(i), y + Double(j), paint(i - 2, j - 2)) } }
     }
     // botanical print
-    frame(192, 30, 18, 24) { i, j in
+    frame(266, 22, 18, 24) { i, j in
         let stem = i == 6 && j > 3
         let leaf = (abs(i - 6) == 2 && j % 5 == 2) || (abs(i - 6) == 3 && j % 5 == 3)
         return stem || leaf ? P.sageD : hx("#efe3cb")
@@ -591,7 +618,7 @@ func drawGallery(_ L: Layer) {
         return (i + j) % 2 != 0 ? hx("#e8d9bc") : hx("#eadcc0")
     }
     // abstract sun
-    frame(252, 32, 20, 16) { i, j in
+    frame(289, 30, 20, 16) { i, j in
         let d = (i - 8) * (i - 8) + (j - 12) * (j - 12)
         if d < 30 { return P.mustard }
         return j > 9 ? P.couch : hx("#e9d7b7")
