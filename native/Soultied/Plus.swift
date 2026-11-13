@@ -262,6 +262,47 @@ private struct PlusHero: View {
     private static let crop = (x: 48.0, y: 8.0, w: 224.0, h: 156.0)
     private static let goingUp: [ReactionKind] = [.heart, .laugh, .heart, .star, .heart, .wow]
 
+    /// what's on the TV: two people on a hill, under the moon (160 × 90, a room pixel each)
+    private static let show: CGImage? = {
+        let w = Int(TV_SCREEN.w), h = Int(TV_SCREEN.h)
+        var px = [UInt8](repeating: 255, count: w * h * 4)
+        func put(_ x: Int, _ y: Int, _ hex: String) {
+            guard x >= 0, y >= 0, x < w, y < h else { return }
+            let c = RGB(hex), i = (y * w + x) * 4
+            px[i] = c.r
+            px[i + 1] = c.g
+            px[i + 2] = c.b
+        }
+        let sky: [(Int, String)] = [(0, "#1c1f3a"), (28, "#232447"), (46, "#2b294f"), (58, "#433259"), (66, "#51395f")]
+        for y in 0..<h {
+            let band = sky.last { y >= $0.0 }!.1
+            for x in 0..<w { put(x, y, band) }
+        }
+        // the moon, and its glow
+        for y in 0..<h {
+            for x in 0..<w {
+                let d = ((Double(x) - 118) * (Double(x) - 118) + (Double(y) - 24) * (Double(y) - 24)).squareRoot()
+                if d < 9 { put(x, y, d < 7 && x < 121 ? "#f4e7c9" : "#e9d7b7") } else if d < 12, (x + y) % 2 == 0 { put(x, y, "#3a3a62") }
+            }
+        }
+        for (x, y) in [(14, 10), (30, 22), (52, 8), (70, 30), (88, 14), (100, 40), (140, 12), (150, 34), (24, 40), (62, 46)] { put(x, y, "#f6e7a8") }
+        // two hills
+        for x in 0..<w {
+            let far = 64 + Int(6 * sin(Double(x) / 18))
+            let near = 72 + Int(8 * sin(Double(x + 40) / 26))
+            for y in far..<h { put(x, y, "#2b2747") }
+            for y in near..<h { put(x, y, "#1a1830") }
+        }
+        // the two of them, sat on the near hill, and a heart between
+        for (ox, hair) in [(56, "#3a2a26"), (63, "#8a5a3c")] {
+            let top = 72 + Int(8 * sin(Double(ox + 2 + 40) / 26)) - 7
+            for y in top..<(top + 3) { for x in (ox + 1)..<(ox + 4) { put(x, y, hair) } }
+            for y in (top + 3)..<(top + 8) { for x in ox..<(ox + 5) { put(x, y, "#0f0e1e") } }
+        }
+        for (x, y) in [(60, 54), (62, 54), (59, 55), (60, 55), (61, 55), (62, 55), (63, 55), (60, 56), (61, 56), (62, 56), (61, 57)] { put(x, y, "#d9534f") }
+        return Pixels.image(px, w, h)
+    }()
+
     private func scene(_ reactions: [WatchReaction]) -> WatchState {
         let mine = place.myLook
         let theirs = place.theirLook ?? (place.me == place.hostId ? Wardrobe.defaultB : Wardrobe.defaultA)
@@ -280,12 +321,23 @@ private struct PlusHero: View {
                 let ups = (max(0, k - 2)...k).map { i in
                     WatchReaction(kind: Self.goingUp[i % Self.goingUp.count], seat: i % 2 == 0 ? .left : .right, t0: start.timeIntervalSince1970 * 1000 + Double(i) * 1600)
                 }
-                if let img = Pixels.image(renderer.render(scene(reduceMotion ? [] : ups), t, now: now)) {
-                    Image(decorative: img, scale: 1)
-                        .resizable()
-                        .interpolation(.none)
-                        .frame(width: CGFloat(WATCH_W) * u, height: CGFloat(WATCH_H) * u)
-                        .offset(x: (geo.size.width - CGFloat(Self.crop.w) * u) / 2 - CGFloat(Self.crop.x) * u, y: -CGFloat(Self.crop.y) * u)
+                let ox = (geo.size.width - CGFloat(Self.crop.w) * u) / 2 - CGFloat(Self.crop.x) * u
+                let oy = -CGFloat(Self.crop.y) * u
+                ZStack(alignment: .topLeading) {
+                    if let img = Pixels.image(renderer.render(scene(reduceMotion ? [] : ups), t, now: now)) {
+                        Image(decorative: img, scale: 1)
+                            .resizable()
+                            .interpolation(.none)
+                            .frame(width: CGFloat(WATCH_W) * u, height: CGFloat(WATCH_H) * u)
+                            .offset(x: ox, y: oy)
+                    }
+                    if let show = Self.show {
+                        Image(decorative: show, scale: 1)
+                            .resizable()
+                            .interpolation(.none)
+                            .frame(width: CGFloat(TV_SCREEN.w) * u, height: CGFloat(TV_SCREEN.h) * u)
+                            .offset(x: ox + CGFloat(TV_SCREEN.x) * u, y: oy + CGFloat(TV_SCREEN.y) * u)
+                    }
                 }
             }
             .frame(width: geo.size.width, height: geo.size.height, alignment: .topLeading)
@@ -331,7 +383,7 @@ struct PlusSheet: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(store.thanks ? "Thank you! Plus is on" : reason.title == PlusReason.plain.title ? "Everything, for both of you" : reason.title)
                         .font(.pxTitle).foregroundStyle(Color.inkSoft).fixedSize(horizontal: false, vertical: true)
-                    Text(store.thanks ? "Everything below is open now, for both of you." : reason.line)
+                    Text(store.thanks ? "Everything below is open now, for both of you." : reason.title == PlusReason.plain.title ? "Every movie night, every game and escape room, cameras and voice. One of you gets it, and you both have it." : reason.line)
                         .font(.pxBody).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
                 }
 
