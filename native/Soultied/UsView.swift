@@ -24,6 +24,7 @@ struct UsView: View {
                     DarkHeading(title: "Us", sub: place.space?.name)
                     couple
                     if !place.partnerHere { InviteCard(place: place) }
+                    if place.partnerHere { RecapCard(place: place).id("recap") }
                     you
                     PlusCardView(place: place)
                     LookPicker().id("looks")

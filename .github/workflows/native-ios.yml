@@ -224,6 +224,13 @@ jobs:
           shot widgets-us -widgets us
           shot widgets-fires -widgets fires
           shot home-countdown -demo -tab home -scrollHome
+          # today's photo: Rohan's is in, yours to take
+          shot home-snap -demo -tab home -scrollHome snap
+          # holding the couch, and your month together (the picture to share)
+          shot home-hold -demo -tab home -scrollHome touches -hold
+          shot recap-share -demo -tab us -recapShare
+          # the five questions when you move in
+          shot about -demo -about
           ls -la "$RUNNER_TEMP/shots"
           echo "dev=$dev" >> "$GITHUB_OUTPUT"
 

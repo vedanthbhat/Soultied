@@ -108,6 +108,8 @@ interface AppContextType {
   couchLevel: number;
   /** days you've both shown up, all time */
   couchDays: number;
+  /** which days those were */
+  togetherDays: string[];
   /** you've both been here today */
   togetherToday: boolean;
   /** the fire behind the couch: the days in a row you've both shown up, and how it burns (0 embers … 3 roaring) */
@@ -1056,6 +1058,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         startJourney,
         couchLevel: couchLevel(eff.couch),
         couchDays: eff.couch.together.length,
+        togetherDays: eff.couch.together,
         togetherToday: eff.couch.together.includes(today),
         // (until your person moves in, the fire just burns steady)
         fire: partnerUser ? fireOf(eff.couch, today) : { streak: 0, level: 2 },

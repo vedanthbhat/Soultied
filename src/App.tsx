@@ -24,6 +24,8 @@ import { DecorProvider, useDecor } from './decor/DecorContext';
 import { TogetherProvider, useTogether } from './together/TogetherContext';
 import { type TouchKind, moodGlyph, moodLine, touchDef, touchSummary } from './together/moods';
 import { MeCard, ThemCard, ago } from './components/SeatCard';
+import { HoldCouch } from './components/HoldCouch';
+import { AboutUs } from './components/AboutUs';
 import type { SlotId } from './decor/catalogue';
 import { PixelIcon } from './components/letters/PixelIcon';
 import { roomSound } from './escape/sfx';
@@ -137,6 +139,22 @@ const BACK: Record<TouchKind, string> = {
   boop: 'Boop back',
 };
 
+/** a once-only flag in this browser (if storage is blocked, it just asks again next time) */
+const flagged = (key: string) => {
+  try {
+    return localStorage.getItem(key) === '1';
+  } catch {
+    return false;
+  }
+};
+const flag = (key: string) => {
+  try {
+    localStorage.setItem(key, '1');
+  } catch {
+    // (blocked: fine)
+  }
+};
+
 const Home: React.FC = () => {
   const { setupComplete, currentUser, partnerUser, space, panel, openPanel, letterBadge, getLetter, today, journey } = useApp();
   const { couchLevel, couchShown, markCouchShown, cloudStatus, demo, fire, hereToday } = useApp();
@@ -144,7 +162,15 @@ const Home: React.FC = () => {
   const turntable = useTurntable();
   const decor = useDecor();
   const together = useTogether();
-  const { asks, myMood, theirMood, roomTouch, touchNews, moodNews, lastSent, board, wallNews } = together;
+  const { asks, myMood, theirMood, roomTouch, touchNews, moodNews, lastSent, board, wallNews, snap } = together;
+  // which part of the wall opens (the photos, for today's photo)
+  const [wallTab, setWallTab] = useState<'notes' | 'photos'>('notes');
+  // "they took today's photo": once you've said later, not again today
+  const [snapLater, setSnapLater] = useState('');
+  const snapNote = !!partnerUser && snap.stage === 'theirs' && snapLater !== snap.day;
+  // holding the couch: their hold shows a note with a cushion to hold back; both holding, you sit side by side
+  const { hold } = together;
+  const holdNote = !!partnerUser && (hold.theirs || hold.mine);
   const pinnedWhat = wallNews ? (wallNews.kind === 'doodle' ? 'a doodle' : wallNews.kind === 'photo' ? 'a photo' : 'a note') : '';
   const [joinCode] = useState(readJoinCode);
   const [welcomeOpen, setWelcomeOpen] = useState(() => !setupComplete || !!joinCode);
@@ -224,7 +250,12 @@ const Home: React.FC = () => {
         : 'Games',
       music: turntable.on ? `Lift the needle${turntable.track ? ` · ${turntable.track.title}` : ''}` : 'Put a record on',
       decor: panel === 'decor' ? 'Choose a painting' : 'Decorate the room',
-      board: wallNews && partnerUser ? `${partnerUser.name} pinned ${pinnedWhat} up` : 'Our wall · notes, doodles, photos',
+      board:
+        wallNews && partnerUser
+          ? `${partnerUser.name} pinned ${pinnedWhat} up`
+          : snap.stage === 'theirs' && partnerUser
+            ? `${partnerUser.name} took today’s photo`
+            : 'Our wall · notes, doodles, photos',
       pet: decor.petName ? `${decor.petName} · asleep by the couch` : 'Your pet · choose who sleeps here',
     };
     const meLabel = `${currentUser.name} · ${myMood ? moodLine(myMood) : 'how are you feeling?'}`;
@@ -233,7 +264,7 @@ const Home: React.FC = () => {
     if (guest) l.right = guest.id === currentUser.id ? meLabel : themLabel(guest);
     else l.right = `Invite ${space?.partnerPlaceholderName || 'your person'}`;
     return l;
-  }, [welcomeOpen, seatsEmpty, letterBadge, partnerSealed, partnerUser, currentUser, host, guest, space, games.waiting, turntable.on, turntable.track, journeyWaiting, journey.next, journey.unseen, panel, askWaiting, asks.forMe.length, myMood, theirMood, wallNews, pinnedWhat, decor.petName, fire.level, fire.streak]);
+  }, [welcomeOpen, seatsEmpty, letterBadge, partnerSealed, partnerUser, currentUser, host, guest, space, games.waiting, turntable.on, turntable.track, journeyWaiting, journey.next, journey.unseen, panel, askWaiting, asks.forMe.length, myMood, theirMood, wallNews, pinnedWhat, decor.petName, fire.level, fire.streak, snap.stage]);
 
   const onHotspot = (id: HotspotId) => {
     roomSound(id);
@@ -249,7 +280,10 @@ const Home: React.FC = () => {
     else if (id === 'music') turntable.toggle();
     else if (id === 'decor') decor.openCatalogue('painting');
     else if (id === 'pet') decor.openCatalogue('pet');
-    else if (id === 'board') openPanel('wall');
+    else if (id === 'board') {
+      setWallTab(snap.stage === 'theirs' ? 'photos' : 'notes');
+      openPanel('wall');
+    }
     else if (id === 'left' || id === 'right') {
       const who = id === 'left' ? host : guest;
       if (!who) openPanel('space');
@@ -357,6 +391,16 @@ const Home: React.FC = () => {
   // signed in and still fetching your place: don't flash a room that isn't yours yet
   const veil = cloudStatus === 'checking' && !welcomeOpen && !demo;
 
+  // the first time you're in your place: five quick questions about the two of you (once; the iPhone app asks the same)
+  const aboutKey = `soultied_about_${space?.id || ''}`;
+  const [asking, setAsking] = useState(false);
+  const aboutDue = !!space && !demo && !welcomeOpen && !veil && !panel && together.about.ready && !together.about.mine && !flagged(aboutKey);
+  useEffect(() => {
+    if (!aboutDue || asking) return;
+    const t = window.setTimeout(() => setAsking(true), 1200);
+    return () => window.clearTimeout(t);
+  }, [aboutDue, asking]);
+
   // once you're in the room, quietly fetch the rest of the place; at the front door, just the character maker
   useEffect(() => (welcomeOpen ? prefetch(['studio'], 2500) : veil ? undefined : prefetch()), [welcomeOpen, veil]);
 
@@ -404,7 +448,7 @@ const Home: React.FC = () => {
         dim={panel && panel !== 'decor' ? 0.25 : 0}
         decor={decor.shown}
         focusX={panel === 'decor' ? DECOR_FOCUS[decor.slot] : undefined}
-        closeness={closeness}
+        closeness={hold.together ? 1 : closeness}
         moods={roomMoods}
         wallArt={welcomeOpen ? null : board.art}
         wallNews={!welcomeOpen && !!wallNews}
@@ -424,7 +468,7 @@ const Home: React.FC = () => {
       {!welcomeOpen && !veil && panel !== 'decor' && <StreamChip />}
       {!welcomeOpen && !veil && panel !== 'decor' && <NowPlaying />}
 
-      {touchNote && !welcomeOpen && !veil && !couchNote && !seatCard && !panel && (
+      {touchNote && !welcomeOpen && !veil && !couchNote && !seatCard && !panel && !holdNote && (
         <div className="fixed left-1/2 bottom-5 z-30 -translate-x-1/2 px-ui w-[min(92vw,520px)]" role="status">
           <div className="px-box px-shadow px-fade px-3 py-2 flex items-center gap-3 flex-wrap justify-center">
             <PixelIcon sprite={touchDef(touchNote.kind)} scale={3} />
@@ -445,7 +489,7 @@ const Home: React.FC = () => {
         </div>
       )}
 
-      {moodNote && !touchNote && !welcomeOpen && !veil && !couchNote && !seatCard && !panel && (
+      {moodNote && !touchNote && !welcomeOpen && !veil && !couchNote && !seatCard && !panel && !holdNote && (
         <div className="fixed left-1/2 bottom-5 z-30 -translate-x-1/2 px-ui w-[min(92vw,520px)]" role="status">
           <div className="px-box px-shadow px-fade px-3 py-2 flex items-center gap-3 flex-wrap justify-center">
             <span className="text-sm leading-snug flex-1 min-w-[180px]">{moodNote}</span>
@@ -465,7 +509,7 @@ const Home: React.FC = () => {
         </div>
       )}
 
-      {wallNews && partnerUser && !touchNote && !moodNote && !welcomeOpen && !veil && !couchNote && !seatCard && !panel && (
+      {wallNews && partnerUser && !touchNote && !moodNote && !welcomeOpen && !veil && !couchNote && !seatCard && !panel && !holdNote && (
         <div className="fixed left-1/2 bottom-5 z-30 -translate-x-1/2 px-ui w-[min(92vw,520px)]" role="status">
           <div className="px-box px-shadow px-fade px-3 py-2 flex items-center gap-3 flex-wrap justify-center">
             <PixelIcon name="envelope" scale={2} />
@@ -482,7 +526,38 @@ const Home: React.FC = () => {
         </div>
       )}
 
-      {gameNote && !welcomeOpen && !veil && !couchNote && !touchNote && !moodNote && !wallNews && !seatCard && (
+      {holdNote && !seatCard && partnerUser && !welcomeOpen && !veil && !panel && (
+        <div className="fixed left-1/2 bottom-5 z-40 -translate-x-1/2 px-ui w-[min(92vw,520px)]">
+          <div className="px-box px-shadow px-fade px-3 py-2">
+            <HoldCouch name={partnerUser.name} compact />
+          </div>
+        </div>
+      )}
+
+      {snapNote && !(holdNote && !seatCard) && !wallNews && partnerUser && !touchNote && !moodNote && !welcomeOpen && !veil && !couchNote && !seatCard && !panel && (
+        <div className="fixed left-1/2 bottom-5 z-30 -translate-x-1/2 px-ui w-[min(92vw,520px)]" role="status">
+          <div className="px-box px-shadow px-fade px-3 py-2 flex items-center gap-3 flex-wrap justify-center">
+            <PixelIcon name="camera" scale={2} />
+            <span className="text-sm leading-snug flex-1 min-w-[180px]">
+              {partnerUser.name} took today’s photo: “{snap.prompt}”. Take yours to see it.
+            </span>
+            <button
+              className="px-btn px-btn--sage px-btn--small"
+              onClick={() => {
+                setWallTab('photos');
+                openPanel('wall');
+              }}
+            >
+              Take mine
+            </button>
+            <button className="px-btn px-btn--paper px-btn--small" aria-label="Not now" onClick={() => setSnapLater(snap.day)}>
+              Later
+            </button>
+          </div>
+        </div>
+      )}
+
+      {gameNote && !welcomeOpen && !veil && !couchNote && !touchNote && !moodNote && !wallNews && !snapNote && !seatCard && (
         <div className="fixed right-4 bottom-4 z-30 px-ui max-w-[92vw]" role="status">
           <div className="px-box px-shadow px-fade px-3 py-2 flex items-center gap-3 flex-wrap">
             <span className="text-sm">{gameNote.text}</span>
@@ -509,7 +584,16 @@ const Home: React.FC = () => {
         </div>
       )}
 
-      {decor.note && !couchNote && !gameNote && !touchNote && !moodNote && !wallNews && !seatCard && !welcomeOpen && !veil && !panel && <EarnNote />}
+      {decor.note && !couchNote && !gameNote && !touchNote && !moodNote && !wallNews && !snapNote && !seatCard && !welcomeOpen && !veil && !panel && <EarnNote />}
+
+      {asking && !welcomeOpen && !veil && (
+        <AboutUs
+          onDone={() => {
+            flag(aboutKey);
+            setAsking(false);
+          }}
+        />
+      )}
 
       {welcomeOpen ? (
         <Welcome
@@ -551,7 +635,7 @@ const Home: React.FC = () => {
           {panel === 'wall' && (
             <PixelPanel title="Our wall" kicker={space?.name} onClose={() => openPanel(null)} width={880}>
               <Suspense fallback={<Opening />}>
-                <WallPanel />
+                <WallPanel initialTab={wallTab} />
               </Suspense>
             </PixelPanel>
           )}

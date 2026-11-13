@@ -79,16 +79,17 @@ struct VisitSheet: View {
         }
         .onAppear {
             what = place.visit.what
-            if place.visitDays != nil, let d = date(place.visit.date) { day = d }
+            if place.visitDays != nil, let d = localDate(place.visit.date) { day = d }
             else { day = Calendar.current.date(byAdding: .day, value: 14, to: Date()) ?? Date() }
         }
     }
+}
 
-    private func date(_ key: String) -> Date? {
-        var c = DateComponents()
-        c.year = Int(key.prefix(4))
-        c.month = Int(key.dropFirst(5).prefix(2))
-        c.day = Int(key.suffix(2))
-        return Calendar.current.date(from: c)
-    }
+/// a day key ("2026-11-20") as that day here
+func localDate(_ key: String) -> Date? {
+    var c = DateComponents()
+    c.year = Int(key.prefix(4))
+    c.month = Int(key.dropFirst(5).prefix(2))
+    c.day = Int(key.suffix(2))
+    return Calendar.current.date(from: c)
 }

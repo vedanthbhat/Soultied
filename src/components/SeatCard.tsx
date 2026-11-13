@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { HoldCouch } from './HoldCouch';
 import type { UserProfile } from '../types';
 import { PixelIcon } from './letters/PixelIcon';
 import { useTogether } from '../together/TogetherContext';
@@ -160,6 +161,7 @@ export const ThemCard: React.FC<{ partner: UserProfile; onUs: () => void; onSent
           </button>
         ))}
       </div>
+      <HoldCouch name={partner.name} compact />
       <p className="m-0 text-sm text-[var(--muted)] leading-snug min-h-[1.25em]" role="status">
         {sent
           ? `Sent ${touchDef(sent).one}. ${here ? `${partner.name}’s here, so they’ll feel it now.` : `${partner.name} gets it when they’re back.`}`

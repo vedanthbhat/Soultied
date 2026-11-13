@@ -70,6 +70,10 @@ export const SPRITES = {
     rows: ['y.y.y.y', '.y.y.y.', 'y.y.y.y'],
     pal: { y: '#b48c4a' },
   },
+  camera: {
+    rows: ['...kkk....', 'kkkkkkkkkk', 'k..kkkk..k', 'k.kwwwwk.k', 'k.kwbbwk.k', 'k.kwwwwk.k', 'k..kkkk..k', 'kkkkkkkkkk'],
+    pal: { k: INK, w: '#c4dcef', b: '#4f6fb0' },
+  },
   spool: {
     rows: ['wwwwwww', '.ttttt.', '.tTtTt.', '.ttttt.', '.tTtTt.', '.ttttt.', 'wwwwwww'],
     pal: { w: '#9a6a43', t: '#a84f4b', T: '#d07a70' },

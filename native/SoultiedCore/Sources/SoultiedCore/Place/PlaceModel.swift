@@ -28,6 +28,16 @@ public final class PlaceModel {
     public internal(set) var moods = MoodsDoc()
     /// the next time you'll be together
     public internal(set) var visit = VisitDoc()
+    /// today's photo (a new one each day)
+    public internal(set) var snapDoc = SnapDoc()
+    /// what each of you said about the two of you, when you moved in (meta/about: by uid, question to answer)
+    public internal(set) var aboutDoc: [String: [String: String]] = [:]
+    /// holding the couch: who's holding, and when your person's last beat arrived here
+    public internal(set) var holdDoc = HoldDoc()
+    public internal(set) var theirHoldSeen: Date?
+    /// you're holding the couch now
+    public private(set) var holding = false
+    @ObservationIgnored private var holdTimer: Timer?
     public internal(set) var touch = TouchDoc()
     public internal(set) var board = BoardDoc()
     /// the notes and doodles up on the wall, newest first
@@ -124,6 +134,24 @@ public final class PlaceModel {
                 self?.visit = VisitDoc(d)
                 self?.loaded.insert("visit")
             },
+            db.listen(meta("about")) { [weak self] d in
+                var by: [String: [String: String]] = [:]
+                for (uid, v) in (d ?? [:]).map("by") { if let a = v as? Doc { by[uid] = a.compactMapValues { $0 as? String } } }
+                self?.aboutDoc = by
+                self?.loaded.insert("about")
+            },
+            db.listen(meta("hold")) { [weak self] d in
+                guard let self else { return }
+                let doc = HoldDoc(d)
+                // (when a new beat of theirs arrives, by this phone's clock)
+                if let t = self.them, let e = doc.by[t], e.holding, e != self.holdDoc.by[t] { self.theirHoldSeen = Date() }
+                self.holdDoc = doc
+            },
+            // (today's; listening starts again at midnight, for the next day's)
+            db.listen(meta(snapDocName(today))) { [weak self] d in
+                self?.snapDoc = SnapDoc(d)
+                self?.loaded.insert("snap")
+            },
             db.listen(meta("touch")) { [weak self] d in
                 guard let self else { return }
                 self.touch = TouchDoc(d)
@@ -187,6 +215,7 @@ public final class PlaceModel {
     }
 
     public func stop() {
+        if holding { hold(false) }
         listeners.forEach { $0.stop() }
         listeners = []
         timer?.invalidate()
@@ -422,6 +451,83 @@ public final class PlaceModel {
         let words = String(text.trimmingCharacters(in: .whitespacesAndNewlines).prefix(MOOD_TEXT_MAX))
         let entry: Any = mood != nil || !words.isEmpty ? ["mood": mood?.rawValue ?? NSNull(), "text": words, "at": Values.nowMs()] as Doc : NSNull()
         save(meta("moods"), ["by": [me: entry]], "mood")
+    }
+
+    /* ---------- about the two of you ---------- */
+
+    /// your answers, once you've given them
+    public var aboutMine: [String: String]? { aboutDoc[me] }
+
+    /// keep what you said about the two of you (question id to answer id)
+    public func saveAbout(_ answers: [String: String]) {
+        var d: Doc = answers
+        d["at"] = String(Int(Values.nowMs()))
+        save(meta("about"), ["by": [me: d]], "your answers")
+    }
+
+    /* ---------- your month together ---------- */
+
+    /// the month a recap's about (the one just gone, in a month's first three days), worked out from what's kept
+    public var recap: Recap {
+        let them = self.them ?? ""
+        func day(_ ms: Double) -> String { Day.today(Date(timeIntervalSince1970: ms / 1000)) }
+        let input = RecapInput(
+            together: couch.together,
+            letters: letters.daily.values.map { d -> (day: String, opened: Bool, same: Int, total: Int) in
+                let s = d.opened && !them.isEmpty ? scoreDay(d, me: me, them: them) : Score()
+                return (d.dateKey, d.opened, s.same, s.total)
+            },
+            photos: photos.filter { !$0.gone }.map { day($0.at) },
+            notes: notes.filter { !$0.gone }.map { (day($0.at), $0.kind == .doodle) }
+        )
+        return monthRecap(input, month: recapMonth(today).month)
+    }
+
+    /* ---------- holding the couch ---------- */
+
+    /// your person's holding the couch, as of `now`
+    public func theyHold(now: Date = Date()) -> Bool { isHolding(them.flatMap { holdDoc.by[$0] }, seen: theirHoldSeen, now: now) }
+
+    /// press and hold (true), or let go (false): while you hold, a beat goes out about once a second
+    public func hold(_ on: Bool) {
+        guard on != holding else { return }
+        holding = on
+        holdTimer?.invalidate()
+        holdTimer = nil
+        beat()
+        if on {
+            let t = Timer(timeInterval: HOLD_BEAT, repeats: true) { [weak self] _ in self?.beat() }
+            RunLoop.main.add(t, forMode: .common)
+            holdTimer = t
+        }
+        if isDemo { demoPartner?.held(on) }
+    }
+
+    private func beat() {
+        save(meta("hold"), ["by": [me: ["holding": holding, "beat": Values.nowMs()] as Doc]], "holding the couch")
+    }
+
+    /* ---------- today's photo ---------- */
+
+    /// today's prompt, the same for both of you
+    public var snapPromptToday: String { snapPrompt(sid, today) }
+    public var snapStageToday: SnapStage { snapStage(snapDoc, me: me, them: them) }
+    public var mySnap: SnapShot? { snapDoc.by[me] }
+    /// theirs, once you've posted yours
+    public var theirSnap: SnapShot? { snapStageToday == .open ? them.flatMap { snapDoc.by[$0] } : nil }
+
+    /// post (or retake) your photo for today: `photo` is a small JPEG data: URL
+    public func postSnap(photo: String, w: Int, h: Int, caption: String) {
+        let words = String(caption.trimmingCharacters(in: .whitespacesAndNewlines).prefix(SNAP_CAPTION_MAX))
+        save(meta(snapDocName(today)), ["by": [me: ["photo": photo, "w": w, "h": h, "caption": words, "at": Values.nowMs()] as Doc]], "your photo")
+    }
+
+    /// one of today's photos, up on the wall with the rest (`thumb` a smaller copy for the grid)
+    public func pinSnap(_ shot: SnapShot, by who: String, thumb: String) {
+        let id = Values.newKey("photo-")
+        db.setLater(meta("photobig-" + id.dropFirst(6)), ["data": shot.photo], self)
+        db.setLater(meta(id), ["by": who, "caption": String(shot.caption.prefix(CAPTION_MAX)), "thumb": thumb, "w": shot.w, "h": shot.h, "at": Values.nowMs(), "day": today, "kept": true], self)
+        pinned(.photo)
     }
 
     /* ---------- the next time you're together ---------- */

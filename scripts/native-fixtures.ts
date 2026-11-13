@@ -28,6 +28,8 @@ import { renderRoom, type RoomState } from '../src/pixel/room';
 import { START_DECOR } from '../src/decor/catalogue';
 import { fireOf, type CouchState } from '../src/couch';
 import { daysLeft, normalizeVisit, visitLine } from '../src/together/visit';
+import { SNAP_PROMPTS, normalizeSnap, snapPrompt, snapStage } from '../src/together/snap';
+import { type RecapInput, monthRecap, recapMonth } from '../src/together/recap';
 import { renderCharacterBack } from '../src/pixel/characterBack';
 import { DEMO_DOODLE, OLD_DOODLE_H, OLD_DOODLE_W, DOODLE_H, DOODLE_W, doodleArt, fullDoodle, smallDoodle } from '../src/together/board';
 
@@ -514,6 +516,46 @@ for (const raw of [
     visits.push({ raw, today, doc: v, days: daysLeft(v, today), line: visitLine(v, today) });
   }
 
+// today's photo: the prompt for a place and a day, what's kept, and who sees what
+const snaps: { prompts: Array<[string, string, string]>; docs: Array<{ raw: unknown; doc: unknown; stages: Array<[string, string | null, string]> }>; count: number } = { prompts: [], docs: [], count: SNAP_PROMPTS.length };
+for (const sid of ['space-demo', 'abc123', 'घर-😀', ''])
+  for (let d = 0; d < 40; d++) {
+    const day = addDays('2026-02-20', d * 3);
+    snaps.prompts.push([sid, day, snapPrompt(sid, day)]);
+  }
+{
+  const pic = 'data:image/jpeg;base64,/9j/AAA';
+  for (const raw of [
+    null,
+    { by: { a: { photo: pic, w: 640, h: 480, caption: '  the hills  ', at: 7 } } },
+    { by: { a: { photo: pic, w: 640, h: 480, caption: '', at: 7 }, b: { photo: pic, w: 480, h: 640, caption: 'x'.repeat(100), at: 9 } } },
+    { by: { a: { photo: 'http://no', w: 1 }, b: { photo: pic } } },
+    { by: { a: 'nope', b: null } },
+  ]) {
+    const doc = normalizeSnap(raw);
+    snaps.docs.push({ raw, doc, stages: [['a', 'b', snapStage(doc, 'a', 'b')], ['b', 'a', snapStage(doc, 'b', 'a')], ['a', null, snapStage(doc, 'a', null)]] });
+  }
+}
+
+// your month together: random months of showing up, letters, photos and notes, and what the recap makes of them
+const recaps: Array<{ input: RecapInput; month: string; recap: unknown }> = [];
+const recapMonths: Array<[string, string, boolean]> = [];
+for (let k = 0; k < 12; k++) {
+  const start = addDays('2025-12-10', k * 17);
+  const day = () => addDays(start, int(70) - 10);
+  const input: RecapInput = {
+    together: Array.from({ length: int(60) }, day),
+    letters: Array.from({ length: int(40) }, () => ({ day: day(), opened: int(4) > 0, same: int(6), total: 5 + int(2) })),
+    photos: Array.from({ length: int(12) }, day),
+    notes: Array.from({ length: int(15) }, () => ({ day: day(), doodle: int(2) === 1 })),
+  };
+  for (const month of [start.slice(0, 7), addDays(start, 31).slice(0, 7)]) recaps.push({ input, month, recap: monthRecap(input, month) });
+}
+for (const t of ['2026-01-01', '2026-01-03', '2026-01-04', '2026-03-02', '2026-03-31', '2024-03-01', '2026-12-04']) {
+  const r = recapMonth(t);
+  recapMonths.push([t, r.month, r.done]);
+}
+
 const out = process.argv[2] || 'native-fixtures.json';
-writeFileSync(out, JSON.stringify({ cards, days, hashes, rngSeq, streaks, demo, same, chapters, games, live, doodle: { judges, brushes, fills, choices, games: doodles }, coasters: coasterSteps, escape, record, watch: { looks, ...watch }, wall: { doodles: wallDoodles }, room: { scenes: roomScenes, fires, visits } }));
+writeFileSync(out, JSON.stringify({ cards, days, hashes, rngSeq, streaks, demo, same, chapters, games, live, doodle: { judges, brushes, fills, choices, games: doodles }, coasters: coasterSteps, escape, record, watch: { looks, ...watch }, wall: { doodles: wallDoodles }, room: { scenes: roomScenes, fires, visits }, snaps, recaps: { cases: recaps, months: recapMonths } }));
 console.log(`wrote ${cards.length} card days, ${streaks.length} streaks, ${demo.length} demo rooms, ${games.length} game moves, ${live.length} live games, ${doodles.length} doodle moves to ${out}`);

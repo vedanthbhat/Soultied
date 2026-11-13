@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { COUCH_STEPS, FIRE_NAMES, couchLine } from '../couch';
 import { NextVisit } from './NextVisit';
+import { MonthRecap } from './MonthRecap';
 import { PixelAvatarRenderer } from './PixelAvatarRenderer';
 import { PixelIcon, SpriteName } from './letters/PixelIcon';
 import { scoreDay } from '../letters/cards';
@@ -143,6 +144,8 @@ export const UsPage: React.FC = () => {
       {partnerUser && <p className="m-0 -mt-1 text-sm text-[var(--muted)]">{couchLine(couchLevel, partnerUser.name)}</p>}
 
       <NextVisit />
+
+      <MonthRecap />
 
       <div className="flex gap-3 flex-wrap">
         <button className="px-btn" onClick={() => openPanel('wardrobe')}>

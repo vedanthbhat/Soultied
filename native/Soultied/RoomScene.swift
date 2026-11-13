@@ -112,6 +112,11 @@ struct RoomScene: View {
         let (c, moving) = closeness(t)
         st.closeness = c
         st.scooting = moving
+        // holding the couch together: side by side, for as long as you both hold on
+        if place.holding && place.theyHold() {
+            st.closeness = 1
+            st.scooting = false
+        }
         st.heartAt = heartAt
         let host = place.hostId, guest = place.guestId
         st.moodLeft = place.moods.current(host, now: place.now.timeIntervalSince1970 * 1000)?.glyph

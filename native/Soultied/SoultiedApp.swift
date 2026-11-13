@@ -76,8 +76,8 @@ enum Launch {
     static var escape: Bool { args.contains("-escape") }
     /// open the Soultied Plus sheet (screenshots)
     static var plus: Bool { args.contains("-plus") }
-    /// Home, scrolled down to the countdown (the screenshots)
-    static var scrollHome: Bool { args.contains("-scrollHome") }
+    /// -scrollHome snap   Home, scrolled down to today's photo (or the countdown) (the screenshots)
+    static var scrollHome: String? { args.contains("-scrollHome") ? (value("-scrollHome").flatMap { $0.hasPrefix("-") ? nil : $0 } ?? "countdown") : nil }
     /// -widgets doodle (or board, empty, us, fires)   the home-screen widgets, drawn by the app (screenshots)
     static var widgets: String? { args.contains("-widgets") ? (value("-widgets") ?? "doodle") : nil }
     static func escapeScene(_ s: EscapeSession) {

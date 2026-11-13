@@ -41,6 +41,8 @@ public enum Demo {
         db.seed("\(p)/meta/decor", ["earned": ["welcome": 240], "bought": Doc(), "placed": Doc(), "petNames": ["ginger": "Biscuit"]])
         db.seed("\(p)/meta/moods", ["by": [them: ["mood": "missing", "text": "counting the days", "at": nowMs - 2 * 3600e3]], "seen": Doc()])
         db.seed("\(p)/meta/touch", ["items": Doc(), "seen": Doc()])
+        // Rohan's taken today's photo (the view from his window)
+        db.seed("\(p)/meta/\(snapDocName(today))", ["by": [them: ["photo": DEMO_SNAP_PHOTO, "w": 384, "h": 288, "caption": "from my window, just now", "at": nowMs - 50 * 60e3] as Doc]])
         // Goa, in twelve days
         db.seed("\(p)/meta/visit", ["date": Day.add(today, 12), "what": "Goa", "by": them, "at": nowMs - 26 * 3600e3])
         db.seed("\(p)/meta/board", ["last": [them: ["at": nowMs - 3 * 3600e3, "kind": "doodle"]], "seen": Doc(), "art": Doodle.art(Doodle.demo, ref: "note-demo-2", by: them, at: nowMs).doc, "drew": [them: ["id": "note-demo-2", "at": nowMs - 3 * 3600e3]]])
@@ -211,6 +213,26 @@ final class DemoPartner {
                 self?.thinking.remove(key)
                 guard let p = self?.place, let cur = p.games[kind], cur.id == m.id, cur.seq == m.seq, let next = Play.botAct(cur, bot) else { return }
                 p.commitGame(next, by: bot)
+            }
+        }
+    }
+
+    /// holds the couch back a moment after you do, and lets go when you do
+    private var holdTimer: Timer?
+    func held(_ on: Bool) {
+        holdTimer?.invalidate()
+        holdTimer = nil
+        DispatchQueue.main.asyncAfter(deadline: .now() + (on ? 1.2 : 0.4)) { [weak self] in
+            guard let self, let p = self.place, p.holding == on else { return }
+            let beat = {
+                guard let p = self.place, let db = p.db as? MemoryBackend else { return }
+                db.apply(Write("spaces/\(p.sid)/meta/hold", ["by": [Demo.them: ["holding": p.holding, "beat": Values.nowMs()] as Doc]], merge: true))
+            }
+            beat()
+            if on {
+                let t = Timer(timeInterval: HOLD_BEAT, repeats: true) { _ in beat() }
+                RunLoop.main.add(t, forMode: .common)
+                self.holdTimer = t
             }
         }
     }

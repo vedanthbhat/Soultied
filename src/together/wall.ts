@@ -133,6 +133,19 @@ function scaled(img: HTMLImageElement, max: number, quality: number) {
   return { url: c.toDataURL('image/jpeg', quality), w, h };
 }
 
+/** One small copy of a photo (today's photo): `max` pixels across at most, under `limit` characters as a data: URL. */
+export async function prepareSmall(file: Blob, max = 640, limit = 300_000) {
+  const img = await readImage(file);
+  try {
+    let out = scaled(img, max, 0.78);
+    if (out.url.length > limit) out = scaled(img, Math.round(max * 0.75), 0.68);
+    if (out.url.length > limit) out = scaled(img, Math.round(max * 0.5), 0.6);
+    return { photo: out.url, w: out.w, h: out.h };
+  } finally {
+    URL.revokeObjectURL(img.src);
+  }
+}
+
 /** A photo, made small enough to keep: a big copy (well under the database's 1 MB a document) and a little one. */
 export async function preparePhoto(file: Blob) {
   const img = await readImage(file);

@@ -4,6 +4,9 @@ import { newKey } from '../../together/useSharedDoc';
 import type { SharedList } from '../../together/useSharedList';
 import { useBigDoc } from '../../together/useSharedList';
 import { CAPTION_MAX, type Photo, type WallArt, bigName, photoArt, preparePhoto } from '../../together/wall';
+import type { SnapShot } from '../../together/snap';
+import { todayKey } from '../../letters/engine';
+import { TodaySnap } from './TodaySnap';
 
 const dayLabel = (p: Photo) =>
   new Date(p.day ? p.day + 'T12:00:00' : p.at).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
@@ -122,6 +125,27 @@ export const PhotosTab: React.FC<{
     }
   };
 
+  /** one of today's photos, up on the wall with the rest (a little copy for the grid, as the others have) */
+  const pinSnap = async (shot: SnapShot, by: string) => {
+    const id = newKey('photo-');
+    const at = Date.now();
+    let thumb = shot.photo;
+    try {
+      const img = await imageFrom(shot.photo);
+      const k = Math.min(1, 360 / Math.max(img.naturalWidth, img.naturalHeight));
+      const c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(img.naturalWidth * k));
+      c.height = Math.max(1, Math.round(img.naturalHeight * k));
+      c.getContext('2d')!.drawImage(img, 0, 0, c.width, c.height);
+      thumb = c.toDataURL('image/jpeg', 0.72);
+    } catch {
+      // the full one will do
+    }
+    save(bigName(id), shot.photo).catch((e) => console.warn('[soultied] photo', e));
+    photos.put(id, { by, caption: shot.caption.slice(0, CAPTION_MAX), thumb, w: shot.w, h: shot.h, at, day: todayKey(), kept: true });
+    onPinned();
+  };
+
   const add = () => {
     if (!draft) return;
     const id = newKey('photo-');
@@ -150,6 +174,7 @@ export const PhotosTab: React.FC<{
 
   return (
     <div className="flex flex-col gap-4">
+      {!draft && <TodaySnap me={me} partner={partner} onPin={pinSnap} />}
       <input ref={file} type="file" accept="image/*" className="hidden" onChange={(e) => pick(e.target.files?.[0])} />
       {draft ? (
         <div className="px-inset p-4 flex flex-col gap-3 px-fade">

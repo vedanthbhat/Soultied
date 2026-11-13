@@ -132,6 +132,8 @@ struct MainView: View {
         .modifier(WidgetSync(place: place, link: widgetLink, open: openFromWidget))
         // which ways the screen may turn (OrientationGate, StreamView.swift)
         .modifier(TurnRule(mask: turns))
+        // five questions about the two of you, once, after the tour; and a rating, at a good moment (AboutViews.swift)
+        .modifier(AboutRule(place: place, tourActive: tour.active))
         .onChange(of: tour.active) { _, on in
             if on { tab = .home }
         }

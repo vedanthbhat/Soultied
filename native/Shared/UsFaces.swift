@@ -199,7 +199,7 @@ struct CountdownFace: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
                     glyphView(UsGlyphs.calendar, 2.5)
-                    Text(u.visitDays != nil ? "Next time together" : "Together").font(WidgetFont.px(11, bold: true)).foregroundStyle(mutedU).lineLimit(1)
+                    Text(u.visitDays != nil ? "Next time" : "Together").font(WidgetFont.px(11, bold: true)).foregroundStyle(mutedU).lineLimit(1)
                 }
                 Spacer(minLength: 0)
                 if let c = u.count {
@@ -324,7 +324,10 @@ struct LockRow: View {
 
 enum UsGlyphs {
     /// a little calendar page, with a heart on one of its days
-    static let calendar = Glyph(["r.....r", "#######", "#ppppp#", "#p#p#p#", "#ppppp#", "#p#h#p#", "#ppppp#", "#######"], ["#": "#8a5a3c", "r": "#c4453f", "p": "#f4e8d0", "h": "#d9534f"])
+    static let calendar = Glyph(
+        [".k.....k.", "#rkrrrkr#", "#rrrrrrr#", "#ppppppp#", "#pdpdpdp#", "#ppppppp#", "#pdphpdp#", "#ppppppp#", "#########"],
+        ["#": "#8a5a3c", "k": "#3a2a26", "r": "#c4453f", "p": "#fffaf0", "d": "#b9a98f", "h": "#d9534f"]
+    )
     static let flame = Icons.flame
     static let flameOut = Icons.flameOut
 }

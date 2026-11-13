@@ -19,6 +19,9 @@ import {
 import { tone } from '../escape/sfx';
 import { type BoardDoc, type WallArt, demoBoard, normalizeBoard } from './board';
 import { type VisitDoc, VISIT_WHAT_MAX, demoVisit, normalizeVisit } from './visit';
+import { type SnapShot, type SnapStage, SNAP_CAPTION_MAX, demoSnap, normalizeSnap, snapDocName, snapPrompt, snapStage } from './snap';
+import { HOLD_BEAT_MS, demoHold, isHolding, normalizeHold } from './hold';
+import { demoAbout, normalizeAbout } from './about';
 
 /**
  * The little shared things of a place that aren't letters, games or decor: the questions you write
@@ -69,6 +72,21 @@ interface TogetherValue {
   visit: VisitDoc;
   /** set the day you'll be together next, and where or what for ('' for the date takes it down) */
   setVisit: (date: string, what: string) => void;
+
+  /** today's photo: the prompt, where it's at, and the two photos (theirs only once you've posted yours) */
+  snap: { day: string; prompt: string; stage: SnapStage; mine: SnapShot | null; theirs: SnapShot | null };
+  /** post (or retake) your photo for today */
+  postSnap: (shot: Omit<SnapShot, 'at'>) => void;
+
+  /** holding the couch: you, your person, and both of you at once (and since when) */
+  hold: { mine: boolean; theirs: boolean; together: boolean; since: number };
+  /** press and hold (true), or let go (false) */
+  setHolding: (on: boolean) => void;
+
+  /** what you said about the two of you (question id to answer id; null until you've answered), once it's loaded */
+  about: { ready: boolean; mine: Record<string, string> | null };
+  /** keep what you said about the two of you */
+  saveAbout: (answers: Record<string, string>) => void;
 }
 
 const Ctx = createContext<TogetherValue | null>(null);
@@ -94,7 +112,7 @@ export function touchSound(kind: TouchKind) {
 }
 
 export const TogetherProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { currentUser, partnerUser, addActivity } = useApp();
+  const { currentUser, partnerUser, addActivity, today, space } = useApp();
   const me = currentUser.id;
   const them = partnerUser?.id || null;
 
@@ -248,6 +266,89 @@ export const TogetherProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     [me, writeVisit]
   );
 
+  /* ---------- today's photo ---------- */
+
+  const snapDoc = useSharedDoc(snapDocName(today), normalizeSnap, demoSnap);
+  const writeSnap = snapDoc.write;
+  const snap = useMemo<TogetherValue['snap']>(() => {
+    const stage = snapStage(snapDoc.doc, me, them);
+    return {
+      day: today,
+      prompt: snapPrompt(space?.id || 'solo', today),
+      stage,
+      mine: snapDoc.doc.by[me] ?? null,
+      // (theirs stays hidden until you've posted yours)
+      theirs: stage === 'open' && them ? (snapDoc.doc.by[them] ?? null) : null,
+    };
+  }, [snapDoc.doc, me, them, today, space?.id]);
+  const postSnap = useCallback<TogetherValue['postSnap']>(
+    (shot) => writeSnap({ by: { [me]: { ...shot, caption: shot.caption.trim().slice(0, SNAP_CAPTION_MAX), at: Date.now() } } }),
+    [me, writeSnap]
+  );
+
+  /* ---------- holding the couch ---------- */
+
+  const holdDoc = useSharedDoc('hold', normalizeHold, demoHold);
+  const writeHold = holdDoc.write;
+  const isDemoRoom = holdDoc.mode === 'demo';
+  const [holding, setHolding] = useState(false);
+  const wasHolding = useRef(false);
+  // while you hold, a beat about once a second (and one to say you've let go)
+  useEffect(() => {
+    if (!holding) {
+      if (wasHolding.current) writeHold({ by: { [me]: { holding: false, beat: Date.now() } } });
+      wasHolding.current = false;
+      return;
+    }
+    wasHolding.current = true;
+    const beat = () => writeHold({ by: { [me]: { holding: true, beat: Date.now() } } });
+    beat();
+    const id = window.setInterval(beat, HOLD_BEAT_MS);
+    return () => window.clearInterval(id);
+  }, [holding, me, writeHold]);
+  // the demo room: Rohan holds back a moment after you do, and lets go when you do
+  useEffect(() => {
+    if (!isDemoRoom || !them) return;
+    let id = 0;
+    const beat = (on: boolean) => writeHold({ by: { [them]: { holding: on, beat: Date.now() } } });
+    const t = window.setTimeout(
+      () => {
+        beat(holding);
+        if (holding) id = window.setInterval(() => beat(true), HOLD_BEAT_MS);
+      },
+      holding ? 1200 : 400
+    );
+    return () => {
+      window.clearTimeout(t);
+      window.clearInterval(id);
+    };
+  }, [holding, isDemoRoom, them, writeHold]);
+  // when each of their beats arrives (by this computer's clock), and a tick to notice when they stop
+  const theirHold = them ? holdDoc.doc.by[them] : undefined;
+  const [theirSeen, setTheirSeen] = useState(0);
+  useEffect(() => {
+    if (theirHold?.holding) setTheirSeen(Date.now());
+  }, [theirHold?.holding, theirHold?.beat]);
+  const [holdNow, setHoldNow] = useState(() => Date.now());
+  const theirsMaybe = !!theirHold?.holding;
+  useEffect(() => {
+    if (!theirsMaybe && !holding) return;
+    const id = window.setInterval(() => setHoldNow(Date.now()), 500);
+    return () => window.clearInterval(id);
+  }, [theirsMaybe, holding]);
+  const theirsHolding = isHolding(theirHold, theirSeen, Math.max(holdNow, theirSeen));
+  const together = holding && theirsHolding;
+  const [since, setSince] = useState(0);
+  useEffect(() => setSince(together ? Date.now() : 0), [together]);
+  const hold = useMemo(() => ({ mine: holding, theirs: theirsHolding, together, since }), [holding, theirsHolding, together, since]);
+
+  /* ---------- about the two of you ---------- */
+
+  const aboutDoc = useSharedDoc('about', normalizeAbout, demoAbout);
+  const writeAbout = aboutDoc.write;
+  const about = useMemo(() => ({ ready: aboutDoc.ready, mine: aboutDoc.doc.by[me] ?? null }), [aboutDoc.ready, aboutDoc.doc, me]);
+  const saveAbout = useCallback<TogetherValue['saveAbout']>((answers) => writeAbout({ by: { [me]: { ...answers, at: String(Date.now()) } } }), [me, writeAbout]);
+
   const value = useMemo<TogetherValue>(
     () => ({
       asksReady: asksDoc.ready,
@@ -273,8 +374,14 @@ export const TogetherProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       hangArt,
       visit: visitDoc.doc,
       setVisit,
+      snap,
+      postSnap,
+      hold,
+      setHolding,
+      about,
+      saveAbout,
     }),
-    [asksDoc.ready, asks, ask, answerAsk, markAskSeen, withdrawAsk, myMood, theirMood, setMood, moodNews, markMoodSeen, sendTouch, touchNews, markTouchesSeen, lastSent, roomTouch, boardDoc.doc, wallNews, markWallSeen, pinned, hangArt, visitDoc.doc, setVisit]
+    [asksDoc.ready, asks, ask, answerAsk, markAskSeen, withdrawAsk, myMood, theirMood, setMood, moodNews, markMoodSeen, sendTouch, touchNews, markTouchesSeen, lastSent, roomTouch, boardDoc.doc, wallNews, markWallSeen, pinned, hangArt, visitDoc.doc, setVisit, snap, postSnap, hold, about, saveAbout]
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 };
