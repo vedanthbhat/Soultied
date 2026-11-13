@@ -76,7 +76,9 @@ enum Launch {
     static var escape: Bool { args.contains("-escape") }
     /// open the Soultied Plus sheet (screenshots)
     static var plus: Bool { args.contains("-plus") }
-    /// -widgets doodle (or board, empty)   the home-screen widgets, drawn by the app (screenshots)
+    /// Home, scrolled down to the countdown (the screenshots)
+    static var scrollHome: Bool { args.contains("-scrollHome") }
+    /// -widgets doodle (or board, empty, us, fires)   the home-screen widgets, drawn by the app (screenshots)
     static var widgets: String? { args.contains("-widgets") ? (value("-widgets") ?? "doodle") : nil }
     static func escapeScene(_ s: EscapeSession) {
         guard let id = value("-escape").flatMap(RoomId.init), let room = s.rooms.first(where: { $0.id == id }) else { return }

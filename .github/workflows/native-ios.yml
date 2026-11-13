@@ -220,6 +220,10 @@ jobs:
           shot widgets -widgets doodle
           shot widgets-board -widgets board
           shot widgets-empty -widgets empty
+          # the fire behind the couch, the countdown, and their widgets
+          shot widgets-us -widgets us
+          shot widgets-fires -widgets fires
+          shot home-countdown -demo -tab home -scrollHome
           ls -la "$RUNNER_TEMP/shots"
           echo "dev=$dev" >> "$GITHUB_OUTPUT"
 

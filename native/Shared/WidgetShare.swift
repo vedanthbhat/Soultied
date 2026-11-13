@@ -11,6 +11,12 @@ enum WidgetShare {
     /// the widgets' kinds (WidgetCenter reloads them by these): their doodle, and our board of photos
     static let kind = "SoultiedDoodle"
     static let boardKind = "SoultiedBoard"
+    /// and the fire, the countdown, your person's mood, and all three together
+    static let fireKind = "SoultiedFire"
+    static let countdownKind = "SoultiedCountdown"
+    static let moodKind = "SoultiedMood"
+    static let usKind = "SoultiedUs"
+    static var usKinds: [String] { [fireKind, countdownKind, moodKind, usKind] }
 
     struct Config: Codable, Equatable {
         var sid: String
@@ -34,9 +40,31 @@ enum WidgetShare {
         var at: Double
     }
 
+    /// what the fire, countdown and mood widgets are worked out from (the app leaves it; the widgets refresh it)
+    struct Us: Codable, Equatable {
+        /// the days you were both here (the newest few hundred), and the last day each of you came in
+        var together: [String] = []
+        var meSeen = ""
+        var themSeen = ""
+        /// whose seat's on the left (whoever started the place), for whose log goes where
+        var meLeft = true
+        /// together since (YYYY-MM-DD, or "")
+        var since = ""
+        /// the next time you're together
+        var visitDate = ""
+        var visitWhat = ""
+        /// your person's mood (a MoodId), their words, and when (ms)
+        var mood: String?
+        var moodText = ""
+        var moodAt = 0.0
+        /// the wallpaper, for the picture of the fire
+        var wall = "sage"
+    }
+
     struct Saved: Codable, Equatable {
         var config: Config?
         var drawing: Drawing?
+        var us: Us?
         /// when the widget last asked (ms), so it can say "checked a moment ago"
         var checked: Double?
     }

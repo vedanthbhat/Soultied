@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { COUCH_STEPS, FIRE_NAMES, couchLine } from '../couch';
+import { NextVisit } from './NextVisit';
 import { PixelAvatarRenderer } from './PixelAvatarRenderer';
 import { PixelIcon, SpriteName } from './letters/PixelIcon';
 import { scoreDay } from '../letters/cards';
@@ -135,11 +136,13 @@ export const UsPage: React.FC = () => {
           <Stat
             icon={fire.level ? 'flame' : 'flameOut'}
             value={fire.level ? `${fire.streak} ${fire.streak === 1 ? 'day' : 'days'}` : 'Embers'}
-            label={fire.level ? `${FIRE_NAMES[fire.level]}, both here` : 'Both show up to light it'}
+            label={fire.level ? `${FIRE_NAMES[fire.level]}, both showing up` : 'Both show up to light it'}
           />
         )}
       </div>
       {partnerUser && <p className="m-0 -mt-1 text-sm text-[var(--muted)]">{couchLine(couchLevel, partnerUser.name)}</p>}
+
+      <NextVisit />
 
       <div className="flex gap-3 flex-wrap">
         <button className="px-btn" onClick={() => openPanel('wardrobe')}>

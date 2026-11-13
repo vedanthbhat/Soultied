@@ -18,6 +18,7 @@ import {
 } from './moods';
 import { tone } from '../escape/sfx';
 import { type BoardDoc, type WallArt, demoBoard, normalizeBoard } from './board';
+import { type VisitDoc, VISIT_WHAT_MAX, demoVisit, normalizeVisit } from './visit';
 
 /**
  * The little shared things of a place that aren't letters, games or decor: the questions you write
@@ -63,6 +64,11 @@ interface TogetherValue {
   pinned: (kind: 'text' | 'doodle' | 'photo', ref?: string) => void;
   /** hang a doodle or photo in the frame over the couch (null takes it down) */
   hangArt: (art: WallArt | null) => void;
+
+  /** the next time you'll be together (its date is '' when none's set) */
+  visit: VisitDoc;
+  /** set the day you'll be together next, and where or what for ('' for the date takes it down) */
+  setVisit: (date: string, what: string) => void;
 }
 
 const Ctx = createContext<TogetherValue | null>(null);
@@ -233,6 +239,15 @@ export const TogetherProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   );
   const hangArt = useCallback<TogetherValue['hangArt']>((art) => writeBoard({ art: art ? { ...art } : null }), [writeBoard]);
 
+  /* ---------- the next time you're together ---------- */
+
+  const visitDoc = useSharedDoc('visit', normalizeVisit, demoVisit);
+  const writeVisit = visitDoc.write;
+  const setVisit = useCallback<TogetherValue['setVisit']>(
+    (date, what) => writeVisit({ date: /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : '', what: date ? what.trim().slice(0, VISIT_WHAT_MAX) : '', by: me, at: Date.now() }),
+    [me, writeVisit]
+  );
+
   const value = useMemo<TogetherValue>(
     () => ({
       asksReady: asksDoc.ready,
@@ -256,8 +271,10 @@ export const TogetherProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       markWallSeen,
       pinned,
       hangArt,
+      visit: visitDoc.doc,
+      setVisit,
     }),
-    [asksDoc.ready, asks, ask, answerAsk, markAskSeen, withdrawAsk, myMood, theirMood, setMood, moodNews, markMoodSeen, sendTouch, touchNews, markTouchesSeen, lastSent, roomTouch, boardDoc.doc, wallNews, markWallSeen, pinned, hangArt]
+    [asksDoc.ready, asks, ask, answerAsk, markAskSeen, withdrawAsk, myMood, theirMood, setMood, moodNews, markMoodSeen, sendTouch, touchNews, markTouchesSeen, lastSent, roomTouch, boardDoc.doc, wallNews, markWallSeen, pinned, hangArt, visitDoc.doc, setVisit]
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 };

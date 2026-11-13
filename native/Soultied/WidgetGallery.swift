@@ -5,7 +5,7 @@ import SoultiedCore
 /*
  * The home-screen widgets, drawn by the app at their real sizes on a pretend home screen, so each build's
  * screenshots show them (a simulator can't put a widget on its home screen from a script).
- *   -widgets doodle | board | empty
+ *   -widgets doodle | board | empty | us (the fire, the countdown, their mood) | fires (the fire at each strength)
  */
 struct WidgetGallery: View {
     let which: String
@@ -21,6 +21,29 @@ struct WidgetGallery: View {
                 .ignoresSafeArea()
             VStack(spacing: 20) {
                 switch which {
+                case "us":
+                    HStack(spacing: 22) {
+                        tile(small) { FireFace(u: .demo).background(Color(hex: "#1a1214")) }
+                        tile(small) { CountdownFace(u: .demo) }
+                    }
+                    tile(medium) { UsFace(u: .demo) }
+                    HStack(spacing: 22) {
+                        tile(small) { MoodFace(u: .demo) }
+                        lockScreen
+                    }
+                case "fires":
+                    HStack(spacing: 22) {
+                        tile(small) { FireFace(u: Self.fire(0, 0)).background(Color(hex: "#1a1214")) }
+                        tile(small) { FireFace(u: Self.fire(1, 2)).background(Color(hex: "#1a1214")) }
+                    }
+                    HStack(spacing: 22) {
+                        tile(small) { FireFace(u: Self.fire(2, 5)).background(Color(hex: "#1a1214")) }
+                        tile(small) { FireFace(u: Self.fire(3, 23)).background(Color(hex: "#1a1214")) }
+                    }
+                    HStack(spacing: 22) {
+                        tile(small) { CountdownFace(u: Self.counting(nil)) }
+                        tile(small) { CountdownFace(u: Self.counting(0)) }
+                    }
                 case "board":
                     HStack(spacing: 22) {
                         tile(small) { board(.small, Self.photos) }
@@ -45,6 +68,45 @@ struct WidgetGallery: View {
                 }
             }
         }
+    }
+
+    /// the lock screen's widgets, as iOS tints them (white on the wallpaper)
+    private var lockScreen: some View {
+        VStack(spacing: 10) {
+            HStack(spacing: 10) {
+                disc { FireRound(u: .demo) }
+                disc { CountdownRound(u: .demo) }
+                disc { MoodRound(u: .demo) }
+            }
+            LockRow(glyph: UsGlyphs.flame, title: UsNow.demo.fireName, sub: UsNow.demo.fireLine)
+                .frame(width: 158, height: 56)
+                .foregroundStyle(.white)
+            Text(UsNow.demo.countLine).font(WidgetFont.px(13)).foregroundStyle(.white)
+        }
+        .frame(width: 158, height: 158)
+    }
+
+    private func disc<V: View>(@ViewBuilder _ face: () -> V) -> some View {
+        face()
+            .foregroundStyle(.white)
+            .frame(width: 46, height: 46)
+            .background(Circle().fill(.white.opacity(0.18)))
+    }
+
+    private static func fire(_ level: Int, _ streak: Int) -> UsNow {
+        var u = UsNow.demo
+        u.level = level
+        u.streak = streak
+        u.logLeft = level > 0
+        u.logRight = level > 1
+        return u
+    }
+
+    private static func counting(_ days: Int?) -> UsNow {
+        var u = UsNow.demo
+        u.visitDays = days
+        u.visitWhat = days == nil ? "" : "the airport"
+        return u
     }
 
     private func tile<V: View>(_ size: CGSize, @ViewBuilder _ face: () -> V) -> some View {

@@ -46,6 +46,12 @@ public struct MoodEntry: Sendable, Equatable {
     public var text: String
     public var at: Double
 
+    public init(mood: MoodId?, text: String, at: Double) {
+        self.mood = mood
+        self.text = text
+        self.at = at
+    }
+
     public var line: String {
         [moodDef(mood)?.phrase, text.isEmpty ? nil : "“\(text)”"].compactMap { $0 }.joined(separator: " · ")
     }

@@ -27,6 +27,7 @@ import { renderWatchRoom, type WatchState } from '../src/pixel/watchRoom';
 import { renderRoom, type RoomState } from '../src/pixel/room';
 import { START_DECOR } from '../src/decor/catalogue';
 import { fireOf, type CouchState } from '../src/couch';
+import { daysLeft, normalizeVisit, visitLine } from '../src/together/visit';
 import { renderCharacterBack } from '../src/pixel/characterBack';
 import { DEMO_DOODLE, OLD_DOODLE_H, OLD_DOODLE_W, DOODLE_H, DOODLE_W, doodleArt, fullDoodle, smallDoodle } from '../src/together/board';
 
@@ -495,6 +496,24 @@ const fires: Array<{ together: string[]; today: string; streak: number; level: n
     }
 }
 
+// the next time you're together: what's kept, and the countdown to it, seen from different days
+const visits: Array<{ raw: unknown; today: string; doc: unknown; days: number | null; line: string | null }> = [];
+for (const raw of [
+  null,
+  { date: '2026-03-12', what: 'Goa', by: 'u1', at: 5 },
+  { date: '2026-03-01', what: '' },
+  { date: '2026-02-28', what: '  the wedding  ' },
+  { date: '2026-3-1', what: 'bad date' },
+  { date: 20260301, what: 'a number' },
+  { date: '2027-01-01', what: 'a very long name for where we are going to be, longer than thirty' },
+  { date: '2024-02-29', what: 'leap day' },
+  { what: 'no date' },
+])
+  for (const today of ['2026-02-26', '2026-02-28', '2026-03-01', '2026-03-12', '2024-02-28', '2026-12-31']) {
+    const v = normalizeVisit(raw);
+    visits.push({ raw, today, doc: v, days: daysLeft(v, today), line: visitLine(v, today) });
+  }
+
 const out = process.argv[2] || 'native-fixtures.json';
-writeFileSync(out, JSON.stringify({ cards, days, hashes, rngSeq, streaks, demo, same, chapters, games, live, doodle: { judges, brushes, fills, choices, games: doodles }, coasters: coasterSteps, escape, record, watch: { looks, ...watch }, wall: { doodles: wallDoodles }, room: { scenes: roomScenes, fires } }));
+writeFileSync(out, JSON.stringify({ cards, days, hashes, rngSeq, streaks, demo, same, chapters, games, live, doodle: { judges, brushes, fills, choices, games: doodles }, coasters: coasterSteps, escape, record, watch: { looks, ...watch }, wall: { doodles: wallDoodles }, room: { scenes: roomScenes, fires, visits } }));
 console.log(`wrote ${cards.length} card days, ${streaks.length} streaks, ${demo.length} demo rooms, ${games.length} game moves, ${live.length} live games, ${doodles.length} doodle moves to ${out}`);

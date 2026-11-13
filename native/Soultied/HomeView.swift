@@ -35,6 +35,8 @@ struct HomeView: View {
 
                         VStack(spacing: 18) {
                             touches
+                            // (counting down to a day: near the top; no day set yet: a nudge further down)
+                            if place.partnerHere && place.visitDays != nil { CountdownCard(place: place).id("countdown") }
                             if place.recordOn { RecordCard(place: place, listening: listening, open: { onRoom(.music) }) }
                             LetterCard(place: place, open: { go(.letters) })
                             AsksCard(place: place, open: { go(.letters) })
@@ -43,6 +45,7 @@ struct HomeView: View {
                             StreakCard(place: place)
                             if !place.recordOn { RecordCard(place: place, open: { onRoom(.music) }) }
                             CouchCard(place: place, invite: { go(.us) })
+                            if place.partnerHere && place.visitDays == nil { CountdownCard(place: place) }
                         }
                         .padding(.horizontal, 16)
                         // (close under your names, so the touches show on the first screen, above the tabs)
@@ -51,6 +54,9 @@ struct HomeView: View {
                     }
                 }
                 .scrollIndicators(.hidden)
+                .onAppear {
+                    if Launch.scrollHome { DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { scroller.scrollTo("countdown", anchor: .top) } }
+                }
                 // the tour points at things in the room, so start it from the top
                 .onChange(of: Tour.shared.active) { _, on in
                     if on { scroller.scrollTo("top", anchor: .top) }

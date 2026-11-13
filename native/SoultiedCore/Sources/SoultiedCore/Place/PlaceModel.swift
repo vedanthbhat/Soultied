@@ -26,6 +26,8 @@ public final class PlaceModel {
     public internal(set) var couch = CouchState()
     public internal(set) var decorDoc = DecorDoc()
     public internal(set) var moods = MoodsDoc()
+    /// the next time you'll be together
+    public internal(set) var visit = VisitDoc()
     public internal(set) var touch = TouchDoc()
     public internal(set) var board = BoardDoc()
     /// the notes and doodles up on the wall, newest first
@@ -117,6 +119,10 @@ public final class PlaceModel {
             db.listen(meta("moods")) { [weak self] d in
                 self?.moods = MoodsDoc(d)
                 self?.loaded.insert("moods")
+            },
+            db.listen(meta("visit")) { [weak self] d in
+                self?.visit = VisitDoc(d)
+                self?.loaded.insert("visit")
             },
             db.listen(meta("touch")) { [weak self] d in
                 guard let self else { return }
@@ -416,6 +422,18 @@ public final class PlaceModel {
         let words = String(text.trimmingCharacters(in: .whitespacesAndNewlines).prefix(MOOD_TEXT_MAX))
         let entry: Any = mood != nil || !words.isEmpty ? ["mood": mood?.rawValue ?? NSNull(), "text": words, "at": Values.nowMs()] as Doc : NSNull()
         save(meta("moods"), ["by": [me: entry]], "mood")
+    }
+
+    /* ---------- the next time you're together ---------- */
+
+    /// days until you're together (nil: no day set, or it's been)
+    public var visitDays: Int? { visit.daysLeft(today: today) }
+
+    /// sets the day you'll be together next, and where or what for ("" for the day takes it down)
+    public func setVisit(date: String, what: String) {
+        let ok = VisitDoc.isKey(date)
+        let words = ok ? String(what.trimmingCharacters(in: .whitespacesAndNewlines).prefix(VISIT_WHAT_MAX)) : ""
+        save(meta("visit"), ["date": ok ? date : "", "what": words, "by": me, "at": Values.nowMs()], "the date")
     }
 
     public func markMoodSeen() {

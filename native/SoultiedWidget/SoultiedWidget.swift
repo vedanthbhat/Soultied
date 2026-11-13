@@ -8,6 +8,11 @@ import SoultiedCore
  * Soultied's home-screen widgets:
  *   Their doodle   your person's last doodle, in a frame (tap: draw one back)
  *   Our board      your newest wall photos as Polaroids on cork (tap: your photos)
+ *   The fire       the fireplace behind the couch, burning as well as you've been showing up (and on the
+ *                  lock screen: the flame and the days in a row)
+ *   Countdown      the days till you're next together (or the days you've been together)
+ *   Their mood     how your person's feeling
+ *   Us             all three, side by side
  * The app leaves a way in (WidgetShare, a keychain group they share); the widgets look for new things
  * themselves (Firestore's REST API, signed in with Firebase's refresh token), every 20 minutes or so as iOS
  * allows, and straight away when the app sees something new.
@@ -18,6 +23,10 @@ struct SoultiedWidgets: WidgetBundle {
     var body: some Widget {
         DoodleWidget()
         BoardWidget()
+        FireWidget()
+        CountdownWidget()
+        MoodWidget()
+        UsWidget()
     }
 }
 
@@ -162,6 +171,150 @@ struct BoardWidget: Widget {
     }
 }
 
+/* ---------- the fire, the countdown, their mood ---------- */
+
+struct UsEntry: TimelineEntry {
+    let date: Date
+    let u: UsNow
+}
+
+struct UsProvider: TimelineProvider {
+    func placeholder(in context: Context) -> UsEntry { UsEntry(date: Date(), u: .demo) }
+
+    func getSnapshot(in context: Context, completion: @escaping (UsEntry) -> Void) {
+        let s = WidgetShare.load()
+        completion(UsEntry(date: Date(), u: context.isPreview && s.us == nil ? .demo : UsNow(s, at: Date())))
+    }
+
+    func getTimeline(in context: Context, completion: @escaping (Timeline<UsEntry>) -> Void) {
+        Task {
+            let s = await Fetch.freshUs()
+            let now = Date()
+            // (now, and each of the next two midnights, so the countdown and the fire move on by themselves)
+            var dates = [now]
+            var day = Calendar.current.startOfDay(for: now)
+            for _ in 0..<2 {
+                day = Calendar.current.date(byAdding: .day, value: 1, to: day) ?? day.addingTimeInterval(86400)
+                dates.append(day.addingTimeInterval(5))
+            }
+            completion(Timeline(entries: dates.map { UsEntry(date: $0, u: UsNow(s, at: $0)) }, policy: .after(now.addingTimeInterval(30 * 60))))
+        }
+    }
+}
+
+private let homeURL = URL(string: "soultied://home")
+
+/// behind a widget: its colour on the home screen, the usual soft disc on a round lock-screen one, nothing on the rest
+struct Backdrop: View {
+    let family: WidgetFamily
+    let color: Color
+    var body: some View {
+        switch family {
+        case .systemSmall, .systemMedium, .systemLarge: color
+        case .accessoryCircular: AccessoryWidgetBackground()
+        default: Color.clear
+        }
+    }
+}
+
+struct FireWidgetView: View {
+    @Environment(\.widgetFamily) private var family
+    let entry: UsEntry
+    var body: some View {
+        let u = entry.u
+        Group {
+            switch family {
+            case .accessoryCircular: FireRound(u: u).widgetAccentable()
+            case .accessoryRectangular: LockRow(glyph: u.level > 0 ? UsGlyphs.flame : UsGlyphs.flameOut, title: u.fireName, sub: u.fireLine)
+            case .accessoryInline: Text(u.level > 0 ? "\(u.streak) \(u.streak == 1 ? "day" : "days") by the fire" : "Embers: show up together today")
+            default: FireFace(u: u)
+            }
+        }
+        .containerBackground(for: .widget) { Backdrop(family: family, color: Color(red: 0.1, green: 0.07, blue: 0.08)) }
+        .widgetURL(homeURL)
+    }
+}
+
+struct FireWidget: Widget {
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: WidgetShare.fireKind, provider: UsProvider()) { FireWidgetView(entry: $0) }
+            .configurationDisplayName("The fire")
+            .description("The fire behind your couch. It burns brighter every day you both show up.")
+            .supportedFamilies([.systemSmall, .accessoryCircular, .accessoryRectangular, .accessoryInline])
+            .contentMarginsDisabled()
+    }
+}
+
+struct CountdownWidgetView: View {
+    @Environment(\.widgetFamily) private var family
+    let entry: UsEntry
+    var body: some View {
+        let u = entry.u
+        Group {
+            switch family {
+            case .accessoryCircular: CountdownRound(u: u)
+            case .accessoryRectangular: LockRow(glyph: UsGlyphs.calendar, title: u.count.map { $0.n == "Today" ? "Today" : "\($0.n) \($0.label.split(separator: " ").first ?? "")" } ?? "Next time together", sub: u.count.map { $0.n == "Today" ? $0.label : $0.label.split(separator: " ").dropFirst().joined(separator: " ") } ?? "Set the day in Soultied")
+            case .accessoryInline: Text(u.countLine)
+            default: CountdownFace(u: u)
+            }
+        }
+        .containerBackground(for: .widget) { Backdrop(family: family, color: Color(red: 0.98, green: 0.95, blue: 0.89)) }
+        .widgetURL(homeURL)
+    }
+}
+
+struct CountdownWidget: Widget {
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: WidgetShare.countdownKind, provider: UsProvider()) { CountdownWidgetView(entry: $0) }
+            .configurationDisplayName("Countdown")
+            .description("The days till you’re next together (or how long you’ve been together).")
+            .supportedFamilies([.systemSmall, .accessoryCircular, .accessoryRectangular, .accessoryInline])
+            .contentMarginsDisabled()
+    }
+}
+
+struct MoodWidgetView: View {
+    @Environment(\.widgetFamily) private var family
+    let entry: UsEntry
+    var body: some View {
+        let u = entry.u
+        Group {
+            switch family {
+            case .accessoryCircular: MoodRound(u: u)
+            case .accessoryRectangular: LockRow(glyph: u.mood?.glyph ?? WORDS_GLYPH, title: u.themName, sub: u.mood?.line ?? "No mood today yet")
+            case .accessoryInline: Text(u.mood.map { "\(u.themName): \($0.line)" } ?? "\(u.themName): no mood yet")
+            default: MoodFace(u: u)
+            }
+        }
+        .containerBackground(for: .widget) { Backdrop(family: family, color: Color(red: 0.98, green: 0.95, blue: 0.89)) }
+        .widgetURL(homeURL)
+    }
+}
+
+struct MoodWidget: Widget {
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: WidgetShare.moodKind, provider: UsProvider()) { MoodWidgetView(entry: $0) }
+            .configurationDisplayName("Their mood")
+            .description("How your person’s feeling today.")
+            .supportedFamilies([.systemSmall, .accessoryCircular, .accessoryRectangular, .accessoryInline])
+            .contentMarginsDisabled()
+    }
+}
+
+struct UsWidget: Widget {
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: WidgetShare.usKind, provider: UsProvider()) { entry in
+            UsFace(u: entry.u)
+                .containerBackground(for: .widget) { Color(red: 0.98, green: 0.95, blue: 0.89) }
+                .widgetURL(homeURL)
+        }
+        .configurationDisplayName("Us")
+        .description("The fire, the countdown and how your person’s feeling, together.")
+        .supportedFamilies([.systemMedium])
+        .contentMarginsDisabled()
+    }
+}
+
 /* ---------- looking for new things (Firestore's REST API) ---------- */
 
 enum Fetch {
@@ -255,6 +408,7 @@ enum Fetch {
         if let n = v["doubleValue"] as? NSNumber { return n.doubleValue }
         if let b = v["booleanValue"] as? Bool { return b }
         if let m = v["mapValue"] as? [String: Any] { return fields(m["fields"]) }
+        if let a = v["arrayValue"] as? [String: Any] { return ((a["values"] as? [Any]) ?? []).compactMap(plain) }
         return nil
     }
 
@@ -322,6 +476,41 @@ enum Fetch {
             WidgetShare.store(s)
         } catch {
             // offline, or signed out somewhere else: keep what's there
+        }
+        return WidgetShare.load()
+    }
+
+    /* the fire, the countdown, their mood */
+
+    /// what's saved, after looking at the couch, the countdown, their mood and the place itself
+    static func freshUs() async -> WidgetShare.Saved {
+        var s = WidgetShare.load()
+        guard let c = s.config else { return s }
+        do {
+            let t = try await token(c)
+            var u = s.us ?? WidgetShare.Us()
+            let couch = try await get(root(c) + "/meta/couch?" + mask(["together", "seen"]), t) ?? [:]
+            u.together = Array(((couch["together"] as? [Any]) ?? []).compactMap { $0 as? String }.suffix(400))
+            let seen = couch["seen"] as? [String: Any] ?? [:]
+            u.meSeen = seen[c.me] as? String ?? ""
+            u.themSeen = seen[c.them] as? String ?? ""
+            let moods = try await get(root(c) + "/meta/moods?" + mask(["by"]), t) ?? [:]
+            let m = (moods["by"] as? [String: Any])?[c.them] as? [String: Any]
+            u.mood = m?["mood"] as? String
+            u.moodText = m?["text"] as? String ?? ""
+            u.moodAt = m?["at"] as? Double ?? 0
+            let visitRaw = try await get(root(c) + "/meta/visit", t)
+            let visit = VisitDoc(visitRaw)
+            u.visitDate = visit.date
+            u.visitWhat = visit.what
+            if let space = try await get(root(c) + "?" + mask(["togetherSince", "creatorId"]), t) {
+                u.since = space["togetherSince"] as? String ?? ""
+                if let host = space["creatorId"] as? String { u.meLeft = host == c.me }
+            }
+            s.us = u
+            WidgetShare.store(s)
+        } catch {
+            // offline: keep what's there
         }
         return WidgetShare.load()
     }
