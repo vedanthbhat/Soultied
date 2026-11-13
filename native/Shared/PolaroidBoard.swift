@@ -159,10 +159,16 @@ struct BoardCard: View {
                     }
                     .frame(width: W, height: H)
                 }
+            case .large where items.isEmpty:
+                VStack(spacing: 22) {
+                    PaperLabel(text: blurb).padding(.horizontal, 16)
+                    PolaroidView(item: BoardItem(id: "", caption: emptyCaption), width: min(170, (H - 110) / 1.18)).rotationEffect(.degrees(-3))
+                }
+                .frame(width: W, height: H)
             case .large:
                 let w = min((W - 56) / 2, (H - 70) / 2 / 1.18)
                 VStack(spacing: 10) {
-                    PaperLabel(text: items.isEmpty ? blurb : "Our board").padding(.top, 14)
+                    PaperLabel(text: "Our board").padding(.top, 14)
                     VStack(spacing: 18) {
                         HStack(spacing: 26) {
                             cell(0, w)

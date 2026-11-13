@@ -637,7 +637,7 @@ export class Overlay implements EngineUI {
     const meLeft = !leftId || leftId === this.engine.me;
     const side = mine === meLeft ? 'left' : 'right';
     this.couch.float(kind, side);
-    if (!this.visible) this.toast(`${mine ? 'You' : this.engine.partnerName} sent ${kind === 'heart' ? 'a heart' : `a ${kind}`}`);
+    if (!this.visible || IN_APP) this.toast(`${mine ? 'You' : this.engine.partnerName} sent ${kind === 'heart' ? 'a heart' : `a ${kind}`}`);
   }
 
   /* ---------------- watch parties ---------------- */
@@ -1195,8 +1195,8 @@ export class Overlay implements EngineUI {
     this.badge.hidden = this.unread === 0;
     this.badge.textContent = String(this.unread);
 
-    // couch corner (on the show)
-    const onShow = video && !!s;
+    // couch corner (on the show; not on a phone, where it covers too much of it)
+    const onShow = video && !!s && !IN_APP;
     this.couch.canvas.classList.toggle('hide', !onShow);
     if (s) {
       const meLeft = !s.leftId || s.leftId === s.me.id;

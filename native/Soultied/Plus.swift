@@ -229,47 +229,129 @@ extension View {
 
 /* ---------- the sheet ---------- */
 
+/// what Plus adds, as tiles: a picture, a name, a line
+private struct PlusFeature: Identifiable {
+    let id: String
+    let glyph: Glyph
+    let title: String
+    let line: String
+    /// the tile's picture sits on this
+    let tint: String
+
+    static var all: [PlusFeature] {
+        [
+            PlusFeature(id: "nights", glyph: Icons.tv, title: "Every movie night", line: "Netflix and Prime Video together, as often as you like.", tint: "#c4dcef"),
+            PlusFeature(id: "cams", glyph: Icons.camera, title: "See and hear each other", line: "Cameras, voice and karaoke night, on the website and the extension.", tint: "#ddd0ef"),
+            PlusFeature(id: "games", glyph: Icons.play, title: "All \(GameKind.allCases.count) games", line: "Coasters, Kitchen Rush, Paper Boats and the rest.", tint: "#cfe3b8"),
+            PlusFeature(id: "rooms", glyph: Icons.door, title: "All \(RoomId.allCases.count) escape rooms", line: "Every room behind the dark door, to solve together.", tint: "#f6e39a"),
+            PlusFeature(id: "hot", glyph: Icons.flame, title: "After dark, hot", line: "The bolder cards, once you’ve both picked Hot.", tint: "#f4c2bd"),
+            PlusFeature(id: "stitches", glyph: Icons.spool, title: "\(PlusRules.bonusStitches) stitches a month", line: "Extra to decorate your place with, every month.", tint: "#eadbbd"),
+        ]
+    }
+}
+
+/// the top of the sheet: the two of you on the couch, a show on, hearts going up
+private struct PlusHero: View {
+    let place: PlaceModel
+    @Environment(\.displayScale) private var displayScale
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var renderer = WatchRenderer()
+    @State private var start = Date()
+
+    /// the part of the room shown (room pixels): the TV, the lamp and the couch
+    private static let crop = (x: 48.0, y: 8.0, w: 224.0, h: 156.0)
+    private static let goingUp: [ReactionKind] = [.heart, .laugh, .heart, .star, .heart, .wow]
+
+    private func scene(_ reactions: [WatchReaction]) -> WatchState {
+        let mine = place.myLook
+        let theirs = place.theirLook ?? (place.me == place.hostId ? Wardrobe.defaultB : Wardrobe.defaultA)
+        return WatchState(left: mine, right: theirs, tv: .playing, reactions: reactions)
+    }
+
+    var body: some View {
+        GeometryReader { geo in
+            // whole screen pixels to a room pixel, as big as the crop fits across
+            let u = max(1, (geo.size.width * displayScale / CGFloat(Self.crop.w)).rounded(.down)) / displayScale
+            TimelineView(.animation(minimumInterval: 1.0 / 12, paused: reduceMotion)) { ctx in
+                let t = ctx.date.timeIntervalSince(start)
+                let now = ctx.date.timeIntervalSince1970 * 1000
+                // a reaction every couple of seconds, from one of you then the other
+                let k = Int(t / 1.6)
+                let ups = (max(0, k - 2)...k).map { i in
+                    WatchReaction(kind: Self.goingUp[i % Self.goingUp.count], seat: i % 2 == 0 ? .left : .right, t0: start.timeIntervalSince1970 * 1000 + Double(i) * 1600)
+                }
+                if let img = Pixels.image(renderer.render(scene(reduceMotion ? [] : ups), t, now: now)) {
+                    Image(decorative: img, scale: 1)
+                        .resizable()
+                        .interpolation(.none)
+                        .frame(width: CGFloat(WATCH_W) * u, height: CGFloat(WATCH_H) * u)
+                        .offset(x: (geo.size.width - CGFloat(Self.crop.w) * u) / 2 - CGFloat(Self.crop.x) * u, y: -CGFloat(Self.crop.y) * u)
+                }
+            }
+            .frame(width: geo.size.width, height: geo.size.height, alignment: .topLeading)
+            .clipped()
+        }
+        .aspectRatio(CGFloat(Self.crop.w / Self.crop.h), contentMode: .fit)
+        .background(Color.roomBrown)
+        .overlay(alignment: .topLeading) {
+            PixelTag(text: "Soultied Plus").padding(10)
+        }
+        .overlay(alignment: .bottomLeading) {
+            Text("Movie night, every night")
+                .font(.px(13, 700))
+                .foregroundStyle(Color.cream)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Color.ink.opacity(0.85))
+                .padding(10)
+        }
+        .padding(PX)
+        .background(NotchedFrame(notch: PX).fill(Color.ink))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("The two of you on the couch, watching a show, sending hearts")
+    }
+}
+
 struct PlusSheet: View {
     let place: PlaceModel
     var reason: PlusReason = .plain
     @State private var store = PlusStore.shared
     @State private var managing = false
+    /// the plan picked (the year, to start with)
+    @State private var yearly = true
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
 
     var body: some View {
+        ScrollViewReader { proxy in
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                PixelTag(text: "Soultied Plus")
-                Text(store.thanks ? "Thank you! Plus is on" : reason.title).font(.pxTitle).foregroundStyle(Color.inkSoft).fixedSize(horizontal: false, vertical: true)
-                Text(store.thanks ? "Everything below is open now, for both of you." : reason.line).font(.pxBody).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
+            VStack(alignment: .leading, spacing: 18) {
+                PlusHero(place: place)
 
-                VStack(alignment: .leading, spacing: 10) {
-                    ForEach(PlusRules.perks) { p in
-                        HStack(alignment: .top, spacing: 10) {
-                            GlyphView(glyph: Icons.heart, scale: 2).padding(.top, 3)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(p.title).font(.pxBodyBold).foregroundStyle(Color.inkSoft)
-                                Text(p.line).font(.pxSmall).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
-                            }
-                        }
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(store.thanks ? "Thank you! Plus is on" : reason.title == PlusReason.plain.title ? "Everything, for both of you" : reason.title)
+                        .font(.pxTitle).foregroundStyle(Color.inkSoft).fixedSize(horizontal: false, vertical: true)
+                    Text(store.thanks ? "Everything below is open now, for both of you." : reason.line)
+                        .font(.pxBody).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
+                }
+
+                features
+                both
+
+                Group {
+                    if place.hasPlus {
+                        on
+                    } else {
+                        plans
                     }
                 }
-                .padding(14)
-                .pxInset()
-
-                if place.hasPlus {
-                    on
-                } else if place.isDemo {
-                    Text("This is the demo room, so everything’s open to try. In your own place, either of you can get Plus, and it covers you both.")
-                        .font(.pxSmall).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
-                } else {
-                    plans
-                }
+                .id("plans")
 
                 if let p = store.problem {
                     Text(p).font(.pxSmall).foregroundStyle(Color.terracottaD).fixedSize(horizontal: false, vertical: true)
                 }
+
+                compare
 
                 HStack(spacing: 16) {
                     Button("Terms") { openURL(URL(string: "https://soultied.app/terms/")!) }
@@ -287,52 +369,200 @@ struct PlusSheet: View {
             }
             .padding(20)
         }
+        .onAppear {
+            // (the screenshots: down at the plans)
+            if Launch.args.contains("-plusPlans") {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1) { proxy.scrollTo("plans", anchor: .top) }
+            }
+        }
+        }
         .task { await store.load() }
         .onDisappear { store.thanks = false }
         .manageSubscriptionsSheet(isPresented: $managing)
     }
 
+    /* what's in it */
+
+    private var features: some View {
+        let all = PlusFeature.all
+        return Grid(horizontalSpacing: 12, verticalSpacing: 12) {
+            ForEach(0..<(all.count + 1) / 2, id: \.self) { r in
+                GridRow {
+                    tile(all[r * 2])
+                    if r * 2 + 1 < all.count { tile(all[r * 2 + 1]) } else { Color.clear }
+                }
+            }
+        }
+    }
+
+    private func tile(_ f: PlusFeature) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            GlyphView(glyph: f.glyph, scale: 3)
+                .frame(width: 46, height: 46)
+                .background(Color(hex: f.tint))
+                .overlay(Rectangle().strokeBorder(Color.ink, lineWidth: 2))
+            Text(f.title).font(.px(15, 700)).foregroundStyle(Color.inkSoft).fixedSize(horizontal: false, vertical: true)
+            Text(f.line).font(.px(12, 500)).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .pxBox(.paperHi)
+        .accessibilityElement(children: .combine)
+    }
+
+    /// one of you having it covers you both
+    private var both: some View {
+        HStack(spacing: 12) {
+            GlyphView(glyph: Icons.couch, scale: 3)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("One Plus, two of you").font(.px(15, 700)).foregroundStyle(Color.inkSoft)
+                Text("Whoever gets it, it covers you both, on the iPhone, the website and the extension.")
+                    .font(.px(12, 500)).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .pxBox(Color(hex: "#e3ebd5"))
+    }
+
+    /// free next to Plus
+    private var compare: some View {
+        VStack(spacing: 0) {
+            compareRow("", "Free", "Plus", header: true)
+            compareRow("Letters, YouTube, decor", "✓", "✓")
+            compareRow("Netflix and Prime nights", "\(PlusRules.freeNights) a month", "Every night")
+            compareRow("Games", "\(PlusRules.freeGames.count)", "All \(GameKind.allCases.count)")
+            compareRow("Escape rooms", "\(PlusRules.freeRooms.count)", "All \(RoomId.allCases.count)")
+            compareRow("Cameras and voice", "–", "✓")
+            compareRow("Hot cards", "–", "✓")
+            compareRow("Bonus stitches", "–", "\(PlusRules.bonusStitches) a month", last: true)
+        }
+        .pxInset()
+        .accessibilityElement(children: .contain)
+    }
+
+    private func compareRow(_ what: String, _ free: String, _ plus: String, header: Bool = false, last: Bool = false) -> some View {
+        HStack(spacing: 0) {
+            Text(what)
+                .font(.px(13, header ? 700 : 500))
+                .foregroundStyle(Color.inkSoft)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.leading, 10)
+            Text(free)
+                .font(.px(13, header ? 700 : 500))
+                .foregroundStyle(header ? Color.inkSoft : Color.muted)
+                .frame(width: 78)
+            Text(plus)
+                .font(.px(13, 700))
+                .foregroundStyle(header ? Color.cream : Color.terracottaD)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .frame(width: 96)
+                .frame(maxHeight: .infinity)
+                .background(header ? Color.terracotta : Color.terracotta.opacity(0.12))
+        }
+        .frame(minHeight: 34)
+        .overlay(alignment: .bottom) {
+            if !last { Rectangle().fill(Color.paperShade).frame(height: 1) }
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    /* the plans */
+
+    private var yearPrice: String { store.year?.displayPrice ?? PlusStore.usual.year }
+    private var monthPrice: String { store.month?.displayPrice ?? PlusStore.usual.month }
+    /// the year's price, a month at a time
+    private var yearMonthly: String { store.year.map { ($0.price / 12).formatted($0.priceFormatStyle) } ?? "$2.50" }
+    /// how much less the year costs than twelve months
+    private var saving: Int {
+        guard let y = store.year, let m = store.month, m.price > 0 else { return 37 }
+        let r = 1 - NSDecimalNumber(decimal: y.price).doubleValue / (NSDecimalNumber(decimal: m.price).doubleValue * 12)
+        return max(0, Int((r * 100).rounded(.down)))
+    }
+
+    private var plans: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            planCard(year: true)
+            planCard(year: false)
+            Button {
+                Haptics.tap()
+                guard !place.isDemo, let p = yearly ? store.year : store.month else { return }
+                Task { await store.buy(p) }
+            } label: {
+                VStack(spacing: 2) {
+                    Text(yearly && store.trial ? "Start 7 days free" : "Get Soultied Plus")
+                    Text(yearly ? (store.trial ? "then \(yearPrice) a year · cancel any time" : "\(yearPrice) a year · cancel any time") : "\(monthPrice) a month · cancel any time")
+                        .font(.px(12, 500)).opacity(0.85)
+                }
+            }
+            .buttonStyle(.px(.terracotta, wide: true))
+            .disabled(store.busy || (!place.isDemo && (yearly ? store.year : store.month) == nil))
+            if place.isDemo {
+                Text("This is the demo room, so everything’s open to try. In your own place, either of you can get Plus, and it covers you both.")
+                    .font(.pxSmall).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
+            }
+            if store.loading { Text("Asking the App Store for prices…").font(.pxTiny).foregroundStyle(Color.muted) }
+            Text(fineprint)
+                .font(.pxTiny).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func planCard(year: Bool) -> some View {
+        let picked = yearly == year
+        return Button {
+            Haptics.tap()
+            yearly = year
+        } label: {
+            HStack(spacing: 12) {
+                // (a pixel radio button)
+                ZStack {
+                    Rectangle().fill(picked ? Color.terracotta : Color.paperHi)
+                    if picked { Rectangle().fill(Color.cream).frame(width: 6, height: 6) }
+                }
+                .frame(width: 18, height: 18)
+                .overlay(Rectangle().strokeBorder(Color.ink, lineWidth: 2))
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 6) {
+                        Text(year ? "A year" : "A month").font(.px(16, 700)).foregroundStyle(Color.inkSoft)
+                        if year { PixelTag(text: "Save \(saving)%") }
+                    }
+                    Text(year ? (store.trial ? "7 days free, then \(yearPrice) a year" : "\(yearPrice) a year") : "\(monthPrice) a month")
+                        .font(.px(12, 500)).foregroundStyle(Color.muted)
+                }
+                Spacer(minLength: 4)
+                VStack(alignment: .trailing, spacing: 0) {
+                    Text(year ? yearMonthly : monthPrice).font(.px(17, 700)).foregroundStyle(Color.inkSoft)
+                    Text("a month").font(.px(11, 500)).foregroundStyle(Color.muted)
+                }
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(picked ? Color(hex: "#fbe6d6") : Color.paperHi)
+            .overlay(Rectangle().strokeBorder(picked ? Color.terracottaD : Color.paperShade, lineWidth: picked ? 3 : 2))
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(picked ? .isSelected : [])
+    }
+
     /// Plus is on: until when, and a way to manage an App Store subscription
     private var on: some View {
         VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                GlyphView(glyph: Icons.check, scale: 3)
+                Text("Plus is on for you both").font(.px(16, 700)).foregroundStyle(Color.sageD)
+            }
             if let until = place.plusUntil {
-                Text("On for you both until \(Date(timeIntervalSince1970: until / 1000).formatted(date: .long, time: .omitted)).")
-                    .font(.pxBodyBold).foregroundStyle(Color.sageD)
+                Text("Until \(Date(timeIntervalSince1970: until / 1000).formatted(date: .long, time: .omitted)).")
+                    .font(.pxSmall).foregroundStyle(Color.muted)
             }
             Button("Manage my subscription") { managing = true }
                 .buttonStyle(.px(.paper, small: true, wide: true))
         }
     }
 
-    private var plans: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Button {
-                if let y = store.year { Task { await store.buy(y) } }
-            } label: {
-                VStack(spacing: 2) {
-                    Text(store.trial ? "Start 7 days free" : "A year: \(store.year?.displayPrice ?? PlusStore.usual.year)")
-                    Text(store.trial ? "then \(store.year?.displayPrice ?? PlusStore.usual.year) a year · save 37%" : "save 37% on paying monthly")
-                        .font(.px(12, 500)).opacity(0.85)
-                }
-            }
-            .buttonStyle(.px(.terracotta, wide: true))
-            .disabled(store.year == nil || store.busy)
-
-            Button("A month: \(store.month?.displayPrice ?? PlusStore.usual.month)") {
-                if let m = store.month { Task { await store.buy(m) } }
-            }
-            .buttonStyle(.px(.paper, wide: true))
-            .disabled(store.month == nil || store.busy)
-
-            Text(fineprint)
-                .font(.pxTiny).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
-            if store.loading { Text("Asking the App Store for prices…").font(.pxTiny).foregroundStyle(Color.muted) }
-        }
-    }
-
     private var fineprint: String {
-        let year = store.year?.displayPrice ?? PlusStore.usual.year
-        let trial = store.trial ? "The first 7 days are free, then it’s \(year) a year unless you cancel before they end. " : ""
+        let trial = store.trial ? "The first 7 days are free, then it’s \(yearPrice) a year unless you cancel before they end. " : ""
         return "One of you subscribing covers you both. \(trial)Payment is charged to your Apple ID. It renews automatically for the same price and length unless you turn it off at least 24 hours before the period ends; manage or cancel any time in Settings › your name › Subscriptions."
     }
 }

@@ -212,6 +212,9 @@ jobs:
           shot looks -demo -tab us -looks
           # Soultied Plus: the sheet that sells it
           shot plus -demo -plus
+          shot plus-plans -demo -plus -plusPlans
+          # YouTube turned sideways: the TV, big
+          shot watch-sideways -demo -tab watch -service youtube -watch dQw4w9WgXcQ -sideways
           # the doodle pad (finer now), and the home-screen widgets as the app draws them
           shot wall-doodle -demo -open doodle
           shot widgets -widgets doodle

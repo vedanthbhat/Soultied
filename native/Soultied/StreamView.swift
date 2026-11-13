@@ -7,16 +7,17 @@ import SoultiedCore
 /*
  * Netflix and Prime Video together, on the iPhone: the site in a browser of the app's own, with the Soultied
  * extension's player code running in it (made by scripts/native-stream.mjs from extension/src), so the show
- * stays in step with your person (on their phone, or on a laptop with the extension) and the couch and the
- * chat sit over it, as on a laptop. SoultiedCore's StreamHub is the app's half: it hands the player who you
+ * stays in step with your person (on their phone, or on a laptop with the extension) and the chat and the
+ * reactions sit over it (not the little couch a laptop has: on a phone it covers too much of the show). SoultiedCore's StreamHub is the app's half: it hands the player who you
  * both are and carries everything along the place's "stream" line.
  *
  * It's meant to feel like part of the app, not a trip out to a website:
  * - the TV switches on (a Soultied curtain) while the site loads, and the browser stays warm between visits,
  *   so going back in is instant and you're where you left off;
- * - once the show plays it turns sideways and goes edge to edge, and the bar over it gets out of the way
- *   (tap the top of the screen to bring it back);
- * - the chat starts tucked away (the heart by the couch opens it), your person's actions buzz, and the sound
+ * - once the show plays it turns sideways and stays that way (no flipping back if the phone tilts), goes
+ *   edge to edge, and the bar over it gets out of the way (tap the top of the screen to bring it back; its
+ *   phone button turns it upright again);
+ * - the chat starts tucked away (the heart at the side opens it), your person's actions buzz, and the sound
  *   plays with the ring switch on silent, like any video app;
  * - "Join Rohan" (in Watch together) opens straight onto what they're watching.
  *
@@ -367,7 +368,10 @@ struct StreamView: View {
     /// the bar's showing (it gets out of the way while the show plays sideways)
     @State private var barShown = true
     @State private var barTimer: DispatchWorkItem?
-    @State private var turned = false
+    /// held sideways while the show plays
+    @State private var locked = false
+    /// you turned it upright yourself: it stays that way this time
+    @State private var upright = false
 
     private var sideways: Bool { vertical == .compact }
     private var hub: StreamHub? { deck.hub }
@@ -408,12 +412,13 @@ struct StreamView: View {
                 showBar(stay: true)
                 return
             }
-            // the show's on: sideways, edge to edge, and the bar steps aside
-            if !turned, !sideways, session?.site.isWatching(session?.url) == true || session?.page.video == true {
-                turned = true
-                Orientation.request(.landscapeRight)
-            }
+            // the show's on: sideways (and held there), edge to edge, and the bar steps aside
+            if !upright, session?.site.isWatching(session?.url) == true || session?.page.video == true { turnSideways() }
             hideBarSoon()
+        }
+        // off the show and back to the site's shelves: free to turn again
+        .onChange(of: session?.url) { _, url in
+            if locked, session?.site.isWatching(url) != true { letTurn() }
         }
         .onChange(of: sideways) { _, s in
             if s, session?.page.playing == true { hideBarSoon() } else { showBar(stay: true) }
@@ -423,6 +428,8 @@ struct StreamView: View {
     }
 
     private func open() {
+        // (any way up while the site's open; MainView's rule takes over again when this closes)
+        OrientationGate.shared.setCover(.allButUpsideDown)
         let h = deck.use(place)
         h.onOpenHub = { leave() }
         let s = deck.session(for: site, hub: h)
@@ -439,19 +446,41 @@ struct StreamView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 6) { liftCurtain() }
         // (the screenshots: turned sideways, as when a show starts)
         if Launch.args.contains("-sideways") {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                turned = true
-                Orientation.request(.landscapeRight)
-            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { turnSideways() }
         }
     }
 
-    /// back to the app: upright first, if the show turned the phone, so the screen behind doesn't flash sideways
-    private func leave() {
-        if turned {
-            turned = false
-            Orientation.request(.portrait)
+    /// sideways, and held there while the show plays
+    private func turnSideways() {
+        guard !locked else { return }
+        locked = true
+        OrientationGate.shared.setCover(.landscape)
+    }
+
+    /// free to turn either way again (it stays as it is until the phone turns)
+    private func letTurn() {
+        locked = false
+        OrientationGate.shared.setCover(.allButUpsideDown)
+    }
+
+    /// the bar's phone button: upright (and kept that way this time), or back to sideways
+    private func flip() {
+        Haptics.tap()
+        if sideways || locked {
+            upright = true
+            locked = false
+            OrientationGate.shared.setCover(.portrait)
+        } else {
+            upright = false
+            turnSideways()
         }
+    }
+
+    /// back to the app: the screen behind decides which way up (upright, unless it's a screen that turns),
+    /// before this goes, so it doesn't flash sideways
+    private func leave() {
+        locked = false
+        OrientationGate.shared.setCover(nil)
         dismiss()
     }
 
@@ -461,7 +490,8 @@ struct StreamView: View {
         barTimer?.cancel()
         try? AVAudioSession.sharedInstance().setCategory(.ambient, options: [.mixWithOthers])
         RecordDeck.shared.hush(false)
-        if turned { Orientation.request(.portrait) }
+        locked = false
+        OrientationGate.shared.setCover(nil)
     }
 
     private func liftCurtain() {
@@ -554,6 +584,13 @@ struct StreamView: View {
                     .lineLimit(1)
             }
             Button {
+                flip()
+            } label: {
+                GlyphView(glyph: sideways || locked ? Self.phoneUpright : Self.phoneSideways, scale: 2).frame(width: 24, height: 20)
+            }
+            .buttonStyle(.px(.paper, small: true))
+            .accessibilityLabel(sideways || locked ? "Turn upright" : "Turn sideways")
+            Button {
                 session?.reload()
             } label: {
                 Text(session?.loading == true ? "…" : "↻").font(.px(16, 700)).frame(width: 24)
@@ -565,6 +602,10 @@ struct StreamView: View {
         .padding(.vertical, sideways ? 4 : 8)
         .background(Color.ink)
     }
+
+    /// the phone button's two faces
+    private static let phoneUpright = Glyph(["kkkkk", "kwwwk", "kwwwk", "kwwwk", "kwwwk", "kwwwk", "kkkkk"], ["k": "#3a2a26", "w": "#c4dcef"])
+    private static let phoneSideways = Glyph(["kkkkkkk", "kwwwwwk", "kwwwwwk", "kwwwwwk", "kkkkkkk"], ["k": "#3a2a26", "w": "#c4dcef"])
 
     /// the same show (whatever the query says)
     private static func same(_ a: URL, _ b: URL) -> Bool { a.host == b.host && a.path == b.path }
@@ -597,7 +638,7 @@ struct StreamCurtain: View {
                         }
                 }
                 Text("Switching on \(site.name)…").font(.pxHeading).foregroundStyle(Color.paper)
-                Text("You’re still in Soultied: the two of you, the couch and the chat come along.")
+                Text("You’re still in Soultied: your person, the chat and the reactions come along.")
                     .font(.pxSmall)
                     .foregroundStyle(Color.paper.opacity(0.65))
                     .multilineTextAlignment(.center)
@@ -608,12 +649,62 @@ struct StreamCurtain: View {
     }
 }
 
-/// asks the phone to turn the screen (the show goes sideways when it starts)
+/// asks the phone to turn the screen
 enum Orientation {
     static func request(_ o: UIInterfaceOrientationMask) {
         guard let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first else { return }
         scene.requestGeometryUpdate(.iOS(interfaceOrientations: o)) { _ in }
-        scene.keyWindow?.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations()
+    }
+}
+
+/// Which ways the screen may turn, and the app's delegate asks it (Info.plist allows all three; this narrows
+/// it): the home screen's room and YouTube's big TV turn, a show from Netflix or Prime turns (and holds
+/// sideways while it plays), everything else stays upright. When what's allowed changes and the screen's the
+/// wrong way, it's turned.
+final class OrientationGate {
+    static let shared = OrientationGate()
+    /// what the screen under everything allows (MainView says, from the tab that's showing)
+    private(set) var base: UIInterfaceOrientationMask = .portrait
+    /// a full-screen thing's own say (the Netflix / Prime Video browser)
+    private(set) var cover: UIInterfaceOrientationMask?
+    var mask: UIInterfaceOrientationMask { cover ?? base }
+
+    func setBase(_ m: UIInterfaceOrientationMask) {
+        guard base != m else { return }
+        base = m
+        apply()
+    }
+
+    func setCover(_ m: UIInterfaceOrientationMask?) {
+        guard cover != m else { return }
+        cover = m
+        apply()
+    }
+
+    private func apply() {
+        guard let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first else { return }
+        for w in scene.windows {
+            var vc = w.rootViewController
+            while let v = vc {
+                v.setNeedsUpdateOfSupportedInterfaceOrientations()
+                vc = v.presentedViewController
+            }
+        }
+        let now: UIInterfaceOrientationMask
+        switch scene.interfaceOrientation {
+        case .landscapeLeft: now = .landscapeLeft
+        case .landscapeRight: now = .landscapeRight
+        case .portraitUpsideDown: now = .portraitUpsideDown
+        default: now = .portrait
+        }
+        if !mask.contains(now) { Orientation.request(mask.contains(.portrait) ? .portrait : .landscapeRight) }
+    }
+}
+
+/// the app's delegate: here only to say which ways the screen may turn
+final class AppDelegate: NSObject, UIApplicationDelegate {
+    func application(_ application: UIApplication, supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
+        OrientationGate.shared.mask
     }
 }
 

@@ -52,12 +52,23 @@ struct MainView: View {
     @State private var tour = Tour.shared
     @State private var covers = Covers.shared
     @State private var widgetLink = WidgetLink.shared
+    /// what Watch together's on (YouTube's TV turns sideways into a big screen)
+    @AppStorage("soultied_watch_service") private var watchService = WatchService.youtube.rawValue
     @Environment(\.verticalSizeClass) private var vertical
 
     private var sideways: Bool { vertical == .compact }
-    /// the phone's sideways with nothing full-screen up: the whole room. (A show playing sideways, or a game,
-    /// keeps the screen; the room only takes over once it's closed.)
-    private var roomSideways: Bool { sideways && covers.up == 0 && game == nil && !escape }
+    /// Home, turned sideways with nothing over it: the whole room
+    private var roomSideways: Bool { sideways && tab == .home && covers.up == 0 && game == nil && !escape }
+    /// Watch together's YouTube, turned sideways: the TV, big (WatchView), with no tab bar
+    private var tvSideways: Bool { sideways && tab == .watch && watchService == WatchService.youtube.rawValue && covers.up == 0 && game == nil && !escape }
+    /// which ways the screen may turn here: Home's room and YouTube's TV turn; the rest stays upright (a game,
+    /// an escape room); a show from Netflix or Prime has its own say (StreamView)
+    private var turns: UIInterfaceOrientationMask {
+        if covers.up > 0 || game != nil || escape { return .portrait }
+        if tab == .home { return .allButUpsideDown }
+        if tab == .watch && watchService == WatchService.youtube.rawValue { return .allButUpsideDown }
+        return .portrait
+    }
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -78,7 +89,7 @@ struct MainView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 // Soultied Plus, when something under the tabs asks for it (Plus.swift)
                 .plusSheet(place)
-                TabBar(tab: $tab, place: place)
+                if !tvSideways { TabBar(tab: $tab, place: place) }
             }
             .opacity(roomSideways ? 0 : 1)
             .allowsHitTesting(!roomSideways)
@@ -88,7 +99,7 @@ struct MainView: View {
                     .ignoresSafeArea()
             }
             Toasts(place: place, onHome: roomSideways || (tab == .home && sheet == nil), onLetter: { go(.letters) })
-                .padding(.bottom, roomSideways ? 12 : 84)
+                .padding(.bottom, roomSideways || tvSideways ? 12 : 84)
         }
         .fullScreenCover(isPresented: $escape) { EscapeScreen(place: place) }
         .sheet(item: $sheet) { s in
@@ -119,6 +130,8 @@ struct MainView: View {
         .onChange(of: place.ready) { _, _ in tour.offer(place: place) }
         // the home-screen widgets: keep them up to date, and open what a tap on one asks for (WidgetBridge.swift)
         .modifier(WidgetSync(place: place, link: widgetLink, open: openFromWidget))
+        // which ways the screen may turn (OrientationGate, StreamView.swift)
+        .modifier(TurnRule(mask: turns))
         .onChange(of: tour.active) { _, on in
             if on { tab = .home }
         }
@@ -468,5 +481,17 @@ struct TouchButtons: View {
             }
         }
         .disabled(!place.partnerHere)
+    }
+}
+
+/// tells OrientationGate which ways the screen under everything may turn, as it changes (RootView puts it
+/// back upright when you're not in your place)
+struct TurnRule: ViewModifier {
+    let mask: UIInterfaceOrientationMask
+
+    func body(content: Content) -> some View {
+        content
+            .onAppear { OrientationGate.shared.setBase(mask) }
+            .onChange(of: mask.rawValue) { _, _ in OrientationGate.shared.setBase(mask) }
     }
 }

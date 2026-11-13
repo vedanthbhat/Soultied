@@ -5,6 +5,8 @@ import SoultiedCore
 
 @main
 struct SoultiedApp: App {
+    // (only says which ways the screen may turn: OrientationGate, StreamView.swift)
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @State private var app: AppModel
 
     init() {
@@ -133,6 +135,8 @@ struct RootView: View {
         // signed out, or out of the place: the home-screen widgets go back to asking you to open the app
         .onChange(of: app.phase) { _, now in
             if now == .signedOut || now == .needsPlace { WidgetBridge.signedOut() }
+            // (the welcome and setting up your place stay upright; your place says for itself)
+            if now != .ready { OrientationGate.shared.setBase(.portrait) }
         }
     }
 }

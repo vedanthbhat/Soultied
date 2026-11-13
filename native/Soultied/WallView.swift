@@ -215,7 +215,7 @@ struct DoodlePanel: View {
                 }
             }
             HStack(spacing: 8) {
-                Button(size == 1 ? "Fine pen" : size == 2 ? "Medium pen" : "Thick pen") { size = size == 1 ? 2 : size == 2 ? 4 : 1 }
+                Button(size == 1 ? "Fine pen" : size == 2 ? "Mid pen" : "Thick pen") { size = size == 1 ? 2 : size == 2 ? 4 : 1 }
                     .buttonStyle(.px(.paper, small: true, wide: true))
                     .accessibilityHint("Changes how thick the pen draws")
                 Button("Undo") { if let last = history.popLast() { px = last } }.buttonStyle(.px(.paper, small: true, wide: true)).disabled(history.isEmpty)

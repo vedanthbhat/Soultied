@@ -52,37 +52,48 @@ struct WatchView: View {
     @State private var logListener: Listener?
     /// the line your person's Netflix / Prime player talks on (what they're watching, for "Join")
     @State private var deck = StreamDeck.shared
+    @Environment(\.verticalSizeClass) private var vertical
 
     private var service: WatchService { WatchService(rawValue: serviceRaw) ?? .youtube }
+    /// YouTube, turned sideways: just the TV (and the two of you), as big as it goes. (The room stays the same
+    /// view, so the video carries on rather than starting again.)
+    private var theater: Bool { vertical == .compact && service == .youtube && session != nil }
 
     var body: some View {
         GeometryReader { geo in
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
-                    DarkHeading(title: "Watch together", sub: service == .youtube ? "YouTube on both your TVs, in sync" : "\(service.name) on both your screens, in sync")
-                    picker
-                    joinCard
+                    if !theater {
+                        DarkHeading(title: "Watch together", sub: service == .youtube ? "YouTube on both your TVs, in sync" : "\(service.name) on both your screens, in sync")
+                        picker
+                        joinCard
+                    }
                     if let s = session {
                         if let site = service.site {
                             // (the way in sits on the TV, so it's on the first screen)
                             WatchRoomView(place: place, session: s, width: max(100, geo.size.width - 32), tv: .idle, showsPlayer: false, onTV: AnyView(openOnTV(site)))
                             streamPane(site)
                         } else {
-                            presence(s)
-                            WatchRoomView(place: place, session: s, width: max(100, geo.size.width - 32))
-                            controls(s)
-                            reactions(s)
-                            chat(s)
+                            if !theater { presence(s) }
+                            WatchRoomView(place: place, session: s, width: theater ? geo.size.width : max(100, geo.size.width - 32), height: theater ? geo.size.height : nil)
+                            if !theater {
+                                controls(s)
+                                reactions(s)
+                                chat(s)
+                            }
                         }
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
-                .padding(.bottom, 120)
+                .padding(.horizontal, theater ? 0 : 16)
+                .padding(.top, theater ? 0 : 8)
+                .padding(.bottom, theater ? 0 : 120)
             }
+            .scrollDisabled(theater)
             .scrollDismissesKeyboard(.interactively)
         }
-        .background(RoomBackground())
+        .ignoresSafeArea(edges: theater ? .all : [])
+        .background(theater ? AnyView(Color.black.ignoresSafeArea()) : AnyView(RoomBackground()))
+        .statusBarHidden(theater)
         .onAppear {
             guard session == nil else { return }
             let s = WatchSession(place: place)
@@ -95,6 +106,10 @@ struct WatchView: View {
             deck.use(place)
             demoPartnerWatching()
             if let v = Launch.service { serviceRaw = v }
+            // (the screenshots: YouTube's TV, turned sideways)
+            if place.isDemo, Launch.stream == nil, Launch.args.contains("-sideways") {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2) { Orientation.request(.landscapeRight) }
+            }
             if place.isDemo, let site = Launch.stream.flatMap(StreamSite.init) { streaming = StreamOpen(site: site, url: nil) }
         }
         .onDisappear {
@@ -323,7 +338,7 @@ struct WatchView: View {
     private func streamPane(_ site: StreamSite) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 8) {
-                Text("Pick a show and press play: it plays for \(place.theirName) too, in step, with the two of you on the couch in the corner. It turns sideways by itself when the show starts.")
+                Text("Pick a show and press play: it plays for \(place.theirName) too, in step, with your chat and reactions over it. It turns sideways by itself when the show starts.")
                     .font(.pxBody)
                     .foregroundStyle(Color.muted)
                     .fixedSize(horizontal: false, vertical: true)
@@ -400,6 +415,8 @@ struct WatchRoomView: View {
     var showsPlayer = true
     /// something to show on the TV's screen instead (the way into Netflix and Prime)
     var onTV: AnyView? = nil
+    /// sideways, the whole screen's height: just the TV and the tops of your heads, as big as they go
+    var height: CGFloat? = nil
     @Environment(\.displayScale) private var displayScale
     @State private var renderer = WatchRenderer()
     @State private var start = Date()
@@ -415,14 +432,24 @@ struct WatchRoomView: View {
         return st
     }
 
+    /// sideways (room pixels): the TV with a little wall round it, down to the tops of your heads
+    private static let big = (w: 200.0, top: 8.0, h: 128.0)
+
     /// screen points per room pixel: whole screen pixels each, as big as the TV and the couch fit across
-    private var u: CGFloat { max(1, (width * displayScale / CGFloat(Self.shown.w)).rounded(.down)) / displayScale }
+    /// (sideways, as big as the TV and your heads fit)
+    private var u: CGFloat {
+        if let height {
+            let k = min(width / CGFloat(Self.big.w), height / CGFloat(Self.big.h))
+            return max(1, (k * displayScale).rounded(.down)) / displayScale
+        }
+        return max(1, (width * displayScale / CGFloat(Self.shown.w)).rounded(.down)) / displayScale
+    }
 
     var body: some View {
         let W = width
         let u = self.u
         let ox = W / 2 - CGFloat(TV_SCREEN.x + TV_SCREEN.w / 2) * u
-        let oy = -CGFloat(Self.top) * u
+        let oy = height.map { ($0 - CGFloat(Self.big.h) * u) / 2 - CGFloat(Self.big.top) * u } ?? -CGFloat(Self.top) * u
         ZStack(alignment: .topLeading) {
             Color.roomBrown
             TimelineView(.animation(minimumInterval: 1.0 / 12)) { ctx in
@@ -446,9 +473,9 @@ struct WatchRoomView: View {
                     .offset(x: ox + CGFloat(TV_SCREEN.x) * u, y: oy + CGFloat(TV_SCREEN.y) * u)
             }
         }
-        .frame(width: W, height: (CGFloat(WATCH_H) - CGFloat(Self.top)) * u, alignment: .topLeading)
+        .frame(width: W, height: height ?? (CGFloat(WATCH_H) - CGFloat(Self.top)) * u, alignment: .topLeading)
         .clipped()
-        .overlay(Rectangle().stroke(Color.ink, lineWidth: 3))
+        .overlay(Rectangle().stroke(Color.ink, lineWidth: height == nil ? 3 : 0))
         .accessibilityElement(children: .contain)
         .accessibilityLabel(!showsPlayer || session.videoId != nil ? "The TV" : "The TV is off. Paste a YouTube link below to put something on.")
     }
@@ -546,7 +573,7 @@ final class YouTubeTV: WatchPlayer {
         }catch(e){}}
         function onYouTubeIframeAPIReady(){
           player=new YT.Player('p',{videoId:'\(id)',width:'100%',height:'100%',
-            playerVars:{start:\(Int(max(0, start))),playsinline:1,rel:0,autoplay:\(autoplay ? 1 : 0),origin:'https://soultied.app'},
+            playerVars:{start:\(Int(max(0, start))),playsinline:1,rel:0,fs:0,autoplay:\(autoplay ? 1 : 0),origin:'https://soultied.app'},
             events:{
               onReady:function(){ready=true;snap('ready')},
               onStateChange:function(){snap('state')},

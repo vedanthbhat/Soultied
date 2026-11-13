@@ -56,6 +56,8 @@ enum WidgetFont {
     static func px(_ size: CGFloat, bold: Bool = false) -> Font {
         var attrs: [UIFontDescriptor.AttributeName: Any] = [.name: "PixelifySans-Regular"]
         attrs[UIFontDescriptor.AttributeName(rawValue: kCTFontVariationAttribute as String)] = [0x7767_6874: bold ? 700 : 400]
+        // (no ligatures: the font's "fi" and "fl" would come out as one odd letter)
+        attrs[.featureSettings] = [[UIFontDescriptor.FeatureKey.type: kLigaturesType, UIFontDescriptor.FeatureKey.selector: kCommonLigaturesOffSelector]]
         let f = UIFont(descriptor: UIFontDescriptor(fontAttributes: attrs), size: size)
         let use = f.familyName == "Pixelify Sans" ? f : UIFont.systemFont(ofSize: size, weight: bold ? .bold : .regular)
         return Font(use as CTFont)
