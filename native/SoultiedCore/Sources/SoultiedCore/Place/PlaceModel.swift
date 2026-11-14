@@ -47,6 +47,8 @@ public final class PlaceModel {
     /// the notes and doodles up on the wall, newest first
     public internal(set) var notes: [Note] = []
     public internal(set) var photos: [Photo] = []
+    /// voice notes on the wall (newest first)
+    public internal(set) var voices: [VoiceNote] = []
     public internal(set) var memoryItems: [String: Memory] = [:]
     public internal(set) var activities: [Activity] = []
     public internal(set) var askItems: [String: Ask] = [:]
@@ -183,6 +185,10 @@ public final class PlaceModel {
             db.listen(prefixQuery("note-")) { [weak self] rows in
                 self?.notes = rows.compactMap { Note(id: $0.id, $0.data) }.sorted { $0.at > $1.at }
                 self?.loaded.insert("notes")
+            },
+            db.listen(prefixQuery("voice-")) { [weak self] rows in
+                self?.voices = rows.compactMap { VoiceNote(id: $0.id, $0.data) }.sorted { $0.at > $1.at }
+                self?.loaded.insert("voices")
             },
             db.listen(prefixQuery("photo-")) { [weak self] rows in
                 self?.photos = rows.compactMap { Photo(id: $0.id, $0.data) }.sorted { $0.at > $1.at }
@@ -695,6 +701,33 @@ public final class PlaceModel {
         // (your person's home-screen widget looks here for your latest doodle)
         if kind == .doodle, let ref { d["drew"] = [me: ["id": ref, "at": at]] }
         save(meta("board"), d, "wall")
+    }
+
+    /* ---------- voice notes ---------- */
+
+    /// the newest one your person left that you haven't heard
+    public var unheardVoiceNote: VoiceNote? { unheardVoice(voices, me: me, them: them) }
+
+    /// leave a voice note (AAC in MP4, as recorded); false if it's too big to send
+    @discardableResult
+    public func sendVoice(_ audio: Data, secs: Double, levels: [Double]) -> Bool {
+        let b64 = audio.base64EncodedString()
+        guard !audio.isEmpty, b64.utf8.count <= VOICE_MAX_CHARS else { return false }
+        let id = Values.newKey("voice-")
+        db.setLater(meta(id), VoiceNote.doc(by: me, secs: secs, audio: b64, peaks: peaksFrom(levels)), self)
+        pinned(.voice)
+        return true
+    }
+
+    /// you've heard it (the first time)
+    public func heardVoice(_ id: String) {
+        guard let v = voices.first(where: { $0.id == id }), v.heard[me] == nil else { return }
+        save(meta(id), ["heard": [me: Values.nowMs()]], "voice note")
+    }
+
+    /// take one of yours down
+    public func removeVoice(_ id: String) {
+        save(meta(id), ["gone": true, "audio": ""], "voice note")
     }
 
     public func pinNote(_ text: String, paper: Int) {

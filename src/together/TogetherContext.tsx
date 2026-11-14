@@ -63,10 +63,10 @@ interface TogetherValue {
   /** our wall: who pinned what last, and the picture in the frame over the couch */
   board: BoardDoc;
   /** what your person pinned since you last looked at the wall */
-  wallNews: { at: number; kind: 'text' | 'doodle' | 'photo' } | null;
+  wallNews: { at: number; kind: 'text' | 'doodle' | 'photo' | 'voice' } | null;
   markWallSeen: () => void;
   /** say you've just pinned something up (so your person sees there's something new) */
-  pinned: (kind: 'text' | 'doodle' | 'photo', ref?: string) => void;
+  pinned: (kind: 'text' | 'doodle' | 'photo' | 'voice', ref?: string) => void;
   /** hang a doodle or photo in the frame over the couch (null takes it down) */
   hangArt: (art: WallArt | null) => void;
 

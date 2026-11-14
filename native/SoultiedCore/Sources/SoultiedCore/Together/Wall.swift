@@ -59,7 +59,7 @@ func isHex(_ s: String) -> Bool {
     s.count == 7 && s.hasPrefix("#") && s.dropFirst().allSatisfy { $0.isHexDigit }
 }
 
-public enum PinKind: String, Sendable { case text, doodle, photo }
+public enum PinKind: String, Sendable { case text, doodle, photo, voice }
 
 public struct BoardDoc: Sendable, Equatable {
     /// when each of you last pinned something up

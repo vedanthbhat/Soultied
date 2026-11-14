@@ -256,7 +256,7 @@ struct WallCard: View {
                     Text("Our wall").font(.pxHeading).foregroundStyle(Color.inkSoft)
                     Spacer()
                     if let n = place.wallNews {
-                        Text("\(place.theirName) pinned \(n.kind == .photo ? "a photo" : n.kind == .doodle ? "a doodle" : "a note")")
+                        Text("\(place.theirName) \(n.kind == .voice ? "left a voice note" : "pinned \(n.kind == .photo ? "a photo" : n.kind == .doodle ? "a doodle" : "a note")")")
                             .font(.px(12, 700)).foregroundStyle(Color.cream)
                             .padding(.horizontal, 7).padding(.vertical, 3)
                             .background(Color.thread)

@@ -25,13 +25,14 @@ import {
 import { todayKey } from '../../letters/engine';
 import { DoodleImage, DoodlePad } from './DoodlePad';
 import { PhotosTab } from './PhotosTab';
+import { VoicesTab } from './VoicesTab';
 
 /**
  * Our wall: notes and doodles you pin up for each other, your photos, and the memories you keep.
  * Opened from the pictures over the couch (or the menu).
  */
 
-export type WallTab = 'notes' | 'doodle' | 'photos' | 'memories';
+export type WallTab = 'notes' | 'doodle' | 'photos' | 'voices' | 'memories';
 
 const Head: React.FC<{ who: UserProfile | null | undefined; size?: number }> = ({ who, size = 22 }) =>
   who ? (
@@ -414,6 +415,7 @@ export const WallPanel: React.FC<{ initialTab?: WallTab }> = ({ initialTab = 'no
     { id: 'notes', label: 'Notes' },
     { id: 'doodle', label: 'Doodle' },
     { id: 'photos', label: 'Photos' },
+    { id: 'voices', label: 'Voices' },
     { id: 'memories', label: 'Memories' },
   ];
 
@@ -452,6 +454,7 @@ export const WallPanel: React.FC<{ initialTab?: WallTab }> = ({ initialTab = 'no
           }}
         />
       )}
+      {tab === 'voices' && <VoicesTab me={currentUser} partnerName={partnerName} onPinned={() => pinned('voice')} />}
       {tab === 'photos' && <PhotosTab photos={photos} me={currentUser} partner={partnerUser} onHang={hangArt} onPinned={() => pinned('photo')} />}
       {tab === 'memories' && (
         <MemoriesTab

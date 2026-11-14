@@ -9,13 +9,14 @@ import SoultiedCore
  */
 
 enum WallTab: String, CaseIterable, Identifiable {
-    case notes = "Notes", doodle = "Doodle", photos = "Photos", memories = "Memories"
+    case notes = "Notes", doodle = "Doodle", photos = "Photos", voices = "Voices", memories = "Memories"
     var id: String { rawValue }
     var glyph: Glyph {
         switch self {
         case .notes: return Icons.pin
         case .doodle: return Icons.pencil
         case .photos: return Icons.camera
+        case .voices: return Icons.mic
         case .memories: return Icons.star
         }
     }
@@ -52,6 +53,7 @@ struct WallView: View {
                 case .notes: NotesPanel(place: place)
                 case .doodle: DoodlePanel(place: place) { tab = .notes }
                 case .photos: PhotosPanel(place: place)
+                case .voices: VoicesPanel(place: place)
                 case .memories: MemoriesPanel(place: place)
                 }
             }
@@ -60,7 +62,11 @@ struct WallView: View {
         }
         .scrollDismissesKeyboard(.interactively)
         .background(RoomBackground())
-        .onAppear { place.markWallSeen() }
+        .onAppear {
+            // (a voice note's the news: open on the voices; and the screenshots)
+            if place.wallNews?.kind == .voice || Launch.args.contains("-voices") { tab = .voices }
+            place.markWallSeen()
+        }
     }
 }
 

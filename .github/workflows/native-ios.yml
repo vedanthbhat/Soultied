@@ -237,6 +237,8 @@ jobs:
           # our list (on Us, and open)
           shot us-list -demo -tab us -scrollUs list
           shot bucket -demo -tab us -bucket
+          # voice notes on the wall (Rohan's, playing)
+          shot wall-voices -demo -open wall -voices -voicePlay
           ls -la "$RUNNER_TEMP/shots"
           echo "dev=$dev" >> "$GITHUB_OUTPUT"
 

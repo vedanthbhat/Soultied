@@ -34,7 +34,7 @@ export function normalizeArt(raw: unknown): WallArt | null {
 
 export interface BoardDoc {
   /** when each of you last pinned something up */
-  last: Record<string, { at: number; kind: 'text' | 'doodle' | 'photo' }>;
+  last: Record<string, { at: number; kind: 'text' | 'doodle' | 'photo' | 'voice' }>;
   /** when each of you last looked at the wall (your own clock) */
   seen: Record<string, number>;
   art: WallArt | null;
@@ -48,7 +48,7 @@ export function normalizeBoard(raw: unknown): BoardDoc {
   if (r.last && typeof r.last === 'object')
     for (const [uid, v] of Object.entries(r.last as Record<string, unknown>)) {
       const x = v as { at?: unknown; kind?: unknown } | null;
-      if (x && typeof x.at === 'number') last[uid] = { at: x.at, kind: x.kind === 'doodle' ? 'doodle' : x.kind === 'photo' ? 'photo' : 'text' };
+      if (x && typeof x.at === 'number') last[uid] = { at: x.at, kind: x.kind === 'doodle' ? 'doodle' : x.kind === 'photo' ? 'photo' : x.kind === 'voice' ? 'voice' : 'text' };
     }
   const seen: Record<string, number> = {};
   if (r.seen && typeof r.seen === 'object') for (const [uid, at] of Object.entries(r.seen as Record<string, unknown>)) if (typeof at === 'number') seen[uid] = at;

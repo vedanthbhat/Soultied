@@ -32,6 +32,7 @@ import { SNAP_PROMPTS, normalizeSnap, snapPrompt, snapStage } from '../src/toget
 import { type RecapInput, monthRecap, recapMonth } from '../src/together/recap';
 import { aheadLine, apartKm, apartLabel, distanceKm, normalizeWhere } from '../src/together/where';
 import { BUCKET_IDEAS, bucketOverflow, bucketView, cleanText, normalizeBucket, plannedLine } from '../src/together/bucket';
+import { normalizeVoice, peaksFrom, unheardVoice, voiceLength } from '../src/together/voice';
 import { renderCharacterBack } from '../src/pixel/characterBack';
 import { DEMO_DOODLE, OLD_DOODLE_H, OLD_DOODLE_W, DOODLE_H, DOODLE_W, doodleArt, fullDoodle, smallDoodle } from '../src/together/board';
 
@@ -618,6 +619,29 @@ const buckets = {
   clean: ['', '  hi  ', 'a\tb\n\nc', 'x'.repeat(85), '😀'.repeat(81), ' é '.repeat(30), 'mixed 😀 text '.repeat(8)].map((s) => [s, cleanText(s)]),
 };
 
+// voice notes: what's kept (and what isn't), the loudness bars, and how long they say they are
+const voiceRaws: Array<[string, unknown]> = [
+  ['voice-a', { by: 'u2', at: 500, secs: 6.06, mime: 'audio/mp4', audio: 'AAAAHGZ0eXBNNEEg', peaks: '123456789', heard: { u1: 700, u3: 'x' } }],
+  ['voice-b', { by: 'u2', at: 900, secs: 61.3, mime: 'audio/mp4;codecs=mp4a.40.2', audio: 'QUJD', peaks: '12a' }],
+  ['voice-c', { by: 'u1', at: 800, secs: -2, mime: 'AUDIO/X-M4A', audio: 'QUJDRA==' }],
+  ['voice-d', { by: 'u2', at: 950, mime: 'audio/webm', audio: 'QUJD' }],
+  ['voice-e', { by: 'u2', at: 960, mime: 'audio/mp4', audio: 'QU JD' }],
+  ['voice-f', { by: 'u2', at: 970, mime: 'audio/mp4', audio: 'QUJD===' }],
+  ['voice-g', { by: 'u2', at: 980, gone: true, audio: '' }],
+  ['voice-h', { by: '', mime: 'audio/mp4', audio: 'QUJD' }],
+  ['voice-i', { by: 'u2', at: 'soon', secs: 'long', mime: 'audio/aac', audio: 'QUJD', peaks: '0'.repeat(65) }],
+  ['voice-j', null],
+  ['voice-k', { by: 'u2', at: 990, mime: 'audio/mp4', audio: 'A'.repeat(420_001) }],
+];
+const voiceDocs = voiceRaws.map(([id, raw]) => ({ id, raw: id === 'voice-k' ? { ...(raw as object), audio: 'long' } : raw, long: id === 'voice-k', voice: normalizeVoice(id, raw) }));
+const kept = voiceRaws.map(([id, raw]) => normalizeVoice(id, raw)).filter((v): v is NonNullable<typeof v> => !!v);
+const voices = {
+  docs: voiceDocs,
+  unheard: [unheardVoice(kept, 'u1', 'u2')?.id ?? null, unheardVoice(kept, 'u3', 'u2')?.id ?? null, unheardVoice(kept, 'u2', 'u1')?.id ?? null, unheardVoice(kept, 'u1', null)?.id ?? null],
+  peaks: [[] as number[], [0, 0, 0], [0.5], [0.1, 0.2, 0.3], ...Array.from({ length: 30 }, () => Array.from({ length: 1 + int(700) }, () => (int(5) === 0 ? 0 : int(10000) / 20000)))].map((l) => [l, peaksFrom(l), peaksFrom(l, 8)]),
+  lengths: [0, 0.4, 0.5, 6.06, 59.5, 60, 61, 125.2].map((s) => [s, voiceLength(s)]),
+};
+
 const out = process.argv[2] || 'native-fixtures.json';
-writeFileSync(out, JSON.stringify({ cards, days, hashes, rngSeq, streaks, demo, same, chapters, games, live, doodle: { judges, brushes, fills, choices, games: doodles }, coasters: coasterSteps, escape, record, watch: { looks, ...watch }, wall: { doodles: wallDoodles }, room: { scenes: roomScenes, fires, visits }, snaps, recaps: { cases: recaps, months: recapMonths }, wheres, buckets }));
+writeFileSync(out, JSON.stringify({ cards, days, hashes, rngSeq, streaks, demo, same, chapters, games, live, doodle: { judges, brushes, fills, choices, games: doodles }, coasters: coasterSteps, escape, record, watch: { looks, ...watch }, wall: { doodles: wallDoodles }, room: { scenes: roomScenes, fires, visits }, snaps, recaps: { cases: recaps, months: recapMonths }, wheres, buckets, voices }));
 console.log(`wrote ${cards.length} card days, ${streaks.length} streaks, ${demo.length} demo rooms, ${games.length} game moves, ${live.length} live games, ${doodles.length} doodle moves to ${out}`);

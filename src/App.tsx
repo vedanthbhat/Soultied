@@ -164,14 +164,14 @@ const Home: React.FC = () => {
   const together = useTogether();
   const { asks, myMood, theirMood, roomTouch, touchNews, moodNews, lastSent, board, wallNews, snap } = together;
   // which part of the wall opens (the photos, for today's photo)
-  const [wallTab, setWallTab] = useState<'notes' | 'photos'>('notes');
+  const [wallTab, setWallTab] = useState<'notes' | 'photos' | 'voices'>('notes');
   // "they took today's photo": once you've said later, not again today
   const [snapLater, setSnapLater] = useState('');
   const snapNote = !!partnerUser && snap.stage === 'theirs' && snapLater !== snap.day;
   // holding the couch: their hold shows a note with a cushion to hold back; both holding, you sit side by side
   const { hold } = together;
   const holdNote = !!partnerUser && (hold.theirs || hold.mine);
-  const pinnedWhat = wallNews ? (wallNews.kind === 'doodle' ? 'a doodle' : wallNews.kind === 'photo' ? 'a photo' : 'a note') : '';
+  const pinnedWhat = wallNews ? (wallNews.kind === 'doodle' ? 'a doodle' : wallNews.kind === 'photo' ? 'a photo' : wallNews.kind === 'voice' ? 'a voice note' : 'a note') : '';
   const [joinCode] = useState(readJoinCode);
   const [welcomeOpen, setWelcomeOpen] = useState(() => !setupComplete || !!joinCode);
   const [draftSeats, setDraftSeats] = useState<{ left: Seat; right: Seat } | null>(null);
@@ -516,8 +516,14 @@ const Home: React.FC = () => {
             <span className="text-sm leading-snug flex-1 min-w-[180px]">
               {partnerUser.name} pinned {pinnedWhat} up on the wall for you.
             </span>
-            <button className="px-btn px-btn--sage px-btn--small" onClick={() => openPanel('wall')}>
-              Look
+            <button
+              className="px-btn px-btn--sage px-btn--small"
+              onClick={() => {
+                setWallTab(wallNews.kind === 'voice' ? 'voices' : wallNews.kind === 'photo' ? 'photos' : 'notes');
+                openPanel('wall');
+              }}
+            >
+              {wallNews.kind === 'voice' ? 'Listen' : 'Look'}
             </button>
             <button className="px-btn px-btn--paper px-btn--small" aria-label="Not now" onClick={together.markWallSeen}>
               Later

@@ -43,6 +43,8 @@ public enum Demo {
         db.seed("\(p)/meta/touch", ["items": Doc(), "seen": Doc()])
         // Rohan's taken today's photo (the view from his window)
         db.seed("\(p)/meta/\(snapDocName(today))", ["by": [them: ["photo": DEMO_SNAP_PHOTO, "w": 384, "h": 288, "caption": "from my window, just now", "at": nowMs - 50 * 60e3] as Doc]])
+        // Rohan hummed you a little tune
+        db.seed("\(p)/meta/voice-demo-1", ["by": them, "at": nowMs - 5 * 3600e3, "secs": 6.1, "mime": "audio/mp4", "audio": DEMO_VOICE_AUDIO, "peaks": peaksFrom(DEMO_VOICE_LEVELS), "heard": Doc(), "gone": false])
         // their list, with three things planned for Goa
         db.seed("\(p)/meta/bucket", demoBucket(now: nowMs))
         // Aanya in Bengaluru, Rohan in London
