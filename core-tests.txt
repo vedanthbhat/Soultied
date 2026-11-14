@@ -1,0 +1,335 @@
+Building for debugging...
+[0/15] /Users/runner/work/Soultied/Soultied/native/SoultiedCore/.build/arm64-apple-macosx/debug/SoultiedCorePackageTests.derived/runner.swift
+[1/15] Write sources
+[1/15] Write render-check-entitlement.plist
+[1/15] Copying decks.json
+[4/15] Copying README.md
+[5/15] Copying escape.json
+[6/15] Write sources
+[9/15] Write swift-version-7974D3F7F03D5E95.txt
+[11/48] Compiling SoultiedCore TurnGames.swift
+[12/48] Compiling SoultiedCore Cards.swift
+[13/48] Compiling SoultiedCore Engine.swift
+[14/48] Compiling SoultiedCore Letters.swift
+[15/48] Compiling SoultiedCore Character.swift
+[16/48] Compiling SoultiedCore Icons.swift
+[17/48] Compiling SoultiedCore PixelBuffer.swift
+[18/48] Compiling SoultiedCore Room.swift
+[19/48] Compiling SoultiedCore RoomLive.swift
+[20/48] Compiling SoultiedCore RoomStatic.swift
+[21/48] Compiling SoultiedCore AppModel.swift
+[22/48] Compiling SoultiedCore Demo.swift
+[23/48] Compiling SoultiedCore Place.swift
+[24/48] Compiling SoultiedCore PlaceModel.swift
+[25/48] Compiling SoultiedCore Plus.swift
+[26/48] Compiling SoultiedCore Asks.swift
+[27/64] Emitting module SoultiedCore
+[28/64] Compiling SoultiedCore Backend.swift
+[29/64] Compiling SoultiedCore MemoryBackend.swift
+[30/64] Compiling SoultiedCore Escape.swift
+[31/64] Compiling SoultiedCore EscapeRooms.swift
+[32/64] Compiling SoultiedCore EscapeScene.swift
+[33/64] Compiling SoultiedCore EscapeSession.swift
+[34/64] Compiling SoultiedCore Carrom.swift
+[35/64] Compiling SoultiedCore Chess.swift
+[36/64] Compiling SoultiedCore Coasters.swift
+[37/64] Compiling SoultiedCore DoodleGuess.swift
+[38/64] Compiling SoultiedCore DoodleSession.swift
+[39/64] Compiling SoultiedCore Games.swift
+[40/64] Compiling SoultiedCore Kitchen.swift
+[41/64] Compiling SoultiedCore Live.swift
+[42/64] Compiling SoultiedCore LiveGames.swift
+[43/64] Compiling SoultiedCore Ludo.swift
+[44/64] Compiling SoultiedCore Bucket.swift
+[45/64] Compiling SoultiedCore Couch.swift
+[46/64] Compiling SoultiedCore Hold.swift
+[47/64] Compiling SoultiedCore Moods.swift
+[48/64] Compiling SoultiedCore Recap.swift
+[49/64] Compiling SoultiedCore Snap.swift
+[50/64] Compiling SoultiedCore Turntable.swift
+[51/64] Compiling SoultiedCore Visit.swift
+[52/64] Compiling SoultiedCore Voice.swift
+[53/64] Compiling SoultiedCore VoiceDemo.swift
+[54/64] Compiling SoultiedCore Wall.swift
+[55/64] Compiling SoultiedCore Where.swift
+[56/64] Compiling SoultiedCore StreamHub.swift
+[57/64] Compiling SoultiedCore WatchScene.swift
+[58/64] Compiling SoultiedCore WatchSession.swift
+[59/64] Compiling SoultiedCore resource_bundle_accessor.swift
+[60/81] Compiling render_check main.swift
+[61/81] Emitting module render_check
+[61/81] Write Objects.LinkFileList
+[62/81] Linking render-check
+[63/81] Applying render-check
+[65/81] Compiling SoultiedCoreTests LiveTests.swift
+[66/81] Compiling SoultiedCoreTests PlaceTests.swift
+[67/81] Compiling SoultiedCoreTests PlusTests.swift
+[68/81] Compiling SoultiedCoreTests RecapTests.swift
+[69/81] Compiling SoultiedCoreTests RoomSceneTests.swift
+[70/81] Compiling SoultiedCoreTests Smoke.swift
+[71/81] Compiling SoultiedCoreTests SnapTests.swift
+[72/88] Emitting module SoultiedCoreTests
+[73/88] Compiling SoultiedCoreTests BucketTests.swift
+[74/88] Compiling SoultiedCoreTests CoastersTests.swift
+[75/88] Compiling SoultiedCoreTests DoodleGuessTests.swift
+[76/88] Compiling SoultiedCoreTests EscapeTests.swift
+[77/88] Compiling SoultiedCoreTests GamesTests.swift
+[78/88] Compiling SoultiedCoreTests HoldTests.swift
+[79/88] Compiling SoultiedCoreTests LettersTests.swift
+[80/88] Compiling SoultiedCoreTests StreamHubTests.swift
+[81/88] Compiling SoultiedCoreTests TurntableTests.swift
+[82/88] Compiling SoultiedCoreTests VisitTests.swift
+[83/88] Compiling SoultiedCoreTests VoiceTests.swift
+[84/88] Compiling SoultiedCoreTests WatchSceneTests.swift
+[85/88] Compiling SoultiedCoreTests WatchSessionTests.swift
+[86/88] Compiling SoultiedCoreTests WhereTests.swift
+[87/90] Compiling SoultiedCorePackageTests runner.swift
+[88/90] Emitting module SoultiedCorePackageTests
+[88/90] Write Objects.LinkFileList
+[89/90] Linking SoultiedCorePackageTests
+Build complete! (57.57s)
+Test Suite 'All tests' started at 2026-11-14 15:50:05.308.
+Test Suite 'SoultiedCorePackageTests.xctest' started at 2026-11-14 15:50:05.315.
+Test Suite 'BucketTests' started at 2026-11-14 15:50:05.315.
+Test Case '-[SoultiedCoreTests.BucketTests testIdeasAndTidying]' started.
+Test Case '-[SoultiedCoreTests.BucketTests testIdeasAndTidying]' passed (0.215 seconds).
+Test Case '-[SoultiedCoreTests.BucketTests testKeptAndOrderedTheSame]' started.
+Test Case '-[SoultiedCoreTests.BucketTests testKeptAndOrderedTheSame]' passed (0.005 seconds).
+Test Case '-[SoultiedCoreTests.BucketTests testTheDemoList]' started.
+Test Case '-[SoultiedCoreTests.BucketTests testTheDemoList]' passed (0.000 seconds).
+Test Suite 'BucketTests' passed at 2026-11-14 15:50:05.536.
+	 Executed 3 tests, with 0 failures (0 unexpected) in 0.220 (0.222) seconds
+Test Suite 'CoastersTests' started at 2026-11-14 15:50:05.537.
+Test Case '-[SoultiedCoreTests.CoastersTests testReachAndGoal]' started.
+Test Case '-[SoultiedCoreTests.CoastersTests testReachAndGoal]' passed (0.001 seconds).
+Test Case '-[SoultiedCoreTests.CoastersTests testTableMatchesTheWebsite]' started.
+Test Case '-[SoultiedCoreTests.CoastersTests testTableMatchesTheWebsite]' passed (0.907 seconds).
+Test Suite 'CoastersTests' passed at 2026-11-14 15:50:06.444.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.907 (0.908) seconds
+Test Suite 'DoodleGuessTests' started at 2026-11-14 15:50:06.444.
+Test Case '-[SoultiedCoreTests.DoodleGuessTests testBrushBucketAndWords]' started.
+Test Case '-[SoultiedCoreTests.DoodleGuessTests testBrushBucketAndWords]' passed (0.106 seconds).
+Test Case '-[SoultiedCoreTests.DoodleGuessTests testGamesMatchTheWebsite]' started.
+Test Case '-[SoultiedCoreTests.DoodleGuessTests testGamesMatchTheWebsite]' passed (0.089 seconds).
+Test Case '-[SoultiedCoreTests.DoodleGuessTests testJudgingGuesses]' started.
+Test Case '-[SoultiedCoreTests.DoodleGuessTests testJudgingGuesses]' passed (0.016 seconds).
+Test Case '-[SoultiedCoreTests.DoodleGuessTests testRoundByHand]' started.
+Test Case '-[SoultiedCoreTests.DoodleGuessTests testRoundByHand]' passed (0.002 seconds).
+Test Suite 'DoodleGuessTests' passed at 2026-11-14 15:50:06.657.
+	 Executed 4 tests, with 0 failures (0 unexpected) in 0.212 (0.213) seconds
+Test Suite 'DoodleSessionTests' started at 2026-11-14 15:50:06.657.
+Test Case '-[SoultiedCoreTests.DoodleSessionTests testTwoPhonesDrawAndGuess]' started.
+Test Case '-[SoultiedCoreTests.DoodleSessionTests testTwoPhonesDrawAndGuess]' passed (4.660 seconds).
+Test Suite 'DoodleSessionTests' passed at 2026-11-14 15:50:11.318.
+	 Executed 1 test, with 0 failures (0 unexpected) in 4.660 (4.660) seconds
+Test Suite 'EscapeSessionTests' started at 2026-11-14 15:50:11.318.
+Test Case '-[SoultiedCoreTests.EscapeSessionTests testBothHalvesOnOneScreen]' started.
+Test Case '-[SoultiedCoreTests.EscapeSessionTests testBothHalvesOnOneScreen]' passed (0.043 seconds).
+Test Case '-[SoultiedCoreTests.EscapeSessionTests testTwoDevicesEscapeTheAttic]' started.
+Test Case '-[SoultiedCoreTests.EscapeSessionTests testTwoDevicesEscapeTheAttic]' passed (3.000 seconds).
+Test Suite 'EscapeSessionTests' passed at 2026-11-14 15:50:14.361.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 3.043 (3.044) seconds
+Test Suite 'EscapeTests' started at 2026-11-14 15:50:14.361.
+Test Case '-[SoultiedCoreTests.EscapeTests testAnswers]' started.
+Test Case '-[SoultiedCoreTests.EscapeTests testAnswers]' passed (0.001 seconds).
+Test Case '-[SoultiedCoreTests.EscapeTests testEventsRoundTrip]' started.
+Test Case '-[SoultiedCoreTests.EscapeTests testEventsRoundTrip]' passed (0.000 seconds).
+Test Case '-[SoultiedCoreTests.EscapeTests testPaintingsMatchTheWebsite]' started.
+Test Case '-[SoultiedCoreTests.EscapeTests testPaintingsMatchTheWebsite]' passed (13.937 seconds).
+Test Case '-[SoultiedCoreTests.EscapeTests testProgressMerges]' started.
+Test Case '-[SoultiedCoreTests.EscapeTests testProgressMerges]' passed (0.000 seconds).
+Test Case '-[SoultiedCoreTests.EscapeTests testRoomsLoad]' started.
+Test Case '-[SoultiedCoreTests.EscapeTests testRoomsLoad]' passed (0.004 seconds).
+Test Case '-[SoultiedCoreTests.EscapeTests testSaveRoundTrip]' started.
+Test Case '-[SoultiedCoreTests.EscapeTests testSaveRoundTrip]' passed (0.003 seconds).
+Test Suite 'EscapeTests' passed at 2026-11-14 15:50:28.308.
+	 Executed 6 tests, with 0 failures (0 unexpected) in 13.945 (13.946) seconds
+Test Suite 'GamesTests' started at 2026-11-14 15:50:28.308.
+Test Case '-[SoultiedCoreTests.GamesTests testCarromPhysicsMatchesTheWebsite]' started.
+Test Case '-[SoultiedCoreTests.GamesTests testCarromPhysicsMatchesTheWebsite]' passed (0.117 seconds).
+Test Case '-[SoultiedCoreTests.GamesTests testCarromRules]' started.
+Test Case '-[SoultiedCoreTests.GamesTests testCarromRules]' passed (0.041 seconds).
+Test Case '-[SoultiedCoreTests.GamesTests testChessRules]' started.
+Test Case '-[SoultiedCoreTests.GamesTests testChessRules]' passed (7.145 seconds).
+Test Case '-[SoultiedCoreTests.GamesTests testLanternsOpeningAndPass]' started.
+Test Case '-[SoultiedCoreTests.GamesTests testLanternsOpeningAndPass]' passed (0.003 seconds).
+Test Case '-[SoultiedCoreTests.GamesTests testLudoRules]' started.
+Test Case '-[SoultiedCoreTests.GamesTests testLudoRules]' passed (0.001 seconds).
+Test Case '-[SoultiedCoreTests.GamesTests testMatchRoundTripsAndWhoseMove]' started.
+Test Case '-[SoultiedCoreTests.GamesTests testMatchRoundTripsAndWhoseMove]' passed (0.003 seconds).
+Test Case '-[SoultiedCoreTests.GamesTests testMovesAndPartnerMatchTheWebsite]' started.
+Test Case '-[SoultiedCoreTests.GamesTests testMovesAndPartnerMatchTheWebsite]' passed (6.035 seconds).
+Test Suite 'GamesTests' passed at 2026-11-14 15:50:41.655.
+	 Executed 7 tests, with 0 failures (0 unexpected) in 13.345 (13.347) seconds
+Test Suite 'HoldTests' started at 2026-11-14 15:50:41.655.
+Test Case '-[SoultiedCoreTests.HoldTests testTheDocument]' started.
+Test Case '-[SoultiedCoreTests.HoldTests testTheDocument]' passed (0.001 seconds).
+Test Case '-[SoultiedCoreTests.HoldTests testWhoIsHolding]' started.
+Test Case '-[SoultiedCoreTests.HoldTests testWhoIsHolding]' passed (0.001 seconds).
+Test Suite 'HoldTests' passed at 2026-11-14 15:50:41.657.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.001 (0.002) seconds
+Test Suite 'LettersTests' started at 2026-11-14 15:50:41.657.
+Test Case '-[SoultiedCoreTests.LettersTests testAloudAndTalk]' started.
+Test Case '-[SoultiedCoreTests.LettersTests testAloudAndTalk]' passed (0.001 seconds).
+Test Case '-[SoultiedCoreTests.LettersTests testCardsFor]' started.
+Test Case '-[SoultiedCoreTests.LettersTests testCardsFor]' passed (0.256 seconds).
+Test Case '-[SoultiedCoreTests.LettersTests testDailyIsAllTaps]' started.
+Test Case '-[SoultiedCoreTests.LettersTests testDailyIsAllTaps]' passed (0.003 seconds).
+Test Case '-[SoultiedCoreTests.LettersTests testDays]' started.
+Test Case '-[SoultiedCoreTests.LettersTests testDays]' passed (0.008 seconds).
+Test Case '-[SoultiedCoreTests.LettersTests testDecks]' started.
+Test Case '-[SoultiedCoreTests.LettersTests testDecks]' passed (0.001 seconds).
+Test Case '-[SoultiedCoreTests.LettersTests testHashAndRng]' started.
+Test Case '-[SoultiedCoreTests.LettersTests testHashAndRng]' passed (0.000 seconds).
+Test Case '-[SoultiedCoreTests.LettersTests testSameAndChapters]' started.
+Test Case '-[SoultiedCoreTests.LettersTests testSameAndChapters]' passed (0.000 seconds).
+Test Case '-[SoultiedCoreTests.LettersTests testScoresAndJourney]' started.
+Test Case '-[SoultiedCoreTests.LettersTests testScoresAndJourney]' passed (0.035 seconds).
+Test Case '-[SoultiedCoreTests.LettersTests testStreaks]' started.
+Test Case '-[SoultiedCoreTests.LettersTests testStreaks]' passed (0.109 seconds).
+Test Suite 'LettersTests' passed at 2026-11-14 15:50:42.073.
+	 Executed 9 tests, with 0 failures (0 unexpected) in 0.414 (0.416) seconds
+Test Suite 'LiveRulesTests' started at 2026-11-14 15:50:42.074.
+Test Case '-[SoultiedCoreTests.LiveRulesTests testInvitationAndResult]' started.
+Test Case '-[SoultiedCoreTests.LiveRulesTests testInvitationAndResult]' passed (0.002 seconds).
+Test Case '-[SoultiedCoreTests.LiveRulesTests testKitchenBurnsAndMisses]' started.
+Test Case '-[SoultiedCoreTests.LiveRulesTests testKitchenBurnsAndMisses]' passed (0.002 seconds).
+Test Case '-[SoultiedCoreTests.LiveRulesTests testRulesBits]' started.
+Test Case '-[SoultiedCoreTests.LiveRulesTests testRulesBits]' passed (0.001 seconds).
+Test Case '-[SoultiedCoreTests.LiveRulesTests testRulesMatchTheWebsite]' started.
+Test Case '-[SoultiedCoreTests.LiveRulesTests testRulesMatchTheWebsite]' passed (0.245 seconds).
+Test Suite 'LiveRulesTests' passed at 2026-11-14 15:50:42.324.
+	 Executed 4 tests, with 0 failures (0 unexpected) in 0.250 (0.251) seconds
+Test Suite 'LiveSessionTests' started at 2026-11-14 15:50:42.324.
+Test Case '-[SoultiedCoreTests.LiveSessionTests testDemoPartnerPlaysPaperScissorsStone]' started.
+Test Case '-[SoultiedCoreTests.LiveSessionTests testDemoPartnerPlaysPaperScissorsStone]' passed (0.834 seconds).
+Test Case '-[SoultiedCoreTests.LiveSessionTests testTwoPhonesPlayQuickDrawAndOneWalksAway]' started.
+Test Case '-[SoultiedCoreTests.LiveSessionTests testTwoPhonesPlayQuickDrawAndOneWalksAway]' passed (1.087 seconds).
+Test Case '-[SoultiedCoreTests.LiveSessionTests testTwoPhonesPlayTugOfWar]' started.
+Test Case '-[SoultiedCoreTests.LiveSessionTests testTwoPhonesPlayTugOfWar]' passed (1.019 seconds).
+Test Suite 'LiveSessionTests' passed at 2026-11-14 15:50:45.265.
+	 Executed 3 tests, with 0 failures (0 unexpected) in 2.940 (2.941) seconds
+Test Suite 'ModelTests' started at 2026-11-14 15:50:45.265.
+Test Case '-[SoultiedCoreTests.ModelTests testDoodleSizes]' started.
+Test Case '-[SoultiedCoreTests.ModelTests testDoodleSizes]' passed (0.139 seconds).
+Test Case '-[SoultiedCoreTests.ModelTests testPhotoArt]' started.
+Test Case '-[SoultiedCoreTests.ModelTests testPhotoArt]' passed (0.026 seconds).
+Test Case '-[SoultiedCoreTests.ModelTests testTouchSummaryAndDecor]' started.
+Test Case '-[SoultiedCoreTests.ModelTests testTouchSummaryAndDecor]' passed (0.001 seconds).
+Test Suite 'ModelTests' passed at 2026-11-14 15:50:45.432.
+	 Executed 3 tests, with 0 failures (0 unexpected) in 0.166 (0.167) seconds
+Test Suite 'PlaceTests' started at 2026-11-14 15:50:45.432.
+Test Case '-[SoultiedCoreTests.PlaceTests testDemoRoom]' started.
+Test Case '-[SoultiedCoreTests.PlaceTests testDemoRoom]' passed (1.999 seconds).
+Test Case '-[SoultiedCoreTests.PlaceTests testTwoPhonesOnePlace]' started.
+Test Case '-[SoultiedCoreTests.PlaceTests testTwoPhonesOnePlace]' passed (14.149 seconds).
+Test Suite 'PlaceTests' passed at 2026-11-14 15:51:01.580.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 16.147 (16.148) seconds
+Test Suite 'PlusTests' started at 2026-11-14 15:51:01.580.
+Test Case '-[SoultiedCoreTests.PlusTests testNights]' started.
+Test Case '-[SoultiedCoreTests.PlusTests testNights]' passed (0.000 seconds).
+Test Case '-[SoultiedCoreTests.PlusTests testRules]' started.
+Test Case '-[SoultiedCoreTests.PlusTests testRules]' passed (0.000 seconds).
+Test Suite 'PlusTests' passed at 2026-11-14 15:51:01.581.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.001 (0.001) seconds
+Test Suite 'RecapTests' started at 2026-11-14 15:51:01.581.
+Test Case '-[SoultiedCoreTests.RecapTests testAgainstTheWebsite]' started.
+Test Case '-[SoultiedCoreTests.RecapTests testAgainstTheWebsite]' passed (0.005 seconds).
+Test Suite 'RecapTests' passed at 2026-11-14 15:51:01.586.
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.005 (0.005) seconds
+Test Suite 'RoomSceneTests' started at 2026-11-14 15:51:01.586.
+Test Case '-[SoultiedCoreTests.RoomSceneTests testFireLevels]' started.
+Test Case '-[SoultiedCoreTests.RoomSceneTests testFireLevels]' passed (0.000 seconds).
+Test Case '-[SoultiedCoreTests.RoomSceneTests testTheFire]' started.
+Test Case '-[SoultiedCoreTests.RoomSceneTests testTheFire]' passed (0.002 seconds).
+Test Case '-[SoultiedCoreTests.RoomSceneTests testTheRoom]' started.
+Test Case '-[SoultiedCoreTests.RoomSceneTests testTheRoom]' passed (1.841 seconds).
+Test Suite 'RoomSceneTests' passed at 2026-11-14 15:51:03.429.
+	 Executed 3 tests, with 0 failures (0 unexpected) in 1.843 (1.843) seconds
+Test Suite 'SmokeTests' started at 2026-11-14 15:51:03.429.
+Test Case '-[SoultiedCoreTests.SmokeTests testSeat]' started.
+Test Case '-[SoultiedCoreTests.SmokeTests testSeat]' passed (0.000 seconds).
+Test Suite 'SmokeTests' passed at 2026-11-14 15:51:03.430.
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.000 (0.000) seconds
+Test Suite 'SnapTests' started at 2026-11-14 15:51:03.430.
+Test Case '-[SoultiedCoreTests.SnapTests testThePrompts]' started.
+Test Case '-[SoultiedCoreTests.SnapTests testThePrompts]' passed (0.001 seconds).
+Test Case '-[SoultiedCoreTests.SnapTests testWhatsKeptAndWhoSeesWhat]' started.
+Test Case '-[SoultiedCoreTests.SnapTests testWhatsKeptAndWhoSeesWhat]' passed (0.000 seconds).
+Test Suite 'SnapTests' passed at 2026-11-14 15:51:03.431.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.001 (0.001) seconds
+Test Suite 'StreamHubTests' started at 2026-11-14 15:51:03.431.
+Test Case '-[SoultiedCoreTests.StreamHubTests testSaidBeforeTheLineOpens]' started.
+Test Case '-[SoultiedCoreTests.StreamHubTests testSaidBeforeTheLineOpens]' passed (0.002 seconds).
+Test Case '-[SoultiedCoreTests.StreamHubTests testTwoPhonesOnTheStreamLine]' started.
+Test Case '-[SoultiedCoreTests.StreamHubTests testTwoPhonesOnTheStreamLine]' passed (0.001 seconds).
+Test Case '-[SoultiedCoreTests.StreamHubTests testYourPlaceAndWhatYouWatched]' started.
+Test Case '-[SoultiedCoreTests.StreamHubTests testYourPlaceAndWhatYouWatched]' passed (0.545 seconds).
+Test Suite 'StreamHubTests' passed at 2026-11-14 15:51:03.979.
+	 Executed 3 tests, with 0 failures (0 unexpected) in 0.547 (0.548) seconds
+Test Suite 'TurntableTests' started at 2026-11-14 15:51:03.979.
+Test Case '-[SoultiedCoreTests.TurntableTests testTheDocument]' started.
+Test Case '-[SoultiedCoreTests.TurntableTests testTheDocument]' passed (0.001 seconds).
+Test Case '-[SoultiedCoreTests.TurntableTests testTheRecord]' started.
+Test Case '-[SoultiedCoreTests.TurntableTests testTheRecord]' passed (0.001 seconds).
+Test Case '-[SoultiedCoreTests.TurntableTests testTwoPhones]' started.
+Test Case '-[SoultiedCoreTests.TurntableTests testTwoPhones]' passed (3.686 seconds).
+Test Case '-[SoultiedCoreTests.TurntableTests testWhatEachButtonWrites]' started.
+Test Case '-[SoultiedCoreTests.TurntableTests testWhatEachButtonWrites]' passed (0.001 seconds).
+Test Case '-[SoultiedCoreTests.TurntableTests testWhereTheRecordIs]' started.
+Test Case '-[SoultiedCoreTests.TurntableTests testWhereTheRecordIs]' passed (0.004 seconds).
+Test Case '-[SoultiedCoreTests.TurntableTests testYouTubeLinks]' started.
+Test Case '-[SoultiedCoreTests.TurntableTests testYouTubeLinks]' passed (0.002 seconds).
+Test Suite 'TurntableTests' passed at 2026-11-14 15:51:07.674.
+	 Executed 6 tests, with 0 failures (0 unexpected) in 3.694 (3.695) seconds
+Test Suite 'VisitTests' started at 2026-11-14 15:51:07.674.
+Test Case '-[SoultiedCoreTests.VisitTests testAgainstTheWebsite]' started.
+Test Case '-[SoultiedCoreTests.VisitTests testAgainstTheWebsite]' passed (0.001 seconds).
+Test Case '-[SoultiedCoreTests.VisitTests testCountingDown]' started.
+Test Case '-[SoultiedCoreTests.VisitTests testCountingDown]' passed (0.000 seconds).
+Test Suite 'VisitTests' passed at 2026-11-14 15:51:07.677.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.002 (0.002) seconds
+Test Suite 'VoiceTests' started at 2026-11-14 15:51:07.677.
+Test Case '-[SoultiedCoreTests.VoiceTests testBarsAndLengths]' started.
+Test Case '-[SoultiedCoreTests.VoiceTests testBarsAndLengths]' passed (0.009 seconds).
+Test Case '-[SoultiedCoreTests.VoiceTests testKeptTheSame]' started.
+Test Case '-[SoultiedCoreTests.VoiceTests testKeptTheSame]' passed (0.007 seconds).
+Test Suite 'VoiceTests' passed at 2026-11-14 15:51:07.693.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.016 (0.016) seconds
+Test Suite 'WatchSceneTests' started at 2026-11-14 15:51:07.693.
+Test Case '-[SoultiedCoreTests.WatchSceneTests testFromBehind]' started.
+Test Case '-[SoultiedCoreTests.WatchSceneTests testFromBehind]' passed (0.226 seconds).
+Test Case '-[SoultiedCoreTests.WatchSceneTests testTheRoom]' started.
+Test Case '-[SoultiedCoreTests.WatchSceneTests testTheRoom]' passed (6.188 seconds).
+Test Suite 'WatchSceneTests' passed at 2026-11-14 15:51:14.107.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 6.414 (6.414) seconds
+Test Suite 'WatchSessionTests' started at 2026-11-14 15:51:14.107.
+Test Case '-[SoultiedCoreTests.WatchSessionTests testBackWhereYouLeftOff]' started.
+Test Case '-[SoultiedCoreTests.WatchSessionTests testBackWhereYouLeftOff]' passed (0.006 seconds).
+Test Case '-[SoultiedCoreTests.WatchSessionTests testWalkingInLate]' started.
+Test Case '-[SoultiedCoreTests.WatchSessionTests testWalkingInLate]' passed (0.008 seconds).
+Test Case '-[SoultiedCoreTests.WatchSessionTests testWatchingTogether]' started.
+Test Case '-[SoultiedCoreTests.WatchSessionTests testWatchingTogether]' passed (0.006 seconds).
+Test Case '-[SoultiedCoreTests.WatchSessionTests testWhatGoesOnTheLine]' started.
+Test Case '-[SoultiedCoreTests.WatchSessionTests testWhatGoesOnTheLine]' passed (0.000 seconds).
+Test Suite 'WatchSessionTests' passed at 2026-11-14 15:51:14.129.
+	 Executed 4 tests, with 0 failures (0 unexpected) in 0.021 (0.022) seconds
+Test Suite 'WhereTests' started at 2026-11-14 15:51:14.129.
+Test Case '-[SoultiedCoreTests.WhereTests testDistances]' started.
+Test Case '-[SoultiedCoreTests.WhereTests testDistances]' passed (0.001 seconds).
+Test Case '-[SoultiedCoreTests.WhereTests testKeptTheSame]' started.
+Test Case '-[SoultiedCoreTests.WhereTests testKeptTheSame]' passed (0.001 seconds).
+Test Case '-[SoultiedCoreTests.WhereTests testLondonAndBengaluru]' started.
+Test Case '-[SoultiedCoreTests.WhereTests testLondonAndBengaluru]' passed (0.002 seconds).
+Test Case '-[SoultiedCoreTests.WhereTests testSaidTheSame]' started.
+Test Case '-[SoultiedCoreTests.WhereTests testSaidTheSame]' passed (0.001 seconds).
+Test Suite 'WhereTests' passed at 2026-11-14 15:51:14.133.
+	 Executed 4 tests, with 0 failures (0 unexpected) in 0.004 (0.004) seconds
+Test Suite 'SoultiedCorePackageTests.xctest' passed at 2026-11-14 15:51:14.133.
+	 Executed 80 tests, with 0 failures (0 unexpected) in 68.799 (68.819) seconds
+Test Suite 'All tests' passed at 2026-11-14 15:51:14.134.
+	 Executed 80 tests, with 0 failures (0 unexpected) in 68.799 (68.826) seconds
+◇ Test run started.
+↳ Testing Library Version: 1902
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.
