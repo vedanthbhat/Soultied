@@ -6,6 +6,9 @@ import { BOT_WORDS, DRAW_SECONDS, DoodleState, ROUNDS, judge, pickChoices } from
 import { NoughtsState, botCell, emptyNoughts, placeMark } from './noughts';
 import { FenceState, botEdge, buildFence, emptyFence, fenceNext } from './fence';
 import { LanternsState, botLantern, emptyLanterns, lightLantern } from './lanterns';
+import { LudoState, botToken, emptyLudo, moveToken, rollD6, rollDie } from './ludo';
+import { ChessMove, ChessState, botMove, emptyChess, evaluate, playMove, seatColor } from './chess';
+import { CarromState, botShot as carromBot, emptyCarrom, shoot as carromShoot } from './carrom';
 import { GAMES } from './types';
 import { LiveLobby, liveJoin, liveStale } from './live/lobby';
 
@@ -128,6 +131,65 @@ export function lanternMove(m: Match<LanternsState>, seat: Seat, cell: number): 
   const mv = lightLantern(m.state, seat, cell);
   if (!mv) return null;
   return { ...m, state: mv.state, status: mv.over ? 'over' : 'playing', turn: mv.next, winner: mv.winner, last: mv.line };
+}
+
+/* ---------- Ludo ---------- */
+
+/** a quick game (two tokens each) or a full one (four) */
+export const newLudo = (starter: Seat, wins?: Record<Seat, number>, count = 4) => base<LudoState>('ludo', starter, emptyLudo(count), wins);
+
+const ludoStep = (m: Match<LudoState>, s: ReturnType<typeof rollDie>): Match<LudoState> | null =>
+  s ? { ...m, state: s.state, status: s.over ? 'over' : 'playing', turn: s.next, winner: s.winner, last: s.line } : null;
+
+export function ludoRoll(m: Match<LudoState>, seat: Seat, dice: number): Match<LudoState> | null {
+  if (m.status !== 'playing' || m.turn !== seat) return null;
+  return ludoStep(m, rollDie(m.state, seat, dice));
+}
+
+export function ludoMove(m: Match<LudoState>, seat: Seat, token: number): Match<LudoState> | null {
+  if (m.status !== 'playing' || m.turn !== seat) return null;
+  return ludoStep(m, moveToken(m.state, seat, token));
+}
+
+/* ---------- Chess ---------- */
+
+/** whoever starts plays white */
+export const newChess = (starter: Seat, wins?: Record<Seat, number>) => base<ChessState>('chess', starter, emptyChess(starter), wins);
+
+export function chessMove(m: Match<ChessState>, seat: Seat, mv: ChessMove): Match<ChessState> | null {
+  if (m.status !== 'playing' || m.turn !== seat) return null;
+  const s = playMove(m.state, seat, mv);
+  if (!s) return null;
+  return { ...m, state: s.state, status: s.over ? 'over' : 'playing', turn: s.next, winner: s.winner, last: s.line };
+}
+
+/** offer a draw (on your move or theirs); it stands until they answer or someone moves */
+export function chessOffer(m: Match<ChessState>, seat: Seat): Match<ChessState> | null {
+  if (m.status !== 'playing' || m.state.offer) return null;
+  return { ...m, state: { ...m.state, offer: seat }, last: 'offered a draw' };
+}
+
+export function chessAnswer(m: Match<ChessState>, seat: Seat, yes: boolean): Match<ChessState> | null {
+  if (m.status !== 'playing' || m.state.offer !== otherSeat(seat)) return null;
+  if (!yes) return { ...m, state: { ...m.state, offer: null }, last: 'said no to a draw, so play on' };
+  return { ...m, state: { ...m.state, offer: null, end: 'agreed' }, status: 'over', turn: null, winner: 'draw', last: 'agreed to a draw' };
+}
+
+export function chessResign(m: Match<ChessState>, seat: Seat): Match<ChessState> | null {
+  if (m.status !== 'playing') return null;
+  return { ...m, state: { ...m.state, offer: null, end: 'resigned' }, status: 'over', turn: null, winner: otherSeat(seat), last: 'resigned' };
+}
+
+/* ---------- Carrom ---------- */
+
+/** whoever starts plays white */
+export const newCarrom = (starter: Seat, wins?: Record<Seat, number>) => base<CarromState>('carrom', starter, emptyCarrom(starter), wins);
+
+export function carromShot(m: Match<CarromState>, seat: Seat, x: number, dx: number, dy: number, power: number): Match<CarromState> | null {
+  if (m.status !== 'playing' || m.turn !== seat) return null;
+  const s = carromShoot(m.state, seat, x, dx, dy, power);
+  if (!s) return null;
+  return { ...m, state: s.state, status: s.over ? 'over' : 'playing', turn: s.next, winner: s.winner, last: s.line };
 }
 
 /* ---------- live games (the invitation; the game itself runs over the live link) ---------- */
@@ -273,6 +335,7 @@ export function needsMe(m: Match | undefined | null, seat: Seat): boolean {
     if (d.state.phase === 'drawing') return d.state.drawer !== seat && (d.state.endsAt || 0) > Date.now();
     return false;
   }
+  if (m.kind === 'chess' && m.status === 'playing' && (m as Match<ChessState>).state.offer === otherSeat(seat)) return true;
   if (m.status === 'playing') return m.turn === seat;
   if (m.status === 'setup' && m.kind === 'boats') return !(m as Match<BoatsState>).state.fleets[seat];
   return false;
@@ -287,6 +350,7 @@ export function noteFor(m: Match, who: string, game: string): string {
     if (d.state.phase === 'drawing') return `${who} is drawing something in ${game}. Come and guess!`;
     return `It’s your turn to draw in ${game}.`;
   }
+  if (m.kind === 'chess' && (m as Match<ChessState>).state.offer) return `${who} offered a draw in ${game}. Take it, or play on?`;
   if (m.status === 'setup') return `${who} started ${game}. Hide your boats!`;
   if (m.seq === 0) return `${who} started a game of ${game}. Your move.`;
   return `${who} ${m.last} in ${game}. Your move.`;
@@ -310,6 +374,24 @@ export function botAct(m: Match, bot: Seat): Match | null {
   if (m.kind === 'fireflies') {
     const f = m as Match<FirefliesState>;
     return f.status === 'playing' && f.turn === bot ? fireflyMove(f, bot, botColumn(f.state.board, bot)) : null;
+  }
+  if (m.kind === 'chess') {
+    const c = m as Match<ChessState>;
+    if (c.status !== 'playing') return null;
+    // a draw: yes when it's behind
+    if (c.state.offer === otherSeat(bot)) return chessAnswer(c, bot, evaluate(c.state.board, seatColor(c.state, bot)) < -150);
+    return c.turn === bot ? chessMove(c, bot, botMove(c.state)) : null;
+  }
+  if (m.kind === 'carrom') {
+    const c = m as Match<CarromState>;
+    if (c.status !== 'playing' || c.turn !== bot) return null;
+    const s = carromBot(c.state, bot);
+    return carromShot(c, bot, s.x, s.dx, s.dy, s.power);
+  }
+  if (m.kind === 'ludo') {
+    const l = m as Match<LudoState>;
+    if (l.status !== 'playing' || l.turn !== bot) return null;
+    return l.state.phase === 'roll' ? ludoRoll(l, bot, rollD6()) : ludoMove(l, bot, botToken(l.state, bot));
   }
   if (m.kind === 'boats') {
     const b = m as Match<BoatsState>;
@@ -347,6 +429,9 @@ export function botDelay(m: Match, bot: Seat): number {
   void bot;
   if (isLiveInvite(m.kind)) return 1400;
   if (m.kind === 'boats' && m.status === 'setup') return 900;
+  if (m.kind === 'ludo') return (m as Match<LudoState>).state.phase === 'roll' ? 800 + Math.random() * 700 : 900 + Math.random() * 500;
+  // (after the last shot has rolled to a stop)
+  if (m.kind === 'carrom') return 4200 + Math.random() * 1500;
   return 1100 + Math.random() * 900;
 }
 
@@ -376,7 +461,7 @@ export function endLine(m: Match, name: (s: Seat) => string, game: string): stri
 }
 
 /** Short words for the games stack in the room, e.g. "Your turn in Fireflies". */
-export function waitingLabel(m: Match, who: string, game: string): string {
+export function waitingLabel(m: Match, who: string, game: string, me?: Seat): string {
   if (isLiveInvite(m.kind)) return `${who} wants to play ${game}`;
   if (m.kind === 'doodle') {
     const st = (m as Match<DoodleState>).state;
@@ -384,5 +469,6 @@ export function waitingLabel(m: Match, who: string, game: string): string {
     if (st.phase === 'drawing') return `${who} is drawing: come and guess`;
     return `Your turn to draw in ${game}`;
   }
+  if (m.kind === 'chess' && me && (m as Match<ChessState>).state.offer === otherSeat(me)) return `${who} offered a draw`;
   return `Your turn in ${game}`;
 }

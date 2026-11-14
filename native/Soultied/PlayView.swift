@@ -53,6 +53,9 @@ enum GameColors {
         case .doodle: return Color(hex: "#6b4f7a")
         case .coasters: return Color(hex: "#5a4636")
         case .kitchen: return Color(hex: "#9a5a3a")
+        case .ludo: return Color(hex: "#6e3d52")
+        case .chess: return Color(hex: "#4a3a2c")
+        case .carrom: return Color(hex: "#8a5a2c")
         }
     }
     static let escape = Color(hex: "#2a1d18")
@@ -79,7 +82,7 @@ struct UpNextCard: View {
         let them = place.theirName
         if let k = place.gamesWaiting.first, let m = place.games[k] {
             let live = Play.isLiveInvite(k)
-            return (k, live ? "\(them.uppercased()) WANTS TO PLAY" : "YOUR MOVE", Play.note(m, who: them), live ? "Join →" : "Play →")
+            return (k, live ? "\(them.uppercased()) WANTS TO PLAY" : "YOUR MOVE", Play.note(m, who: them, me: place.mySeat), live ? "Join →" : "Play →")
         }
         // nothing waiting: something for tonight (a live one when they're around), a different one each day
         let day = Int(Day.today().replacingOccurrences(of: "-", with: "")) ?? 0

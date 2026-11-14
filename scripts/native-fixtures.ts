@@ -12,6 +12,9 @@ import { botCell } from '../src/games/noughts';
 import { botEdge } from '../src/games/fence';
 import { botLantern } from '../src/games/lanterns';
 import { botShot, randomFleet } from '../src/games/boats';
+import { type LudoState, botToken, rollD6 } from '../src/games/ludo';
+import { type ChessState, botMove } from '../src/games/chess';
+import { type CarromState, botShot as carromBot, simulate as carromSim } from '../src/games/carrom';
 import { TUG } from '../src/games/tug';
 import { RPS } from '../src/games/rps';
 import { QUICK } from '../src/games/quickdraw';
@@ -123,7 +126,8 @@ const chapters = Array.from({ length: 32 }, (_, i) => {
 
 // the games you take turns at: whole games between two of the demo room's partners, every move written down
 // (with the random numbers each pick was made from), so the iPhone's rules and partner can be checked move by move
-const games: Array<{ kind: GameKind; seat: Seat; seed: number; arg: unknown; before: Match; after: Match }> = [];
+// (`exact`: carrom's numbers as text too, since some JSON readers are a hair off on the last digit)
+const games: Array<{ kind: GameKind; seat: Seat; seed: number; arg: unknown; before: Match; after: Match; exact?: Record<string, string | string[]> }> = [];
 const starters: Record<string, (s: Seat) => Match> = {
   fireflies: (s) => play.newFireflies(s),
   noughts: (s) => play.newNoughts(s),
@@ -161,6 +165,65 @@ for (const kind of Object.keys(starters) as GameKind[]) {
       games.push({ kind, seat, seed, arg, before: m, after });
       m = after;
     }
+  }
+}
+
+// Ludo: whole games (two quick, two full), every roll and every move written down
+for (let g = 0; g < 4; g++) {
+  let m: Match = { ...play.newLudo(g % 2 ? 'b' : 'a', undefined, g < 2 ? 2 : 4), id: `mludo${g}`, startedAt: 0, updatedAt: 0 };
+  for (let step = 0; step < 4000 && m.status !== 'over'; step++) {
+    const seed = int(2 ** 31);
+    const r = rng(seed);
+    const st = m.state as LudoState;
+    const seat = m.turn as Seat;
+    let arg: number;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mm = m as any;
+    const after: Match | null = st.phase === 'roll' ? play.ludoRoll(mm, seat, (arg = rollD6(r))) : play.ludoMove(mm, seat, (arg = botToken(st, seat, r)));
+    if (!after) throw new Error('no move in ludo');
+    games.push({ kind: 'ludo', seat, seed, arg, before: m, after });
+    m = after;
+  }
+  if (m.status !== 'over') throw new Error('a game of ludo that never ended');
+}
+
+// Chess: whole games between two of the demo room's partners (up to 300 moves), every move written down
+for (let g = 0; g < 6; g++) {
+  let m: Match = { ...play.newChess(g % 2 ? 'b' : 'a'), id: `mchess${g}`, startedAt: 0, updatedAt: 0 };
+  for (let step = 0; step < 300 && m.status !== 'over'; step++) {
+    const seed = int(2 ** 31);
+    const r = rng(seed);
+    const seat = m.turn as Seat;
+    const arg = botMove(m.state as ChessState, r);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const after = play.chessMove(m as any, seat, arg);
+    if (!after) throw new Error('no move in chess');
+    games.push({ kind: 'chess', seat, seed, arg, before: m, after });
+    m = after;
+  }
+}
+
+// Carrom: the shots of two games (where each one was taken from and how), and what came of them; plus a few
+// shots played out frame by frame, to check the physics move for move
+const carromFrames: Array<Record<string, unknown>> = [];
+for (let g = 0; g < 2; g++) {
+  let m: Match = { ...play.newCarrom(g % 2 ? 'b' : 'a'), id: `mcarrom${g}`, startedAt: 0, updatedAt: 0 };
+  const r = rng(77 + g);
+  for (let step = 0; step < 40 && m.status !== 'over'; step++) {
+    const seat = m.turn as Seat;
+    const st = m.state as CarromState;
+    const s = carromBot(st, seat, r);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const after = play.carromShot(m as any, seat, s.x, s.dx, s.dy, s.power);
+    if (!after) throw new Error('no shot in carrom');
+    const as = after.state as CarromState;
+    const exact = { bx: st.xs.map(String), by: st.ys.map(String), ax: as.xs.map(String), ay: as.ys.map(String), x: String(s.x), dx: String(s.dx), dy: String(s.dy), power: String(s.power) };
+    games.push({ kind: 'carrom', seat, seed: 0, arg: s, before: m, after, exact });
+    if (step < 3 && g === 0) {
+      const sim = carromSim(st.xs, st.ys, seat, s.x, s.dx, s.dy, s.power, 4);
+      carromFrames.push({ ...exact, seat, steps: sim.steps, frames: sim.frames.filter((_, i) => i % 6 === 0).map((f) => f.map(String)) });
+    }
+    m = after;
   }
 }
 
@@ -643,5 +706,5 @@ const voices = {
 };
 
 const out = process.argv[2] || 'native-fixtures.json';
-writeFileSync(out, JSON.stringify({ cards, days, hashes, rngSeq, streaks, demo, same, chapters, games, live, doodle: { judges, brushes, fills, choices, games: doodles }, coasters: coasterSteps, escape, record, watch: { looks, ...watch }, wall: { doodles: wallDoodles }, room: { scenes: roomScenes, fires, visits }, snaps, recaps: { cases: recaps, months: recapMonths }, wheres, buckets, voices }));
+writeFileSync(out, JSON.stringify({ cards, days, hashes, rngSeq, streaks, demo, same, chapters, games, live, doodle: { judges, brushes, fills, choices, games: doodles }, coasters: coasterSteps, escape, record, watch: { looks, ...watch }, wall: { doodles: wallDoodles }, room: { scenes: roomScenes, fires, visits }, snaps, recaps: { cases: recaps, months: recapMonths }, wheres, buckets, voices, carromFrames }));
 console.log(`wrote ${cards.length} card days, ${streaks.length} streaks, ${demo.length} demo rooms, ${games.length} game moves, ${live.length} live games, ${doodles.length} doodle moves to ${out}`);

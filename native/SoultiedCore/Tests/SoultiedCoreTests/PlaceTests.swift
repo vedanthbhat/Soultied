@@ -240,14 +240,21 @@ final class PlaceTests: XCTestCase {
         XCTAssertEqual(p.seats.left.name, "Aanya")
         XCTAssertEqual(p.seats.right.avatar?.facialHair, "stubble")
 
-        // Rohan started Fireflies; your move, and then he takes his
-        XCTAssertEqual(p.gamesWaiting, [.fireflies])
+        // Rohan started Fireflies; your move, and then he takes his (and you're halfway through a game of Ludo)
+        XCTAssertEqual(p.gamesWaiting, [.fireflies, .ludo, .chess, .carrom])
+        XCTAssertEqual(p.games[.chess]?.last, "moved a bishop to c4")
         let m = try XCTUnwrap(Play.fireflies(try XCTUnwrap(p.games[.fireflies]), .a, col: 2))
         p.saveGame(m)
         for _ in 0..<40 where p.games[.fireflies]?.turn != .a { try? await Task.sleep(nanoseconds: 100_000_000) }
         XCTAssertEqual(p.games[.fireflies]?.turn, .a)
         XCTAssertEqual(p.games[.fireflies]?.seq, 3)
         XCTAssertEqual(p.games[.fireflies]?.updatedBy, .b)
+
+        // the 5 you rolled at Ludo lands on one of Rohan's: back to his yard, and you roll again
+        let l = try XCTUnwrap(Play.ludoMove(try XCTUnwrap(p.games[.ludo]), .a, token: 0))
+        XCTAssertEqual(Ludo.State(l.state).sent, [0])
+        XCTAssertEqual(l.turn, .a)
+        XCTAssertEqual(l.last, "sent one of yours back to the start")
     }
 
 }

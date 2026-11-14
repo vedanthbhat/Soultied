@@ -245,7 +245,7 @@ const Home: React.FC = () => {
       door: 'The dark door',
       games: games.waiting.length
         ? games.waiting
-            .map((k) => waitingLabel(games.matches[k] as Match, games.seatName(otherSeat(games.mySeat)), GAMES[k].name))
+            .map((k) => waitingLabel(games.matches[k] as Match, games.seatName(otherSeat(games.mySeat)), GAMES[k].name, games.mySeat))
             .join(' · ')
         : 'Games',
       music: turntable.on ? `Lift the needle${turntable.track ? ` · ${turntable.track.title}` : ''}` : 'Put a record on',

@@ -118,6 +118,12 @@ struct GameTune {
         case .coasters: return GameTune(bpm: 118, root: 196, minor: true, chords: [0, 5, 6, 4], line: [0, nil, 0, 2, nil, 3, 2, nil], lead: .square, ticks: true)
         // a busy kitchen
         case .kitchen: return GameTune(bpm: 132, root: 261.63, chords: [0, 3, 4, 0], line: [0, 1, 2, 1, 3, 2, 1, 2], lead: .square, ticks: true)
+        // a bouncy parlour game
+        case .ludo: return GameTune(bpm: 112, root: 246.94, chords: [0, 4, 5, 3], line: [0, 2, 4, 2, 3, nil, 1, 2], lead: .triangle, ticks: true)
+        // a slow, thinking waltz
+        case .chess: return GameTune(bpm: 66, root: 196, minor: true, chords: [0, 3, 4, 0], line: [0, nil, 2, nil, 1, nil, nil, nil])
+        // an afternoon on the verandah
+        case .carrom: return GameTune(bpm: 100, root: 220, chords: [0, 5, 3, 4], line: [0, 2, nil, 3, 2, nil, 1, nil])
         }
     }
 

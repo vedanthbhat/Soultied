@@ -3,7 +3,7 @@ import { PixelArt, Painter } from './Pixel';
 
 /** The picture on each game box, drawn in the room's pixel style (40 x 26). */
 
-export type BoxId = 'fireflies' | 'boats' | 'door' | 'doodle' | 'coasters' | 'kitchen' | 'noughts' | 'fence' | 'lanterns' | 'tug' | 'quickdraw' | 'rps';
+export type BoxId = 'fireflies' | 'boats' | 'door' | 'doodle' | 'coasters' | 'kitchen' | 'noughts' | 'fence' | 'lanterns' | 'tug' | 'quickdraw' | 'rps' | 'ludo' | 'chess' | 'carrom';
 
 const W = 40;
 const H = 26;
@@ -231,6 +231,89 @@ const PAINT: Record<BoxId, Painter> = {
     px(33, 13, 3, 3, '#e07a5f');
     px(30, 14, 1, 1, '#3a2b25');
     px(34, 14, 1, 1, '#3a2b25');
+  },
+  ludo: (px, dot) => {
+    px(0, 0, W, H, '#3b2a1e');
+    // the board: four corners round a cross, a heart in the middle
+    px(6, 1, 24, 24, '#6b4a2f');
+    px(7, 2, 22, 22, '#f4ead6');
+    px(7, 15, 9, 9, '#e9a58d');
+    px(9, 17, 5, 5, '#fbf3e2');
+    px(20, 2, 9, 9, '#8fd3bd');
+    px(22, 4, 5, 5, '#fbf3e2');
+    px(7, 2, 9, 9, '#7d8f62');
+    px(20, 15, 9, 9, '#7d8f62');
+    px(17, 16, 2, 7, '#f2c4b2');
+    px(17, 3, 2, 7, '#bfe8da');
+    px(16, 11, 4, 4, '#e07a5f');
+    dot(16, 11, '#3b2a1e');
+    dot(19, 11, '#3b2a1e');
+    dot(17, 14, '#3b2a1e');
+    dot(18, 14, '#3b2a1e');
+    // tokens in the yards and out on the track
+    const pawn = (x: number, y: number, b: string, d: string) => {
+      px(x + 1, y, 1, 1, d);
+      px(x, y + 1, 3, 2, b);
+      px(x, y + 3, 3, 1, d);
+    };
+    pawn(10, 18, '#e07a5f', '#7a3022');
+    pawn(23, 5, '#4fb896', '#1f5a4a');
+    pawn(13, 11, '#e07a5f', '#7a3022');
+    pawn(21, 12, '#4fb896', '#1f5a4a');
+    // the die
+    px(32, 14, 7, 7, '#3a2a26');
+    px(32, 14, 6, 6, '#fbf3e2');
+    [[33, 15], [36, 15], [33, 18], [36, 18], [34, 16], [35, 17]].forEach(([x, y], i) => i < 4 && dot(x, y, '#3a2a26'));
+  },
+  chess: (px) => {
+    px(0, 0, W, H, '#3b2a1e');
+    // a corner of the board, and a king and a knight facing off
+    for (let r = 0; r < 6; r++) for (let c = 0; c < 10; c++) px(c * 4, 2 + r * 4, 4, 4, (r + c) % 2 ? '#a8784f' : '#efe0c2');
+    const king = (x: number, y: number, o: string, b: string) => {
+      px(x + 2, y, 1, 3, o);
+      px(x + 1, y + 1, 3, 1, o);
+      px(x, y + 3, 5, 6, o);
+      px(x + 1, y + 4, 3, 4, b);
+      px(x - 1, y + 9, 7, 2, o);
+    };
+    const knight = (x: number, y: number, o: string, b: string) => {
+      px(x + 2, y, 2, 1, o);
+      px(x + 1, y + 1, 4, 2, o);
+      px(x, y + 3, 5, 2, o);
+      px(x + 2, y + 2, 2, 1, b);
+      px(x + 1, y + 3, 3, 1, b);
+      px(x + 2, y + 5, 3, 4, o);
+      px(x + 3, y + 5, 1, 3, b);
+      px(x, y + 9, 7, 2, o);
+    };
+    king(10, 9, '#3a2a26', '#fbf3e2');
+    knight(24, 9, '#140d0a', '#8a6650');
+  },
+  carrom: (px, dot) => {
+    px(0, 0, W, H, '#3b2a1e');
+    // the board, its pockets, and the coins mid-break
+    px(7, 0, 26, 26, '#6b4a2f');
+    px(9, 2, 22, 22, '#e9cf9c');
+    for (const [x, y] of [[9, 2], [29, 2], [9, 22], [29, 22]]) px(x, y, 2, 2, '#1b1411');
+    px(12, 19, 16, 1, '#5a3a24');
+    px(12, 5, 16, 1, '#5a3a24');
+    const coin = (x: number, y: number, b: string, r: string) => {
+      px(x, y + 1, 3, 1, b);
+      px(x + 1, y, 1, 3, b);
+      dot(x, y, r);
+      dot(x + 2, y + 2, r);
+    };
+    coin(18, 11, '#d4473c', '#9a2a22');
+    coin(21, 12, '#fbf3e2', '#d9c6a1');
+    coin(15, 13, '#4a3428', '#2a1c14');
+    coin(19, 8, '#4a3428', '#2a1c14');
+    coin(23, 9, '#fbf3e2', '#d9c6a1');
+    coin(16, 9, '#fbf3e2', '#d9c6a1');
+    coin(25, 15, '#4a3428', '#2a1c14');
+    // the striker, on its way
+    px(19, 17, 3, 3, '#cfe3ea');
+    dot(19, 17, '#ffffff');
+    px(20, 20, 1, 1, '#8fb3c2');
   },
   kitchen: (px) => {
     for (let y = 0; y < H; y += 4) for (let x = 0; x < W; x += 4) px(x, y, 4, 4, (x + y) % 8 === 0 ? '#efdcb8' : '#d2bb93');

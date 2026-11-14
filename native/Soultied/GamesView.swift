@@ -3,7 +3,7 @@ import SoultiedCore
 
 /*
  * The games you take turns at, on the iPhone: Fireflies, Paper Boats, Noughts & Hearts, Fence the Garden and
- * Lanterns. The same games as the website's (the rules are in SoultiedCore), so a game started on a laptop
+ * Lanterns (and Ludo, Chess and Carrom, in their own files). The same games as the website's (the rules are in SoultiedCore), so a game started on a laptop
  * can be finished on a phone. Each sits on the same dark, warm backdrop as the website's game screens.
  */
 
@@ -55,6 +55,9 @@ enum GameArt {
         case .doodle: return Icons.pencil
         case .coasters: return Glyph(["..ccc..", ".ckkkc.", "ckkkkkc", "ckkkkkc", "ckkkkkc", ".ckkkc.", "..ccc.."], ["c": "#b48c4a", "k": "#d6ad63"])
         case .kitchen: return Glyph([".www.", "wwwww", "wwwww", ".kkk.", ".kkk."], ["w": "#fbf3e2", "k": "#d6c29c"])
+        case .ludo: return die
+        case .chess: return piece("N")
+        case .carrom: return carromCoin
         }
     }
 }
@@ -229,6 +232,9 @@ struct GameScreen: View {
         case .doodle: DoodleGameView(place: place)
         case .coasters: CoastersGameView(place: place)
         case .kitchen: KitchenGameView(place: place)
+        case .ludo: LudoGameView(place: place)
+        case .chess: ChessGameView(place: place)
+        case .carrom: CarromGameView(place: place)
         }
     }
 }
@@ -996,7 +1002,7 @@ struct GameCard: View {
                     GlyphView(glyph: GameArt.icon(k), scale: 4).frame(width: 40)
                     VStack(alignment: .leading, spacing: 6) {
                         Text(k.info.name).font(.px(14, 600)).foregroundStyle(Color.muted)
-                        Text(Play.note(m, who: place.theirName)).font(.pxBodyBold).foregroundStyle(Color.inkSoft).multilineTextAlignment(.leading).fixedSize(horizontal: false, vertical: true)
+                        Text(Play.note(m, who: place.theirName, me: place.mySeat)).font(.pxBodyBold).foregroundStyle(Color.inkSoft).multilineTextAlignment(.leading).fixedSize(horizontal: false, vertical: true)
                         Text(Play.onIPhone.contains(k) ? (Play.isLiveInvite(k) ? "Join →" : "Play →") : "Open soultied.app →").font(.px(16, 700)).foregroundStyle(Color.terracottaD)
                     }
                     Spacer(minLength: 0)

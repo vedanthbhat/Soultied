@@ -15,7 +15,10 @@ export type GameKind =
   | 'quickdraw'
   | 'rps'
   | 'coasters'
-  | 'kitchen';
+  | 'kitchen'
+  | 'ludo'
+  | 'chess'
+  | 'carrom';
 
 /** 'turns': play across the day, whenever it's your move. 'live': you're both here, right now. */
 export type GameMode = 'turns' | 'live';
@@ -136,5 +139,26 @@ export const GAMES: Record<GameKind, GameInfo> = {
     tagline: 'One of you chops, the other cooks, and the orders keep coming. Ninety seconds, on the same side.',
     style: 'Together, live',
     mode: 'live',
+  },
+  ludo: {
+    kind: 'ludo',
+    name: 'Ludo',
+    tagline: 'Roll the die and race your tokens round the board and home. Land on one of theirs and it goes back to the start.',
+    style: 'Take turns',
+    mode: 'turns',
+  },
+  chess: {
+    kind: 'chess',
+    name: 'Chess',
+    tagline: 'Proper chess, a move whenever you’re here. Whoever starts plays white; offer a draw, or play it out to checkmate.',
+    style: 'Take turns',
+    mode: 'turns',
+  },
+  carrom: {
+    kind: 'carrom',
+    name: 'Carrom',
+    tagline: 'Flick the striker and sink your nine before they sink theirs. Sink one and you go again; the red queen needs covering.',
+    style: 'Take turns',
+    mode: 'turns',
   },
 };

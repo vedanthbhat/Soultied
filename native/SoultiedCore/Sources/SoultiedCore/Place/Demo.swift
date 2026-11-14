@@ -74,6 +74,37 @@ public enum Demo {
             ff.updatedBy = .b
             db.seed("\(p)/meta/game-fireflies", ff.doc)
         }
+        // halfway through a game of Ludo: you've just rolled a 5, and one of Rohan's is five squares ahead
+        var ludo = Play.newLudo(.b)
+        var lst = Ludo.State(count: 4)
+        lst.tokens = [.a: [12, -1, 30, 56], .b: [43, 20, -1, -1]]
+        lst.phase = "move"
+        lst.dice = 5
+        ludo.state = lst.doc
+        ludo.turn = .a
+        ludo.seq = 38
+        ludo.updatedBy = .a
+        ludo.updatedAt = nowMs - 3 * 60e3
+        ludo.last = "rolled a 5"
+        db.seed("\(p)/meta/game-ludo", ludo.doc)
+        // a few moves into a game of chess, Rohan's white: your move
+        var chess = Play.newChess(.b)
+        for (s, f, t) in [(Side.b, 52, 36), (.a, 12, 28), (.b, 62, 45), (.a, 1, 18), (.b, 61, 34)] {
+            if let n = Play.chess(chess, s, move: Chess.Move(f, t)) { chess = n }
+        }
+        chess.seq = 5
+        chess.updatedBy = .b
+        chess.updatedAt = nowMs - 25 * 60e3
+        db.seed("\(p)/meta/game-chess", chess.doc)
+        // Rohan broke at carrom (he's white): your shot
+        for x in [50.0, 44, 56, 38, 62, 47, 53] {
+            guard var c = Play.carrom(Play.newCarrom(.b), .b, x: x, dx: 0, dy: 1, power: 0.9), c.turn == .a else { continue }
+            c.seq = 1
+            c.updatedBy = .b
+            c.updatedAt = nowMs - 12 * 60e3
+            db.seed("\(p)/meta/game-carrom", c.doc)
+            break
+        }
         let acts: [(String, String, String, Double)] = [
             ("question_revealed", "Letter opened together", "In sync on 4 of 5.", 86400),
             ("avatar_updated", "Wardrobe refresh", "Rohan put on a terracotta cardigan and round glasses.", 3 * 86400),

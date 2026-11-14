@@ -14,7 +14,7 @@ public enum Side: String, Sendable, Hashable, CaseIterable {
 }
 
 public enum GameKind: String, CaseIterable, Sendable, Identifiable {
-    case fireflies, boats, doodle, noughts, fence, lanterns, tug, quickdraw, rps, coasters, kitchen
+    case fireflies, boats, doodle, noughts, fence, lanterns, tug, quickdraw, rps, coasters, kitchen, ludo, chess, carrom
     public var id: String { rawValue }
     public var info: GameInfo { GAMES[self]! }
     public var docName: String { "game-\(rawValue)" }
@@ -44,12 +44,15 @@ public let GAMES: [GameKind: GameInfo] = {
         GameInfo(kind: .rps, name: "Paper, Scissors, Stone", tagline: "Pick before the timer runs out, and see what they picked. First to three rounds.", style: "Live", mode: .live),
         GameInfo(kind: .coasters, name: "Coasters", tagline: "Air hockey on the coffee table with two drink coasters and a bottle cap. First to 7.", style: "Live", mode: .live),
         GameInfo(kind: .kitchen, name: "Kitchen Rush", tagline: "One of you chops, the other cooks, and the orders keep coming. Ninety seconds, on the same side.", style: "Together, live", mode: .live),
+        GameInfo(kind: .ludo, name: "Ludo", tagline: "Roll the die and race your tokens round the board and home. Land on one of theirs and it goes back to the start.", style: "Take turns", mode: .turns),
+        GameInfo(kind: .chess, name: "Chess", tagline: "Proper chess, a move whenever you’re here. Whoever starts plays white; offer a draw, or play it out to checkmate.", style: "Take turns", mode: .turns),
+        GameInfo(kind: .carrom, name: "Carrom", tagline: "Flick the striker and sink your nine before they sink theirs. Sink one and you go again; the red queen needs covering.", style: "Take turns", mode: .turns),
     ]
     return Dictionary(uniqueKeysWithValues: all.map { ($0.kind, $0) })
 }()
 
 /// the games you take turns at, in the order the shelf shows them
-public let TURN_GAMES: [GameKind] = [.fireflies, .boats, .noughts, .fence, .lanterns]
+public let TURN_GAMES: [GameKind] = [.fireflies, .boats, .noughts, .fence, .lanterns, .ludo, .chess, .carrom]
 /// the games you play at the same moment
 public let LIVE_GAMES: [GameKind] = [.tug, .quickdraw, .rps, .doodle, .coasters, .kitchen]
 
@@ -231,6 +234,117 @@ public enum Play {
         return n
     }
 
+    /* Ludo */
+    /// a quick game (two tokens each) or a full one (four)
+    public static func newLudo(_ starter: Side, wins: [Side: Int]? = nil, count: Int = 4) -> Match {
+        Match(kind: .ludo, starter: starter, state: Ludo.State(count: count).doc, wins: wins)
+    }
+
+    private static func ludoStep(_ m: Match, _ s: Ludo.Step?) -> Match? {
+        guard let s else { return nil }
+        var n = m
+        n.state = s.state.doc
+        n.status = s.over ? .over : .playing
+        n.turn = s.next
+        n.winner = s.winner
+        n.last = s.line
+        return n
+    }
+
+    public static func ludoRoll(_ m: Match, _ seat: Side, dice: Int) -> Match? {
+        guard m.status == .playing, m.turn == seat else { return nil }
+        return ludoStep(m, Ludo.roll(Ludo.State(m.state), seat, dice))
+    }
+
+    public static func ludoMove(_ m: Match, _ seat: Side, token: Int) -> Match? {
+        guard m.status == .playing, m.turn == seat else { return nil }
+        return ludoStep(m, Ludo.move(Ludo.State(m.state), seat, token))
+    }
+
+    /* Chess */
+    /// whoever starts plays white
+    public static func newChess(_ starter: Side, wins: [Side: Int]? = nil) -> Match {
+        Match(kind: .chess, starter: starter, state: Chess.State(white: starter).doc, wins: wins)
+    }
+
+    public static func chess(_ m: Match, _ seat: Side, move: Chess.Move) -> Match? {
+        guard m.status == .playing, m.turn == seat, let s = Chess.play(Chess.State(m.state), seat, move) else { return nil }
+        var n = m
+        n.state = s.state.doc
+        n.status = s.over ? .over : .playing
+        n.turn = s.next
+        n.winner = s.winner
+        n.last = s.line
+        return n
+    }
+
+    /// offer a draw (on your move or theirs); it stands until they answer or someone moves
+    public static func chessOffer(_ m: Match, _ seat: Side) -> Match? {
+        var st = Chess.State(m.state)
+        guard m.status == .playing, st.offer == nil else { return nil }
+        st.offer = seat
+        var n = m
+        n.state = st.doc
+        n.last = "offered a draw"
+        return n
+    }
+
+    public static func chessAnswer(_ m: Match, _ seat: Side, yes: Bool) -> Match? {
+        var st = Chess.State(m.state)
+        guard m.status == .playing, st.offer == seat.other else { return nil }
+        st.offer = nil
+        var n = m
+        if !yes {
+            n.state = st.doc
+            n.last = "said no to a draw, so play on"
+            return n
+        }
+        st.end = "agreed"
+        n.state = st.doc
+        n.status = .over
+        n.turn = nil
+        n.winner = "draw"
+        n.last = "agreed to a draw"
+        return n
+    }
+
+    public static func chessResign(_ m: Match, _ seat: Side) -> Match? {
+        guard m.status == .playing else { return nil }
+        var st = Chess.State(m.state)
+        st.offer = nil
+        st.end = "resigned"
+        var n = m
+        n.state = st.doc
+        n.status = .over
+        n.turn = nil
+        n.winner = seat.other.rawValue
+        n.last = "resigned"
+        return n
+    }
+
+    /* Carrom */
+    /// whoever starts plays white
+    public static func newCarrom(_ starter: Side, wins: [Side: Int]? = nil) -> Match {
+        Match(kind: .carrom, starter: starter, state: Carrom.State(white: starter).doc, wins: wins)
+    }
+
+    public static func carrom(_ m: Match, _ seat: Side, x: Double, dx: Double, dy: Double, power: Double) -> Match? {
+        guard m.status == .playing, m.turn == seat, let s = Carrom.shoot(Carrom.State(m.state), seat, x: x, dx: dx, dy: dy, power: power) else { return nil }
+        var n = m
+        n.state = s.state.doc
+        n.status = s.over ? .over : .playing
+        n.turn = s.next
+        n.winner = s.winner?.rawValue
+        n.last = s.line
+        return n
+    }
+
+    /// a draw your person offered at chess, waiting on you
+    public static func chessOfferFor(_ m: Match?, _ seat: Side) -> Bool {
+        guard let m, m.kind == .chess, m.status == .playing else { return false }
+        return Chess.State(m.state).offer == seat.other
+    }
+
     /// a fresh game of `kind`: the person who didn't start the last one goes first
     public static func rematch(_ kind: GameKind, me: Side, last: Match?) -> Match? {
         let starter = kind == .fireflies || kind == .boats ? me : (last.map { $0.status == .over ? $0.startedBy.other : me } ?? me)
@@ -241,6 +355,9 @@ public enum Play {
         case .noughts: return newNoughts(starter, wins: w)
         case .fence: return newFence(starter, wins: w)
         case .lanterns: return newLanterns(starter, wins: w)
+        case .ludo: return newLudo(starter, wins: w, count: last.map { Ludo.State($0.state).count } ?? 4)
+        case .chess: return newChess(starter, wins: w)
+        case .carrom: return newCarrom(starter, wins: w)
         default: return nil
         }
     }
@@ -280,13 +397,14 @@ public enum Play {
             if phase == "drawing" { return drawer != seat && (m.state.num("endsAt") ?? 0) > now }
             return false
         }
+        if chessOfferFor(m, seat) { return true }
         if m.status == .playing { return m.turn == seat }
         if m.status == .setup && m.kind == .boats { return Boats.State(m.state).fleets[seat] == nil }
         return false
     }
 
     /// the line for the little note in the room, e.g. "Rohan dropped a firefly in the middle in Fireflies. Your move."
-    public static func note(_ m: Match, who: String) -> String {
+    public static func note(_ m: Match, who: String, me: Side? = nil) -> String {
         let game = m.kind.info.name
         if isLiveInvite(m.kind) { return "\(who) wants to play \(game) with you, right now. Join them\(onIPhone.contains(m.kind) ? "" : " on soultied.app")?" }
         if m.kind == .doodle {
@@ -296,6 +414,7 @@ public enum Play {
             default: return "It’s your turn to draw in \(game)."
             }
         }
+        if let me, chessOfferFor(m, me) { return "\(who) offered a draw in \(game). Take it, or play on?" }
         if m.status == .setup { return "\(who) started \(game). Hide your boats!" }
         if m.seq == 0 { return "\(who) started a game of \(game). Your move." }
         return "\(who) \(m.last) in \(game). Your move."
@@ -322,6 +441,7 @@ public enum Play {
             return (w == "draw" ? "Last game: a draw" : "\(name(Side(rawValue: w) ?? .a)) won last time", false)
         }
         guard let m else { return ("Start a game", false) }
+        if chessOfferFor(m, me) { return ("\(partner) offered a draw", true) }
         if needsMe(m, me, now: now) { return (m.status == .setup ? "Hide your boats" : "Your move", true) }
         if m.status == .setup { return ("\(partner) is hiding boats", false) }
         if m.status == .playing { return ("\(partner)’s move", false) }
@@ -366,6 +486,20 @@ public enum Play {
             if m.status == .setup && st.fleets[bot] == nil { return boatsReady(m, bot, Boats.randomFleet(rng)) }
             if m.status == .playing && m.turn == bot { return boatsShot(m, bot, cell: Boats.botShot(st, bot, rng)) }
             return nil
+        case .carrom:
+            guard m.status == .playing, m.turn == bot else { return nil }
+            let s = Carrom.botShot(Carrom.State(m.state), bot, rng)
+            return carrom(m, bot, x: s.x, dx: s.dx, dy: s.dy, power: s.power)
+        case .chess:
+            guard m.status == .playing else { return nil }
+            let st = Chess.State(m.state)
+            // a draw: yes when it's behind
+            if st.offer == bot.other { return chessAnswer(m, bot, yes: Chess.evaluate(st.board, st.color(of: bot)) < -150) }
+            return m.turn == bot ? chess(m, bot, move: Chess.botMove(st, rng)) : nil
+        case .ludo:
+            guard m.status == .playing, m.turn == bot else { return nil }
+            let st = Ludo.State(m.state)
+            return st.phase == "roll" ? ludoRoll(m, bot, dice: Ludo.rollD6(rng)) : ludoMove(m, bot, token: Ludo.botToken(st, bot, rng))
         case .doodle:
             return doodleBot(m, bot, rng)
         default:
@@ -383,6 +517,9 @@ public enum Play {
         }
         if isLiveInvite(m.kind) { return 1.4 }
         if m.kind == .boats && m.status == .setup { return 0.9 }
+        // (after the last shot has rolled to a stop)
+        if m.kind == .carrom { return 4.2 + Double.random(in: 0..<1.5) }
+        if m.kind == .ludo { return Ludo.State(m.state).phase == "roll" ? 0.8 + Double.random(in: 0..<0.7) : 0.9 + Double.random(in: 0..<0.5) }
         return 1.1 + Double.random(in: 0..<0.9)
     }
 }

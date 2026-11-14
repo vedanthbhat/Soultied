@@ -282,6 +282,7 @@ struct VoicesPanel: View {
                     .accessibilityLabel("Take it down")
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(10)
         .background(mine ? Color.paper2 : Color.paperInput)
         .overlay(Rectangle().strokeBorder(Color.ink, lineWidth: 2))

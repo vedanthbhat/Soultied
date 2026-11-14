@@ -18,6 +18,9 @@ import { QuickDrawGame } from './QuickDrawGame';
 import { RpsGame } from './RpsGame';
 import { CoastersGame } from './CoastersGame';
 import { KitchenGame } from './KitchenGame';
+import { LudoGame } from './LudoGame';
+import { ChessGame } from './ChessGame';
+import { CarromGame } from './CarromGame';
 import type { LiveLobby } from '../../games/live/lobby';
 import { usePlus } from '../../plus/usePlus';
 import { PlusUpsell } from '../PlusUpsell';
@@ -47,6 +50,9 @@ const TURNS: Shelf[] = [
   { id: 'noughts', ...GAMES.noughts },
   { id: 'fence', ...GAMES.fence },
   { id: 'lanterns', ...GAMES.lanterns },
+  { id: 'ludo', ...GAMES.ludo },
+  { id: 'chess', ...GAMES.chess },
+  { id: 'carrom', ...GAMES.carrom },
 ];
 
 const SCREENS: Partial<Record<GameKind, React.FC<{ onBack: () => void }>>> = {
@@ -61,6 +67,9 @@ const SCREENS: Partial<Record<GameKind, React.FC<{ onBack: () => void }>>> = {
   rps: RpsGame,
   coasters: CoastersGame,
   kitchen: KitchenGame,
+  ludo: LudoGame,
+  chess: ChessGame,
+  carrom: CarromGame,
 };
 
 const Section: React.FC<{ title: string; note: string; games: Shelf[]; card: (g: Shelf) => React.ReactNode }> = ({ title, note, games, card }) => (
