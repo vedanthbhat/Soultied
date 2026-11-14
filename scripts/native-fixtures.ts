@@ -31,6 +31,7 @@ import { daysLeft, normalizeVisit, visitLine } from '../src/together/visit';
 import { SNAP_PROMPTS, normalizeSnap, snapPrompt, snapStage } from '../src/together/snap';
 import { type RecapInput, monthRecap, recapMonth } from '../src/together/recap';
 import { aheadLine, apartKm, apartLabel, distanceKm, normalizeWhere } from '../src/together/where';
+import { BUCKET_IDEAS, bucketOverflow, bucketView, cleanText, normalizeBucket, plannedLine } from '../src/together/bucket';
 import { renderCharacterBack } from '../src/pixel/characterBack';
 import { DEMO_DOODLE, OLD_DOODLE_H, OLD_DOODLE_W, DOODLE_H, DOODLE_W, doodleArt, fullDoodle, smallDoodle } from '../src/together/board';
 
@@ -580,6 +581,43 @@ for (const km of [0, 5, 19.9, 20, 22.4, 24.9, 97.4, 97.6, 99.9, 102, 104.9, 999,
   wheres.labels.push([km, apartLabel(km), apartLabel(km, true)]);
 for (const d of [0, 7, 8, -8, 15, 22, 23, 29, 30, 44, 52, 53, 60, 337, -330, 345, 525, -600, 780, -9.6, 59.6, ...Array.from({ length: 30 }, () => int(1561) - 720)]) wheres.aheads.push([d, aheadLine(d)]);
 
+// our list: what's kept, how it's ordered, what goes when it's too long, and how what's typed is tidied
+const bucketRaws: unknown[] = [
+  null,
+  { items: 'nope' },
+  {
+    items: {
+      a: { text: 'Watch the sunrise', by: 'u1', at: 300, next: true },
+      b: { text: '  Eat   at the shack\twith the\nlights  ', by: 'u2', at: 500, next: true },
+      c: { text: 'Read the same book', by: 'u1', at: 500 },
+      d: { text: 'Escape room', by: 'u1', at: 100, done: 900, doneBy: 'u2' },
+      e: { text: 'Fall asleep on a call', by: 'u2', at: 50, done: 900, doneBy: 'u1' },
+      f: { text: '   ', by: 'u1', at: 1 },
+      g: null,
+      h: 'nope',
+      i: { text: 42, at: 2 },
+      j: { text: 'Next is a string', next: 'yes', at: 'soon', done: 'no' },
+      k: { text: '😀'.repeat(100) },
+      l: { text: 'x'.repeat(120) },
+      m: { text: 'no\u00a0break\u2003space', at: 500 },
+    },
+  },
+];
+{
+  const items: Record<string, unknown> = {};
+  for (let k = 0; k < 206; k++) items[`w${String(k).padStart(3, '0')}`] = { text: `thing ${k}`, at: int(1000), next: int(5) === 0, ...(int(3) === 0 ? { done: 1 + int(1000), doneBy: 'u1' } : {}) };
+  bucketRaws.push({ items });
+}
+const buckets = {
+  ideas: BUCKET_IDEAS,
+  docs: bucketRaws.map((raw) => {
+    const doc = normalizeBucket(raw);
+    const v = bucketView(doc);
+    return { raw, doc, todo: v.todo.map((i) => i.id), done: v.done.map((i) => i.id), overflow: bucketOverflow(doc), planned: [plannedLine(doc, 'Goa'), plannedLine(doc, '')] };
+  }),
+  clean: ['', '  hi  ', 'a\tb\n\nc', 'x'.repeat(85), '😀'.repeat(81), ' é '.repeat(30), 'mixed 😀 text '.repeat(8)].map((s) => [s, cleanText(s)]),
+};
+
 const out = process.argv[2] || 'native-fixtures.json';
-writeFileSync(out, JSON.stringify({ cards, days, hashes, rngSeq, streaks, demo, same, chapters, games, live, doodle: { judges, brushes, fills, choices, games: doodles }, coasters: coasterSteps, escape, record, watch: { looks, ...watch }, wall: { doodles: wallDoodles }, room: { scenes: roomScenes, fires, visits }, snaps, recaps: { cases: recaps, months: recapMonths }, wheres }));
+writeFileSync(out, JSON.stringify({ cards, days, hashes, rngSeq, streaks, demo, same, chapters, games, live, doodle: { judges, brushes, fills, choices, games: doodles }, coasters: coasterSteps, escape, record, watch: { looks, ...watch }, wall: { doodles: wallDoodles }, room: { scenes: roomScenes, fires, visits }, snaps, recaps: { cases: recaps, months: recapMonths }, wheres, buckets }));
 console.log(`wrote ${cards.length} card days, ${streaks.length} streaks, ${demo.length} demo rooms, ${games.length} game moves, ${live.length} live games, ${doodles.length} doodle moves to ${out}`);

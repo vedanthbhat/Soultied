@@ -3,6 +3,7 @@ import { useApp } from '../context/AppContext';
 import { COUCH_STEPS, FIRE_NAMES, couchLine } from '../couch';
 import { NextVisit } from './NextVisit';
 import { HowFar } from './HowFar';
+import { OurList } from './OurList';
 import { MonthRecap } from './MonthRecap';
 import { PixelAvatarRenderer } from './PixelAvatarRenderer';
 import { PixelIcon, SpriteName } from './letters/PixelIcon';
@@ -147,6 +148,8 @@ export const UsPage: React.FC = () => {
       <NextVisit />
 
       <HowFar />
+
+      <OurList />
 
       <MonthRecap />
 

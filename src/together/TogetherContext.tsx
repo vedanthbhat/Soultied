@@ -23,6 +23,7 @@ import { type SnapShot, type SnapStage, SNAP_CAPTION_MAX, demoSnap, normalizeSna
 import { HOLD_BEAT_MS, demoHold, isHolding, normalizeHold } from './hold';
 import { demoAbout, normalizeAbout } from './about';
 import { type WhereEntry, apartKm, demoWhere, deviceZone, normalizeWhere, roundCoord } from './where';
+import { type BucketDoc, BUCKET_MAX, bucketOverflow, cleanText, demoBucket, normalizeBucket } from './bucket';
 
 /**
  * The little shared things of a place that aren't letters, games or decor: the questions you write
@@ -93,6 +94,14 @@ interface TogetherValue {
   where: { ready: boolean; mine: WhereEntry | null; theirs: WhereEntry | null; km: number | null; myZone: string };
   /** share roughly where you are (asks the browser), or stop sharing it */
   shareWhere: (on: boolean) => Promise<'ok' | 'denied' | 'unavailable'>;
+
+  /** our list: the things you want to do together */
+  bucket: BucketDoc;
+  /** add something (for next time, or some day); tick it done (or not); star it for next time; take it off */
+  addWish: (text: string, next?: boolean) => void;
+  tickWish: (id: string, done: boolean) => void;
+  starWish: (id: string, next: boolean) => void;
+  dropWish: (id: string) => void;
 }
 
 const Ctx = createContext<TogetherValue | null>(null);
@@ -407,6 +416,29 @@ export const TogetherProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     [whereDoc.ready, whereDoc.doc, myWhere, me, them, demoWhereRoom, zone]
   );
 
+  /* ---------- our list ---------- */
+
+  const bucketDoc = useSharedDoc('bucket', normalizeBucket, demoBucket);
+  const writeBucket = bucketDoc.write;
+  const addWish = useCallback<TogetherValue['addWish']>(
+    (text, next = false) => {
+      const t = cleanText(text);
+      if (!t) return;
+      const id = newKey('wish-');
+      const item = { id, text: t, by: me, at: Date.now(), next, done: 0, doneBy: '' };
+      // (a long list loses its oldest done things first)
+      const over = bucketOverflow({ items: { ...bucketDoc.doc.items, [id]: item } }).slice(0, BUCKET_MAX);
+      writeBucket({ items: { [id]: item, ...Object.fromEntries(over.map((o) => [o, null])) } });
+    },
+    [me, bucketDoc.doc.items, writeBucket]
+  );
+  const tickWish = useCallback<TogetherValue['tickWish']>(
+    (id, done) => writeBucket({ items: { [id]: { done: done ? Date.now() : 0, doneBy: done ? me : '' } } }),
+    [me, writeBucket]
+  );
+  const starWish = useCallback<TogetherValue['starWish']>((id, next) => writeBucket({ items: { [id]: { next } } }), [writeBucket]);
+  const dropWish = useCallback<TogetherValue['dropWish']>((id) => writeBucket({ items: { [id]: null } }), [writeBucket]);
+
   const value = useMemo<TogetherValue>(
     () => ({
       asksReady: asksDoc.ready,
@@ -440,8 +472,13 @@ export const TogetherProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       saveAbout,
       where,
       shareWhere,
+      bucket: bucketDoc.doc,
+      addWish,
+      tickWish,
+      starWish,
+      dropWish,
     }),
-    [asksDoc.ready, asks, ask, answerAsk, markAskSeen, withdrawAsk, myMood, theirMood, setMood, moodNews, markMoodSeen, sendTouch, touchNews, markTouchesSeen, lastSent, roomTouch, boardDoc.doc, wallNews, markWallSeen, pinned, hangArt, visitDoc.doc, setVisit, snap, postSnap, hold, about, saveAbout, where, shareWhere]
+    [asksDoc.ready, asks, ask, answerAsk, markAskSeen, withdrawAsk, myMood, theirMood, setMood, moodNews, markMoodSeen, sendTouch, touchNews, markTouchesSeen, lastSent, roomTouch, boardDoc.doc, wallNews, markWallSeen, pinned, hangArt, visitDoc.doc, setVisit, snap, postSnap, hold, about, saveAbout, where, shareWhere, bucketDoc.doc, addWish, tickWish, starWish, dropWish]
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 };

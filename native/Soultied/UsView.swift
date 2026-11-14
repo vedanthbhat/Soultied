@@ -26,6 +26,7 @@ struct UsView: View {
                     if !place.partnerHere { InviteCard(place: place) }
                     if place.partnerHere {
                         ApartCard(place: place).id("apart")
+                        BucketCard(place: place).id("list")
                         RecapCard(place: place).id("recap")
                     }
                     you

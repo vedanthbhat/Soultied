@@ -34,6 +34,8 @@ public final class PlaceModel {
     public internal(set) var aboutDoc: [String: [String: String]] = [:]
     /// how far apart: each of you's time zone, and roughly where (meta/where, once you share it)
     public internal(set) var whereDoc = WhereDoc()
+    /// our list: the things you want to do together (meta/bucket)
+    public internal(set) var bucket = BucketDoc()
     /// holding the couch: who's holding, and when your person's last beat arrived here
     public internal(set) var holdDoc = HoldDoc()
     public internal(set) var theirHoldSeen: Date?
@@ -135,6 +137,10 @@ public final class PlaceModel {
             db.listen(meta("visit")) { [weak self] d in
                 self?.visit = VisitDoc(d)
                 self?.loaded.insert("visit")
+            },
+            db.listen(meta("bucket")) { [weak self] d in
+                self?.bucket = BucketDoc(d)
+                self?.loaded.insert("bucket")
             },
             db.listen(meta("where")) { [weak self] d in
                 guard let self else { return }
@@ -542,6 +548,36 @@ public final class PlaceModel {
 
     /// days until you're together (nil: no day set, or it's been)
     public var visitDays: Int? { visit.daysLeft(today: today) }
+
+    /* ---------- our list ---------- */
+
+    /// add something to do together (for next time, or some day)
+    public func addWish(_ text: String, next: Bool = false) {
+        let t = cleanText(text)
+        guard !t.isEmpty else { return }
+        let item = BucketItem(id: Values.newKey("wish-"), text: t, by: me, at: Values.nowMs(), next: next)
+        // (a long list loses its oldest done things first)
+        var after = bucket
+        after.items[item.id] = item
+        var items: Doc = [item.id: item.doc]
+        for id in after.overflow { items[id] = NSNull() }
+        save(meta("bucket"), ["items": items], "your list")
+    }
+
+    /// tick it done (or not done after all)
+    public func tickWish(_ id: String, done: Bool) {
+        save(meta("bucket"), ["items": [id: ["done": done ? Values.nowMs() : 0, "doneBy": done ? me : ""] as Doc]], "your list")
+    }
+
+    /// star it for the next time you're together (or not)
+    public func starWish(_ id: String, next: Bool) {
+        save(meta("bucket"), ["items": [id: ["next": next] as Doc]], "your list")
+    }
+
+    /// take it off the list
+    public func dropWish(_ id: String) {
+        save(meta("bucket"), ["items": [id: NSNull()] as Doc], "your list")
+    }
 
     /* ---------- how far apart ---------- */
 

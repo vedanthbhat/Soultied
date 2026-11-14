@@ -234,6 +234,9 @@ jobs:
           # how far apart, and their time (on Us, and as widgets)
           shot us-apart -demo -tab us -scrollUs apart
           shot widgets-apart -widgets apart
+          # our list (on Us, and open)
+          shot us-list -demo -tab us -scrollUs list
+          shot bucket -demo -tab us -bucket
           ls -la "$RUNNER_TEMP/shots"
           echo "dev=$dev" >> "$GITHUB_OUTPUT"
 

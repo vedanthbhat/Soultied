@@ -392,7 +392,7 @@ enum UsGlyphs {
     )
     /// a little map pin
     static let pin = Glyph(
-        ["..#####..", ".#rrrrr#.", "#rrwwwrr#", "#rwwwwwr#", "#rrwwwrr#", ".#rrrrr#.", "..#rrr#..", "...#r#...", "....#...."],
+        ["..#####..", ".#rrrrr#.", "#rrrwrrr#", "#rrwwwrr#", "#rrrwrrr#", ".#rrrrr#.", "..#rrr#..", "...#r#...", "....#...."],
         ["#": "#7a2e2a", "r": "#d9534f", "w": "#fffaf0"]
     )
     static let flame = Icons.flame

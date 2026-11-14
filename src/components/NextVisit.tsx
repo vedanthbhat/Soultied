@@ -2,12 +2,13 @@ import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { useTogether } from '../together/TogetherContext';
 import { VISIT_WHAT_MAX, daysLeft, visitLine } from '../together/visit';
+import { plannedLine } from '../together/bucket';
 import { addDays } from '../letters/engine';
 
 /** The next time you'll be together: the countdown, and a way for either of you to set or change the day. */
 export const NextVisit: React.FC = () => {
   const { today, partnerUser } = useApp();
-  const { visit, setVisit } = useTogether();
+  const { visit, setVisit, bucket } = useTogether();
   const left = daysLeft(visit, today);
   const line = visitLine(visit, today);
   const [editing, setEditing] = useState(false);
@@ -39,6 +40,7 @@ export const NextVisit: React.FC = () => {
                 ? `until ${visit.what || 'you’re together'}`
                 : visit.what || 'you’re together'}
           </div>
+          {left !== null && plannedLine(bucket, visit.what) && <div className="text-sm text-[var(--terracotta-d,#8f4b3a)]">{plannedLine(bucket, visit.what)}</div>}
         </div>
         {!editing && (
           <button className="px-btn px-btn--small" onClick={open}>

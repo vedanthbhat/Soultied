@@ -20,6 +20,9 @@ struct CountdownCard: View {
                     Text(left > 1 ? "\(left) days" : left == 1 ? "Tomorrow" : "Today!").font(.pxHeading).foregroundStyle(Color.inkSoft)
                     Text(place.visit.what.isEmpty ? (left > 1 ? "until you’re together" : "you’re together") : (left > 1 ? "until \(place.visit.what)" : place.visit.what))
                         .font(.pxBody).foregroundStyle(Color.muted).lineLimit(2)
+                    if let planned = place.bucket.plannedLine(place.visit.what) {
+                        Text(planned).font(.pxSmall).foregroundStyle(Color.terracottaD).lineLimit(1).minimumScaleFactor(0.8)
+                    }
                 } else {
                     Text("When do you see each other next?").font(.pxBodyBold).foregroundStyle(Color.inkSoft).fixedSize(horizontal: false, vertical: true)
                     Text("Set the day and you’ll both count down to it.").font(.pxSmall).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
