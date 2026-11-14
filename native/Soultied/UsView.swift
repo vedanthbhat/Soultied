@@ -24,7 +24,10 @@ struct UsView: View {
                     DarkHeading(title: "Us", sub: place.space?.name)
                     couple
                     if !place.partnerHere { InviteCard(place: place) }
-                    if place.partnerHere { RecapCard(place: place).id("recap") }
+                    if place.partnerHere {
+                        ApartCard(place: place).id("apart")
+                        RecapCard(place: place).id("recap")
+                    }
                     you
                     PlusCardView(place: place)
                     LookPicker().id("looks")
@@ -39,6 +42,8 @@ struct UsView: View {
                 if MainView.showLooks || Launch.args.contains("-looks") {
                     MainView.showLooks = false
                     DispatchQueue.main.async { proxy.scrollTo("looks", anchor: .center) }
+                } else if let to = Launch.scrollUs {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { proxy.scrollTo(to, anchor: .top) }
                 }
             }
         }

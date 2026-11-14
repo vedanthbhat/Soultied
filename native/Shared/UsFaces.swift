@@ -39,6 +39,10 @@ struct UsNow {
     /// your person's mood (nil once it's a day old), and how long ago they said it
     var mood: MoodEntry?
     var moodAgo = ""
+    /// your person's time zone, yours, and how far apart you are (once you've both shared roughly where)
+    var themTz = ""
+    var myTz = TimeZone.current.identifier
+    var apartKm: Double?
 
     init() {}
 
@@ -66,6 +70,8 @@ struct UsNow {
         let v = VisitDoc(date: u.visitDate, what: u.visitWhat)
         visitDays = v.daysLeft(today: today)
         visitWhat = u.visitWhat
+        themTz = u.themTz ?? ""
+        apartKm = u.apartKm
         let ms = date.timeIntervalSince1970 * 1000
         if u.mood != nil || !u.moodText.isEmpty, ms - u.moodAt < MOOD_TTL {
             mood = MoodEntry(mood: u.mood.flatMap { MoodId(rawValue: $0) }, text: u.moodText, at: u.moodAt)
@@ -88,8 +94,15 @@ struct UsNow {
         u.visitWhat = "Goa"
         u.mood = MoodEntry(mood: .missing, text: "counting the days", at: Date().timeIntervalSince1970 * 1000 - 2 * 3600e3)
         u.moodAgo = "2 hours ago"
+        // Aanya in Bengaluru, Rohan in London
+        u.themTz = "Europe/London"
+        u.myTz = "Asia/Kolkata"
+        u.apartKm = WhereDoc(demoWhere(now: 0)).apartKm(me: Demo.me, them: Demo.them)
         return u
     }
+
+    /// how far apart, in km or miles as people count where you are
+    var apartLine: String? { apartKm.map { apartLabel($0, miles: countsInMiles(region: Locale.current.region?.identifier)) } }
 
     var fireName: String { CouchState.fireNames[max(0, min(3, level))] }
     /// "4 days in a row", or what lights it again
@@ -112,6 +125,26 @@ struct UsNow {
         guard let c = count else { return "Set the day in Soultied" }
         return c.n == "Today" ? "Today: \(c.label)" : "\(c.n) \(c.label)"
     }
+}
+
+/// your person's time ("4:11 pm"), its hour, and how it sits against yours ("5½ hours behind you")
+struct TheirClock {
+    let text: String
+    let hour: Int
+    let ahead: String?
+
+    init?(zone: String, mine: String, at: Date) {
+        guard !zone.isEmpty, let tz = TimeZone(identifier: zone) else { return nil }
+        var f = Date.FormatStyle(date: .omitted, time: .shortened)
+        f.timeZone = tz
+        text = at.formatted(f).replacingOccurrences(of: "\u{202f}", with: " ").replacingOccurrences(of: "AM", with: "am").replacingOccurrences(of: "PM", with: "pm")
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = tz
+        hour = cal.component(.hour, from: at)
+        ahead = zoneDiffMinutes(theirs: zone, mine: mine, at: at).map(aheadLine)
+    }
+
+    var asleep: Bool { asleepHour(hour) }
 }
 
 /* ---------- pictures ---------- */
@@ -274,6 +307,35 @@ struct UsFace: View {
     }
 }
 
+/// your person's time, big, and how far apart you are
+struct ApartFace: View {
+    let u: UsNow
+    let date: Date
+    var body: some View {
+        PaperFace {
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    glyphView(UsGlyphs.pin, 2.5)
+                    Text(u.themName).font(WidgetFont.px(11, bold: true)).foregroundStyle(mutedU).lineLimit(1)
+                }
+                Spacer(minLength: 0)
+                if let c = TheirClock(zone: u.themTz, mine: u.myTz, at: date) {
+                    Text(c.text).font(WidgetFont.px(34, bold: true)).foregroundStyle(inkU).lineLimit(1).minimumScaleFactor(0.5)
+                    if let a = c.ahead {
+                        Text(c.asleep ? "\(a) · asleep?" : a).font(WidgetFont.px(11)).foregroundStyle(mutedU).lineLimit(2).minimumScaleFactor(0.8)
+                    }
+                    if let km = u.apartLine {
+                        Text(km).font(WidgetFont.px(13, bold: true)).foregroundStyle(inkU).lineLimit(1).minimumScaleFactor(0.7)
+                    }
+                } else {
+                    Text(u.setUp ? "Their time shows here once they’ve opened Soultied" : "Open Soultied").font(WidgetFont.px(13, bold: true)).foregroundStyle(inkU).fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        }
+    }
+}
+
 /* ---------- lock screen (drawn in one colour by iOS; the shapes do the work) ---------- */
 
 /// round: the fire's flame and the days in a row
@@ -327,6 +389,11 @@ enum UsGlyphs {
     static let calendar = Glyph(
         [".k.....k.", "#rkrrrkr#", "#rrrrrrr#", "#ppppppp#", "#pdpdpdp#", "#ppppppp#", "#pdphpdp#", "#ppppppp#", "#########"],
         ["#": "#8a5a3c", "k": "#3a2a26", "r": "#c4453f", "p": "#fffaf0", "d": "#b9a98f", "h": "#d9534f"]
+    )
+    /// a little map pin
+    static let pin = Glyph(
+        ["..#####..", ".#rrrrr#.", "#rrwwwrr#", "#rwwwwwr#", "#rrwwwrr#", ".#rrrrr#.", "..#rrr#..", "...#r#...", "....#...."],
+        ["#": "#7a2e2a", "r": "#d9534f", "w": "#fffaf0"]
     )
     static let flame = Icons.flame
     static let flameOut = Icons.flameOut

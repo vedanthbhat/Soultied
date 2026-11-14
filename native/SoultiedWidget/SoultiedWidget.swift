@@ -27,6 +27,7 @@ struct SoultiedWidgets: WidgetBundle {
         CountdownWidget()
         MoodWidget()
         UsWidget()
+        ApartWidget()
     }
 }
 
@@ -315,6 +316,56 @@ struct UsWidget: Widget {
     }
 }
 
+/* ---------- your person's time, and how far apart ---------- */
+
+/// a new picture each minute for the next hour, so their clock keeps time
+struct ApartProvider: TimelineProvider {
+    func placeholder(in context: Context) -> UsEntry { UsEntry(date: Date(), u: .demo) }
+
+    func getSnapshot(in context: Context, completion: @escaping (UsEntry) -> Void) {
+        let s = WidgetShare.load()
+        completion(UsEntry(date: Date(), u: context.isPreview && s.us == nil ? .demo : UsNow(s, at: Date())))
+    }
+
+    func getTimeline(in context: Context, completion: @escaping (Timeline<UsEntry>) -> Void) {
+        Task {
+            let s = await Fetch.freshUs()
+            let now = Date()
+            let minute = Date(timeIntervalSince1970: (now.timeIntervalSince1970 / 60).rounded(.down) * 60)
+            let dates = [now] + (1..<60).map { minute.addingTimeInterval(Double($0) * 60) }
+            completion(Timeline(entries: dates.map { UsEntry(date: $0, u: UsNow(s, at: $0)) }, policy: .atEnd))
+        }
+    }
+}
+
+struct ApartWidgetView: View {
+    @Environment(\.widgetFamily) private var family
+    let entry: UsEntry
+    var body: some View {
+        let u = entry.u
+        let c = TheirClock(zone: u.themTz, mine: u.myTz, at: entry.date)
+        Group {
+            switch family {
+            case .accessoryRectangular: LockRow(glyph: UsGlyphs.pin, title: c.map { "\($0.text) for \(u.themName)" } ?? u.themName, sub: u.apartLine ?? c?.ahead ?? "Their time shows once they’ve opened Soultied")
+            case .accessoryInline: Text(c.map { "\(u.themName): \($0.text)\(u.apartLine.map { " · \($0)" } ?? "")" } ?? "\(u.themName)’s time")
+            default: ApartFace(u: u, date: entry.date)
+            }
+        }
+        .containerBackground(for: .widget) { Backdrop(family: family, color: Color(red: 0.98, green: 0.95, blue: 0.89)) }
+        .widgetURL(homeURL)
+    }
+}
+
+struct ApartWidget: Widget {
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: WidgetShare.apartKind, provider: ApartProvider()) { ApartWidgetView(entry: $0) }
+            .configurationDisplayName("Their time")
+            .description("What time it is for your person, and how far apart you are.")
+            .supportedFamilies([.systemSmall, .accessoryRectangular, .accessoryInline])
+            .contentMarginsDisabled()
+    }
+}
+
 /* ---------- looking for new things (Firestore's REST API) ---------- */
 
 enum Fetch {
@@ -499,6 +550,9 @@ enum Fetch {
             u.mood = m?["mood"] as? String
             u.moodText = m?["text"] as? String ?? ""
             u.moodAt = m?["at"] as? Double ?? 0
+            let wh = WhereDoc(try await get(root(c) + "/meta/where", t))
+            u.themTz = wh.by[c.them]?.tz
+            u.apartKm = wh.apartKm(me: c.me, them: c.them)
             let visitRaw = try await get(root(c) + "/meta/visit", t)
             let visit = VisitDoc(visitRaw)
             u.visitDate = visit.date

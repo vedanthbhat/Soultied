@@ -32,6 +32,8 @@ public final class PlaceModel {
     public internal(set) var snapDoc = SnapDoc()
     /// what each of you said about the two of you, when you moved in (meta/about: by uid, question to answer)
     public internal(set) var aboutDoc: [String: [String: String]] = [:]
+    /// how far apart: each of you's time zone, and roughly where (meta/where, once you share it)
+    public internal(set) var whereDoc = WhereDoc()
     /// holding the couch: who's holding, and when your person's last beat arrived here
     public internal(set) var holdDoc = HoldDoc()
     public internal(set) var theirHoldSeen: Date?
@@ -133,6 +135,12 @@ public final class PlaceModel {
             db.listen(meta("visit")) { [weak self] d in
                 self?.visit = VisitDoc(d)
                 self?.loaded.insert("visit")
+            },
+            db.listen(meta("where")) { [weak self] d in
+                guard let self else { return }
+                self.whereDoc = WhereDoc(d)
+                self.loaded.insert("where")
+                self.keepZone()
             },
             db.listen(meta("about")) { [weak self] d in
                 var by: [String: [String: String]] = [:]
@@ -534,6 +542,36 @@ public final class PlaceModel {
 
     /// days until you're together (nil: no day set, or it's been)
     public var visitDays: Int? { visit.daysLeft(today: today) }
+
+    /* ---------- how far apart ---------- */
+
+    /// yours and theirs (nil until there's anything kept)
+    public var whereMine: WhereEntry? { whereDoc.by[me] }
+    public var whereTheirs: WhereEntry? { them.flatMap { whereDoc.by[$0] } }
+    /// how far apart you are, once you've both shared roughly where you are
+    public var apartKm: Double? { whereDoc.apartKm(me: me, them: them) }
+    /// your time zone (in the demo room, Aanya's)
+    public var myZone: String { isDemo ? (whereMine?.tz ?? TimeZone.current.identifier) : TimeZone.current.identifier }
+
+    /// keeps your time zone up to date, so your person can see what time it is for you
+    private func keepZone() {
+        let zone = TimeZone.current.identifier
+        guard !isDemo, WhereDoc.isZone(zone), whereMine?.tz != zone else { return }
+        save(meta("where"), ["by": [me: ["tz": zone, "at": Values.nowMs()] as Doc]], "your time zone")
+    }
+
+    /// share roughly where you are (rounded to a tenth of a degree, about 11 km, before it's kept)
+    public func shareWhere(lat: Double, lon: Double) {
+        let zone = TimeZone.current.identifier
+        var e: Doc = ["lat": roundCoord(lat), "lon": roundCoord(lon), "at": Values.nowMs()]
+        if WhereDoc.isZone(zone) && !isDemo { e["tz"] = zone }
+        save(meta("where"), ["by": [me: e]], "where you are")
+    }
+
+    /// stop sharing where you are (your time zone stays)
+    public func stopSharingWhere() {
+        save(meta("where"), ["by": [me: ["lat": NSNull(), "lon": NSNull(), "at": Values.nowMs()] as Doc]], "where you are")
+    }
 
     /// sets the day you'll be together next, and where or what for ("" for the day takes it down)
     public func setVisit(date: String, what: String) {

@@ -85,6 +85,7 @@ targets:
         SoultiedKeychainGroup: $(DEVELOPMENT_TEAM).$(APP_BUNDLE_ID).shared
         NSCameraUsageDescription: So you can take a photo for your wall, and so your person can see you on a call.
         NSMicrophoneUsageDescription: So your person can hear you on a call and at karaoke night.
+        NSLocationWhenInUseUsageDescription: So the two of you can see how far apart you are. Soultied only keeps the town, never the street.
         NSPhotoLibraryUsageDescription: So you can put your photos on your shared wall.
     settings:
       base:

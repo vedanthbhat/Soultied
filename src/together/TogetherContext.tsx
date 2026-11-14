@@ -22,6 +22,7 @@ import { type VisitDoc, VISIT_WHAT_MAX, demoVisit, normalizeVisit } from './visi
 import { type SnapShot, type SnapStage, SNAP_CAPTION_MAX, demoSnap, normalizeSnap, snapDocName, snapPrompt, snapStage } from './snap';
 import { HOLD_BEAT_MS, demoHold, isHolding, normalizeHold } from './hold';
 import { demoAbout, normalizeAbout } from './about';
+import { type WhereEntry, apartKm, demoWhere, deviceZone, normalizeWhere, roundCoord } from './where';
 
 /**
  * The little shared things of a place that aren't letters, games or decor: the questions you write
@@ -87,6 +88,11 @@ interface TogetherValue {
   about: { ready: boolean; mine: Record<string, string> | null };
   /** keep what you said about the two of you */
   saveAbout: (answers: Record<string, string>) => void;
+
+  /** how far apart you are (km, once you've both shared roughly where), your time zone and theirs */
+  where: { ready: boolean; mine: WhereEntry | null; theirs: WhereEntry | null; km: number | null; myZone: string };
+  /** share roughly where you are (asks the browser), or stop sharing it */
+  shareWhere: (on: boolean) => Promise<'ok' | 'denied' | 'unavailable'>;
 }
 
 const Ctx = createContext<TogetherValue | null>(null);
@@ -349,6 +355,58 @@ export const TogetherProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const about = useMemo(() => ({ ready: aboutDoc.ready, mine: aboutDoc.doc.by[me] ?? null }), [aboutDoc.ready, aboutDoc.doc, me]);
   const saveAbout = useCallback<TogetherValue['saveAbout']>((answers) => writeAbout({ by: { [me]: { ...answers, at: String(Date.now()) } } }), [me, writeAbout]);
 
+  /* ---------- how far apart ---------- */
+
+  const whereDoc = useSharedDoc('where', normalizeWhere, demoWhere);
+  const writeWhere = whereDoc.write;
+  const demoWhereRoom = whereDoc.mode === 'demo';
+  const zone = useMemo(deviceZone, []);
+  const myWhere = whereDoc.doc.by[me] ?? null;
+  // your time zone, kept up to date (so your person can see what time it is for you)
+  useEffect(() => {
+    if (!whereDoc.ready || demoWhereRoom || !zone || myWhere?.tz === zone) return;
+    writeWhere({ by: { [me]: { tz: zone, at: Date.now() } } });
+  }, [whereDoc.ready, demoWhereRoom, zone, myWhere?.tz, me, writeWhere]);
+  const shareWhere = useCallback<TogetherValue['shareWhere']>(
+    async (on) => {
+      if (!on) {
+        writeWhere({ by: { [me]: { lat: null, lon: null, at: Date.now() } } });
+        return 'ok';
+      }
+      if (typeof navigator === 'undefined' || !navigator.geolocation) return 'unavailable';
+      return new Promise((resolve) =>
+        navigator.geolocation.getCurrentPosition(
+          (p) => {
+            writeWhere({ by: { [me]: { lat: roundCoord(p.coords.latitude), lon: roundCoord(p.coords.longitude), ...(zone ? { tz: zone } : {}), at: Date.now() } } });
+            resolve('ok');
+          },
+          (e) => resolve(e.code === 1 ? 'denied' : 'unavailable'),
+          { enableHighAccuracy: false, maximumAge: 30 * 60e3, timeout: 20000 }
+        )
+      );
+    },
+    [me, zone, writeWhere]
+  );
+  // once you're sharing, where you are follows you (quietly, when the browser already allows it, twice a day at most)
+  const whereStale = !demoWhereRoom && !!myWhere && myWhere.lat !== null && Date.now() - myWhere.at > 12 * 3600e3;
+  useEffect(() => {
+    if (!whereStale || typeof navigator === 'undefined' || !navigator.permissions) return;
+    navigator.permissions
+      .query({ name: 'geolocation' as PermissionName })
+      .then((s) => (s.state === 'granted' ? shareWhere(true) : undefined))
+      .catch(() => undefined);
+  }, [whereStale, shareWhere]);
+  const where = useMemo(
+    () => ({
+      ready: whereDoc.ready,
+      mine: myWhere,
+      theirs: them ? (whereDoc.doc.by[them] ?? null) : null,
+      km: apartKm(whereDoc.doc, me, them),
+      myZone: demoWhereRoom ? (myWhere?.tz ?? zone) : zone,
+    }),
+    [whereDoc.ready, whereDoc.doc, myWhere, me, them, demoWhereRoom, zone]
+  );
+
   const value = useMemo<TogetherValue>(
     () => ({
       asksReady: asksDoc.ready,
@@ -380,8 +438,10 @@ export const TogetherProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       setHolding,
       about,
       saveAbout,
+      where,
+      shareWhere,
     }),
-    [asksDoc.ready, asks, ask, answerAsk, markAskSeen, withdrawAsk, myMood, theirMood, setMood, moodNews, markMoodSeen, sendTouch, touchNews, markTouchesSeen, lastSent, roomTouch, boardDoc.doc, wallNews, markWallSeen, pinned, hangArt, visitDoc.doc, setVisit, snap, postSnap, hold, about, saveAbout]
+    [asksDoc.ready, asks, ask, answerAsk, markAskSeen, withdrawAsk, myMood, theirMood, setMood, moodNews, markMoodSeen, sendTouch, touchNews, markTouchesSeen, lastSent, roomTouch, boardDoc.doc, wallNews, markWallSeen, pinned, hangArt, visitDoc.doc, setVisit, snap, postSnap, hold, about, saveAbout, where, shareWhere]
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 };

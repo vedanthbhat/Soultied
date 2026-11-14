@@ -231,6 +231,9 @@ jobs:
           shot recap-share -demo -tab us -recapShare
           # the five questions when you move in
           shot about -demo -about
+          # how far apart, and their time (on Us, and as widgets)
+          shot us-apart -demo -tab us -scrollUs apart
+          shot widgets-apart -widgets apart
           ls -la "$RUNNER_TEMP/shots"
           echo "dev=$dev" >> "$GITHUB_OUTPUT"
 

@@ -78,6 +78,8 @@ enum Launch {
     static var plus: Bool { args.contains("-plus") }
     /// -scrollHome snap   Home, scrolled down to today's photo (or the countdown) (the screenshots)
     static var scrollHome: String? { args.contains("-scrollHome") ? (value("-scrollHome").flatMap { $0.hasPrefix("-") ? nil : $0 } ?? "countdown") : nil }
+    /// -scrollUs apart   Us, scrolled down to a card (the screenshots)
+    static var scrollUs: String? { value("-scrollUs").flatMap { $0.hasPrefix("-") ? nil : $0 } }
     /// -widgets doodle (or board, empty, us, fires)   the home-screen widgets, drawn by the app (screenshots)
     static var widgets: String? { args.contains("-widgets") ? (value("-widgets") ?? "doodle") : nil }
     static func escapeScene(_ s: EscapeSession) {

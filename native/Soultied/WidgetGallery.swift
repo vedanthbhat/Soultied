@@ -6,6 +6,7 @@ import SoultiedCore
  * The home-screen widgets, drawn by the app at their real sizes on a pretend home screen, so each build's
  * screenshots show them (a simulator can't put a widget on its home screen from a script).
  *   -widgets doodle | board | empty | us (the fire, the countdown, their mood) | fires (the fire at each strength)
+ *   | apart (their time, and how far apart)
  */
 struct WidgetGallery: View {
     let which: String
@@ -44,6 +45,17 @@ struct WidgetGallery: View {
                         tile(small) { CountdownFace(u: Self.counting(nil)) }
                         tile(small) { CountdownFace(u: Self.counting(0)) }
                     }
+                case "apart":
+                    HStack(spacing: 22) {
+                        tile(small) { ApartFace(u: .demo, date: Self.evening) }
+                        tile(small) { ApartFace(u: Self.timeOnly, date: Self.evening.addingTimeInterval(-6 * 3600)) }
+                    }
+                    VStack(spacing: 10) {
+                        LockRow(glyph: UsGlyphs.pin, title: "\(TheirClock(zone: "Europe/London", mine: "Asia/Kolkata", at: Self.evening)?.text ?? "") for Rohan", sub: UsNow.demo.apartLine ?? "")
+                            .frame(width: 158, height: 56)
+                        Text("Rohan: \(TheirClock(zone: "Europe/London", mine: "Asia/Kolkata", at: Self.evening)?.text ?? "") · \(UsNow.demo.apartLine ?? "")").font(WidgetFont.px(13))
+                    }
+                    .foregroundStyle(.white)
                 case "board":
                     HStack(spacing: 22) {
                         tile(small) { board(.small, Self.photos) }
@@ -99,6 +111,21 @@ struct WidgetGallery: View {
         u.streak = streak
         u.logLeft = level > 0
         u.logRight = level > 1
+        return u
+    }
+
+    /// 9:40 pm in Bengaluru (so 4:10 pm in London), for the pictures of their time
+    private static var evening: Date {
+        var c = DateComponents()
+        (c.year, c.month, c.day, c.hour, c.minute) = (2026, 11, 14, 16, 10)
+        c.timeZone = TimeZone(identifier: "Europe/London")
+        return Calendar(identifier: .gregorian).date(from: c) ?? Date()
+    }
+
+    /// their time, before you've both shared where you are
+    private static var timeOnly: UsNow {
+        var u = UsNow.demo
+        u.apartKm = nil
         return u
     }
 

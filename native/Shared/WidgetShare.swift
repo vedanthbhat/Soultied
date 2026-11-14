@@ -16,7 +16,9 @@ enum WidgetShare {
     static let countdownKind = "SoultiedCountdown"
     static let moodKind = "SoultiedMood"
     static let usKind = "SoultiedUs"
-    static var usKinds: [String] { [fireKind, countdownKind, moodKind, usKind] }
+    /// and your person's time, and how far apart you are
+    static let apartKind = "SoultiedApart"
+    static var usKinds: [String] { [fireKind, countdownKind, moodKind, usKind, apartKind] }
 
     struct Config: Codable, Equatable {
         var sid: String
@@ -59,6 +61,9 @@ enum WidgetShare {
         var moodAt = 0.0
         /// the wallpaper, for the picture of the fire
         var wall = "sage"
+        /// your person's time zone, and how far apart you are (km, once you've both shared roughly where)
+        var themTz: String?
+        var apartKm: Double?
     }
 
     struct Saved: Codable, Equatable {

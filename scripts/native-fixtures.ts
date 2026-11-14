@@ -30,6 +30,7 @@ import { fireOf, type CouchState } from '../src/couch';
 import { daysLeft, normalizeVisit, visitLine } from '../src/together/visit';
 import { SNAP_PROMPTS, normalizeSnap, snapPrompt, snapStage } from '../src/together/snap';
 import { type RecapInput, monthRecap, recapMonth } from '../src/together/recap';
+import { aheadLine, apartKm, apartLabel, distanceKm, normalizeWhere } from '../src/together/where';
 import { renderCharacterBack } from '../src/pixel/characterBack';
 import { DEMO_DOODLE, OLD_DOODLE_H, OLD_DOODLE_W, DOODLE_H, DOODLE_W, doodleArt, fullDoodle, smallDoodle } from '../src/together/board';
 
@@ -556,6 +557,29 @@ for (const t of ['2026-01-01', '2026-01-03', '2026-01-04', '2026-03-02', '2026-0
   recapMonths.push([t, r.month, r.done]);
 }
 
+// how far apart: what's kept, the distance between two places, and how it's all said
+const wheres: { docs: unknown[]; dists: number[][]; labels: Array<[number, string, string]>; aheads: Array<[number, string]> } = { docs: [], dists: [], labels: [], aheads: [] };
+for (const raw of [
+  null,
+  { by: { a: { lat: 12.97, lon: 77.59, tz: 'Asia/Kolkata', at: 5 }, b: { lat: 51.507, lon: -0.128, tz: 'Europe/London', at: 7 } } },
+  { by: { a: { lat: -33.87, lon: 151.21, tz: 'Australia/Sydney' }, b: { lat: 40.71, lon: -74.01, tz: 'America/New_York' } } },
+  { by: { a: { lat: 91, lon: 10, tz: 'Bad Zone!' }, b: { lat: -0.04, lon: -0.15, tz: 'Etc/GMT+5' } } },
+  { by: { a: { lat: 10, tz: 'UTC' }, b: { lat: '10', lon: 20, tz: 5 }, c: 'nope' } },
+  { by: { a: { lat: 45.25, lon: -179.95, tz: 'America/Argentina/Buenos_Aires' }, b: { lat: -45.25, lon: 179.95, tz: 'Pacific/Auckland', at: 1e12 } } },
+  { by: 'nope' },
+]) {
+  const doc = normalizeWhere(raw);
+  wheres.docs.push({ raw, doc, km: apartKm(doc, 'a', 'b') });
+}
+for (let k = 0; k < 80; k++) {
+  const a = { lat: int(1801) / 10 - 90, lon: int(3601) / 10 - 180 };
+  const b = k % 4 === 0 ? { lat: a.lat + (int(41) - 20) / 10, lon: a.lon + (int(41) - 20) / 10 } : { lat: int(1801) / 10 - 90, lon: int(3601) / 10 - 180 };
+  wheres.dists.push([a.lat, a.lon, b.lat, b.lon, distanceKm(a, b)]);
+}
+for (const km of [0, 5, 19.9, 20, 22.4, 24.9, 97.4, 97.6, 99.9, 102, 104.9, 999, 1000, 1024, 1608, 8049, 8075, 12345.6, 20015, ...Array.from({ length: 30 }, () => int(2000000) / 100)])
+  wheres.labels.push([km, apartLabel(km), apartLabel(km, true)]);
+for (const d of [0, 7, 8, -8, 15, 22, 23, 29, 30, 44, 52, 53, 60, 337, -330, 345, 525, -600, 780, -9.6, 59.6, ...Array.from({ length: 30 }, () => int(1561) - 720)]) wheres.aheads.push([d, aheadLine(d)]);
+
 const out = process.argv[2] || 'native-fixtures.json';
-writeFileSync(out, JSON.stringify({ cards, days, hashes, rngSeq, streaks, demo, same, chapters, games, live, doodle: { judges, brushes, fills, choices, games: doodles }, coasters: coasterSteps, escape, record, watch: { looks, ...watch }, wall: { doodles: wallDoodles }, room: { scenes: roomScenes, fires, visits }, snaps, recaps: { cases: recaps, months: recapMonths } }));
+writeFileSync(out, JSON.stringify({ cards, days, hashes, rngSeq, streaks, demo, same, chapters, games, live, doodle: { judges, brushes, fills, choices, games: doodles }, coasters: coasterSteps, escape, record, watch: { looks, ...watch }, wall: { doodles: wallDoodles }, room: { scenes: roomScenes, fires, visits }, snaps, recaps: { cases: recaps, months: recapMonths }, wheres }));
 console.log(`wrote ${cards.length} card days, ${streaks.length} streaks, ${demo.length} demo rooms, ${games.length} game moves, ${live.length} live games, ${doodles.length} doodle moves to ${out}`);

@@ -43,6 +43,8 @@ public enum Demo {
         db.seed("\(p)/meta/touch", ["items": Doc(), "seen": Doc()])
         // Rohan's taken today's photo (the view from his window)
         db.seed("\(p)/meta/\(snapDocName(today))", ["by": [them: ["photo": DEMO_SNAP_PHOTO, "w": 384, "h": 288, "caption": "from my window, just now", "at": nowMs - 50 * 60e3] as Doc]])
+        // Aanya in Bengaluru, Rohan in London
+        db.seed("\(p)/meta/where", demoWhere(now: nowMs))
         // Goa, in twelve days
         db.seed("\(p)/meta/visit", ["date": Day.add(today, 12), "what": "Goa", "by": them, "at": nowMs - 26 * 3600e3])
         db.seed("\(p)/meta/board", ["last": [them: ["at": nowMs - 3 * 3600e3, "kind": "doodle"]], "seen": Doc(), "art": Doodle.art(Doodle.demo, ref: "note-demo-2", by: them, at: nowMs).doc, "drew": [them: ["id": "note-demo-2", "at": nowMs - 3 * 3600e3]]])

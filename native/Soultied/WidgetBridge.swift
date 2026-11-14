@@ -67,6 +67,8 @@ enum WidgetBridge {
         u.moodText = m?.text ?? ""
         u.moodAt = m?.at ?? 0
         u.wall = place.decor.wall
+        u.themTz = place.whereTheirs?.tz
+        u.apartKm = place.apartKm
         s.us = u
         if WidgetShare.store(s) {
             if before.config != s.config || before.drawing != s.drawing { WidgetCenter.shared.reloadTimelines(ofKind: WidgetShare.kind) }
