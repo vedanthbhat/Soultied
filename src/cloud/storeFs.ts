@@ -3,6 +3,7 @@ import {
   Timestamp,
   arrayUnion,
   collection,
+  deleteDoc,
   doc,
   documentId,
   getDoc,
@@ -393,4 +394,18 @@ export const subscribeMetaList = (db: Firestore, sid: string, prefix: string, fn
 export const fetchMeta = async (db: Firestore, sid: string, name: string): Promise<unknown> => {
   const s = await getDoc(metaNamed(db, sid, name));
   return s.exists() ? s.data() : null;
+};
+
+/* ---------- the couples board (src/together/ranks.ts) ---------- */
+
+/** your line on the board, written whole */
+export const writeRank = (db: Firestore, sid: string, entry: object) => setDoc(doc(db, 'leaderboard', sid), clean(entry));
+
+/** your line, taken off */
+export const dropRank = (db: Firestore, sid: string) => deleteDoc(doc(db, 'leaderboard', sid));
+
+/** the best `n` lines on a board, by one field */
+export const fetchRanks = async (db: Firestore, field: string, desc: boolean, n: number): Promise<Array<{ id: string; data: unknown }>> => {
+  const s = await getDocs(query(collection(db, 'leaderboard'), orderBy(field, desc ? 'desc' : 'asc'), limit(n)));
+  return s.docs.map((d) => ({ id: d.id, data: d.data() }));
 };

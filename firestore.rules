@@ -118,6 +118,42 @@ service cloud.firestore {
       }
     }
 
+    // The couples board: one line per place, only while both of you have said yes (spaces/{sid}/meta/ranks).
+    // Anyone signed in can read the board; a line shows your two characters, a couple name made of two
+    // words from Soultied's own lists (src/together/ranks.ts: 40 of each), and whole numbers. Either of
+    // you can take it down.
+    match /leaderboard/{sid} {
+      function bothSaidYes() {
+        let m = get(spacePath(sid)).data.members;
+        let y = get(/databases/$(database)/documents/spaces/$(sid)/meta/ranks).data.get('yes', {});
+        return m.size() == 2 && y.get(m[0], null) is int && y.get(m[1], null) is int;
+      }
+      // (a field that's either not there, or a whole number from 0 to `most`)
+      function wholeUpTo(d, k, most) {
+        return !(k in d) || (d[k] is int && d[k] >= 0 && d[k] <= most);
+      }
+      function lineOk(d) {
+        return d.keys().hasOnly(['name', 'looks', 'fire', 'fireDay', 'kitchen', 'doodle', 'kw', 'dw', 'esc', 'at'])
+          && d.name is list && d.name.size() == 2
+          && d.name[0] is int && d.name[0] >= 0 && d.name[0] < 40
+          && d.name[1] is int && d.name[1] >= 0 && d.name[1] < 40
+          && d.looks is list && d.looks.size() == 2
+          && d.looks[0] is map && d.looks[0].size() <= 16
+          && d.looks[1] is map && d.looks[1].size() <= 16
+          && d.fire is int && d.fire >= 0 && d.fire <= 20000
+          && d.fireDay is string && d.fireDay.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+          && wholeUpTo(d, 'kitchen', 99) && wholeUpTo(d, 'doodle', 6)
+          && wholeUpTo(d, 'kw', 99999999) && wholeUpTo(d, 'dw', 99999999)
+          && d.esc is map && d.esc.keys().hasOnly(['attic', 'cellar', 'office', 'library'])
+          && wholeUpTo(d.esc, 'attic', 36000000) && wholeUpTo(d.esc, 'cellar', 36000000)
+          && wholeUpTo(d.esc, 'office', 36000000) && wholeUpTo(d.esc, 'library', 36000000)
+          && d.at is int;
+      }
+      allow get, list: if signedIn();
+      allow create, update: if isMember(sid) && bothSaidYes() && lineOk(request.resource.data);
+      allow delete: if isMember(sid);
+    }
+
     // A watch party from the browser extension: two people, no Soultied place
     // needed (each is signed in anonymously by the extension). Whoever has the
     // link can see who started it and take the one empty seat; only the two

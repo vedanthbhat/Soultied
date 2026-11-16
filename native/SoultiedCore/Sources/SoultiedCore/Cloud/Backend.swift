@@ -85,6 +85,8 @@ public protocol Backend: AnyObject {
     func update(_ path: String, _ data: Doc) async throws
     /// all or nothing
     func commit(_ writes: [Write]) async throws
+    /// takes a document away (only the couples board does this: your line, when you come off it)
+    func delete(_ path: String) async throws
     /// when a value from the database is a moment in time, as milliseconds
     func millis(_ v: Any?) -> Double?
     /// a moment in time, as the database keeps it

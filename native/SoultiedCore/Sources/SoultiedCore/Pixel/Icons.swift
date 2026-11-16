@@ -46,6 +46,8 @@ public enum Icons {
     public static let door = Glyph(["#######", "#ooooo#", "#ooooo#", "#ooooo#", "#ooogo#", "#ooooo#", "#ooooo#", "#ooooo#"], ["#": "#5a3a2c", "o": "#8a5a3c", "g": "#e2b359"])
     /// a television (watching together)
     public static let tv = Glyph(["..k...k..", "...k.k...", "kkkkkkkkk", "kbbbbbbbk", "kbbwbbbbk", "kbbbbbbbk", "kkkkkkkkk", ".k.....k."], ["k": "#3a2a26", "b": "#4f6fb0", "w": "#c4dcef"])
+    /// a little cup (the couples board)
+    public static let trophy = Glyph(["..yyyyyyy..", "yyyhyyyyyyy", "y.yhyyyyd.y", "y.yhyyyyd.y", ".yyhyyyydy.", "..yyyyydd..", "...yyyyd...", "....ddd....", "....yyy....", "..kkkkkkk..", "..kkkkkkk.."], ["y": "#e2b359", "h": "#fff1c2", "d": "#b48c4a", "k": "#8a5a3c"])
     /// a record (the record player; src/components/NowPlaying.tsx)
     public static let record = Glyph(["..kkkkk..", ".kkgkgkk.", "kkkkkkkkk", "kgkrrrkgk", "kkkrwrkkk", "kgkrrrkgk", "kkkkkkkkk", ".kkgkgkk.", "..kkkkk.."], ["k": "#1f1718", "g": "#3a3035", "r": "#b8674f", "w": "#efdcb8"])
 }

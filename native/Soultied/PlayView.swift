@@ -12,16 +12,23 @@ struct PlayView: View {
     let place: PlaceModel
     @State private var open: GameKind?
     @State private var escaping = false
+    @State private var ranking = false
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 DarkHeading(title: "Play", sub: "Games for two, and the rooms behind the dark door")
+                // (your person asking to go on the couples board comes first; otherwise the board waits at the end)
+                let asked = place.rankStage == .askedMe
+                if asked { RanksCard(place: place) { ranking = true } }
                 UpNextCard(place: place) { play($0) }
                 GameGrid(place: place, open: { play($0) }, escape: {
                     Haptics.tap()
                     escaping = true
                 })
+                if !asked && (place.partnerHere || place.isDemo) {
+                    RanksCard(place: place) { ranking = true }.padding(.top, 4)
+                }
             }
             .padding(16)
             .padding(.bottom, 100)
@@ -30,6 +37,14 @@ struct PlayView: View {
         .background(RoomBackground())
         .fullScreenCover(isPresented: $escaping) { EscapeScreen(place: place).coversTabs() }
         .fullScreenCover(item: $open) { k in GameScreen(place: place, kind: k).coversTabs() }
+        .sheet(isPresented: $ranking) { RanksSheet(place: place).presentationDragIndicator(.visible).presentationBackground(Color.paper) }
+        // (the screenshots: the couples board, open; and on it together)
+        .onAppear { if Launch.args.contains("-ranks") { ranking = true } }
+        .task {
+            guard Launch.args.contains("-ranksOn") else { return }
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            if place.rankStage == .askedMe { place.answerRanks(true) }
+        }
     }
 
     /// a game, or (for one that's in Plus, without it) the Plus sheet

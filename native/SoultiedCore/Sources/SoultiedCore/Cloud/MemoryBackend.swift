@@ -71,6 +71,13 @@ public final class MemoryBackend: Backend {
         await MainActor.run { for w in writes { apply(w) } }
     }
 
+    public func delete(_ path: String) async throws {
+        await MainActor.run {
+            docs[path] = nil
+            changed(path)
+        }
+    }
+
     /// write without waiting (handy from synchronous code)
     public func apply(_ w: Write) {
         let before = docs[w.path] ?? [:]
@@ -117,12 +124,26 @@ public final class MemoryBackend: Backend {
                 }
             }
         }
-        rows.sort { a, b in
-            if let k = q.orderBy {
-                let x = a.data[k] as? String ?? "", y = b.data[k] as? String ?? ""
-                return q.descending ? x > y : x < y
+        if let k = q.orderBy {
+            // (as Firestore: a dotted name reaches into maps, and documents without the field are left out)
+            func at(_ d: Doc) -> Any? {
+                var cur: Any? = d
+                for part in k.split(separator: ".") { cur = (cur as? Doc)?[String(part)] }
+                return cur
             }
-            return a.id < b.id
+            rows = rows.filter { at($0.data) != nil && !(at($0.data) is NSNull) }
+            rows.sort { a, b in
+                let x = at(a.data), y = at(b.data)
+                if let p = Values.num(x), let q2 = Values.num(y), !(x is String), !(y is String) {
+                    if p != q2 { return q.descending ? p > q2 : p < q2 }
+                } else {
+                    let s = x as? String ?? "", t = y as? String ?? ""
+                    if s != t { return q.descending ? s > t : s < t }
+                }
+                return a.id < b.id
+            }
+        } else {
+            rows.sort { $0.id < $1.id }
         }
         if let n = q.limit { rows = Array(rows.prefix(n)) }
         return rows

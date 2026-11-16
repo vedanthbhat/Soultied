@@ -242,6 +242,9 @@ jobs:
           shot bucket -demo -tab us -bucket
           # voice notes on the wall (Rohan's, playing)
           shot wall-voices -demo -open wall -voices -voicePlay
+          # the couples board: Rohan's asked to go on it; and on it together
+          shot ranks -demo -tab play -ranks
+          shot ranks-on -demo -tab play -ranks -ranksOn
           ls -la "$RUNNER_TEMP/shots"
           echo "dev=$dev" >> "$GITHUB_OUTPUT"
 

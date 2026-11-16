@@ -24,6 +24,7 @@ import { CarromGame } from './CarromGame';
 import type { LiveLobby } from '../../games/live/lobby';
 import { usePlus } from '../../plus/usePlus';
 import { PlusUpsell } from '../PlusUpsell';
+import { CouplesBoard, CouplesBoardCard } from './CouplesBoard';
 
 interface Shelf {
   id: BoxId;
@@ -93,11 +94,14 @@ export const GameShelf: React.FC<{ onExit: () => void; onOpenDoor: () => void; i
   const plus = usePlus();
   /** a Plus game tapped without Plus */
   const [upsell, setUpsell] = useState<string | null>(null);
+  /** the couples board, open */
+  const [board, setBoard] = useState(false);
   const them: Seat = otherSeat(mySeat);
   const partner = seatName(them);
 
   const Screen = open ? SCREENS[open] : null;
   if (Screen) return <Screen onBack={() => setOpen(null)} />;
+  if (board) return <CouplesBoard onBack={() => setBoard(false)} />;
 
   const line = (kind: GameKind): { text: string; hot: boolean } => {
     const m = matches[kind];
@@ -185,6 +189,7 @@ export const GameShelf: React.FC<{ onExit: () => void; onOpenDoor: () => void; i
             Games need two. Once {partner} has joined your place, you can play them here.
           </div>
         )}
+        <CouplesBoardCard onOpen={() => setBoard(true)} />
         <Section title="Play together now" note="For when you’re both here: invite your person and play live." games={LIVE} card={card} />
         <Section title="Take turns" note="Make your move and leave it. They’ll take theirs whenever they’re next here." games={TURNS} card={card} />
         {upsell && (

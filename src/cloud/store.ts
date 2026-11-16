@@ -154,3 +154,6 @@ export const fetchLettersBefore = later('fetchLettersBefore');
 export const writeMeta = later('writeMeta');
 export const writeMetaDoc = later('writeMetaDoc');
 export const fetchMeta = later('fetchMeta');
+export const writeRank = later('writeRank');
+export const dropRank = later('dropRank');
+export const fetchRanks = later('fetchRanks');

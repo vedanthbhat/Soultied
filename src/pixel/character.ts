@@ -202,16 +202,17 @@ export function normalizeAvatar(raw: unknown, fallback: AvatarConfig = DEFAULT_A
   };
 }
 
-export function randomAvatar(): AvatarConfig {
-  const any = <T extends { id: string }>(l: readonly T[]) => l[Math.floor(Math.random() * l.length)].id;
+/** someone made up (`rng` for the same one every time) */
+export function randomAvatar(rng: () => number = Math.random): AvatarConfig {
+  const any = <T extends { id: string }>(l: readonly T[]) => l[Math.floor(rng() * l.length)].id;
   const hairStyle = any(HAIR_STYLES.slice(0, 10));
   return {
     rendererVersion: 2,
-    height: (['short', 'medium', 'tall'] as const)[Math.floor(Math.random() * 3)],
+    height: (['short', 'medium', 'tall'] as const)[Math.floor(rng() * 3)],
     skin: any(SKIN_TONES),
     hairStyle,
     hairColor: hairStyle === 'hijab' ? any(CLOTH_COLORS) : any(HAIR_COLORS.slice(0, 6)),
-    facialHair: Math.random() < 0.3 ? any(FACIAL_HAIR.slice(0, 4)) : 'none',
+    facialHair: rng() < 0.3 ? any(FACIAL_HAIR.slice(0, 4)) : 'none',
     top: any(TOPS),
     topColor: any(CLOTH_COLORS),
     bottom: any(BOTTOMS),
@@ -219,9 +220,9 @@ export function randomAvatar(): AvatarConfig {
     shoes: any(SHOES.slice(0, 4)),
     shoesColor: any(CLOTH_COLORS),
     // (the sillier pieces are there to pick, not to be handed at random)
-    glasses: Math.random() < 0.35 ? any(GLASSES.slice(1, 4)) : 'none',
-    hat: Math.random() < 0.2 && hairStyle !== 'hijab' ? any(HATS.slice(1, 4)) : 'none',
-    extra: Math.random() < 0.4 ? any(EXTRAS.slice(1, 4)) : 'none',
+    glasses: rng() < 0.35 ? any(GLASSES.slice(1, 4)) : 'none',
+    hat: rng() < 0.2 && hairStyle !== 'hijab' ? any(HATS.slice(1, 4)) : 'none',
+    extra: rng() < 0.4 ? any(EXTRAS.slice(1, 4)) : 'none',
   };
 }
 

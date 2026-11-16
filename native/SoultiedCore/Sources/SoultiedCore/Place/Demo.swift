@@ -47,6 +47,10 @@ public enum Demo {
         db.seed("\(p)/meta/voice-demo-1", ["by": them, "at": nowMs - 5 * 3600e3, "secs": 6.1, "mime": "audio/mp4", "audio": DEMO_VOICE_AUDIO, "peaks": peaksFrom(DEMO_VOICE_LEVELS), "heard": Doc(), "gone": false])
         // their list, with three things planned for Goa
         db.seed("\(p)/meta/bucket", demoBucket(now: nowMs))
+        // the couples board: Rohan has asked to go on it, and the other couples on it (made up)
+        db.seed("\(p)/meta/ranks", Ranks.demoRanks(them: them))
+        db.seed("\(p)/meta/bests", Ranks.demoBests(now: nowMs))
+        for r in Ranks.demoBoards(today: today, now: nowMs) { db.seed("leaderboard/\(r.id)", r.data) }
         // Aanya in Bengaluru, Rohan in London
         db.seed("\(p)/meta/where", demoWhere(now: nowMs))
         // Goa, in twelve days
@@ -234,6 +238,14 @@ final class DemoPartner {
             guard let p = self?.place, let db = p.db as? MemoryBackend else { return }
             let reply: Doc = options.isEmpty ? ["text": DEMO_REPLIES.randomElement()!, "at": Values.nowMs()] : ["pick": Int.random(in: 0..<options.count), "at": Values.nowMs()]
             db.apply(Write("spaces/\(p.sid)/meta/asks", ["items": [id: ["answers": [Demo.them: reply]]]], merge: true))
+        }
+    }
+
+    /// says yes to going on the couples board, a moment after you ask
+    func ranks() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
+            guard let p = self?.place, let db = p.db as? MemoryBackend, p.rankStage == .asked else { return }
+            db.apply(Write("spaces/\(p.sid)/meta/ranks", ["yes": [Demo.them: Int(Values.nowMs())]], merge: true))
         }
     }
 

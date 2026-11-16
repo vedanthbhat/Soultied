@@ -94,6 +94,10 @@ final class FirestoreBackend: Backend {
         try await b.commit()
     }
 
+    func delete(_ path: String) async throws {
+        try await db.document(path).delete()
+    }
+
     func millis(_ v: Any?) -> Double? {
         if let t = v as? Timestamp { return Double(t.seconds) * 1000 + Double(t.nanoseconds) / 1e6 }
         if let d = v as? Date { return d.timeIntervalSince1970 * 1000 }

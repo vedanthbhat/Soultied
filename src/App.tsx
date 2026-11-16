@@ -22,6 +22,7 @@ import { TurntableProvider, useTurntable } from './music/TurntableContext';
 import { NowPlaying } from './components/NowPlaying';
 import { DecorProvider, useDecor } from './decor/DecorContext';
 import { TogetherProvider, useTogether } from './together/TogetherContext';
+import { RanksProvider } from './together/RanksContext';
 import { type TouchKind, moodGlyph, moodLine, touchDef, touchSummary } from './together/moods';
 import { MeCard, ThemCard, ago } from './components/SeatCard';
 import { HoldCouch } from './components/HoldCouch';
@@ -676,7 +677,9 @@ export default function App() {
           <GamesProvider>
             <DecorProvider>
               <TogetherProvider>
-                <Home />
+                <RanksProvider>
+                  <Home />
+                </RanksProvider>
               </TogetherProvider>
             </DecorProvider>
           </GamesProvider>

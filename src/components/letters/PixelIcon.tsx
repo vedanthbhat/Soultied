@@ -82,6 +82,10 @@ export const SPRITES = {
     rows: ['#########.', '#ccccccc#p', '#cyyyyyc#p', '#ccccccc#p', '#cyyyyyc#p', '#ccccccc#p', '#cccchcc#p', '#########p', '.pppppppp.'],
     pal: { '#': INK, c: '#b8674f', y: '#efdcb8', h: '#f3a19c', p: '#f4e8d0' },
   },
+  trophy: {
+    rows: ['..yyyyyyy..', 'yyyhyyyyyyy', 'y.yhyyyyd.y', 'y.yhyyyyd.y', '.yyhyyyydy.', '..yyyyydd..', '...yyyyd...', '....ddd....', '....yyy....', '..kkkkkkk..', '..kkkkkkk..'],
+    pal: { y: '#e2b359', h: '#fff1c2', d: '#b48c4a', k: '#8a5a3c' },
+  },
 } satisfies Record<string, Sprite>;
 
 export type SpriteName = keyof typeof SPRITES;

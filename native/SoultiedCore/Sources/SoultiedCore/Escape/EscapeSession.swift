@@ -343,6 +343,8 @@ public final class EscapeSession {
         if let f = p.finishedAt {
             let t = f - p.startedAt
             save.best[p.room] = save.best[p.room].map { min($0, t) } ?? t
+            // (and for the couples board, if it's your fastest)
+            place?.noteEscape(p.room, ms: t)
         }
         save.store(place?.sid ?? "solo", defaults)
         let sig = "\(p.room.rawValue)|\(p.step)|\(p.hints.sorted { $0.key < $1.key })|\(p.finishedAt ?? -1)"

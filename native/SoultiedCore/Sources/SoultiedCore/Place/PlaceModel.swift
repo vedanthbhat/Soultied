@@ -36,6 +36,13 @@ public final class PlaceModel {
     public internal(set) var whereDoc = WhereDoc()
     /// our list: the things you want to do together (meta/bucket)
     public internal(set) var bucket = BucketDoc()
+    /// the couples board: who's said yes, and your name on it (meta/ranks)
+    public internal(set) var ranksDoc = RanksDoc()
+    /// your best games together, for the board (meta/bests)
+    public internal(set) var bests = BestsDoc()
+    @ObservationIgnored private var rankKey: String?
+    @ObservationIgnored private var bestsSent: String?
+    @ObservationIgnored private var escapesSynced = false
     /// holding the couch: who's holding, and when your person's last beat arrived here
     public internal(set) var holdDoc = HoldDoc()
     public internal(set) var theirHoldSeen: Date?
@@ -144,6 +151,20 @@ public final class PlaceModel {
                 self?.bucket = BucketDoc(d)
                 self?.loaded.insert("bucket")
             },
+            db.listen(meta("ranks")) { [weak self] d in
+                guard let self else { return }
+                self.ranksDoc = RanksDoc(d)
+                self.loaded.insert("ranks")
+                self.keepRank()
+            },
+            db.listen(meta("bests")) { [weak self] d in
+                guard let self else { return }
+                self.bests = BestsDoc(d)
+                self.loaded.insert("bests")
+                self.noteBests()
+                self.syncEscapes()
+                self.keepRank()
+            },
             db.listen(meta("where")) { [weak self] d in
                 guard let self else { return }
                 self.whereDoc = WhereDoc(d)
@@ -212,6 +233,7 @@ public final class PlaceModel {
                 }
                 self.games = next
                 self.loaded.insert("games")
+                self.noteBests()
                 self.demoPartner?.games()
             },
             db.listen(QuerySpec(path("activities"), orderBy: "at", descending: true, limit: 30)) { [weak self] rows in
@@ -269,6 +291,7 @@ public final class PlaceModel {
         guard ready, space != nil else { return }
         checkIn()
         earnStitches()
+        keepRank()
     }
 
     /* ---------- writing ---------- */
@@ -583,6 +606,113 @@ public final class PlaceModel {
     /// take it off the list
     public func dropWish(_ id: String) {
         save(meta("bucket"), ["items": [id: NSNull()] as Doc], "your list")
+    }
+
+    /* ---------- the couples board (src/together/RanksContext.tsx) ---------- */
+
+    /// off, you've asked, they've asked, or you're on it
+    public var rankStage: RankStage { ranksDoc.stage(me: me, them: them) }
+
+    /// say yes to the board, under this name (your person says yes too before you're on it)
+    public func askRanks(_ name: RankName) {
+        ranksDoc.yes[me] = Values.nowMs()
+        ranksDoc.name = name
+        save(meta("ranks"), ["yes": [me: Int(Values.nowMs())], "name": name.list], "the board")
+        demoPartner?.ranks()
+    }
+
+    /// your person asked: yes (you're both on it), or not now (neither of you is)
+    public func answerRanks(_ yes: Bool) {
+        if yes {
+            ranksDoc.yes[me] = Values.nowMs()
+            save(meta("ranks"), ["yes": [me: Int(Values.nowMs())]], "the board")
+        } else {
+            leaveRanks()
+        }
+    }
+
+    /// a new name on the board
+    public func renameRanks(_ name: RankName) {
+        ranksDoc.name = name
+        save(meta("ranks"), ["name": name.list], "the board")
+    }
+
+    /// take the two of you off the board (and take back an ask)
+    public func leaveRanks() {
+        var yes: Doc = [me: NSNull()]
+        if let t = them { yes[t] = NSNull() }
+        for uid in ranksDoc.yes.keys { yes[uid] = NSNull() }
+        ranksDoc.yes = [:]
+        rankKey = nil
+        // (your yes goes first, so neither of you can put the line back up after it's gone)
+        let db = self.db, p = meta("ranks"), line = "leaderboard/\(sid)", y = yes
+        Task {
+            do {
+                try await db.merge(p, ["yes": y])
+                try await db.delete(line)
+            } catch { self.failed("the board", error) }
+        }
+    }
+
+    /// your line on the board, as it would be now
+    public var rankEntry: RankEntry? {
+        guard let name = ranksDoc.name, let t = them else { return nil }
+        let host = hostId == me ? myLook : (member(t)?.avatar ?? Wardrobe.defaultA)
+        let guest = hostId == me ? (member(t)?.avatar ?? Wardrobe.defaultB) : myLook
+        return RankEntry(name: name, looks: [host, guest], couch: couch, today: today, bests: bests, now: Values.nowMs())
+    }
+
+    /// keeps your line on the board up to date while you're both on it
+    private func keepRank() {
+        guard ready, ["ranks", "bests"].allSatisfy(loaded.contains), rankStage == .on, let e = rankEntry else {
+            if rankStage != .on { rankKey = nil }
+            return
+        }
+        guard e.key != rankKey else { return }
+        rankKey = e.key
+        let db = self.db, p = "leaderboard/\(sid)", d = e.doc
+        Task {
+            do { try await db.set(p, d, merge: false) } catch {
+                print("[soultied] the board: \(error)")
+                await MainActor.run { self.rankKey = nil }
+            }
+        }
+    }
+
+    /// a finished Kitchen Rush shift or Doodle Guess game that beats your best
+    private func noteBests() {
+        guard loaded.contains("bests"), loaded.contains("games") else { return }
+        guard let p = bests.patch(kitchen: games[.kitchen], doodle: games[.doodle], now: Values.nowMs()) else { return }
+        let key = "\(p["kitchen"] ?? "")|\(p["doodle"] ?? "")|\((p["week"] as? Doc).map { "\($0["w"] ?? "")/\($0["kitchen"] ?? "")/\($0["doodle"] ?? "")" } ?? "")"
+        guard key != bestsSent else { return }
+        bestsSent = key
+        save(meta("bests"), p, "your bests")
+    }
+
+    /// a way out of an escape room (kept if it's your fastest)
+    public func noteEscape(_ room: RoomId, ms: Double) {
+        guard loaded.contains("bests"), let p = bests.escapePatch(room, ms: ms) else { return }
+        bests.escape[room] = Int(ms.rounded())
+        save(meta("bests"), p, "your bests")
+    }
+
+    /// escapes from before the board (kept on this phone): once, when your bests arrive
+    private func syncEscapes() {
+        guard !escapesSynced, !isDemo else { return }
+        escapesSynced = true
+        for (room, ms) in EscapeSave.load(sid).best { noteEscape(room, ms: ms) }
+    }
+
+    /// one of the boards, best first (nil if it couldn't be fetched)
+    public func board(_ id: BoardId) async -> [BoardRow]? {
+        let q = id.query
+        do {
+            let rows = try await db.query(QuerySpec("leaderboard", orderBy: q.field, descending: q.descending, limit: Ranks.limit))
+            return Ranks.rows(id, rows, mine: sid, today: today, now: Values.nowMs())
+        } catch {
+            print("[soultied] board \(id.rawValue): \(error)")
+            return nil
+        }
     }
 
     /* ---------- how far apart ---------- */

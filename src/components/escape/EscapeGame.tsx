@@ -13,6 +13,7 @@ import { LockPanel } from './LockPanel';
 import { DoorSprite } from './Glyph';
 import { usePlus } from '../../plus/usePlus';
 import { PlusUpsell } from '../PlusUpsell';
+import { useRanks } from '../../together/RanksContext';
 
 type Screen = 'corridor' | 'door' | 'play';
 type Mode = 'here' | 'online';
@@ -61,6 +62,9 @@ export const EscapeGame: React.FC<{ onExit: () => void }> = ({ onExit }) => {
   const [activeSince, setActiveSince] = useState(Date.now());
   const [wide, setWide] = useState(() => window.innerWidth >= 980);
   const plus = usePlus();
+  const { noteEscape } = useRanks();
+  const noteEscapeRef = useRef(noteEscape);
+  noteEscapeRef.current = noteEscape;
   /** a Plus room tapped without Plus */
   const [upsell, setUpsell] = useState<string | null>(null);
   const [chat, setChat] = useState<ChatMsg[]>([]);
@@ -190,6 +194,8 @@ export const EscapeGame: React.FC<{ onExit: () => void }> = ({ onExit }) => {
       storeSave(spaceId, next);
       return next;
     });
+    // (and for the couples board, if it's your fastest)
+    if (progress.finishedAt) noteEscapeRef.current(progress.room, progress.finishedAt - progress.startedAt);
     const sig = JSON.stringify([progress.room, progress.step, progress.hints, progress.finishedAt]);
     if (mode === 'online' && sig !== lastSent.current) {
       lastSent.current = sig;

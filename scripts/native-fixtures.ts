@@ -36,6 +36,26 @@ import { type RecapInput, monthRecap, recapMonth } from '../src/together/recap';
 import { aheadLine, apartKm, apartLabel, distanceKm, normalizeWhere } from '../src/together/where';
 import { BUCKET_IDEAS, bucketOverflow, bucketView, cleanText, normalizeBucket, plannedLine } from '../src/together/bucket';
 import { normalizeVoice, peaksFrom, unheardVoice, voiceLength } from '../src/together/voice';
+import {
+  BOARD_IDS,
+  RANK_FIRST,
+  RANK_SECOND,
+  type RankName,
+  bestsPatch,
+  boardQuery,
+  boardRows,
+  demoBoards,
+  escapePatch,
+  normalizeBests,
+  normalizeRanks,
+  rankEntry,
+  rankName,
+  rankStage,
+  suggestNames,
+  valueText,
+  weekOf,
+} from '../src/together/ranks';
+import { randomAvatar } from '../src/pixel/character';
 import { renderCharacterBack } from '../src/pixel/characterBack';
 import { DEMO_DOODLE, OLD_DOODLE_H, OLD_DOODLE_W, DOODLE_H, DOODLE_W, doodleArt, fullDoodle, smallDoodle } from '../src/together/board';
 
@@ -705,6 +725,84 @@ const voices = {
   lengths: [0, 0.4, 0.5, 6.06, 59.5, 60, 61, 125.2].map((s) => [s, voiceLength(s)]),
 };
 
+// the couples board: names, weeks, who's said yes, your bests (and what a finished game changes), your line,
+// and the boards as they show (from the demo room's made-up couples, and some lines that aren't right)
+const DAY = 86400000;
+const rankNow = Date.UTC(2026, 10, 18, 15, 30);
+const rankToday = '2026-11-18';
+const kitchenMatch = (served: number, status: string, at: number) => ({ kind: 'kitchen', id: `k${at}`, status, turn: null, winner: 'draw', startedBy: 'a', startedAt: at - 90000, updatedAt: at, updatedBy: 'a', seq: 3, state: { phase: 'done', joined: { a: true, b: true }, seed: 1, result: { winner: 'draw', line: 'x', score: { a: served, b: served } } }, wins: { a: 0, b: 0 }, last: '' });
+const doodleMatch = (got: number, best: number, status: string, at: number) => ({ kind: 'doodle', id: `d${at}`, status, turn: null, winner: null, startedBy: 'a', startedAt: at - 600000, updatedAt: at, updatedBy: 'b', seq: 30, state: { phase: 'reveal', joined: { a: true, b: true }, round: 6, drawer: 'a', choices: [], word: null, startedAt: null, endsAt: null, guesses: [], rounds: Array.from({ length: 6 }, (_, i) => ({ word: `w${i}`, drawer: i % 2 ? 'b' : 'a', secs: i < got ? 10 + i : null })), best }, wins: { a: 0, b: 0 }, last: '' });
+const bestsRaws: unknown[] = [
+  null,
+  { kitchen: 'lots', doodle: 9, week: 'x', escape: 'y' },
+  { kitchen: 12.7, doodle: 4, week: { w: weekOf(rankNow), kitchen: 9, doodle: 2 }, escape: { attic: 872000.4, cellar: 5000, office: 'fast', library: 40_000_000, hall: 90000 } },
+  { kitchen: -3, doodle: 6, week: { w: weekOf(rankNow - 8 * DAY), kitchen: 20, doodle: 6 }, escape: { library: 600000 } },
+  { kitchen: 150, doodle: 2.9, week: { w: weekOf(rankNow), kitchen: 0, doodle: 0 } },
+];
+const games2 = [
+  {},
+  { kitchen: kitchenMatch(14, 'over', rankNow - 3600000) },
+  { kitchen: kitchenMatch(5, 'over', rankNow - 10 * DAY) },
+  { kitchen: kitchenMatch(30, 'playing', rankNow) },
+  { kitchen: kitchenMatch(200, 'over', rankNow) },
+  { doodle: doodleMatch(5, 3, 'over', rankNow - 60000) },
+  { doodle: doodleMatch(1, 6, 'playing', rankNow) },
+  { doodle: doodleMatch(2, 2, 'over', rankNow - 9 * DAY) },
+  { kitchen: kitchenMatch(9, 'over', rankNow - 1000), doodle: doodleMatch(4, 4, 'over', rankNow - 1000) },
+  { kitchen: { ...kitchenMatch(3, 'over', rankNow), state: { phase: 'done', result: null } } },
+];
+const looksA = randomAvatar(seeded(1));
+const looksB = randomAvatar(seeded(2));
+const rankCouches: CouchState[] = [
+  { seen: {}, together: [], shown: {} },
+  { seen: {}, together: ['2026-11-15', '2026-11-16', '2026-11-17', '2026-11-18'], shown: {} },
+  { seen: {}, together: ['2026-11-10', '2026-11-16', '2026-11-17'], shown: {} },
+  { seen: {}, together: ['2026-11-12', '2026-11-13'], shown: {} },
+];
+const oddLines: Array<{ id: string; data: unknown }> = [
+  { id: 'odd-1', data: null },
+  { id: 'odd-2', data: { name: [1, 50], looks: [{}, {}], fire: 10, fireDay: rankToday } },
+  { id: 'odd-3', data: { name: [1.5, 2], looks: [{}, {}], fire: 10, fireDay: rankToday } },
+  { id: 'odd-4', data: { name: [3, 4], looks: [{}], fire: 10, fireDay: rankToday } },
+  { id: 'odd-5', data: { name: [3, 4], looks: [{ rendererVersion: 2, skin: 'nope', hat: 'crown' }, 'x'], fire: 10.8, fireDay: '2026-11-16', kitchen: '7', doodle: 3, kw: weekOf(rankNow) * 100 + 4, dw: weekOf(rankNow - 7 * DAY) * 100 + 5, esc: { attic: 9000, cellar: 600000, office: 'x' } } },
+  { id: 'odd-6', data: { name: [5, 6], looks: [looksA, looksB], fire: 3, fireDay: '2026-11-15', kitchen: 17, doodle: 6, kw: weekOf(rankNow) * 100 + 17, esc: { library: 1_200_000 } } },
+  { id: 'odd-7', data: { name: [7, 8], looks: [looksB, looksA], fire: 0, fireDay: rankToday, kitchen: 17, esc: {} } },
+];
+const ranks = {
+  first: RANK_FIRST,
+  second: RANK_SECOND,
+  weeks: [0, DAY * 3, Date.UTC(2020, 11, 31), Date.UTC(2021, 0, 3, 23, 59), Date.UTC(2021, 0, 4), Date.UTC(2024, 11, 30), Date.UTC(2026, 0, 1), Date.UTC(2026, 11, 28), Date.UTC(2027, 0, 1), Date.UTC(2032, 11, 31), rankNow, ...Array.from({ length: 40 }, () => int(4_000_000) * 1_000_000)].map((ms) => [ms, weekOf(ms)]),
+  names: [1, 2, 3, 99, 4711].flatMap((s) => [3, 5, 40].map((n) => ({ seed: s, count: n, avoid: s === 99 ? [[0, 2], [5, 5]] : [], names: suggestNames(seeded(s), n, s === 99 ? [[0, 2], [5, 5]] : []) }))),
+  nameTexts: [[0, 0], [0, 2], [39, 39], [17, 7]].map((n) => [n, rankName(n as RankName)]),
+  docs: [null, { yes: 'x', name: 'y' }, { yes: { u1: 5, u2: 'yes', u3: -1, u4: 0 }, name: [1, 2] }, { yes: { u1: 5, u2: 6 }, name: [40, 1] }, { yes: { u2: 6 }, name: [2.5, 1] }, { yes: { u2: 6 }, name: [3, 4, 5] }, { yes: {}, name: [0, 0] }].map((raw) => {
+    const d = normalizeRanks(raw);
+    return { raw, doc: d, stages: [rankStage(d, 'u1', 'u2'), rankStage(d, 'u2', 'u1'), rankStage(d, 'u1', null), rankStage(d, 'u3', 'u2')] };
+  }),
+  bests: bestsRaws.map((raw) => {
+    const b = normalizeBests(raw);
+    return {
+      raw,
+      doc: b,
+      patches: games2.map((g) => bestsPatch(b, g as never, rankNow)),
+      escapes: (['attic', 'cellar', 'office', 'library'] as const).flatMap((room) => [5000, 500000, 872000, 872000.6, 900000, 50_000_000].map((ms) => [room, ms, escapePatch(b, room, ms)])),
+    };
+  }),
+  entries: rankCouches.flatMap((couch) =>
+    bestsRaws.map((raw) => {
+      const e = rankEntry({ name: [3, 9], looks: [looksA, looksB], couch, today: rankToday, bests: normalizeBests(raw), now: rankNow });
+      return { couch, raw, entry: JSON.parse(JSON.stringify(e)) };
+    })
+  ),
+  avatars: [1, 2, 3, 42, 4711, 20261116].map((s) => randomAvatar(seeded(s))),
+  boards: BOARD_IDS.map((id) => {
+    const rows = [...demoBoards(rankToday, rankNow), ...oddLines];
+    return { id, query: boardQuery(id), rows: boardRows(id, rows, 'odd-6', rankToday, rankNow), values: [1, 2, 59, 600000].map((v) => valueText(id, v)) };
+  }),
+  demo: demoBoards(rankToday, rankNow),
+  now: rankNow,
+  today: rankToday,
+};
+
 const out = process.argv[2] || 'native-fixtures.json';
-writeFileSync(out, JSON.stringify({ cards, days, hashes, rngSeq, streaks, demo, same, chapters, games, live, doodle: { judges, brushes, fills, choices, games: doodles }, coasters: coasterSteps, escape, record, watch: { looks, ...watch }, wall: { doodles: wallDoodles }, room: { scenes: roomScenes, fires, visits }, snaps, recaps: { cases: recaps, months: recapMonths }, wheres, buckets, voices, carromFrames }));
+writeFileSync(out, JSON.stringify({ cards, days, hashes, rngSeq, streaks, demo, same, chapters, games, live, doodle: { judges, brushes, fills, choices, games: doodles }, coasters: coasterSteps, escape, record, watch: { looks, ...watch }, wall: { doodles: wallDoodles }, room: { scenes: roomScenes, fires, visits }, snaps, recaps: { cases: recaps, months: recapMonths }, wheres, buckets, voices, carromFrames, ranks }));
 console.log(`wrote ${cards.length} card days, ${streaks.length} streaks, ${demo.length} demo rooms, ${games.length} game moves, ${live.length} live games, ${doodles.length} doodle moves to ${out}`);

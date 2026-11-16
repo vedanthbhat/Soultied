@@ -180,26 +180,29 @@ public enum Wardrobe {
         ]
     }
 
-    public static func random() -> AvatarConfig {
-        func any(_ l: [Choice]) -> String { l.randomElement()!.id }
-        func anyS(_ l: [Swatch]) -> String { l.randomElement()!.id }
+    /// someone made up (`rng` for the same one every time: the website's randomAvatar, number for number)
+    public static func random(_ rng: Random = systemRandom) -> AvatarConfig {
+        func pickIndex(_ n: Int) -> Int { min(n - 1, Int((rng() * Double(n)).rounded(.down))) }
+        func any(_ l: [Choice]) -> String { l[pickIndex(l.count)].id }
+        func anyS(_ l: [Swatch]) -> String { l[pickIndex(l.count)].id }
         // (the sillier pieces are there to pick, not to be handed at random)
         let hairStyle = any(Array(hairStyles.prefix(10)))
+        let height = ["short", "medium", "tall"][pickIndex(3)]
+        let skin = anyS(skinTones)
+        let hairColor = hairStyle == "hijab" ? anyS(clothColors) : anyS(Array(hairColors.prefix(6)))
+        let beard = rng() < 0.3 ? any(Array(facialHair.prefix(4))) : "none"
+        let top = any(tops)
+        let topColor = anyS(clothColors)
+        let bottom = any(bottoms)
+        let bottomColor = anyS(clothColors)
+        let shoe = any(Array(shoes.prefix(4)))
+        let shoeColor = anyS(clothColors)
+        let specs = rng() < 0.35 ? any(Array(glasses[1..<4])) : "none"
+        let hat = rng() < 0.2 && hairStyle != "hijab" ? any(Array(hats[1..<4])) : "none"
+        let extra = rng() < 0.4 ? any(Array(extras[1..<4])) : "none"
         return AvatarConfig(
-            height: ["short", "medium", "tall"].randomElement()!,
-            skin: anyS(skinTones),
-            hairStyle: hairStyle,
-            hairColor: hairStyle == "hijab" ? anyS(clothColors) : anyS(Array(hairColors.prefix(6))),
-            facialHair: Double.random(in: 0..<1) < 0.3 ? any(Array(facialHair.prefix(4))) : "none",
-            top: any(tops),
-            topColor: anyS(clothColors),
-            bottom: any(bottoms),
-            bottomColor: anyS(clothColors),
-            shoes: any(Array(shoes.prefix(4))),
-            shoesColor: anyS(clothColors),
-            glasses: Double.random(in: 0..<1) < 0.35 ? any(Array(glasses[1..<4])) : "none",
-            hat: Double.random(in: 0..<1) < 0.2 && hairStyle != "hijab" ? any(Array(hats[1..<4])) : "none",
-            extra: Double.random(in: 0..<1) < 0.4 ? any(Array(extras[1..<4])) : "none"
+            height: height, skin: skin, hairStyle: hairStyle, hairColor: hairColor, facialHair: beard, top: top, topColor: topColor,
+            bottom: bottom, bottomColor: bottomColor, shoes: shoe, shoesColor: shoeColor, glasses: specs, hat: hat, extra: extra
         )
     }
 }
