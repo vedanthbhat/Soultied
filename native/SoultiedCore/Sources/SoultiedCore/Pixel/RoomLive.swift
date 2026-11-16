@@ -705,8 +705,18 @@ func drawCatCurl(_ L: Layer, _ t: Double, _ dark: RGB, _ light: RGB, _ face: RGB
     L.S(x + 20, y + 4 - sw, dark)
 }
 
-func drawPet(_ L: Layer, _ t: Double, _ pet: String) {
+/// a little heart, 3 wide: rising over the pet, or in its bubble
+private let PET_HEART = ["#.#", "###", ".#."]
+
+private func glyphRows(_ rows: [String], _ body: (Int, Int, Character) -> Void) {
+    for (j, row) in rows.enumerated() {
+        for (i, k) in row.enumerated() where k != "." { body(i, j, k) }
+    }
+}
+
+func drawPet(_ L: Layer, _ t: Double, _ pet: String, _ care: PetCareState? = nil) {
     let x = PetBox.x, y = PetBox.y
+    let level = care?.level ?? 0
     // cushion
     for j in 0..<6 {
         for i in 0..<26 {
@@ -715,6 +725,24 @@ func drawPet(_ L: Layer, _ t: Double, _ pet: String) {
             L.S(x - 3 + Double(i), y + 4 + Double(j), j < 2 ? hx("#a2b187") : j > 3 ? P.sageD : P.sage)
         }
     }
+    // the closer it's grown to you, the fancier its cushion: a stitched edge, a heart, tassels, then gold
+    if level >= 1 {
+        var i = 2
+        while i < 24 {
+            L.S(x - 3 + Double(i), y + 8, level >= 4 ? hx("#e2c46a") : hx("#c9d3b0"))
+            i += 2
+        }
+    }
+    if level >= 2 {
+        glyphRows(PET_HEART) { i, j, _ in L.S(x + 1 + Double(i), y + 5 + Double(j), level >= 4 ? hx("#e2c46a") : hx("#d9706b")) }
+    }
+    if level >= 3 {
+        for (tx, ty) in [(x - 4, y + 5), (x - 4, y + 8), (x + 23, y + 5), (x + 23, y + 8)] {
+            L.S(tx, ty, hx("#d8b45a"))
+            L.S(tx, ty + 1, hx("#b48f3c"))
+        }
+    }
+    if let care, pet != "none" { drawPetThings(L, t, care) }
     if pet == "none" { return }
     if pet == "tuxedo" {
         drawCatCurl(L, t, hx("#26201f"), hx("#3b3334"), hx("#3b3334"), true)
@@ -736,9 +764,19 @@ func drawPet(_ L: Layer, _ t: Double, _ pet: String) {
     } else {
         drawCatCurl(L, t, hx("#b86e33"), hx("#d98c4a"), hx("#d98c4a"), false)
     }
-    // zzz
+    // a cuddle: a little blanket tucked over its back half
+    if care?.cuddled == true { drawPetBlanket(L) }
+    // zzz, or hearts once you've both been by today
     let zl = jm(t * 0.5, 1)
-    if zl < 0.7 {
+    if care?.both == true {
+        if zl < 0.8 {
+            let a = jsRound(230 * (1 - zl / 0.8))
+            let hxp = jsRound(x + 1 - zl * 2 + (sin(t * 5) > 0 ? 1 : 0))
+            let hyp = jsRound(y - 5 - zl * 11)
+            let c = hx("#f07a8a")
+            glyphRows(PET_HEART) { i, j, _ in L.S(hxp + Double(i), hyp + Double(j), c, a) }
+        }
+    } else if care?.waiting != true && zl < 0.7 {
         let zx = x - 2 - zl * 3
         let zy = y - 4 - zl * 10
         let a = jsRound(220 * (1 - zl))
@@ -749,6 +787,72 @@ func drawPet(_ L: Layer, _ t: Double, _ pet: String) {
         L.S(zx, zy + 2, c, a)
         L.S(zx + 1, zy + 2, c, a)
     }
+}
+
+/// its bowl beside the cushion (full once it's been fed today), and its ball out on the rug once someone's played
+private func drawPetThings(_ L: Layer, _ t: Double, _ care: PetCareState) {
+    let x = PetBox.x, y = PetBox.y
+    let bx = x - 13, by = y + 5
+    // the bowl: a rim, then narrowing to its foot
+    for i in 0..<8 { L.S(bx + Double(i), by + 1, i == 0 || i == 7 ? hx("#4f6f94") : hx("#9cc0e2")) }
+    for i in 1..<7 { L.S(bx + Double(i), by + 2, i == 1 || i == 6 ? hx("#4f6f94") : hx("#6f95c0")) }
+    for i in 2..<6 { L.S(bx + Double(i), by + 3, hx("#3f5b7a")) }
+    if care.fed {
+        // heaped with food, a crumb catching the light now and then
+        for i in 1..<7 { L.S(bx + Double(i), by + 1, i % 2 == 1 ? hx("#a0643a") : hx("#c07f4a")) }
+        for i in 2..<6 { L.S(bx + Double(i), by, i == 3 ? hx("#d99a5e") : hx("#a0643a")) }
+        if sin(t * 1.7) > 0.85 { L.S(bx + 4, by, hx("#f0c48a")) }
+    } else {
+        // empty: you can see in
+        for i in 1..<7 { L.S(bx + Double(i), by + 1, i == 1 || i == 6 ? hx("#9cc0e2") : hx("#2f4660")) }
+    }
+    if care.played {
+        // a tennis ball out on the rug, rocking a little
+        let rx = x - 19 + (sin(t * 0.9) > 0.6 ? 1 : 0)
+        let ry = y + 8
+        glyphRows([".yy.", "yWyy", "yyWy", ".yy."]) { i, j, k in
+            L.S(rx + Double(i), ry + Double(j), k == "W" ? hx("#f6f9d8") : j == 3 ? hx("#a3b23a") : hx("#d4e45c"))
+        }
+    }
+}
+
+/// a little cream blanket with red stripes, tucked over the pet's back half after a cuddle
+private func drawPetBlanket(_ L: Layer) {
+    let x = PetBox.x, y = PetBox.y
+    let rows = [
+        "...ooooo...",
+        ".ooCCCCCoo.",
+        "oCCCCCCCCCo",
+        "orrrrrrrrro",
+        "oCCCCCCCCCo",
+        "orrrrrrrrro",
+        "oCCCCCCCCCo",
+        ".o.o.o.o.o.",
+    ]
+    let pal: [Character: RGB] = ["o": hx("#a8584f"), "C": hx("#f1e3cc"), "r": hx("#cf6a62")]
+    glyphRows(rows) { i, j, k in L.S(x + 10 + Double(i), y - 1 + Double(j), pal[k]!) }
+}
+
+/// your person's been by and you haven't: a little heart in a bubble over the pet, bobbing
+func drawPetBubble(_ L: Layer, _ t: Double) {
+    let x = PetBox.x, y = PetBox.y
+    let bob: Double = sin(t * 3) > 0 ? 0 : 1
+    let bx = x + 2
+    let by = y - 15 + bob
+    // the bubble: 9 x 7 with its corners rounded off, and two dots trailing down to the pet
+    for j in 0..<7 {
+        for i in 0..<9 {
+            if (j == 0 || j == 6) && (i == 0 || i == 8) { continue }
+            let edge = j == 0 || j == 6 || i == 0 || i == 8
+            L.S(bx + Double(i), by + Double(j), edge ? hx("#4a3b3c") : hx("#fbf6ec"))
+        }
+    }
+    L.S(bx + 1, by + 8, hx("#fbf6ec"))
+    L.S(bx, by + 10, hx("#fbf6ec"))
+    // a heart that beats now and then
+    let big = jm(t * 1.6, 1) < 0.18
+    let heart = big ? ["##.##", "#####", ".###.", "..#.."] : [".#.#.", ".###.", "..#.."]
+    glyphRows(heart) { i, j, _ in L.S(bx + 2 + Double(i), by + (big ? 1 : 2) + Double(j), hx("#d9534f")) }
 }
 
 /// a person's colours for the little portrait on the mantel never change, so they're worked out once

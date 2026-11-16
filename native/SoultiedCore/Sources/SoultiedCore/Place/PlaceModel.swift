@@ -40,6 +40,8 @@ public final class PlaceModel {
     public internal(set) var ranksDoc = RanksDoc()
     /// your best games together, for the board (meta/bests)
     public internal(set) var bests = BestsDoc()
+    /// the pet you both raise: who looked after it when (meta/pet)
+    public internal(set) var petDoc = PetDoc()
     @ObservationIgnored private var rankKey: String?
     @ObservationIgnored private var bestsSent: String?
     @ObservationIgnored private var escapesSynced = false
@@ -150,6 +152,13 @@ public final class PlaceModel {
             db.listen(meta("bucket")) { [weak self] d in
                 self?.bucket = BucketDoc(d)
                 self?.loaded.insert("bucket")
+            },
+            db.listen(meta("pet")) { [weak self] d in
+                guard let self else { return }
+                self.petDoc = PetDoc(d)
+                self.loaded.insert("pet")
+                self.countPetDays()
+                self.afterChange()
             },
             db.listen(meta("ranks")) { [weak self] d in
                 guard let self else { return }
@@ -1076,6 +1085,9 @@ public final class PlaceModel {
             if !has(v) { credits.append((v, Catalogue.visit, "you showed up")) }
             if togetherToday && !has(DecorDoc.earnTogether(today)) { credits.append((DecorDoc.earnTogether(today), Catalogue.together, "you’re both here today")) }
             if letter(.daily).opened && !has(DecorDoc.earnLetter(today)) { credits.append((DecorDoc.earnLetter(today), Catalogue.letter, "today’s letter is open")) }
+            if decor.pet != "none" && petView?.mood == .both && !has(DecorDoc.earnPet(today)) {
+                credits.append((DecorDoc.earnPet(today), Catalogue.pet, "you both looked after \(petName ?? "your pet")"))
+            }
         }
         if credits.isEmpty { return }
         credits.forEach { earnSent.insert($0.0) }
@@ -1129,6 +1141,37 @@ public final class PlaceModel {
         } else {
             activity(.new(.roomDecorated, "A name for the pet", "\(myName) named the \(what) \(name)."))
         }
+    }
+
+    /* ---------- the pet you both raise (src/together/PetContext.tsx) ---------- */
+
+    /// how the pet's doing today (nil while nobody sleeps on the cushion)
+    public var petView: PetView? { decor.pet == "none" ? nil : petDoc.view(today: today, me: me, them: them) }
+
+    /// its name, or "your ginger cat" while it hasn't got one
+    public var petCallName: String {
+        if let n = petName { return n }
+        return "your \((Catalogue.item(.pet, decor.pet)?.name ?? "pet").lowercased())"
+    }
+
+    /// Look after it: what it did ("Biscuit wolfed it down."), and a line if today took it up a level (nil when
+    /// you already have today).
+    @discardableResult
+    public func carePet(_ act: PetAct) -> (reaction: String, levelUp: String?)? {
+        guard decor.pet != "none", let patch = petDoc.carePatch(today: today, me: me, them: them, act: act, now: Values.nowMs()) else { return nil }
+        let before = Pet.level(petDoc.bond).level
+        petDoc = PetDoc(Values.deepMerge(petDoc.doc, patch))
+        save(meta("pet"), patch, "the pet")
+        let after = Pet.level(petDoc.bond).level
+        let name = petCallName
+        earnStitches()
+        return (Pet.reaction(act, name: name), after > before ? Pet.levelUp(after, name: name) : nil)
+    }
+
+    /// a day you both looked after it at the same moment (neither saw the other's yet): count it now
+    private func countPetDays() {
+        guard let p = petDoc.missingDays(me: me, them: them) else { return }
+        save(meta("pet"), p, "the pet")
     }
 
     /* ---------- you two ---------- */

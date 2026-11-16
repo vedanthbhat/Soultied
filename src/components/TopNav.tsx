@@ -7,18 +7,23 @@ import { useDecor } from '../decor/DecorContext';
 import { PixelIcon } from './letters/PixelIcon';
 import { sfx } from '../escape/sfx';
 import { useTogether } from '../together/TogetherContext';
+import { usePet } from '../together/PetContext';
 
 /**
  * The menu hides above the screen and slides down when the cursor touches
  * the top edge (or when anything inside it gets keyboard focus). On touch
  * screens a small tab stays visible to open it.
  */
-export const TopNav: React.FC<{ letterUnread: boolean }> = ({ letterUnread }) => {
+export const TopNav: React.FC<{ letterUnread: boolean; onPet?: () => void }> = ({ letterUnread, onPet }) => {
   const { space, currentUser, partnerUser, panel, openPanel, switchActiveUser, cloudMode } = useApp();
   const { waiting } = useGames();
   const turntable = useTurntable();
   const decor = useDecor();
   const { wallNews } = useTogether();
+  const pet = usePet();
+  // the pet: there's one on the cushion, and you haven't been by today
+  const hasPet = decor.placed.pet !== 'none';
+  const petWaits = hasPet && (pet.view.mood === 'waiting' || pet.view.mood === 'resting' || pet.view.mood === 'missing');
   const [open, setOpen] = useState(false);
   const [hint, setHint] = useState(true);
   const [quiet, setQuiet] = useState(() => sfx.isMuted());
@@ -154,6 +159,18 @@ export const TopNav: React.FC<{ letterUnread: boolean }> = ({ letterUnread }) =>
                   {decor.stitches}
                 </span>
               </button>
+              {onPet && (
+                <button
+                  className="px-btn px-btn--paper px-btn--small"
+                  onClick={() => {
+                    setOpen(false);
+                    onPet();
+                  }}
+                >
+                  {hasPet ? decor.petName || 'Pet' : 'Pet'}
+                  {petWaits && <span aria-label="waiting for you" className="inline-block w-2 h-2 bg-[var(--thread)] mo-beat" />}
+                </button>
+              )}
               <button className="px-btn px-btn--paper px-btn--small" onClick={() => go('us')}>
                 Us
               </button>

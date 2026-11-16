@@ -130,6 +130,8 @@ export const REWARDS = {
   together: 10,
   /** you opened that day's letter together */
   letter: 10,
+  /** you both looked after the pet that day */
+  pet: 10,
 };
 /** Your first look at the catalogue: something to spend straight away, more if you've been showing up already. */
 export const WELCOME = 60;
@@ -189,6 +191,7 @@ export const earnKey = {
   visit: (day: string, uid: string) => `${day}|visit|${uid}`,
   together: (day: string) => `${day}|together`,
   letter: (day: string) => `${day}|letter`,
+  pet: (day: string) => `${day}|pet`,
   welcome: 'welcome',
 };
 

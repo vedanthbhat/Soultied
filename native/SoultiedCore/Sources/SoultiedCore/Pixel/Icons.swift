@@ -48,6 +48,11 @@ public enum Icons {
     public static let tv = Glyph(["..k...k..", "...k.k...", "kkkkkkkkk", "kbbbbbbbk", "kbbwbbbbk", "kbbbbbbbk", "kkkkkkkkk", ".k.....k."], ["k": "#3a2a26", "b": "#4f6fb0", "w": "#c4dcef"])
     /// a little cup (the couples board)
     public static let trophy = Glyph(["..yyyyyyy..", "yyyhyyyyyyy", "y.yhyyyyd.y", "y.yhyyyyd.y", ".yyhyyyydy.", "..yyyyydd..", "...yyyyd...", "....ddd....", "....yyy....", "..kkkkkkk..", "..kkkkkkk.."], ["y": "#e2b359", "h": "#fff1c2", "d": "#b48c4a", "k": "#8a5a3c"])
+    /// the pet's bowl, full (feeding it), its tennis ball (playing), its blanket (a cuddle), and a paw print
+    public static let bowl = Glyph(["..kKkKk..", ".kKkKkKk.", "bBBBBBBBb", ".bBBBBBb.", "..bbbbb.."], ["k": "#a0643a", "K": "#c07f4a", "B": "#9cc0e2", "b": "#4f6f94"])
+    public static let ball = Glyph(["..yyy..", ".yWyyy.", "yyWyyyy", "yyyWyyy", "yyyyWyy", ".yyyWy.", "..ddd.."], ["y": "#d4e45c", "W": "#f6f9d8", "d": "#a3b23a"])
+    public static let blanket = Glyph(["ooooooooo", "oCCCCCCCo", "orrrrrrro", "oCCCCCCCo", "orrrrrrro", "oCCCCCCCo", ".o.o.o.o."], ["o": "#a8584f", "C": "#f1e3cc", "r": "#cf6a62"])
+    public static let paw = Glyph([".p.p.", "p...p", ".ppp.", "ppppp", ".ppp."], ["p": "#8a6a52"])
     /// a record (the record player; src/components/NowPlaying.tsx)
     public static let record = Glyph(["..kkkkk..", ".kkgkgkk.", "kkkkkkkkk", "kgkrrrkgk", "kkkrwrkkk", "kgkrrrkgk", "kkkkkkkkk", ".kkgkgkk.", "..kkkkk.."], ["k": "#1f1718", "g": "#3a3035", "r": "#b8674f", "w": "#efdcb8"])
 }

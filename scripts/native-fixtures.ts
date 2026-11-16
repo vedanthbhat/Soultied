@@ -31,6 +31,7 @@ import { renderRoom, type RoomState } from '../src/pixel/room';
 import { START_DECOR } from '../src/decor/catalogue';
 import { fireOf, type CouchState } from '../src/couch';
 import { daysLeft, normalizeVisit, visitLine } from '../src/together/visit';
+import { PET_ACTS, carePatch, demoPet, missingDays, normalizePet, petLevel, petLevelUp, petLine, petReaction, petView, petCareState } from '../src/together/pet';
 import { SNAP_PROMPTS, normalizeSnap, snapPrompt, snapStage } from '../src/together/snap';
 import { type RecapInput, monthRecap, recapMonth } from '../src/together/recap';
 import { aheadLine, apartKm, apartLabel, distanceKm, normalizeWhere } from '../src/together/where';
@@ -545,6 +546,13 @@ const roomScenes: RoomScene[] = [];
     { left: 4, right: 5, t: 8.8, flame: 3, logs: { left: true, right: true }, closeness: 1 },
     { left: 6, right: -1, t: 12.05, flame: 3, fire: 1, hover: 'photo' },
     { left: 0, right: 1, t: 0.37, flame: 3, fire: 0.75, decor: { view: 'rain', wall: 'midnight' } },
+    // the pet: waiting on you (a heart over it), fed and played with, cuddled and both been (hearts), every level
+    { left: 0, right: 1, t: 1.3, petCare: { fed: true, played: true, cuddled: false, both: false, waiting: true, level: 0 } },
+    { left: 2, right: 3, t: 2.3, petCare: { fed: true, played: true, cuddled: true, both: true, waiting: false, level: 2 }, decor: { pet: 'pug' } },
+    { left: 4, right: 5, t: 3.65, closeness: 1, petCare: { fed: false, played: false, cuddled: true, both: true, waiting: false, level: 3 }, decor: { pet: 'tuxedo' } },
+    { left: 6, right: 7, t: 6.1, petCare: { fed: true, played: false, cuddled: false, both: false, waiting: false, level: 4 }, decor: { pet: 'fox' } },
+    { left: 8, right: 9, t: 9.42, petCare: { fed: true, played: true, cuddled: true, both: false, waiting: true, level: 1 }, decor: { pet: 'none' } },
+    { left: 1, right: 0, t: 4.8, petCare: { fed: false, played: true, cuddled: false, both: true, waiting: false, level: 1 }, decor: { pet: 'bunny' }, bare: true },
   ];
   const seat = (l: number, status = 'online') => (l >= 0 ? { avatar: looks[l], name: 'x', status } : { avatar: null, name: '', status: 'empty' });
   for (const sc of scenes) {
@@ -567,6 +575,7 @@ const roomScenes: RoomScene[] = [];
       touch: sc.touch || null,
       wallArt: sc.wallArt || null,
       wallNews: !!sc.wallNews,
+      petCare: sc.petCare || null,
     } as unknown as RoomState;
     roomScenes.push({ ...sc, hash: fnv(renderRoom(st, sc.t).data, 0x811c9dc5) });
   }
@@ -601,6 +610,61 @@ for (const raw of [
     const v = normalizeVisit(raw);
     visits.push({ raw, today, doc: v, days: daysLeft(v, today), line: visitLine(v, today) });
   }
+
+// the pet you both raise: what's kept, how it's doing seen by each of you on different days, the lines, and
+// what looking after it writes
+const pets: Array<{ raw: unknown; doc: unknown; cases: unknown[] }> = [];
+{
+  const now = Date.UTC(2026, 10, 18, 9, 30);
+  const raws: unknown[] = [
+    null,
+    { care: 'x', days: [1, 2] },
+    {
+      care: {
+        '2026-11-18': { a: { feed: now - 3600e3, play: 'yes', cuddle: true }, b: { cuddle: now - 60e3, nap: now }, '': { feed: now } },
+        '2026-11-17': { a: { feed: now - 86400e3 }, b: { play: now - 86400e3 - 5, feed: 12 } },
+        '2026-11-16': { b: { feed: now - 2 * 86400e3 } },
+        '2026-11-3': { a: { feed: now } },
+        '2026-10-30': { a: { feed: now - 19 * 86400e3 }, b: {} },
+        '2026-11-12': 'nothing',
+        '2026-11-11': { a: null },
+      },
+      days: { '2026-11-17': true, '2026-11-10': true, '2026-11-09': 'yes', '2026-11-08': false, '2026-11-07': 2, nope: true },
+    },
+    { care: { '2026-11-14': { a: { feed: now - 4 * 86400e3 } } }, days: { '2026-11-01': true } },
+    { care: { '2026-11-18': { b: { feed: now - 7200e3, play: now - 7000e3 } } }, days: Object.fromEntries(Array.from({ length: 13 }, (_, i) => [addDays('2026-11-17', -i), true])) },
+    { care: { '2026-11-18': { a: { play: now - 100 } } }, days: Object.fromEntries(Array.from({ length: 31 }, (_, i) => [addDays('2026-11-17', -i * 2), true])) },
+    demoPet('2026-11-18', now, 'a', 'b'),
+  ];
+  for (const raw of raws) {
+    const d = normalizePet(raw);
+    const cases: unknown[] = [];
+    for (const today of ['2026-11-18', '2026-11-19', '2026-11-22', '2026-12-05'])
+      for (const [me, them] of [
+        ['a', 'b'],
+        ['b', 'a'],
+        ['a', null],
+      ] as const) {
+        const v = petView(d, today, me, them);
+        cases.push({
+          today,
+          me,
+          them,
+          view: v,
+          care: petCareState(v),
+          lines: [petLine(v, 'Biscuit', them ? 'Rohan' : null), petLine(v, 'your ginger cat', them ? 'Rohan' : null)],
+          patches: PET_ACTS.map((a) => carePatch(d, today, me, them, a, now + 0.4)),
+          missing: missingDays(d, me, them),
+        });
+      }
+    pets.push({ raw, doc: d, cases });
+  }
+}
+const petWords = {
+  levels: [0, 1, 2, 3, 4, 6, 7, 13, 14, 29, 30, 31, 400].map((n) => [n, petLevel(n)]),
+  reactions: PET_ACTS.map((a) => [a, petReaction(a, 'Biscuit'), petReaction(a, 'your duckling')]),
+  levelUps: [0, 1, 2, 3, 4, 9].map((l) => [l, petLevelUp(l, 'Biscuit')]),
+};
 
 // today's photo: the prompt for a place and a day, what's kept, and who sees what
 const snaps: { prompts: Array<[string, string, string]>; docs: Array<{ raw: unknown; doc: unknown; stages: Array<[string, string | null, string]> }>; count: number } = { prompts: [], docs: [], count: SNAP_PROMPTS.length };
@@ -804,5 +868,5 @@ const ranks = {
 };
 
 const out = process.argv[2] || 'native-fixtures.json';
-writeFileSync(out, JSON.stringify({ cards, days, hashes, rngSeq, streaks, demo, same, chapters, games, live, doodle: { judges, brushes, fills, choices, games: doodles }, coasters: coasterSteps, escape, record, watch: { looks, ...watch }, wall: { doodles: wallDoodles }, room: { scenes: roomScenes, fires, visits }, snaps, recaps: { cases: recaps, months: recapMonths }, wheres, buckets, voices, carromFrames, ranks }));
+writeFileSync(out, JSON.stringify({ cards, days, hashes, rngSeq, streaks, demo, same, chapters, games, live, doodle: { judges, brushes, fills, choices, games: doodles }, coasters: coasterSteps, escape, record, watch: { looks, ...watch }, wall: { doodles: wallDoodles }, room: { scenes: roomScenes, fires, visits }, snaps, recaps: { cases: recaps, months: recapMonths }, wheres, buckets, voices, carromFrames, ranks, pet: { docs: pets, ...petWords } }));
 console.log(`wrote ${cards.length} card days, ${streaks.length} streaks, ${demo.length} demo rooms, ${games.length} game moves, ${live.length} live games, ${doodles.length} doodle moves to ${out}`);

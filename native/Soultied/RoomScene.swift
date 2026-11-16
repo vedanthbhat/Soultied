@@ -126,6 +126,7 @@ struct RoomScene: View {
         st.wallNews = place.wallNews != nil
         st.gamesWaiting = !place.gamesWaiting.isEmpty
         st.music = place.recordOn
+        st.petCare = place.petView?.careState
         return st
     }
 

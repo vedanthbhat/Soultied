@@ -38,8 +38,10 @@ interface Props {
   flame?: number;
   /** whose log is on the fire today */
   logs?: { left: boolean; right: boolean };
-  /** a little card that opens over one of the two seats */
-  pop?: { at: 'left' | 'right'; node: React.ReactNode; onClose: () => void } | null;
+  /** a little card that opens over one of the two seats (or the pet) */
+  pop?: { at: HotspotId; node: React.ReactNode; onClose: () => void } | null;
+  /** how the pet's been looked after today */
+  petCare?: RoomState['petCare'];
 }
 
 /** one step along the couch (1/7) takes about a second and a half */
@@ -162,6 +164,7 @@ export const RoomCanvas: React.FC<Props> = ({
   wallNews = false,
   flame = 2,
   logs,
+  petCare = null,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [fit, setFit] = useState<Fit>(() => computeFit(window.innerWidth, window.innerHeight, focusX));
@@ -187,6 +190,7 @@ export const RoomCanvas: React.FC<Props> = ({
   stateRef.current.wallNews = wallNews;
   stateRef.current.flame = flame;
   stateRef.current.logs = logs;
+  stateRef.current.petCare = petCare;
 
   // a touch plays once, from the moment it arrives (in the room's own clock); one that comes in
   // while another is still playing waits its turn

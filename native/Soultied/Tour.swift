@@ -85,7 +85,7 @@ final class Tour {
         }
         s += [
             TourStep(spot: "spot.board", title: "Your wall", text: "The pictures over the couch are your wall: notes, doodles, photos and memories you leave each other."),
-            TourStep(spot: "spot.pet", title: place.petName.map { "\($0), your pet" } ?? "Your pet", text: "Asleep on its cushion by the couch. Tap it to choose who sleeps there (a cat, a pug, a duckling, a frog…) and give them a name."),
+            TourStep(spot: "spot.pet", title: place.petName.map { "\($0), your pet" } ?? "Your pet", text: "Asleep on its cushion by the couch, and yours to raise together. Tap it to feed it, play with it or give it a cuddle; every day you both come by, it grows closer to you."),
             TourStep(spot: "spot.letter", title: "Today’s letter", text: "Five quick questions a day, all taps. Answer in secret; it opens once you’ve both sealed it, with something to talk about."),
             TourStep(spot: "spot.music", title: "The record player", text: "Hear that? Put a record on, or a song from YouTube, and it plays for both of you, in sync."),
             TourStep(spot: "tab.watch", title: "Watch together", text: "Put on YouTube, Netflix or Prime Video and it plays for both of you, in sync, with a chat and the two of you on the couch."),

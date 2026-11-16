@@ -167,7 +167,7 @@ public enum Catalogue {
     public static func name(_ slot: SlotId) -> String { slots.first { $0.id == slot }!.name }
 
     /// how you earn stitches
-    public static let visit = 10, together = 10, letter = 10
+    public static let visit = 10, together = 10, letter = 10, pet = 10
     public static let welcome = 60, welcomePerDay = 10, welcomeMax = 300
     public static func welcomeGift(_ daysTogether: Int) -> Int { min(welcomeMax, welcome + welcomePerDay * daysTogether) }
 
@@ -237,6 +237,7 @@ public struct DecorDoc: Sendable, Equatable {
     public static func earnVisit(_ day: String, _ uid: String) -> String { "\(day)|visit|\(uid)" }
     public static func earnTogether(_ day: String) -> String { "\(day)|together" }
     public static func earnLetter(_ day: String) -> String { "\(day)|letter" }
+    public static func earnPet(_ day: String) -> String { "\(day)|pet" }
     public static let earnWelcome = "welcome"
 }
 

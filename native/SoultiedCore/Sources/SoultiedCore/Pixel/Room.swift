@@ -130,6 +130,8 @@ public struct RoomState {
     public var touch: RoomTouch? = nil
     public var wallArt: WallArtPixels? = nil
     public var wallNews = false
+    /// how the pet's been looked after today (Together/Pet.swift): its bowl, ball, blanket, hearts and cushion
+    public var petCare: PetCareState? = nil
 
     public init(left: Seat, right: Seat) {
         self.left = left
@@ -179,6 +181,7 @@ let HOTSPOTS: [Hotspot] = [
     Hotspot(id: .board, x: 263, y: 20, w: 47, h: 28),
     // the pet asleep on its cushion: choose who sleeps there
     Hotspot(id: .pet, x: PetBox.x - 4, y: PetBox.y - 5, w: 28, h: 15),
+    Hotspot(id: .pet, x: PetBox.x - 14, y: PetBox.y + 3, w: 10, h: 7),
 ]
 
 /// Focal point to keep in view when the screen is narrower than 16:9.
@@ -358,7 +361,7 @@ func renderRoom(_ L: Layer, _ state: RoomState, _ t: Double) {
     drawCandles(L, t)
     drawWeather(L, t, d.view)
     drawPhotoPortrait(L, state)
-    drawPet(L, t, d.pet)
+    drawPet(L, t, d.pet, state.bare ? nil : state.petCare)
     drawGameStack(L, t, state.gamesWaiting, state.hover == .games)
     drawTurntable(L, t, state.music, state.hover == .music)
 
@@ -406,6 +409,8 @@ func renderRoom(_ L: Layer, _ state: RoomState, _ t: Double) {
             if let m = state.moodLeft, headL != 0 { drawMoodBubble(L, m, lx, headL, .left, t, 0) }
             if let m = state.moodRight, headR != 0 { drawMoodBubble(L, m, rx, headR, .right, t, 1.3) }
         }
+        // the pet waiting on you, over whatever's on the couch
+        if state.petCare?.waiting == true && d.pet != "none" { drawPetBubble(L, t) }
     }
 
     drawTable(L)
@@ -426,6 +431,27 @@ public let DECOR_CROPS: [String: (Int, Int, Int, Int)] = [
     "painting": (104, 10, 48, 32),
     "plant": (0, 94, 48, 72),
 ]
+
+/// the pet's corner of the room, close up: its cushion, bowl, ball, and whatever's floating over it (the pet card's
+/// picture; src/components/PetCard.tsx)
+public let PET_PORTRAIT = (x: 166, y: 136, w: 46, h: 30)
+private let petLayer = Layer(ROOM_W, ROOM_H)
+
+public func renderPetPortrait(_ left: Seat, _ right: Seat, _ decor: Decor, _ care: PetCareState?, _ t: Double) -> PixelBuffer {
+    var st = RoomState(left: left, right: right)
+    st.decor = decor
+    st.petCare = care
+    let (x0, y0, w, h) = PET_PORTRAIT
+    let out = PixelBuffer(w, h)
+    roomLock.lock()
+    renderRoom(petLayer, st, t)
+    for j in 0..<h {
+        let from = ((y0 + j) * ROOM_W + x0) * 4
+        out.data.replaceSubrange((j * w * 4)..<((j + 1) * w * 4), with: petLayer.data[from..<(from + w * 4)])
+    }
+    roomLock.unlock()
+    return out
+}
 
 public func renderDecorThumb(_ decor: Decor, _ slot: String, _ left: Seat, _ right: Seat) -> PixelBuffer {
     var st = RoomState(left: left, right: right)

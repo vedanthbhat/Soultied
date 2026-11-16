@@ -3,6 +3,7 @@ import { renderCharacter } from './character';
 import type { AvatarConfig } from '../types';
 import { START_DECOR, type Decor, type SlotId } from '../decor/catalogue';
 import type { Glyph } from '../together/moods';
+import type { PetCareState } from '../together/pet';
 
 /**
  * The living room. 320 x 180 native pixels, drawn from code every frame.
@@ -53,6 +54,8 @@ export interface RoomState {
   wallArt?: { w: number; h: number; pal: string[]; px: string } | null;
   /** your person pinned something new to the wall: a little note tucked in the frame */
   wallNews?: boolean;
+  /** how the pet's been looked after today (see together/pet.ts): its bowl, ball, blanket, hearts and cushion */
+  petCare?: PetCareState | null;
 }
 
 export interface RoomTouch {
@@ -119,8 +122,9 @@ const HOTSPOTS: Hotspot[] = [
   // the picture over the mantel, and the two beside the chimney: our wall (notes, doodles, photos, memories)
   { id: 'board', x: 214, y: 24, w: 34, h: 26 },
   { id: 'board', x: 263, y: 20, w: 47, h: 28 },
-  // the pet asleep on its cushion: choose who sleeps there
+  // the pet asleep on its cushion: look after it (and its bowl beside it)
   { id: 'pet', x: PET.x - 4, y: PET.y - 5, w: 28, h: 15 },
+  { id: 'pet', x: PET.x - 14, y: PET.y + 3, w: 10, h: 7 },
 ];
 
 /* ------------------------------------------------------------------------ */
@@ -1829,8 +1833,12 @@ function drawCatCurl(L: Layer, t: number, dark: string, light: string, face: str
   L.set(x + 20, y + 4 - sw, dark);
 }
 
-function drawPet(L: Layer, t: number, pet: string) {
+/** a little heart, 3 wide: rising over the pet, or in its bubble */
+const PET_HEART = ['#.#', '###', '.#.'];
+
+function drawPet(L: Layer, t: number, pet: string, care: PetCareState | null = null) {
   const { x, y } = PET;
+  const level = care ? care.level : 0;
   // cushion
   for (let j = 0; j < 6; j++)
     for (let i = 0; i < 26; i++) {
@@ -1838,6 +1846,17 @@ function drawPet(L: Layer, t: number, pet: string) {
       if (corner) continue;
       L.set(x - 3 + i, y + 4 + j, j < 2 ? '#a2b187' : j > 3 ? P.sageD : P.sage);
     }
+  // the closer it's grown to you, the fancier its cushion: a stitched edge, a heart, tassels, then gold
+  if (level >= 1)
+    for (let i = 2; i < 24; i += 2) L.set(x - 3 + i, y + 8, level >= 4 ? '#e2c46a' : '#c9d3b0');
+  if (level >= 2)
+    PET_HEART.forEach((row, j) => [...row].forEach((k, i) => k === '#' && L.set(x + 1 + i, y + 5 + j, level >= 4 ? '#e2c46a' : '#d9706b')));
+  if (level >= 3)
+    for (const [tx, ty] of [[x - 4, y + 5], [x - 4, y + 8], [x + 23, y + 5], [x + 23, y + 8]]) {
+      L.set(tx, ty, '#d8b45a');
+      L.set(tx, ty + 1, '#b48f3c');
+    }
+  if (care && pet !== 'none') drawPetThings(L, t, care);
   if (pet === 'none') return;
   if (pet === 'tuxedo') drawCatCurl(L, t, '#26201f', '#3b3334', '#3b3334', true);
   else if (pet === 'smoky') drawCatCurl(L, t, '#5d595e', '#8b878c', '#8b878c', false);
@@ -1856,9 +1875,18 @@ function drawPet(L: Layer, t: number, pet: string) {
     );
     if (pet === 'pug' && Math.sin(t * 1.3) > 0.7) L.set(x + sp.dx + 21, y + sp.dy + 3, sp.pal.t);
   } else drawCatCurl(L, t, '#b86e33', '#d98c4a', '#d98c4a', false);
-  // zzz
+  // a cuddle: a little blanket tucked over its back half
+  if (care?.cuddled) drawPetBlanket(L);
+  // zzz, or hearts once you've both been by today
   const zl = (t * 0.5) % 1;
-  if (zl < 0.7) {
+  if (care?.both) {
+    if (zl < 0.8) {
+      const a = Math.round(230 * (1 - zl / 0.8));
+      const hx = Math.round(x + 1 - zl * 2 + (Math.sin(t * 5) > 0 ? 1 : 0));
+      const hy = Math.round(y - 5 - zl * 11);
+      PET_HEART.forEach((row, j) => [...row].forEach((k, i) => k === '#' && L.set(hx + i, hy + j, '#f07a8a', a)));
+    }
+  } else if (!care?.waiting && zl < 0.7) {
     const zx = x - 2 - zl * 3;
     const zy = y - 4 - zl * 10;
     const a = Math.round(220 * (1 - zl));
@@ -1868,6 +1896,72 @@ function drawPet(L: Layer, t: number, pet: string) {
     L.set(zx, zy + 2, '#e9e0d0', a);
     L.set(zx + 1, zy + 2, '#e9e0d0', a);
   }
+}
+
+/** its bowl beside the cushion (full once it's been fed today), and its ball out on the rug once someone's played */
+function drawPetThings(L: Layer, t: number, care: PetCareState) {
+  const { x, y } = PET;
+  const bx = x - 13;
+  const by = y + 5;
+  // the bowl: a rim, then narrowing to its foot
+  for (let i = 0; i < 8; i++) L.set(bx + i, by + 1, i === 0 || i === 7 ? '#4f6f94' : '#9cc0e2');
+  for (let i = 1; i < 7; i++) L.set(bx + i, by + 2, i === 1 || i === 6 ? '#4f6f94' : '#6f95c0');
+  for (let i = 2; i < 6; i++) L.set(bx + i, by + 3, '#3f5b7a');
+  if (care.fed) {
+    // heaped with food, a crumb catching the light now and then
+    for (let i = 1; i < 7; i++) L.set(bx + i, by + 1, i % 2 ? '#a0643a' : '#c07f4a');
+    for (let i = 2; i < 6; i++) L.set(bx + i, by, i === 3 ? '#d99a5e' : '#a0643a');
+    if (Math.sin(t * 1.7) > 0.85) L.set(bx + 4, by, '#f0c48a');
+  } else {
+    // empty: you can see in
+    for (let i = 1; i < 7; i++) L.set(bx + i, by + 1, i === 1 || i === 6 ? '#9cc0e2' : '#2f4660');
+  }
+  if (care.played) {
+    // a tennis ball out on the rug, rocking a little
+    const rx = x - 19 + (Math.sin(t * 0.9) > 0.6 ? 1 : 0);
+    const ry = y + 8;
+    ['.yy.', 'yWyy', 'yyWy', '.yy.'].forEach((row, j) =>
+      [...row].forEach((k, i) => k !== '.' && L.set(rx + i, ry + j, k === 'W' ? '#f6f9d8' : j === 3 ? '#a3b23a' : '#d4e45c'))
+    );
+  }
+}
+
+/** a little cream blanket with red stripes, tucked over the pet's back half after a cuddle */
+function drawPetBlanket(L: Layer) {
+  const { x, y } = PET;
+  const rows = [
+    '...ooooo...',
+    '.ooCCCCCoo.',
+    'oCCCCCCCCCo',
+    'orrrrrrrrro',
+    'oCCCCCCCCCo',
+    'orrrrrrrrro',
+    'oCCCCCCCCCo',
+    '.o.o.o.o.o.',
+  ];
+  const pal: Record<string, string> = { o: '#a8584f', C: '#f1e3cc', r: '#cf6a62' };
+  rows.forEach((row, j) => [...row].forEach((k, i) => k !== '.' && L.set(x + 10 + i, y - 1 + j, pal[k])));
+}
+
+/** your person's been by and you haven't: a little heart in a bubble over the pet, bobbing */
+function drawPetBubble(L: Layer, t: number) {
+  const { x, y } = PET;
+  const bob = Math.sin(t * 3) > 0 ? 0 : 1;
+  const bx = x + 2;
+  const by = y - 15 + bob;
+  // the bubble: 9 x 7 with its corners rounded off, and two dots trailing down to the pet
+  for (let j = 0; j < 7; j++)
+    for (let i = 0; i < 9; i++) {
+      if ((j === 0 || j === 6) && (i === 0 || i === 8)) continue;
+      const edge = j === 0 || j === 6 || i === 0 || i === 8;
+      L.set(bx + i, by + j, edge ? '#4a3b3c' : '#fbf6ec');
+    }
+  L.set(bx + 1, by + 8, '#fbf6ec');
+  L.set(bx, by + 10, '#fbf6ec');
+  // a heart that beats now and then
+  const big = (t * 1.6) % 1 < 0.18;
+  const heart = big ? ['##.##', '#####', '.###.', '..#..'] : ['.#.#.', '.###.', '..#..'];
+  heart.forEach((row, j) => [...row].forEach((k, i) => k === '#' && L.set(bx + 2 + i, by + (big ? 1 : 2) + j, '#d9534f')));
 }
 
 function drawPhotoPortrait(L: Layer, state: RoomState) {
@@ -2207,7 +2301,7 @@ export function renderRoom(state: RoomState, t: number): PixelBuffer {
   drawCandles(L, t);
   drawWeather(L, t, d.view);
   drawPhotoPortrait(L, state);
-  drawPet(L, t, d.pet);
+  drawPet(L, t, d.pet, state.bare ? null : state.petCare || null);
   drawGameStack(L, t, !!state.gamesWaiting, state.hover === 'games');
   drawTurntable(L, t, !!state.music, state.hover === 'music');
 
@@ -2258,6 +2352,8 @@ export function renderRoom(state: RoomState, t: number): PixelBuffer {
       if (moods.left && headL) drawMoodBubble(L, moods.left, lx, headL, 'left', t, 0);
       if (moods.right && headR) drawMoodBubble(L, moods.right, rx, headR, 'right', t, 1.3);
     }
+    // the pet waiting on you, over whatever's on the couch
+    if (state.petCare?.waiting && d.pet !== 'none') drawPetBubble(L, t);
   }
 
   drawTable(L);

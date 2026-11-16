@@ -19,6 +19,7 @@ import {
   welcomeGift,
 } from './catalogue';
 import { BONUS_STITCHES, bonusKey } from '../plus/rules';
+import { usePet } from '../together/PetContext';
 
 /** "+20 stitches: you showed up, and you're both here today." */
 export interface EarnNote {
@@ -202,11 +203,14 @@ export const DecorProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [note, setNote] = useState<EarnNote | null>(null);
   const sent = useRef(new Set<string>());
   const letterOpen = !!letters.daily[today]?.revealedAt;
+  // you've both looked after the pet today
+  const petBoth = usePet().view.mood === 'both';
   useEffect(() => {
     if (!ready || !setupComplete || !space) return;
     const d = docRef.current;
     const has = (k: string) => k in d.earned || sent.current.has(`${scope}|${k}`);
     const credits: Array<{ key: string; amount: number; why: string }> = [];
+    const petOut = decorOf(d.placed).pet;
     if (!has(earnKey.welcome)) credits.push({ key: earnKey.welcome, amount: welcomeGift(couchDays), why: 'welcome' });
     // Soultied Plus: bonus stitches once a month (online places only)
     if (cloudMode && hasPlus && !has(bonusKey(today))) credits.push({ key: bonusKey(today), amount: BONUS_STITCHES, why: 'plus' });
@@ -216,6 +220,7 @@ export const DecorProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (!has(visit)) credits.push({ key: visit, amount: REWARDS.visit, why: 'visit' });
       if (togetherToday && !has(earnKey.together(today))) credits.push({ key: earnKey.together(today), amount: REWARDS.together, why: 'together' });
       if (letterOpen && !has(earnKey.letter(today))) credits.push({ key: earnKey.letter(today), amount: REWARDS.letter, why: 'letter' });
+      if (petBoth && petOut !== 'none' && !has(earnKey.pet(today))) credits.push({ key: earnKey.pet(today), amount: REWARDS.pet, why: 'pet' });
     }
     if (!credits.length) return;
     credits.forEach((c) => sent.current.add(`${scope}|${c.key}`));
@@ -226,11 +231,11 @@ export const DecorProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const first = !welcome && !introSeen ? ` That makes ${balance(d) + amount} in the jar to decorate the room with.` : '';
     const text = welcome
       ? `A housewarming gift: ${amount} stitches to decorate the room with.`
-      : `+${amount} stitches: ${joinReasons(credits.map((c) => REASON[c.why]))}.${first}`;
+      : `+${amount} stitches: ${joinReasons(credits.map((c) => (c.why === 'pet' ? `you both looked after ${d.petNames[petOut] || 'your pet'}` : REASON[c.why])))}.${first}`;
     setNote({ key: credits.map((c) => c.key).join(','), amount, text });
     markIntroSeen();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, scope, doc.earned, setupComplete, space?.id, partnerUser?.id, me, today, togetherToday, letterOpen, couchDays, cloudMode, hasPlus]);
+  }, [ready, scope, doc.earned, setupComplete, space?.id, partnerUser?.id, me, today, togetherToday, letterOpen, petBoth, couchDays, cloudMode, hasPlus]);
 
   // someone who hasn't looked at the catalogue yet (your person moving in to a room with stitches already in the jar)
   const introKey = `soultied_decor_intro_${sid}_${me}`;

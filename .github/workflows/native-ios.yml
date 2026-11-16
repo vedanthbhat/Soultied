@@ -202,6 +202,8 @@ jobs:
           shot tour-music -demo -tour 5
           shot tour-watch -demo -tour 6
           shot pet -demo -open pet
+          # the pet you both raise, on Home: Rohan's been by, so it's your turn
+          shot home-pet -demo -tab home -scrollHome pet
           # turned sideways as a show starts: Netflix stays up (it used to close for the room)
           shot stream-sideways -demo -tab watch -service netflix -stream netflix -sideways
           # the Starlight look

@@ -28,6 +28,8 @@ enum AppTab: String, CaseIterable, Identifiable {
 /// what the room can open as a sheet (sideways, or from a tap on the couch)
 enum RoomSheet: String, Identifiable {
     case me, them, letters, wall, decor, play, us, music, watch, pet
+    /// the decor catalogue, open at the pet (choosing a different one, or naming it)
+    case petDecor
     /// the wall, open at the doodle pad or the photos (a tap on a home-screen widget)
     case doodle, photos
     var id: String { rawValue }
@@ -174,7 +176,7 @@ struct MainView: View {
             Haptics.tap()
             sheet = .wall
         case .decor: sheet = .decor
-        // the pet on its cushion: choose who sleeps there
+        // the pet on its cushion: look after it
         case .pet:
             Haptics.soft()
             sheet = .pet
@@ -207,7 +209,8 @@ struct MainView: View {
         case .us: UsView(app: app, place: place)
         case .music: RecordSheet(place: place, hostsSong: roomSideways).presentationDetents([.medium, .large])
         case .watch: WatchView(place: place)
-        case .pet: DecorView(place: place, start: .pet)
+        case .pet: PetSheet(place: place, choose: { sheet = .petDecor }).presentationDetents([.medium, .large])
+        case .petDecor: DecorView(place: place, start: .pet)
         }
     }
 }

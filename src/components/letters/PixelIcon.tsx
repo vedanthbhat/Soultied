@@ -86,6 +86,26 @@ export const SPRITES = {
     rows: ['..yyyyyyy..', 'yyyhyyyyyyy', 'y.yhyyyyd.y', 'y.yhyyyyd.y', '.yyhyyyydy.', '..yyyyydd..', '...yyyyd...', '....ddd....', '....yyy....', '..kkkkkkk..', '..kkkkkkk..'],
     pal: { y: '#e2b359', h: '#fff1c2', d: '#b48c4a', k: '#8a5a3c' },
   },
+  /** the pet's bowl, full (feeding it) */
+  bowl: {
+    rows: ['..kKkKk..', '.kKkKkKk.', 'bBBBBBBBb', '.bBBBBBb.', '..bbbbb..'],
+    pal: { k: '#a0643a', K: '#c07f4a', B: '#9cc0e2', b: '#4f6f94' },
+  },
+  /** its tennis ball (playing with it) */
+  ball: {
+    rows: ['..yyy..', '.yWyyy.', 'yyWyyyy', 'yyyWyyy', 'yyyyWyy', '.yyyWy.', '..ddd..'],
+    pal: { y: '#d4e45c', W: '#f6f9d8', d: '#a3b23a' },
+  },
+  /** its blanket (a cuddle) */
+  blanket: {
+    rows: ['ooooooooo', 'oCCCCCCCo', 'orrrrrrro', 'oCCCCCCCo', 'orrrrrrro', 'oCCCCCCCo', '.o.o.o.o.'],
+    pal: { o: '#a8584f', C: '#f1e3cc', r: '#cf6a62' },
+  },
+  /** a paw print (one of you came by) */
+  paw: {
+    rows: ['.p.p.', 'p...p', '.ppp.', 'ppppp', '.ppp.'],
+    pal: { p: '#8a6a52' },
+  },
 } satisfies Record<string, Sprite>;
 
 export type SpriteName = keyof typeof SPRITES;

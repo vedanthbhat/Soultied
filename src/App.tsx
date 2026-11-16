@@ -23,6 +23,9 @@ import { NowPlaying } from './components/NowPlaying';
 import { DecorProvider, useDecor } from './decor/DecorContext';
 import { TogetherProvider, useTogether } from './together/TogetherContext';
 import { RanksProvider } from './together/RanksContext';
+import { PetProvider, usePet } from './together/PetContext';
+import { petCareState } from './together/pet';
+import { PetCard } from './components/PetCard';
 import { type TouchKind, moodGlyph, moodLine, touchDef, touchSummary } from './together/moods';
 import { MeCard, ThemCard, ago } from './components/SeatCard';
 import { HoldCouch } from './components/HoldCouch';
@@ -162,6 +165,7 @@ const Home: React.FC = () => {
   const games = useGames();
   const turntable = useTurntable();
   const decor = useDecor();
+  const pet = usePet();
   const together = useTogether();
   const { asks, myMood, theirMood, roomTouch, touchNews, moodNews, lastSent, board, wallNews, snap } = together;
   // which part of the wall opens (the photos, for today's photo)
@@ -177,7 +181,7 @@ const Home: React.FC = () => {
   const [welcomeOpen, setWelcomeOpen] = useState(() => !setupComplete || !!joinCode);
   const [draftSeats, setDraftSeats] = useState<{ left: Seat; right: Seat } | null>(null);
   // the card over a seat: how you're feeling, or a hug for them
-  const [seatCard, setSeatCard] = useState<'left' | 'right' | null>(null);
+  const [seatCard, setSeatCard] = useState<'left' | 'right' | 'pet' | null>(null);
   const seatClosed = React.useRef({ id: '', at: 0 });
   const closeSeatCard = () => {
     if (seatCard) seatClosed.current = { id: seatCard, at: Date.now() };
@@ -186,6 +190,8 @@ const Home: React.FC = () => {
   useEffect(() => {
     if (panel) setSeatCard(null);
   }, [panel]);
+  // (tapping a seat or the pet again closes its card: the tap itself already did)
+  const justClosed = (id: string) => seatClosed.current.id === id && Date.now() - seatClosed.current.at < 400;
 
   // If the app is reset from inside, go back to the welcome sheet.
   useEffect(() => {
@@ -257,7 +263,20 @@ const Home: React.FC = () => {
           : snap.stage === 'theirs' && partnerUser
             ? `${partnerUser.name} took today’s photo`
             : 'Our wall · notes, doodles, photos',
-      pet: decor.petName ? `${decor.petName} · asleep by the couch` : 'Your pet · choose who sleeps here',
+      pet:
+        decor.shown.pet === 'none'
+          ? 'Your pet · choose who sleeps here'
+          : `${decor.petName || 'Your pet'} · ${
+              pet.view.mood === 'waiting'
+                ? `${partnerUser?.name || 'your person'} came by, your turn`
+                : pet.view.mood === 'both'
+                  ? 'over the moon'
+                  : pet.view.mood === 'mine'
+                    ? 'happy you came by'
+                    : pet.view.mood === 'missing'
+                      ? 'misses you'
+                      : 'feed, play, cuddle'
+            }`,
     };
     const meLabel = `${currentUser.name} · ${myMood ? moodLine(myMood) : 'how are you feeling?'}`;
     const themLabel = (u: UserProfile) => [u.name, theirMood && moodLine(theirMood), 'send a hug'].filter(Boolean).join(' · ');
@@ -265,7 +284,7 @@ const Home: React.FC = () => {
     if (guest) l.right = guest.id === currentUser.id ? meLabel : themLabel(guest);
     else l.right = `Invite ${space?.partnerPlaceholderName || 'your person'}`;
     return l;
-  }, [welcomeOpen, seatsEmpty, letterBadge, partnerSealed, partnerUser, currentUser, host, guest, space, games.waiting, turntable.on, turntable.track, journeyWaiting, journey.next, journey.unseen, panel, askWaiting, asks.forMe.length, myMood, theirMood, wallNews, pinnedWhat, decor.petName, fire.level, fire.streak, snap.stage]);
+  }, [welcomeOpen, seatsEmpty, letterBadge, partnerSealed, partnerUser, currentUser, host, guest, space, games.waiting, turntable.on, turntable.track, journeyWaiting, journey.next, journey.unseen, panel, askWaiting, asks.forMe.length, myMood, theirMood, wallNews, pinnedWhat, decor.petName, decor.shown.pet, pet.view.mood, fire.level, fire.streak, snap.stage]);
 
   const onHotspot = (id: HotspotId) => {
     roomSound(id);
@@ -280,7 +299,9 @@ const Home: React.FC = () => {
     else if (id === 'games') openPanel('games');
     else if (id === 'music') turntable.toggle();
     else if (id === 'decor') decor.openCatalogue('painting');
-    else if (id === 'pet') decor.openCatalogue('pet');
+    else if (id === 'pet') {
+      if (!justClosed('pet')) setSeatCard('pet');
+    }
     else if (id === 'board') {
       setWallTab(snap.stage === 'theirs' ? 'photos' : 'notes');
       openPanel('wall');
@@ -289,7 +310,7 @@ const Home: React.FC = () => {
       const who = id === 'left' ? host : guest;
       if (!who) openPanel('space');
       // tapping the same seat again closes its card (the tap itself already did)
-      else if (!(seatClosed.current.id === id && Date.now() - seatClosed.current.at < 400)) setSeatCard(id);
+      else if (!justClosed(id)) setSeatCard(id);
     }
   };
 
@@ -301,8 +322,32 @@ const Home: React.FC = () => {
       ? { id: roomTouch.id, kind: roomTouch.kind, together: touchDef(roomTouch.kind).together, from: roomTouch.by === host?.id ? ('left' as const) : ('right' as const), glyph: touchDef(roomTouch.kind) }
       : null;
   const seatWho = seatCard === 'left' ? host : seatCard === 'right' ? guest : null;
+  const petPop =
+    seatCard === 'pet' && !welcomeOpen && !panel
+      ? {
+          at: 'pet' as const,
+          onClose: closeSeatCard,
+          node: (
+            <PetCard
+              decor={decor.shown}
+              petName={decor.petName}
+              partnerName={partnerUser?.name || null}
+              left={liveLeft}
+              right={liveRight}
+              onChoose={() => {
+                setSeatCard(null);
+                decor.openCatalogue('pet');
+              }}
+              onName={() => {
+                setSeatCard(null);
+                decor.openCatalogue('pet');
+              }}
+            />
+          ),
+        }
+      : null;
   const seatPop =
-    seatCard && seatWho && !welcomeOpen && !panel
+    seatCard && seatCard !== 'pet' && seatWho && !welcomeOpen && !panel
       ? {
           at: seatCard,
           onClose: closeSeatCard,
@@ -456,7 +501,8 @@ const Home: React.FC = () => {
         flame={welcomeOpen ? 2 : fire.level}
         logs={welcomeOpen || !partnerUser ? undefined : { left: hereToday(host?.id), right: hereToday(guest?.id) }}
         touch={playTouch}
-        pop={seatPop}
+        pop={seatPop || petPop}
+        petCare={welcomeOpen ? null : petCareState(pet.view)}
         scoot={scootGo}
         onScooted={(c) => {
           if (scootPending && c * COUCH_STEPS >= couchLevel - 1e-6) {
@@ -621,7 +667,13 @@ const Home: React.FC = () => {
         </div>
       ) : (
         <>
-          <TopNav letterUnread={letterUnread} />
+          <TopNav
+            letterUnread={letterUnread}
+            onPet={() => {
+              openPanel(null);
+              setSeatCard('pet');
+            }}
+          />
 
           {(panel === 'question' || panel === 'questions') && (
             <PixelPanel title="Letters" kicker={prettyDate(today, true)} onClose={() => openPanel(null)} width={680}>
@@ -677,13 +729,15 @@ export default function App() {
       <StreamHubProvider>
         <TurntableProvider>
           <GamesProvider>
-            <DecorProvider>
-              <TogetherProvider>
-                <RanksProvider>
-                  <Home />
-                </RanksProvider>
-              </TogetherProvider>
-            </DecorProvider>
+            <PetProvider>
+              <DecorProvider>
+                <TogetherProvider>
+                  <RanksProvider>
+                    <Home />
+                  </RanksProvider>
+                </TogetherProvider>
+              </DecorProvider>
+            </PetProvider>
           </GamesProvider>
         </TurntableProvider>
       </StreamHubProvider>

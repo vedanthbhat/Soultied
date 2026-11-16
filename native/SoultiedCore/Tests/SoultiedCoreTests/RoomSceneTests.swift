@@ -29,7 +29,7 @@ final class RoomSceneTests: XCTestCase {
             i >= 0 ? Seat(avatar: ls[i], name: "x", status: SeatStatus(rawValue: status ?? "online")!) : .empty
         }
         let scenes = fx["scenes"] as! [Doc]
-        XCTAssertEqual(scenes.count, 15)
+        XCTAssertEqual(scenes.count, 21)
         let renderer = RoomRenderer()
         var bad: [String] = []
         for (n, s) in scenes.enumerated() {
@@ -59,6 +59,9 @@ final class RoomSceneTests: XCTestCase {
                 st.wallArt = WallArtPixels(w: a.int("w")!, h: a.int("h")!, pal: (a["pal"] as! [String]).map { RGB($0) }, px: a.str("px")!)
             }
             st.wallNews = s["wallNews"] as? Bool ?? false
+            if let pc = s["petCare"] as? Doc {
+                st.petCare = PetCareState(fed: pc.bool("fed"), played: pc.bool("played"), cuddled: pc.bool("cuddled"), both: pc.bool("both"), waiting: pc.bool("waiting"), level: pc.int("level")!)
+            }
             let buf = renderer.render(st, s.num("t")!)
             if Double(fnv(buf.data, 0x811C_9DC5)) != s.num("hash")! { bad.append("scene \(n) (flame \(st.flame), t \(s.num("t")!))") }
         }

@@ -42,6 +42,7 @@ struct HomeView: View {
                             if place.recordOn { RecordCard(place: place, listening: listening, open: { onRoom(.music) }).popIn(0.14) }
                             LetterCard(place: place, open: { go(.letters) }).popIn(0.18)
                             AsksCard(place: place, open: { go(.letters) }).popIn(0.22)
+                            PetHomeCard(place: place, open: { onRoom(.pet) }).id("pet").popIn(0.24)
                             GameCard(place: place, open: openGame).popIn(0.26)
                             WallCard(place: place, open: { onRoom(.board) }).popIn(0.3)
                             StreakCard(place: place).popIn(0.34)
