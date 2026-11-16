@@ -139,7 +139,7 @@ export const ThemCard: React.FC<{ partner: UserProfile; onUs: () => void; onSent
         </div>
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2" role="group" aria-label={`Send ${partner.name} a touch`}>
-        {TOUCHES.map((t) => (
+        {TOUCHES.map((t, i) => (
           <button
             key={t.id}
             type="button"
@@ -154,7 +154,8 @@ export const ThemCard: React.FC<{ partner: UserProfile; onUs: () => void; onSent
               onSent?.();
             }}
           >
-            <span className="inline-flex items-center justify-center shrink-0 w-[18px] h-[16px]">
+            {/* (the touches bob in a little wave, asking to be sent) */}
+            <span className="inline-flex items-center justify-center shrink-0 w-[18px] h-[16px] mo-sway" style={{ ['--mo-d' as string]: `${-0.45 * i}s` }}>
               <PixelIcon sprite={t} scale={2} />
             </span>
             <span className="leading-tight">{t.label}</span>

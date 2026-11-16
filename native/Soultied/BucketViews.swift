@@ -26,7 +26,7 @@ struct BucketCard: View {
         let v = place.bucket.view
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 12) {
-                GlyphView(glyph: Icons.star, scale: 3)
+                GlyphView(glyph: Icons.star, scale: 3).twinkle()
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Our list").font(.pxHeading).foregroundStyle(Color.inkSoft)
                     Text(v.todo.isEmpty && v.done.isEmpty ? "Things to do together, some day or next time" : "\(v.todo.count) to do · \(v.done.count) done together")

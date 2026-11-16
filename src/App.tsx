@@ -472,7 +472,9 @@ const Home: React.FC = () => {
       {touchNote && !welcomeOpen && !veil && !couchNote && !seatCard && !panel && !holdNote && (
         <div className="fixed left-1/2 bottom-5 z-30 -translate-x-1/2 px-ui w-[min(92vw,520px)]" role="status">
           <div className="px-box px-shadow px-fade px-3 py-2 flex items-center gap-3 flex-wrap justify-center">
-            <PixelIcon sprite={touchDef(touchNote.kind)} scale={3} />
+            <span className="inline-flex mo-beat">
+              <PixelIcon sprite={touchDef(touchNote.kind)} scale={3} />
+            </span>
             <span className="text-sm leading-snug flex-1 min-w-[180px]">{touchNote.text}</span>
             <button
               className="px-btn px-btn--sage px-btn--small"

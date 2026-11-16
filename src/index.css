@@ -449,3 +449,125 @@ label {
     animation: none;
   }
 }
+
+/* ---------- small motions (the iPhone's Motion.swift) ----------
+   Things that bob and sway while they wait for a click, a wiggle now and then on whatever's waiting for you,
+   hearts that beat, cards that come in one after another. --mo-d sets an element's delay (a negative one starts
+   it part-way through, so neighbours move out of step). All of it stands still for prefers-reduced-motion. */
+@keyframes mo-sway {
+  0%, 100% { transform: translateY(0) rotate(-1.2deg); }
+  50% { transform: translateY(-3px) rotate(1.2deg); }
+}
+.mo-sway {
+  animation: mo-sway 2.8s ease-in-out infinite;
+  animation-delay: var(--mo-d, 0s);
+}
+.mo-bob {
+  animation: mo-bob 3s ease-in-out infinite;
+  animation-delay: var(--mo-d, 0s);
+}
+@keyframes mo-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+@keyframes mo-nudge {
+  0%, 86%, 100% { transform: rotate(0) scale(1); }
+  88% { transform: rotate(-4deg) scale(1.05); }
+  91% { transform: rotate(4deg) scale(1.04); }
+  94% { transform: rotate(-3deg) scale(1.02); }
+  97% { transform: rotate(2deg) scale(1.01); }
+}
+.mo-nudge {
+  animation: mo-nudge 4.5s ease-in-out infinite;
+  animation-delay: var(--mo-d, 0s);
+}
+@keyframes mo-beat {
+  0%, 30%, 100% { transform: scale(1); }
+  9% { transform: scale(1.16); }
+  20% { transform: scale(1.08); }
+}
+.mo-beat {
+  animation: mo-beat 1.6s ease-in-out infinite;
+  animation-delay: var(--mo-d, 0s);
+}
+@keyframes mo-twinkle {
+  0%, 100% { transform: scale(0.95); filter: brightness(1); }
+  50% { transform: scale(1.05); filter: brightness(1.12); }
+}
+.mo-twinkle {
+  animation: mo-twinkle 2.2s ease-in-out infinite;
+}
+@keyframes mo-flicker {
+  0%, 100% { transform: scale(1, 1); }
+  25% { transform: scale(0.97, 1.07); }
+  50% { transform: scale(1.01, 0.96); }
+  75% { transform: scale(0.98, 1.04); }
+}
+.mo-flicker {
+  animation: mo-flicker 0.8s steps(4) infinite;
+  transform-origin: 50% 100%;
+}
+@keyframes mo-in {
+  from { opacity: 0; transform: translateY(14px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+.mo-in {
+  /* (backwards, not both: once it's in, hover and press transforms work as usual) */
+  animation: mo-in 420ms cubic-bezier(0.2, 0.9, 0.3, 1.2) backwards;
+  animation-delay: var(--mo-d, 0s);
+}
+/* a note on the wall: tilted a touch (--tilt), and stirring a little */
+@keyframes mo-note {
+  0%, 100% { transform: rotate(calc(var(--tilt, 0deg) - 0.6deg)) translateY(0); }
+  50% { transform: rotate(calc(var(--tilt, 0deg) + 0.6deg)) translateY(-1.5px); }
+}
+.mo-note {
+  animation: mo-note 3.6s ease-in-out infinite;
+  animation-delay: var(--mo-d, 0s);
+}
+.mo-note:hover,
+.mo-note:focus-within {
+  animation-play-state: paused;
+}
+/* a card you can click: it lifts toward you, and gives a little when pressed */
+.mo-lift {
+  transition: transform 160ms cubic-bezier(0.2, 0.9, 0.3, 1.5);
+}
+.mo-lift:hover {
+  transform: translateY(-3px) rotate(-0.4deg);
+}
+.mo-lift:active {
+  transform: translateY(1px) scale(0.98);
+}
+/* an answer, picked: it swells and settles */
+@keyframes mo-pick {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.06); }
+  70% { transform: scale(0.99); }
+  100% { transform: scale(1.02); }
+}
+.px-option[aria-pressed='true'] {
+  animation: mo-pick 340ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .mo-sway,
+  .mo-bob,
+  .mo-nudge,
+  .mo-beat,
+  .mo-twinkle,
+  .mo-flicker,
+  .mo-in,
+  .mo-note,
+  .px-option[aria-pressed='true'] {
+    animation: none;
+  }
+  .mo-note {
+    transform: rotate(var(--tilt, 0deg));
+  }
+  .mo-lift,
+  .mo-lift:hover,
+  .mo-lift:active {
+    transform: none;
+    transition: none;
+  }
+}

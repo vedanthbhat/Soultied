@@ -229,6 +229,9 @@ struct PixelButtonStyle: ButtonStyle {
             )
             .padding(PX)
             .offset(y: pressed ? 2 : 0)
+            // (a little squash under your finger, and a springy bounce back)
+            .scaleEffect(pressed ? 0.96 : 1)
+            .animation(pressed ? .easeOut(duration: 0.06) : .spring(response: 0.3, dampingFraction: 0.45), value: pressed)
             .contentShape(Rectangle())
             .onChange(of: pressed) { _, down in
                 if down && enabled { Feedback.press() }
@@ -254,8 +257,8 @@ struct PressStyle: ButtonStyle {
     @Environment(\.isEnabled) private var enabled
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? 0.98 : 1)
-            .animation(.easeOut(duration: 0.08), value: configuration.isPressed)
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .animation(configuration.isPressed ? .easeOut(duration: 0.06) : .spring(response: 0.3, dampingFraction: 0.5), value: configuration.isPressed)
             .onChange(of: configuration.isPressed) { _, down in
                 if down && enabled { Feedback.press() }
             }
@@ -310,6 +313,10 @@ struct OptionStyle: ButtonStyle {
             )
             .padding(PX)
             .offset(y: configuration.isPressed ? 2 : 0)
+            // (picked: it swells and settles, with a spring)
+            .scaleEffect(configuration.isPressed ? 0.96 : selected ? 1.03 : 1)
+            .animation(.spring(response: 0.32, dampingFraction: 0.5), value: selected)
+            .animation(.easeOut(duration: 0.06), value: configuration.isPressed)
             .contentShape(Rectangle())
             .onChange(of: configuration.isPressed) { _, down in
                 if down { Feedback.press() }

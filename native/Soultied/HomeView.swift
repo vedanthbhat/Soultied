@@ -34,19 +34,20 @@ struct HomeView: View {
                         nameplates
 
                         VStack(spacing: 18) {
-                            touches.id("touches")
-                            if place.partnerHere { SnapCard(place: place).id("snap") }
+                            // (the cards come in one after another as Home opens)
+                            touches.id("touches").popIn()
+                            if place.partnerHere { SnapCard(place: place).id("snap").popIn(0.06) }
                             // (counting down to a day: near the top; no day set yet: a nudge further down)
-                            if place.partnerHere && place.visitDays != nil { CountdownCard(place: place).id("countdown") }
-                            if place.recordOn { RecordCard(place: place, listening: listening, open: { onRoom(.music) }) }
-                            LetterCard(place: place, open: { go(.letters) })
-                            AsksCard(place: place, open: { go(.letters) })
-                            GameCard(place: place, open: openGame)
-                            WallCard(place: place, open: { onRoom(.board) })
-                            StreakCard(place: place)
-                            if !place.recordOn { RecordCard(place: place, open: { onRoom(.music) }) }
-                            CouchCard(place: place, invite: { go(.us) })
-                            if place.partnerHere && place.visitDays == nil { CountdownCard(place: place) }
+                            if place.partnerHere && place.visitDays != nil { CountdownCard(place: place).id("countdown").popIn(0.12) }
+                            if place.recordOn { RecordCard(place: place, listening: listening, open: { onRoom(.music) }).popIn(0.14) }
+                            LetterCard(place: place, open: { go(.letters) }).popIn(0.18)
+                            AsksCard(place: place, open: { go(.letters) }).popIn(0.22)
+                            GameCard(place: place, open: openGame).popIn(0.26)
+                            WallCard(place: place, open: { onRoom(.board) }).popIn(0.3)
+                            StreakCard(place: place).popIn(0.34)
+                            if !place.recordOn { RecordCard(place: place, open: { onRoom(.music) }).popIn(0.38) }
+                            CouchCard(place: place, invite: { go(.us) }).popIn(0.42)
+                            if place.partnerHere && place.visitDays == nil { CountdownCard(place: place).popIn(0.46) }
                         }
                         .padding(.horizontal, 16)
                         // (close under your names, so the touches show on the first screen, above the tabs)
@@ -78,7 +79,7 @@ struct HomeView: View {
             VStack(alignment: .leading, spacing: 0) {
                 Text(place.space?.name ?? "Our Little Place").font(.px(22, 700)).foregroundStyle(Color.paper).lineLimit(1)
                 if let d = place.daysTogether, d > 0 {
-                    Text("\(d.formatted()) days together").font(.pxTiny).foregroundStyle(Color.paper.opacity(0.65))
+                    CountUp(value: d) { "\($0.formatted()) days together" }.font(.pxTiny).foregroundStyle(Color.paper.opacity(0.65))
                 }
             }
             Spacer()
@@ -88,8 +89,8 @@ struct HomeView: View {
                 // the jar of stitches you've earned: spend them on the room
                 HStack(spacing: 6) {
                     GlyphView(glyph: Icons.brush, scale: 2)
-                    GlyphView(glyph: Icons.stitch, scale: 3)
-                    Text("\(place.stitches)").font(.px(16, 700)).foregroundStyle(Color.inkSoft)
+                    GlyphView(glyph: Icons.stitch, scale: 3).twinkle(period: 2.6)
+                    CountUp(value: place.stitches).font(.px(16, 700)).foregroundStyle(Color.inkSoft)
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 5)
@@ -128,7 +129,7 @@ struct HomeView: View {
             VStack(alignment: id == .left ? .leading : .trailing, spacing: 1) {
                 HStack(spacing: 5) {
                     if seat.status == .online && !mine {
-                        Rectangle().fill(Color.sage).frame(width: 7, height: 7)
+                        Rectangle().fill(Color.sage).frame(width: 7, height: 7).beat(every: 1.8, amount: 0.35)
                     }
                     Text(seat.status == .empty ? "An empty seat" : seat.name).font(.px(14, 700)).foregroundStyle(Color.inkSoft)
                 }
@@ -190,6 +191,11 @@ struct LetterCard: View {
         Button(action: open) {
             HStack(alignment: .top, spacing: 14) {
                 GlyphView(glyph: d.opened ? Icons.heart : mine ? Icons.seal : Icons.envelope, scale: 4)
+                    // (waiting on you: the envelope sways, and wiggles once your person has sealed theirs; just
+                    // opened: the heart beats)
+                    .sway(lift: 3, tilt: 3, period: 2.6, active: place.partnerHere && !d.opened && !mine)
+                    .nudge(place.partnerHere && theirs && !mine && !d.opened, every: 4)
+                    .beat(d.opened && d.by[place.me]?.seenAt == nil)
                     .frame(width: 60)
                     .padding(.top, 4)
                 VStack(alignment: .leading, spacing: 6) {
@@ -214,7 +220,7 @@ struct AsksCard: View {
         if let a = v.forMe.first {
             Button(action: open) {
                 HStack(alignment: .top, spacing: 14) {
-                    if let l = place.theirLook { HeadView(look: l, size: 44) }
+                    if let l = place.theirLook { HeadView(look: l, size: 44).nudge(every: 4, phase: 0.3) }
                     VStack(alignment: .leading, spacing: 6) {
                         Text("\(place.theirName) asked you").font(.px(14, 600)).foregroundStyle(Color.muted)
                         Text(a.prompt).font(.pxBodyBold).foregroundStyle(Color.inkSoft).multilineTextAlignment(.leading)
@@ -228,7 +234,7 @@ struct AsksCard: View {
         } else if let a = v.fresh.first {
             Button(action: open) {
                 HStack(spacing: 14) {
-                    GlyphView(glyph: Icons.heart, scale: 3)
+                    GlyphView(glyph: Icons.heart, scale: 3).beat()
                     VStack(alignment: .leading, spacing: 4) {
                         Text("A question just opened").font(.px(14, 600)).foregroundStyle(Color.muted)
                         Text(a.prompt).font(.pxBodyBold).foregroundStyle(Color.inkSoft).multilineTextAlignment(.leading)
@@ -260,6 +266,7 @@ struct WallCard: View {
                             .font(.px(12, 700)).foregroundStyle(Color.cream)
                             .padding(.horizontal, 7).padding(.vertical, 3)
                             .background(Color.thread)
+                            .nudge(every: 4.5, angle: 3)
                     }
                 }
                 HStack(alignment: .top, spacing: 12) {
@@ -281,6 +288,7 @@ struct WallCard: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(Color(hex: NOTE_PAPERS[n.paper]))
                         .rotationEffect(.degrees(-1.2))
+                        .sway(lift: 1.5, tilt: 1, period: 3.6)
                     } else {
                         Text("Pin up a note, a doodle or a photo for \(place.theirName) to find.").font(.pxBody).foregroundStyle(Color.muted)
                     }
@@ -302,9 +310,14 @@ struct StreakCard: View {
         let s = place.streak
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 12) {
-                GlyphView(glyph: s.current > 0 ? Icons.flame : Icons.flameOut, scale: 4)
+                Group {
+                    if s.current > 0 { GlyphView(glyph: Icons.flame, scale: 4).flicker() } else { GlyphView(glyph: Icons.flameOut, scale: 4) }
+                }
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(s.current > 0 ? "\(s.current)-day streak" : "No streak yet").font(.pxHeading).foregroundStyle(Color.inkSoft)
+                    Group {
+                        if s.current > 0 { CountUp(value: s.current) { "\($0)-day streak" } } else { Text("No streak yet") }
+                    }
+                    .font(.pxHeading).foregroundStyle(Color.inkSoft)
                     Text("Best \(s.best) · \(s.together) \(s.together == 1 ? "letter" : "letters") opened together").font(.pxSmall).foregroundStyle(Color.muted)
                 }
                 Spacer(minLength: 0)
@@ -347,7 +360,7 @@ struct StreakCard: View {
         case .done: Rectangle().fill(Color.terracotta)
         case .mended: Rectangle().fill(Color.butter)
         case .missed: Rectangle().fill(Color.paper2)
-        case .today: Rectangle().fill(Color.paperHi).overlay { Rectangle().strokeBorder(Color.terracotta, lineWidth: 3) }
+        case .today: Rectangle().fill(Color.paperHi).overlay { Rectangle().strokeBorder(Color.terracotta, lineWidth: 3) }.beat(every: 2.2, amount: 0.1)
         case .upcoming: Rectangle().fill(Color.paper2).opacity(0.5)
         case .before: Rectangle().strokeBorder(Color.paper2, lineWidth: 2)
         }
@@ -363,7 +376,9 @@ struct FireLine: View {
     var body: some View {
         let f = place.fire
         HStack(alignment: .top, spacing: 12) {
-            GlyphView(glyph: f.level > 0 ? Icons.flame : Icons.flameOut, scale: 3)
+            Group {
+                if f.level > 0 { GlyphView(glyph: Icons.flame, scale: 3).flicker() } else { GlyphView(glyph: Icons.flameOut, scale: 3) }
+            }
             VStack(alignment: .leading, spacing: 3) {
                 Text(f.level == 0 ? "Embers" : "\(CouchState.fireNames[f.level]) · \(f.streak) \(f.streak == 1 ? "day" : "days") in a row")
                     .font(.pxBody).foregroundStyle(Color.inkSoft)

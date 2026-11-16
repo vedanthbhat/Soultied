@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { CountUp } from '../CountUp';
 import { useApp } from '../../context/AppContext';
 import type { UserProfile } from '../../types';
 import { LetterFlow } from './LetterFlow';
@@ -37,9 +38,11 @@ const StreakStrip: React.FC = () => {
       <div className="px-divider" />
       <div className="flex items-center gap-4 flex-wrap justify-between">
         <div className="flex items-center gap-3">
-          <PixelIcon name={streak.current ? 'flame' : 'flameOut'} scale={4} />
+          <span className={`inline-flex ${streak.current ? 'mo-flicker' : ''}`}>
+            <PixelIcon name={streak.current ? 'flame' : 'flameOut'} scale={4} />
+          </span>
           <div className="leading-tight">
-            <div className="text-lg font-bold">{streak.current ? `${streak.current}-day streak` : 'No streak yet'}</div>
+            <div className="text-lg font-bold">{streak.current ? <CountUp value={streak.current} format={(n) => `${n}-day streak`} /> : 'No streak yet'}</div>
             <div className="text-sm text-[var(--muted)]">
               Best {streak.best} · {streak.together} {streak.together === 1 ? 'letter' : 'letters'} opened together
             </div>
@@ -93,7 +96,7 @@ const LetterView: React.FC<{
   if (mine?.sealedAt) {
     return (
       <div className="flex flex-col items-center text-center gap-3 py-2 px-fade">
-        <div className="relative">
+        <div className="relative mo-sway">
           <PixelIcon name="envelope" scale={7} label="Sealed letter" />
         </div>
         <div className="text-2xl font-bold">Sealed and waiting on the table</div>
@@ -342,9 +345,11 @@ const JourneyNudge: React.FC<{ onOpen: () => void }> = ({ onOpen }) => {
         <PixelIcon name="book" scale={3} />
         {text}
       </span>
-      <button className="px-btn px-btn--small px-btn--sage" onClick={onOpen}>
-        {journey.started ? 'Open' : 'Take a look'}
-      </button>
+      <span className="mo-nudge inline-block" style={{ ['--mo-d' as string]: '1.8s' }}>
+        <button className="px-btn px-btn--small px-btn--sage" onClick={onOpen}>
+          {journey.started ? 'Open' : 'Take a look'}
+        </button>
+      </span>
     </div>
   );
 };

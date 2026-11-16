@@ -111,6 +111,9 @@ struct NotesPanel: View {
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 14), GridItem(.flexible(), spacing: 14)], spacing: 16) {
                 ForEach(Array(shown.enumerated()), id: \.element.id) { i, n in
                     NoteView(place: place, note: n, tilt: [-2.0, 1.5, -1.0, 2.0, 0.5][i % 5])
+                        // (the notes stir a little on the wall, each in its own time, and come in one after another)
+                        .sway(lift: 1.5, tilt: 0.8, period: 3.6, phase: Double(i % 5) * 0.23)
+                        .popIn(Double(min(i, 8)) * 0.05)
                 }
             }
         }
@@ -138,13 +141,15 @@ struct NoteView: View {
                 Text(place.member(note.by)?.name ?? "").font(.pxTiny).foregroundStyle(Color.muted)
                 Spacer()
                 if mine {
-                    if note.loved[place.them ?? ""] != nil { GlyphView(glyph: Icons.heart, scale: 2) }
+                    if note.loved[place.them ?? ""] != nil { GlyphView(glyph: Icons.heart, scale: 2).beat(every: 1.8) }
                 } else {
                     Button {
                         place.love(note)
                         Haptics.soft()
                     } label: {
                         GlyphView(glyph: loved ? Icons.heart : Icons.heartEmpty, scale: 2)
+                            .scaleEffect(loved ? 1.15 : 1)
+                            .animation(.spring(response: 0.3, dampingFraction: 0.4), value: loved)
                     }
                     .accessibilityLabel(loved ? "Take the heart off" : "Put a heart on it")
                 }

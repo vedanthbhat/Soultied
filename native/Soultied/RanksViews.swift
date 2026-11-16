@@ -71,7 +71,7 @@ struct RanksCard: View {
             open()
         } label: {
             HStack(spacing: 12) {
-                GlyphView(glyph: Icons.trophy, scale: 3.5)
+                GlyphView(glyph: Icons.trophy, scale: 3.5).nudge(hot, every: 3.5).twinkle(period: 2.8)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(l.kicker).font(.px(11, 700)).kerning(1.4).foregroundStyle(Color.butter).lineLimit(1).minimumScaleFactor(0.7)
                     Text(l.title).font(.px(16, 700)).foregroundStyle(Color.paper).lineLimit(2).minimumScaleFactor(0.8).fixedSize(horizontal: false, vertical: true)

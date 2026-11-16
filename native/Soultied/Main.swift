@@ -257,11 +257,14 @@ struct TabBar: View {
                 } label: {
                     VStack(spacing: 4) {
                         GlyphView(glyph: t.glyph, scale: 3)
+                            // (the tab you pick hops; one with something waiting wiggles now and then)
+                            .hop(tab == t)
+                            .nudge(dot(t) && tab != t, every: 5, angle: 6)
                             .frame(height: 33)
                             // watching together is the heart of it: the TV glows a little
                             .background { if t == .watch { TabGlow(still: reduceMotion) } }
                             .overlay(alignment: .topTrailing) {
-                                if dot(t) { Rectangle().fill(Color.thread).frame(width: 9, height: 9).offset(x: 6, y: -2) }
+                                if dot(t) { Rectangle().fill(Color.thread).frame(width: 9, height: 9).beat(every: 1.4, amount: 0.35).offset(x: 6, y: -2) }
                             }
                         Text(t.label).font(.px(12, tab == t ? 700 : 500)).foregroundStyle(tab == t ? Color.inkSoft : Color.muted)
                     }
@@ -463,7 +466,7 @@ struct TouchButtons: View {
 
     var body: some View {
         LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: compact ? 6 : 10), count: compact ? 6 : 3), spacing: 10) {
-            ForEach(TOUCHES) { t in
+            ForEach(Array(TOUCHES.enumerated()), id: \.element.id) { i, t in
                 Button {
                     guard busy == nil else { return }
                     busy = t.id
@@ -473,7 +476,9 @@ struct TouchButtons: View {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) { busy = nil }
                 } label: {
                     VStack(spacing: 5) {
+                        // (the touches bob in a little wave, asking to be sent)
                         GlyphView(glyph: t.glyph, scale: compact ? 3 : 4).frame(height: compact ? 24 : 30)
+                            .sway(lift: 2, tilt: 4, period: 2.4, phase: Double(i) * 0.16, active: place.partnerHere && busy == nil)
                         if !compact { Text(t.label).lineLimit(1).minimumScaleFactor(0.8) }
                     }
                     .opacity(busy == t.id ? 0.5 : 1)

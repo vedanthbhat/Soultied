@@ -20,12 +20,13 @@ struct PlayView: View {
                 DarkHeading(title: "Play", sub: "Games for two, and the rooms behind the dark door")
                 // (your person asking to go on the couples board comes first; otherwise the board waits at the end)
                 let asked = place.rankStage == .askedMe
-                if asked { RanksCard(place: place) { ranking = true } }
-                UpNextCard(place: place) { play($0) }
+                if asked { RanksCard(place: place) { ranking = true }.popIn() }
+                UpNextCard(place: place) { play($0) }.popIn(0.05)
                 GameGrid(place: place, open: { play($0) }, escape: {
                     Haptics.tap()
                     escaping = true
                 })
+                .popIn(0.12)
                 if !asked && (place.partnerHere || place.isDemo) {
                     RanksCard(place: place) { ranking = true }.padding(.top, 4)
                 }
@@ -207,7 +208,10 @@ struct GameGrid: View {
         let line = Play.shelfLine(place.games[k], kind: k, me: place.mySeat, name: place.seatName, now: place.now.timeIntervalSince1970 * 1000)
         let tag: String? = !ready || !line.hot ? nil : Play.isLiveInvite(k) || k == .doodle ? "JOIN" : "YOUR MOVE"
         // (a game that's in Plus says so, when the place doesn't have it)
-        return GameTile(title: k.info.name, glyph: GameArt.icon(k), color: GameColors.of(k), tag: tag, plus: !place.hasPlus && !PlusRules.freeGames.contains(k)) { open(k) }
+        let at = Double(GameKind.allCases.firstIndex(of: k) ?? 0)
+        return GameTile(title: k.info.name, glyph: GameArt.icon(k), color: GameColors.of(k), tag: tag, plus: !place.hasPlus && !PlusRules.freeGames.contains(k), phase: at * 0.13) { open(k) }
+            // (a game that's waiting on you wiggles now and then)
+            .nudge(tag != nil, every: 4.5, phase: at * 0.21, angle: 3)
             .disabled(!ready)
             .opacity(ready ? 1 : 0.55)
             .accessibilityHint(ready ? line.text : "Once \(place.theirName) has joined")
@@ -222,6 +226,8 @@ struct GameTile: View {
     var tag: String?
     /// in Soultied Plus (a small tag in the corner)
     var plus = false
+    /// when its picture bobs (so the tiles don't all bob as one)
+    var phase: Double = 0
     var action: () -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -230,6 +236,7 @@ struct GameTile: View {
             VStack(spacing: 5) {
                 Spacer(minLength: 0)
                 GlyphView(glyph: glyph, scale: 3.5).frame(height: 32)
+                    .sway(lift: 1.5, tilt: 0, period: 3, phase: phase)
                 Text(title)
                     .font(.px(12, 700))
                     .foregroundStyle(Color.cream)

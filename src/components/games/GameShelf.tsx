@@ -73,7 +73,7 @@ const SCREENS: Partial<Record<GameKind, React.FC<{ onBack: () => void }>>> = {
   carrom: CarromGame,
 };
 
-const Section: React.FC<{ title: string; note: string; games: Shelf[]; card: (g: Shelf) => React.ReactNode }> = ({ title, note, games, card }) => (
+const Section: React.FC<{ title: string; note: string; games: Shelf[]; card: (g: Shelf, i: number) => React.ReactNode }> = ({ title, note, games, card }) => (
   <section className="flex flex-col gap-3">
     <div>
       <h2 className="text-2xl font-bold m-0">
@@ -82,7 +82,7 @@ const Section: React.FC<{ title: string; note: string; games: Shelf[]; card: (g:
       <p className="m-0 opacity-80 leading-snug">{note}</p>
     </div>
     <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))' }}>
-      {games.map((g) => card(g))}
+      {games.map((g, i) => card(g, i))}
     </div>
   </section>
 );
@@ -134,7 +134,7 @@ export const GameShelf: React.FC<{ onExit: () => void; onOpenDoor: () => void; i
     };
   };
 
-  const card = (g: Shelf) => {
+  const card = (g: Shelf, i: number) => {
     const kind = g.kind;
     const st = kind ? line(kind) : null;
     const m = kind ? matches[kind] : undefined;
@@ -143,8 +143,8 @@ export const GameShelf: React.FC<{ onExit: () => void; onOpenDoor: () => void; i
     return (
       <button
         key={g.id}
-        className="px-box text-left border-0 p-4 flex flex-col gap-3 items-start"
-        style={{ cursor: disabled ? 'default' : 'pointer', opacity: g.soon ? 0.72 : 1 }}
+        className={`px-box text-left border-0 p-4 flex flex-col gap-3 items-start mo-in ${disabled ? '' : 'mo-lift'}`}
+        style={{ cursor: disabled ? 'default' : 'pointer', opacity: g.soon ? 0.72 : 1, ['--mo-d' as string]: `${Math.min(i, 10) * 0.04}s` }}
         disabled={disabled}
         onClick={() => {
           if (g.id === 'door') onOpenDoor();
@@ -153,7 +153,10 @@ export const GameShelf: React.FC<{ onExit: () => void; onOpenDoor: () => void; i
         }}
       >
         <div className="w-full flex justify-center py-2" style={{ background: '#1d1518' }}>
-          <BoxArt id={g.id} scale={4} dim={g.soon} />
+          {/* (the box art bobs a little; a game that's waiting on you wiggles now and then) */}
+          <span className={st?.hot ? 'mo-nudge' : 'mo-bob'} style={{ ['--mo-d' as string]: `${-0.37 * i}s` }}>
+            <BoxArt id={g.id} scale={4} dim={g.soon} />
+          </span>
         </div>
         <div className="flex items-center gap-2 flex-wrap -mb-1">
           <span className="px-tag">{g.style}</span>

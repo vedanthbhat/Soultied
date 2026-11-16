@@ -13,11 +13,14 @@ struct CountdownCard: View {
     var body: some View {
         let left = place.visitDays
         HStack(alignment: .center, spacing: 14) {
-            GlyphView(glyph: UsGlyphs.calendar, scale: 4)
+            GlyphView(glyph: UsGlyphs.calendar, scale: 4).nudge(left != nil, every: 5, angle: 5)
             VStack(alignment: .leading, spacing: 2) {
                 Text("Next time together").font(.pxTiny).foregroundStyle(Color.muted)
                 if let left {
-                    Text(left > 1 ? "\(left) days" : left == 1 ? "Tomorrow" : "Today!").font(.pxHeading).foregroundStyle(Color.inkSoft)
+                    Group {
+                        if left > 1 { CountUp(value: left) { "\($0) days" } } else { Text(left == 1 ? "Tomorrow" : "Today!") }
+                    }
+                    .font(.pxHeading).foregroundStyle(Color.inkSoft)
                     Text(place.visit.what.isEmpty ? (left > 1 ? "until you’re together" : "you’re together") : (left > 1 ? "until \(place.visit.what)" : place.visit.what))
                         .font(.pxBody).foregroundStyle(Color.muted).lineLimit(2)
                     if let planned = place.bucket.plannedLine(place.visit.what) {

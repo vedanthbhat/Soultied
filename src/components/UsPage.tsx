@@ -8,10 +8,16 @@ import { MonthRecap } from './MonthRecap';
 import { PixelAvatarRenderer } from './PixelAvatarRenderer';
 import { PixelIcon, SpriteName } from './letters/PixelIcon';
 import { scoreDay } from '../letters/cards';
+import { CountUp } from './CountUp';
 
-const Stat: React.FC<{ icon: SpriteName; value: string; label: string }> = ({ icon, value, label }) => (
-  <div className="px-inset flex items-center gap-3 px-3.5 py-3">
-    <PixelIcon name={icon} scale={4} />
+/** what each little picture does while it sits there: the flame flickers, the heart beats, the rest bob */
+const MOTION: Partial<Record<SpriteName, string>> = { flame: 'mo-flicker', heart: 'mo-beat', seal: 'mo-bob', envelope: 'mo-bob' };
+
+const Stat: React.FC<{ icon: SpriteName; value: React.ReactNode; label: string; at?: number }> = ({ icon, value, label, at = 0 }) => (
+  <div className="px-inset flex items-center gap-3 px-3.5 py-3 mo-in" style={{ ['--mo-d' as string]: `${at * 0.05}s` }}>
+    <span className={`inline-flex ${MOTION[icon] || ''}`} style={{ ['--mo-d' as string]: `${-0.5 * at}s` }}>
+      <PixelIcon name={icon} scale={4} />
+    </span>
     <div className="leading-tight">
       <div className="text-xl font-bold">{value}</div>
       <div className="text-sm text-[var(--muted)]">{label}</div>
@@ -53,11 +59,12 @@ export const UsPage: React.FC = () => {
       {/* the two of you */}
       <div className="flex items-end gap-6 flex-wrap">
         <div className="flex items-end gap-2">
-          <div className="flex flex-col items-center">
+          {/* (the two of you shift your weight a little, out of step) */}
+          <div className="flex flex-col items-center mo-sway">
             <PixelAvatarRenderer config={currentUser.avatar} size={120} />
             <span className="text-sm font-semibold mt-1">{currentUser.name}</span>
           </div>
-          <div className="flex flex-col items-center">
+          <div className="flex flex-col items-center mo-sway" style={{ ['--mo-d' as string]: '-1.3s' }}>
             {partnerUser ? (
               <>
                 <PixelAvatarRenderer config={partnerUser.avatar} size={120} flipped />
@@ -108,9 +115,11 @@ export const UsPage: React.FC = () => {
             <>
               <div className="text-3xl font-bold leading-tight">{space.name}</div>
               <p className="m-0 text-[var(--muted)]">
-                {days !== null
-                  ? `Together since ${fmt(space.togetherSince!)} · ${days.toLocaleString()} days`
-                  : partnerUser
+                {days !== null ? (
+                  <>
+                    Together since {fmt(space.togetherSince!)} · <CountUp value={days} /> days
+                  </>
+                ) : partnerUser
                     ? `${currentUser.name} & ${partnerUser.name}`
                     : `Saving a seat for ${space.partnerPlaceholderName}`}
               </p>
@@ -126,19 +135,20 @@ export const UsPage: React.FC = () => {
       <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))' }}>
         <Stat
           icon={streak.current ? 'flame' : 'flameOut'}
-          value={`${streak.current} ${streak.current === 1 ? 'day' : 'days'}`}
+          value={<CountUp value={streak.current} format={(n) => `${n} ${streak.current === 1 ? 'day' : 'days'}`} />}
           label="Streak"
         />
-        <Stat icon="seal" value={`${streak.best} ${streak.best === 1 ? 'day' : 'days'}`} label="Best streak" />
-        <Stat icon="envelope" value={String(streak.together)} label="Letters opened" />
-        <Stat icon="heart" value={sync === null ? '—' : `${sync}%`} label="In sync" />
+        <Stat icon="seal" value={<CountUp value={streak.best} format={(n) => `${n} ${streak.best === 1 ? 'day' : 'days'}`} />} label="Best streak" at={1} />
+        <Stat icon="envelope" value={<CountUp value={streak.together} />} label="Letters opened" at={2} />
+        <Stat icon="heart" value={sync === null ? '—' : <CountUp value={sync} format={(n) => `${n}%`} />} label="In sync" at={3} />
         {partnerUser && (
-          <Stat icon="couch" value={couchLevel >= COUCH_STEPS ? 'Side by side' : `${couchLevel} of ${COUCH_STEPS}`} label="Closer on the couch" />
+          <Stat icon="couch" value={couchLevel >= COUCH_STEPS ? 'Side by side' : `${couchLevel} of ${COUCH_STEPS}`} label="Closer on the couch" at={4} />
         )}
         {partnerUser && (
           <Stat
+            at={5}
             icon={fire.level ? 'flame' : 'flameOut'}
-            value={fire.level ? `${fire.streak} ${fire.streak === 1 ? 'day' : 'days'}` : 'Embers'}
+            value={fire.level ? <CountUp value={fire.streak} format={(n) => `${n} ${fire.streak === 1 ? 'day' : 'days'}`} /> : 'Embers'}
             label={fire.level ? `${FIRE_NAMES[fire.level]}, both showing up` : 'Both show up to light it'}
           />
         )}

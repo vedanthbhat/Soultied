@@ -32,9 +32,9 @@ struct LettersView: View {
                         } else {
                             switch tab {
                             case .today:
-                                LetterPanel(place: place, kind: .daily, key: place.today)
-                                JourneyNudge(place: place) { tab = .journey }
-                                StreakCard(place: place)
+                                LetterPanel(place: place, kind: .daily, key: place.today).popIn()
+                                JourneyNudge(place: place) { tab = .journey }.popIn(0.08)
+                                StreakCard(place: place).popIn(0.16)
                             case .journey: JourneyPanel(place: place)
                             case .ask: AskPanel(place: place)
                             case .afterDark: AfterDarkPanel(place: place)
@@ -64,7 +64,7 @@ struct LettersView: View {
                     } label: {
                         HStack(spacing: 4) {
                             Text(t.rawValue)
-                            if badge(t) { Rectangle().fill(Color.thread).frame(width: 7, height: 7) }
+                            if badge(t) { Rectangle().fill(Color.thread).frame(width: 7, height: 7).beat(every: 1.4, amount: 0.35) }
                         }
                     }
                     .buttonStyle(.px(tab == t ? .terracotta : .paper, small: true))
@@ -118,7 +118,7 @@ struct LetterPanel: View {
                     .onAppear { place.markSeen(kind, key) }
             } else if d.sealed(place.me) {
                 VStack(spacing: 12) {
-                    GlyphView(glyph: Icons.envelope, scale: 7)
+                    GlyphView(glyph: Icons.envelope, scale: 7).sway(lift: 4, tilt: 3, period: 3)
                     Text(kind == .journey ? "Your answer is sealed" : "Sealed and waiting on the table").font(.pxHeading).foregroundStyle(Color.inkSoft).multilineTextAlignment(.center)
                     Text(kind == .journey ? "It opens for both of you as soon as \(place.theirName) answers too." : "\(place.theirName) hasn’t sealed \(night ? "tonight’s After dark cards" : "today’s letter") yet. It opens for both of you the moment they do.")
                         .font(.pxBody).foregroundStyle(Color.muted).multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
@@ -251,6 +251,7 @@ struct LetterFlowView: View {
                         .fill(Cards.isAnswered(c, answers[c.id]) ? Color.terracotta : Color.paper2)
                         .frame(width: 14, height: 14)
                         .overlay { if i == step { Rectangle().strokeBorder(Color.ink, lineWidth: 3).padding(-3) } }
+                        .beat(i == step, every: 2, amount: 0.18)
                 }
                 .accessibilityLabel("Card \(i + 1)")
             }
@@ -319,6 +320,7 @@ struct LetterFlowView: View {
             }
             .buttonStyle(.px(night ? .night : .terracotta, wide: true))
             .disabled(!place.ready(toSeal: kind, key))
+            .nudge(place.ready(toSeal: kind, key), every: 4, angle: 2)
         }
     }
 
@@ -359,6 +361,7 @@ struct LetterFlowView: View {
                         }
                     }
                     .buttonStyle(OptionStyle(selected: a?.pick == i, big: true))
+                    .sway(lift: 3, tilt: 1.2, phase: Double(i) * 0.5, active: a == nil)
                 }
             }
         } else if c.style == .open {
@@ -370,9 +373,12 @@ struct LetterFlowView: View {
             }
         } else if c.options.count == 2 {
             HStack(spacing: 10) {
+                let waiting = (g ? a?.guess : a?.pick) == nil
                 Button(c.options[0]) { choose(c, 0) }.buttonStyle(OptionStyle(selected: (g ? a?.guess : a?.pick) == 0, big: true))
-                Text("or").font(.px(16, 700)).foregroundStyle(Color.muted)
+                    .sway(lift: 3, tilt: 1.4, phase: 0, active: waiting)
+                Text("or").font(.px(16, 700)).foregroundStyle(Color.muted).beat(waiting, every: 2.8, amount: 0.12)
                 Button(c.options[1]) { choose(c, 1) }.buttonStyle(OptionStyle(selected: (g ? a?.guess : a?.pick) == 1, big: true))
+                    .sway(lift: 3, tilt: 1.4, phase: 0.5, active: waiting)
             }
         } else {
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
@@ -384,6 +390,7 @@ struct LetterFlowView: View {
                         }
                     }
                     .buttonStyle(OptionStyle(selected: (g ? a?.guess : a?.pick) == i))
+                    .sway(lift: 2, tilt: 0.8, period: 3.2, phase: Double(i) * 0.27, active: (g ? a?.guess : a?.pick) == nil)
                 }
             }
         }
@@ -592,7 +599,7 @@ struct JourneyNudge: View {
                     : j.unseen != nil ? "Day \(j.unseen!) of your 30 days just opened." : "Day \(j.next ?? 1) of your 30 days is waiting for you.")
                     .font(.pxSmall).foregroundStyle(Color.inkSoft).fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
-                Button(j.started ? "Open" : "Take a look", action: open).buttonStyle(.px(.sage, small: true))
+                Button(j.started ? "Open" : "Take a look", action: open).buttonStyle(.px(.sage, small: true)).nudge(every: 5, phase: 0.4)
             }
             .pxCard()
         }

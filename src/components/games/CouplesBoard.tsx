@@ -45,10 +45,11 @@ const roomName = (r: RoomId) => r.charAt(0).toUpperCase() + r.slice(1);
 const MEDAL: Record<number, string> = { 1: '#e2b359', 2: '#b9b3a8', 3: '#c98a5a' };
 
 /** one couple on a board */
-const Line: React.FC<{ r: BoardRow }> = ({ r }) => (
+const Line: React.FC<{ r: BoardRow; at?: number }> = ({ r, at = 0 }) => (
   <li
-    className="flex items-center gap-3 px-2 py-2"
+    className="flex items-center gap-3 px-2 py-2 mo-in"
     style={{
+      ['--mo-d' as string]: `${Math.min(at, 12) * 0.035}s`,
       background: r.mine ? '#fff1dc' : 'var(--paper-hi)',
       boxShadow: `inset 0 0 0 3px ${r.mine ? 'var(--terracotta)' : 'var(--paper-shade)'}`,
       color: 'var(--ink-soft)',
@@ -269,7 +270,9 @@ export const CouplesBoard: React.FC<{ onBack: () => void }> = ({ onBack }) => {
           </button>
         </div>
         <div className="flex items-center gap-4">
-          <PixelIcon name="trophy" scale={4} className="shrink-0" />
+          <span className="inline-flex shrink-0 mo-twinkle">
+            <PixelIcon name="trophy" scale={4} />
+          </span>
           <div>
             <h1 className="text-3xl sm:text-4xl font-bold m-0">Couples board</h1>
             <p className="m-0 mt-1 leading-snug opacity-85">How the two of you stack up against other couples on Soultied.</p>
@@ -323,8 +326,8 @@ export const CouplesBoard: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                 Nobody’s on this board yet.
               </li>
             )}
-            {rows.map((r) => (
-              <Line key={r.id} r={r} />
+            {rows.map((r, i) => (
+              <Line key={r.id} r={r} at={i} />
             ))}
             {stage === 'on' && !rows.some((r) => r.mine) && (
               <li className="px-4 py-3 flex flex-col" style={{ background: '#fff1dc', boxShadow: 'inset 0 0 0 3px var(--terracotta)', color: 'var(--ink-soft)' }}>
@@ -368,7 +371,9 @@ export const CouplesBoardCard: React.FC<{ onOpen: () => void }> = ({ onOpen }) =
       style={{ cursor: 'pointer', color: 'var(--ink-soft)' }}
       onClick={onOpen}
     >
-      <PixelIcon name="trophy" scale={4} />
+      <span className={`inline-flex shrink-0 ${hot ? 'mo-nudge' : 'mo-twinkle'}`}>
+        <PixelIcon name="trophy" scale={4} />
+      </span>
       <span className="flex flex-col gap-1 min-w-0 flex-1">
         <span className="flex items-center gap-2 flex-wrap">
           <span className="text-xl font-bold leading-tight">Couples board</span>

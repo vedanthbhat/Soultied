@@ -64,7 +64,9 @@ const NoteCard: React.FC<{
   onKeep: () => void;
   onTakeDown: () => void;
   onHang: () => void;
-}> = ({ n, me, partner, fresh, onLove, onKeep, onTakeDown, onHang }) => {
+  /** where it is on the wall (each note leans its own way, and stirs in its own time) */
+  i?: number;
+}> = ({ n, me, partner, fresh, onLove, onKeep, onTakeDown, onHang, i = 0 }) => {
   const mine = n.by === me.id;
   const author = mine ? me : partner;
   const lovedByThem = partner && n.loved[partner.id];
@@ -72,8 +74,12 @@ const NoteCard: React.FC<{
   const [hung, setHung] = useState(false);
   return (
     <li
-      className={`flex flex-col gap-2 p-3 shadow-[0_0_0_2px_#3a2a26,3px_3px_0_2px_rgba(58,42,38,0.35)] ${fresh ? 'px-pop' : 'px-fade'}`}
-      style={{ background: NOTE_PAPERS[n.paper] }}
+      className={`flex flex-col gap-2 p-3 shadow-[0_0_0_2px_#3a2a26,3px_3px_0_2px_rgba(58,42,38,0.35)] ${fresh ? 'px-pop' : 'mo-note'}`}
+      style={{
+        background: NOTE_PAPERS[n.paper],
+        ['--tilt' as string]: `${[-1.2, 0.9, -0.6, 1.2, 0.3][i % 5]}deg`,
+        ['--mo-d' as string]: `${-0.83 * (i % 5)}s`,
+      }}
     >
       <div className="flex items-center gap-2 text-xs text-[#5a4a42]">
         <Head who={author} />
@@ -95,7 +101,11 @@ const NoteCard: React.FC<{
             {lovedByMe ? '♥ Loved' : '♡ Love it'}
           </button>
         )}
-        {mine && lovedByThem && <span className="text-[#a84f4b] font-semibold">♥ {partner!.name} loved this</span>}
+        {mine && lovedByThem && (
+          <span className="text-[#a84f4b] font-semibold">
+            <span className="inline-block mo-beat">♥</span> {partner!.name} loved this
+          </span>
+        )}
         <button className="px-link" onClick={onKeep}>
           {n.kept ? 'Kept ✓' : 'Keep'}
         </button>
@@ -190,9 +200,10 @@ const NotesTab: React.FC<{
         <p className="m-0 text-[var(--muted)]">Opening…</p>
       ) : list.length ? (
         <ul className="list-none p-0 m-0 grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))' }}>
-          {list.map((n) => (
+          {list.map((n, i) => (
             <NoteCard
               key={n.id}
+              i={i}
               n={n}
               me={me}
               partner={partner}

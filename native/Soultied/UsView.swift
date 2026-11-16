@@ -22,14 +22,14 @@ struct UsView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     DarkHeading(title: "Us", sub: place.space?.name)
-                    couple
-                    if !place.partnerHere { InviteCard(place: place) }
+                    couple.popIn()
+                    if !place.partnerHere { InviteCard(place: place).popIn(0.08) }
                     if place.partnerHere {
-                        ApartCard(place: place).id("apart")
-                        BucketCard(place: place).id("list")
-                        RecapCard(place: place).id("recap")
+                        ApartCard(place: place).id("apart").popIn(0.08)
+                        BucketCard(place: place).id("list").popIn(0.16)
+                        RecapCard(place: place).id("recap").popIn(0.24)
                     }
-                    you
+                    you.popIn(0.3)
                     PlusCardView(place: place)
                     LookPicker().id("looks")
                     history
@@ -64,16 +64,17 @@ struct UsView: View {
     private var couple: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .bottom, spacing: 18) {
-                CharacterView(look: place.myLook, scale: 3)
+                // (the two of you shift your weight a little, out of step)
+                CharacterView(look: place.myLook, scale: 3).sway(lift: 2, tilt: 1.5, period: 3.2)
                 if let l = place.theirLook {
-                    CharacterView(look: l, scale: 3)
+                    CharacterView(look: l, scale: 3).sway(lift: 2, tilt: 1.5, period: 3.2, phase: 0.45)
                 }
                 Spacer()
             }
             .frame(maxWidth: .infinity)
             Text(place.partnerHere ? "\(place.myName) & \(place.theirName)" : place.myName).font(.pxTitle).foregroundStyle(Color.inkSoft)
             if let t = place.space?.togetherSince, let d = place.daysTogether {
-                Text("Together since \(Day.pretty(t, long: true)) \(t.prefix(4)) · \(d.formatted()) days").font(.pxBody).foregroundStyle(Color.muted)
+                CountUp(value: d) { "Together since \(Day.pretty(t, long: true)) \(t.prefix(4)) · \($0.formatted()) days" }.font(.pxBody).foregroundStyle(Color.muted)
             }
             if let s = place.space {
                 Text("In your little place since \(Day.pretty(s.startKey)) \(s.startKey.prefix(4)) · \(place.streak.together) letters opened together").font(.pxSmall).foregroundStyle(Color.muted)

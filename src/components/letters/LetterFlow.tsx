@@ -196,15 +196,18 @@ export const LetterFlow: React.FC<Props> = ({ day, me, partner, night, tag, titl
             ? `${partner.name} has already sealed theirs, so this opens the moment you seal yours.`
             : `Once it’s sealed you can’t change it. It waits on the table until ${partner.name} seals theirs, then you both see everything.`}
         </p>
-        <button
-          className="px-btn self-start text-lg"
-          onClick={() => {
-            saveExtra();
-            onSeal();
-          }}
-        >
-          <PixelIcon name="seal" scale={2} /> {partnerSealed ? 'Seal it and open together' : sealLabel || 'Seal the letter'}
-        </button>
+        {/* (it wiggles now and then: everything's answered, it's time) */}
+        <span className="mo-nudge self-start inline-block" style={{ ['--mo-d' as string]: '1s' }}>
+          <button
+            className="px-btn text-lg"
+            onClick={() => {
+              saveExtra();
+              onSeal();
+            }}
+          >
+            <PixelIcon name="seal" scale={2} /> {partnerSealed ? 'Seal it and open together' : sealLabel || 'Seal the letter'}
+          </button>
+        </span>
       </div>
     );
   }
@@ -212,6 +215,8 @@ export const LetterFlow: React.FC<Props> = ({ day, me, partner, night, tag, titl
   /* ---------- one card ---------- */
   const two = card.options.length === 2;
   const header = card.guess && guessing ? `What will ${partner.name} pick?` : card.prompt;
+  /** nothing picked yet on this card (the choices sway until you do) */
+  const waiting = guessing ? ans?.guess == null : !ans;
 
   return (
     <div ref={rootRef} className="flex flex-col gap-4">
@@ -246,15 +251,16 @@ export const LetterFlow: React.FC<Props> = ({ day, me, partner, night, tag, titl
         {card.style === 'likely' ? (
           <div className="grid grid-cols-2 gap-3" role="group" aria-label={header}>
             {[me, partner].map((who, i) => (
-              <button
-                key={who.id}
-                className="px-option px-option--big flex flex-col items-center justify-center gap-1.5"
-                aria-pressed={ans?.pick === i}
-                onClick={() => choose(i)}
-              >
-                <AvatarThumb config={who.avatar} region="head" size={44} />
-                <span>{i === 0 ? `Me (${who.name})` : who.name}</span>
-              </button>
+              <span key={who.id} className={`block ${waiting ? 'mo-sway' : ''}`} style={{ ['--mo-d' as string]: `${-1.4 * i}s` }}>
+                <button
+                  className="px-option px-option--big flex flex-col items-center justify-center gap-1.5 h-full"
+                  aria-pressed={ans?.pick === i}
+                  onClick={() => choose(i)}
+                >
+                  <AvatarThumb config={who.avatar} region="head" size={44} />
+                  <span>{i === 0 ? `Me (${who.name})` : who.name}</span>
+                </button>
+              </span>
             ))}
           </div>
         ) : card.style === 'open' ? (
@@ -278,24 +284,37 @@ export const LetterFlow: React.FC<Props> = ({ day, me, partner, night, tag, titl
             </button>
           </div>
         ) : two ? (
-          <div className="grid items-center gap-3" style={{ gridTemplateColumns: '1fr auto 1fr' }}>
-            <button className="px-option px-option--big" aria-pressed={ans?.pick === 0} onClick={() => choose(0)}>
-              {card.options[0]}
-            </button>
-            <span className="font-bold text-[var(--muted)]">or</span>
-            <button className="px-option px-option--big" aria-pressed={ans?.pick === 1} onClick={() => choose(1)}>
-              {card.options[1]}
-            </button>
+          // (until you pick: the two choices bob and tilt, out of step with each other)
+          <div className="grid items-stretch gap-3" style={{ gridTemplateColumns: '1fr auto 1fr' }}>
+            <span className={`flex ${waiting ? 'mo-sway' : ''}`}>
+              <button className="px-option px-option--big" aria-pressed={ans?.pick === 0} onClick={() => choose(0)}>
+                {card.options[0]}
+              </button>
+            </span>
+            <span className={`font-bold text-[var(--muted)] self-center ${waiting ? 'mo-beat' : ''}`} style={{ ['--mo-d' as string]: '0.4s' }}>
+              or
+            </span>
+            <span className={`flex ${waiting ? 'mo-sway' : ''}`} style={{ ['--mo-d' as string]: '-1.4s' }}>
+              <button className="px-option px-option--big" aria-pressed={ans?.pick === 1} onClick={() => choose(1)}>
+                {card.options[1]}
+              </button>
+            </span>
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-3" role="group" aria-label={header}>
             {card.options.map((o, i) => {
               const pressed = guessing ? ans?.guess === i : ans?.pick === i;
               return (
-                <button key={i} className="px-option" aria-pressed={pressed} onClick={() => choose(i)}>
-                  <span>{o}</span>
-                  {guessing && ans?.pick === i && <span className="px-tag">you</span>}
-                </button>
+                <span
+                  key={i}
+                  className={`flex ${waiting ? 'mo-bob' : ''}`}
+                  style={{ ['--mo-d' as string]: `${-0.75 * i}s` }}
+                >
+                  <button className="px-option" aria-pressed={pressed} onClick={() => choose(i)}>
+                    <span>{o}</span>
+                    {guessing && ans?.pick === i && <span className="px-tag">you</span>}
+                  </button>
+                </span>
               );
             })}
           </div>

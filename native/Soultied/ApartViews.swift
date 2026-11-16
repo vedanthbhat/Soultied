@@ -107,7 +107,8 @@ struct ApartCard: View {
         let line = bits.joined(separator: " · ")
         return VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .center, spacing: 14) {
-                GlyphView(glyph: UsGlyphs.pin, scale: 4)
+                // (the pin's heart beats: they're out there)
+                GlyphView(glyph: UsGlyphs.pin, scale: 4).beat(every: 1.8, amount: 0.1)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(km != nil ? "How far apart" : clock != nil ? "Their time" : "How far apart").font(.pxTiny).foregroundStyle(Color.muted)
                     Text(title).font(.pxHeading).foregroundStyle(Color.inkSoft).fixedSize(horizontal: false, vertical: true)

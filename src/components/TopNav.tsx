@@ -110,11 +110,11 @@ export const TopNav: React.FC<{ letterUnread: boolean }> = ({ letterUnread }) =>
               </button>
               <button className="px-btn px-btn--paper px-btn--small" onClick={() => go('question')}>
                 Letters
-                {letterUnread && <span aria-label="new" className="inline-block w-2 h-2 bg-[var(--thread)]" />}
+                {letterUnread && <span aria-label="new" className="inline-block w-2 h-2 bg-[var(--thread)] mo-beat" />}
               </button>
               <button className="px-btn px-btn--paper px-btn--small" onClick={() => go('wall')}>
                 Our wall
-                {wallNews && <span aria-label="new" className="inline-block w-2 h-2 bg-[var(--thread)]" />}
+                {wallNews && <span aria-label="new" className="inline-block w-2 h-2 bg-[var(--thread)] mo-beat" />}
               </button>
               <button className="px-btn px-btn--paper px-btn--small" onClick={() => go('watch')}>
                 Watch together
@@ -124,7 +124,7 @@ export const TopNav: React.FC<{ letterUnread: boolean }> = ({ letterUnread }) =>
               </button>
               <button className="px-btn px-btn--paper px-btn--small" onClick={() => go('games')}>
                 Games
-                {waiting.length > 0 && <span aria-label="your turn" className="inline-block w-2 h-2 bg-[var(--thread)]" />}
+                {waiting.length > 0 && <span aria-label="your turn" className="inline-block w-2 h-2 bg-[var(--thread)] mo-beat" />}
               </button>
               <button className="px-btn px-btn--paper px-btn--small" onClick={() => go('escape')}>
                 Dark door
