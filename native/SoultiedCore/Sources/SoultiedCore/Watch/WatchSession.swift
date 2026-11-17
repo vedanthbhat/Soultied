@@ -33,6 +33,12 @@ public protocol WatchPlayer: AnyObject {
     func play()
     func pause()
     func stop()
+    /// the video's title, once the player knows it (for Continue watching)
+    var title: String { get }
+}
+
+public extension WatchPlayer {
+    var title: String { "" }
 }
 
 public struct WatchChat: Identifiable, Equatable, Sendable {
@@ -156,6 +162,12 @@ public final class WatchSession {
     @ObservationIgnored private var lastBeat = 0.0
     @ObservationIgnored private var lastSave = 0.0
     @ObservationIgnored private var askedToPlayAt: Double?
+    /// Continue watching: told where you got to (video, title, seconds in, how long it is, your person there
+    /// too) every half a minute while it plays, when it stops, and as you leave
+    @ObservationIgnored public var onProgress: ((_ videoId: String, _ title: String, _ pos: Double, _ dur: Double, _ together: Bool) -> Void)?
+    @ObservationIgnored private var kept: (id: String, pos: Double, at: Double) = ("", -1, 0)
+    /// it's played since it was last kept (so just opening Watch, with last night's video waiting, keeps nothing)
+    @ObservationIgnored private var playedSince = false
 
     /// online, every message is a small write, so check in less often (as the website does)
     static let pingEvery = 20_000.0
@@ -199,6 +211,7 @@ public final class WatchSession {
     }
 
     public func stop() {
+        keepProgress(leaving: true)
         guard let c = chan else { return }
         send(.bye)
         c.close()
@@ -329,6 +342,7 @@ public final class WatchSession {
 
     /// the player's gone (you left the room)
     public func playerGone() {
+        keepProgress(leaving: true)
         player = nil
         ready = false
     }
@@ -381,6 +395,7 @@ public final class WatchSession {
             send(.ping)
             if now - lastSeen > Self.goneAfter { partnerHere = false }
         }
+        keepProgress(leaving: false)
         if let asked = askedToPlayAt, now - asked >= 1800 {
             askedToPlayAt = nil
             if let p = player, p.state != .playing, expected.playing { needsTap = true }
@@ -388,7 +403,31 @@ public final class WatchSession {
         if reactions.contains(where: { now - $0.t0 >= 2000 }) { reactions = reactions.filter { now - $0.t0 < 2000 } }
     }
 
+    /// where you got to, for Continue watching: one of you keeps it (whoever's leading, or you on your own)
+    func keepProgress(leaving: Bool) {
+        guard let p = player, let v = videoId, let keep = onProgress else { return }
+        if partnerHere && leader != me { return }
+        let st = p.state
+        let playing = st == .playing
+        if playing { playedSince = true }
+        let dur = p.duration
+        let pos = st == .ended && dur > 0 ? dur : p.time
+        let now = clock()
+        guard playedSince, pos > 0, pos.isFinite, !(v == kept.id && abs(pos - kept.pos) < 2) else { return }
+        if !leaving && playing && now - kept.at < 30_000 { return }
+        if !leaving && !playing && st != .paused && st != .ended { return }
+        kept = (v, pos, now)
+        playedSince = playing
+        keep(v, p.title, pos, dur, partnerHere)
+    }
+
     /* ---------- what you do ---------- */
+
+    /// carry on with a video from Continue watching, for both of you
+    public func resume(_ id: String, at start: Double) {
+        guard YouTubeLink.isId(id) else { return }
+        loadVideo(id, max(0, start))
+    }
 
     /// put a video from a YouTube link on the TV, for both of you; what's wrong with the link, if it isn't one
     @discardableResult

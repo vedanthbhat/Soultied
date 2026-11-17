@@ -144,6 +144,7 @@ export const writeRepair = later('writeRepair');
 export const writeCouchSeen = later('writeCouchSeen');
 export const writeCouchShown = later('writeCouchShown');
 export const writeWatched = later('writeWatched');
+export const writeTape = later('writeTape');
 export const writeActivity = later('writeActivity');
 export const writeGame = later('writeGame');
 export const writeDoodleCanvas = later('writeDoodleCanvas');

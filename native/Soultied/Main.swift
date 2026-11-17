@@ -102,6 +102,8 @@ struct MainView: View {
             }
             Toasts(place: place, onHome: roomSideways || (tab == .home && sheet == nil), onLetter: { go(.letters) })
                 .padding(.bottom, roomSideways || tvSideways ? 12 : 84)
+            // on FaceTime: where its little window fits, for a few seconds (CallWatch.swift)
+            if !sideways { CallSlot(name: place.theirName) }
         }
         .fullScreenCover(isPresented: $escape) { EscapeScreen(place: place) }
         .sheet(item: $sheet) { s in

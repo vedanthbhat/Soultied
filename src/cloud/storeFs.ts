@@ -293,15 +293,19 @@ export const subscribeStreamLog = (db: Firestore, sid: string, fn: (log: Togethe
     () => undefined
   );
 
-export const writeWatched = (db: Firestore, sid: string, t: TitleInfo, pos: number) =>
+/** an episode you watched together, and where you got to (`dur`: how long it is, when the player knows) */
+export const writeWatched = (db: Firestore, sid: string, t: TitleInfo, pos: number, dur = 0) =>
   setDoc(
     streamRef(db, sid),
     {
       seen: { [t.key]: { show: t.show, episode: t.episode, at: Date.now() } },
-      shows: { [t.showKey]: { show: t.show, episode: t.episode, key: t.key, url: t.url, pos, at: Date.now() } },
+      shows: { [t.showKey]: { show: t.show, episode: t.episode, key: t.key, url: t.url, pos, dur: dur > 0 && Number.isFinite(dur) ? Math.floor(dur) : 0, by: 'both', at: Date.now() } },
     },
     { merge: true }
   );
+
+/** where you got to in a YouTube video (watch/tapes.ts youTubeTapePatch), for Continue watching */
+export const writeTape = (db: Firestore, sid: string, patch: { shows: Record<string, unknown> }) => setDoc(streamRef(db, sid), patch, { merge: true });
 
 export const writeActivity = (db: Firestore, sid: string, a: Omit<ActivityItem, 'id' | 'timestamp'>) => {
   const id = newId('act');

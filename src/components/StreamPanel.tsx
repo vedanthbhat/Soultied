@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { useStreamHub } from '../stream/StreamHub';
-import { EXTENSION_STORE_URL, SERVICES, clock, type Platform } from '../stream/protocol';
+import { EXTENSION_STORE_URL, SERVICES, type Platform } from '../stream/protocol';
+import { continueTapes, resumeUrl } from '../watch/tapes';
+import { TapeShelf } from './TapeShelf';
 import { PlusCard } from './PlusCard';
 import { PlusUpsell } from './PlusUpsell';
 import { usePlus } from '../plus/usePlus';
@@ -10,7 +12,7 @@ import { FREE_NIGHTS } from '../plus/rules';
 /** Netflix, Prime Video and the other streaming sites together: set-up, the buttons, and where you left off. */
 export const StreamPanel: React.FC = () => {
   const hub = useStreamHub();
-  const { partnerUser, cloudMode, cloudEnabled, hasPlus } = useApp();
+  const { currentUser, partnerUser, cloudMode, cloudEnabled, hasPlus } = useApp();
   const name = partnerUser?.name || 'your person';
   const plus = usePlus();
   const [upsell, setUpsell] = useState(false);
@@ -21,9 +23,8 @@ export const StreamPanel: React.FC = () => {
     if (!plus.takeNight()) return setUpsell(true);
     window.open(url, '_blank', 'noopener');
   };
-  const recent = Object.values(hub.log.shows)
-    .sort((a, b) => b.at - a.at)
-    .slice(0, 3);
+  // what you were part way through together, on everything but YouTube (that's the TV's own)
+  const tapes = continueTapes(hub.log, Date.now(), 6).filter((t) => t.platform !== 'youtube');
 
   return (
     <div className="flex flex-col gap-4">
@@ -112,25 +113,7 @@ export const StreamPanel: React.FC = () => {
               <li>With Soultied Plus, hold T to talk, and pop your cameras out into a window that stays on top of the show.</li>
             )}
           </ul>
-          {recent.length > 0 && (
-            <div className="flex flex-col gap-2">
-              <span className="px-label">Where you left off together</span>
-              {recent.map((s) => (
-                <div key={s.key} className="px-inset px-3 py-2 flex items-center justify-between gap-3 text-sm">
-                  <span>
-                    <strong>{s.show}</strong>
-                    {s.episode ? ` · ${s.episode.split(' · ')[0]}` : ''} at {clock(s.pos)}
-                  </span>
-                  <button
-                    className="px-btn px-btn--paper px-btn--small shrink-0"
-                    onClick={() => open(s.key.startsWith('netflix:') ? `${s.url}?t=${Math.floor(s.pos)}` : s.url)}
-                  >
-                    Continue
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
+          <TapeShelf tapes={tapes} onPick={(t) => open(resumeUrl(t))} me={currentUser.id} theirName={partnerUser?.name || ''} heading="Where you left off together" />
         </>
       )}
     </div>

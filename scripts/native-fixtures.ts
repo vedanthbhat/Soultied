@@ -32,6 +32,7 @@ import { START_DECOR } from '../src/decor/catalogue';
 import { fireOf, type CouchState } from '../src/couch';
 import { daysLeft, normalizeVisit, visitLine } from '../src/together/visit';
 import { christmasSeason } from '../src/season';
+import { continueTapes, demoStreamShows, resumeAt, resumeUrl, tapeAgo, tapeClock, tapeLeft, tapePlatform, tapeService, tapeShare, tapeSprite, tapeTitle, tapeWho, youTubeTapePatch } from '../src/watch/tapes';
 import { PET_ACTS, carePatch, demoPet, missingDays, normalizePet, petLevel, petLevelUp, petLine, petReaction, petView, petCareState } from '../src/together/pet';
 import { SNAP_PROMPTS, normalizeSnap, snapPrompt, snapStage } from '../src/together/snap';
 import { type RecapInput, monthRecap, recapMonth } from '../src/together/recap';
@@ -680,6 +681,72 @@ const petWords = {
   levelUps: [0, 1, 2, 3, 4, 9].map((l) => [l, petLevelUp(l, 'Biscuit')]),
 };
 
+// Continue watching: the tapes from meta/stream, where each carries on, and the words and pixels on them
+const tapeNow = 1_790_000_000_000;
+const H = 3600 * 1000;
+const tapeRaws: unknown[] = [
+  null,
+  { shows: 'nope' },
+  {
+    shows: {
+      'youtube:M7lc1UVf-VE': { show: 'A Sunday roast', episode: '', key: 'youtube:M7lc1UVf-VE', url: 'https://www.youtube.com/watch?v=M7lc1UVf-VE', pos: 754.6, dur: 1820, by: 'u2', at: tapeNow - 3 * H },
+      'netflix-show:dark': { show: 'Dark', episode: 'S1:E3 · Past and Present', key: 'netflix:80100173', url: 'https://www.netflix.com/watch/80100173', pos: 1312, at: tapeNow - 26 * H },
+      'prime-show:good-omens': { show: 'Good Omens', episode: 'S1:E2 · The Book', key: 'prime:B07FMHTRFH', url: 'https://www.primevideo.com/detail/B07FMHTRFH?ref=x', pos: 1903, dur: 3240, by: 'both', at: tapeNow - 98 * H },
+      'hotstar-show:panchayat': { show: 'Panchayat', episode: 'S2:E1', key: 'hotstar:1260', url: 'https://www.hotstar.com/in/shows/1260', pos: 60, dur: 0, at: tapeNow - 5 * H },
+      'youtube:aaaaaaaaaaa': { show: 'Finished', key: 'youtube:aaaaaaaaaaa', url: 'https://www.youtube.com/watch?v=aaaaaaaaaaa', pos: 1795, dur: 1810, by: 'u1', at: tapeNow - H },
+      'youtube:bbbbbbbbbbb': { show: 'Barely started', key: 'youtube:bbbbbbbbbbb', url: 'https://www.youtube.com/watch?v=bbbbbbbbbbb', pos: 6, dur: 600, by: 'u1', at: tapeNow - H },
+      'netflix-show:old': { show: 'Old', episode: '', key: 'netflix:1', url: 'https://www.netflix.com/watch/1', pos: 600, at: tapeNow - 61 * 24 * H },
+      'netflix-show:nourl': { show: 'No link', key: 'netflix:2', pos: 600, at: tapeNow },
+      'netflix-show:nokey': { show: '', episode: 'S3:E1 · Kept', url: 'https://www.netflix.com/watch/3?trackId=9', pos: 4000.9, dur: 3000, at: tapeNow - 2 * 24 * H },
+      'youtube:ccccccccccc': { show: 'Short and nearly over', key: 'youtube:ccccccccccc', url: 'https://www.youtube.com/watch?v=ccccccccccc', pos: 270, dur: 300, by: '', at: tapeNow - 2 * H },
+      'youtube:ddddddddddd': { show: 'Long one', key: 'youtube:ddddddddddd', url: 'https://www.youtube.com/watch?v=ddddddddddd', pos: 9100, dur: 10_000, at: tapeNow - 9 * 24 * H },
+      broken: null,
+      odd: 'x',
+      'zee5-show:x': { show: 'Same time', key: 'zee5:9', url: 'https://www.zee5.com/x', pos: 100, by: 'u2', at: tapeNow - 26 * H },
+    },
+  },
+  demoStreamShows(tapeNow, 'u2'),
+  { shows: { 'youtube:M7lc1UVf-VE': youTubeTapePatch('M7lc1UVf-VE', '', 30, 0, 'u1', tapeNow - 30 * 60000).shows['youtube:M7lc1UVf-VE'] } },
+];
+const tapeSets = [
+  [6, null],
+  [6, ['youtube', 'netflix', 'prime']],
+  [2, null],
+] as const;
+const tapes = {
+  now: tapeNow,
+  docs: tapeRaws.map((raw) => ({
+    raw,
+    sets: tapeSets.map(([max, platforms]) => {
+      const list = continueTapes(raw, tapeNow, max, platforms ? [...platforms] : null);
+      return {
+        max,
+        platforms,
+        tapes: list,
+        words: list.map((t) => ({
+          url: resumeUrl(t),
+          title: tapeTitle(t),
+          left: tapeLeft(t),
+          whoMe: tapeWho(t, 'u1', 'Rohan', tapeNow),
+          whoThem: tapeWho(t, 'u2', '', tapeNow),
+          service: tapeService(t.platform),
+          share: tapeShare(t),
+        })),
+      };
+    }),
+  })),
+  ago: [0, 59_000, 119_000, 120_000, 5 * 60000, 59 * 60000, 89 * 60000, 90 * 60000, 23 * H, 23.5 * H, 25 * H, 36 * H, 6 * 24 * H, 6.6 * 24 * H, 10 * 24 * H, 40 * 24 * H, -5000].map((d) => [d, tapeAgo(tapeNow - d, tapeNow)]),
+  clocks: [0, 9.9, 61, 3599, 3600, 3725.5, 36000, -4].map((x) => [x, tapeClock(x)]),
+  resumes: [0, 4.9, 5, 12.7, 600].map((x) => [x, resumeAt(x)]),
+  platforms: ['netflix:1', 'netflix-show:dark', 'youtube:abc', 'nope', ':x', 'prime-show:a:b'].map((k) => [k, tapePlatform(k)]),
+  patches: [
+    ['M7lc1UVf-VE', '  A title  ', 12.9, 300.4, 'u1', 5],
+    ['M7lc1UVf-VE', '', 12, 0, 'both', 6],
+    ['M7lc1UVf-VE', 'x'.repeat(150), 1, -3, 'u2', 7],
+  ].map((a) => [a, youTubeTapePatch(...(a as [string, string, number, number, string, number]))]),
+  sprites: ([[0, 'youtube'], [0.12, 'netflix'], [0.3, 'prime'], [0.5, 'hotstar'], [0.62, 'zee5'], [0.88, 'crunchyroll'], [1, 'youtube']] as const).map(([sh, pl]) => ({ share: sh, platform: pl, ...tapeSprite(sh, pl) })),
+};
+
 // today's photo: the prompt for a place and a day, what's kept, and who sees what
 const snaps: { prompts: Array<[string, string, string]>; docs: Array<{ raw: unknown; doc: unknown; stages: Array<[string, string | null, string]> }>; count: number } = { prompts: [], docs: [], count: SNAP_PROMPTS.length };
 for (const sid of ['space-demo', 'abc123', 'घर-😀', ''])
@@ -882,5 +949,5 @@ const ranks = {
 };
 
 const out = process.argv[2] || 'native-fixtures.json';
-writeFileSync(out, JSON.stringify({ cards, days, hashes, rngSeq, streaks, demo, same, chapters, games, live, doodle: { judges, brushes, fills, choices, games: doodles }, coasters: coasterSteps, escape, record, watch: { looks, ...watch }, wall: { doodles: wallDoodles }, room: { scenes: roomScenes, fires, visits, seasons }, snaps, recaps: { cases: recaps, months: recapMonths }, wheres, buckets, voices, carromFrames, ranks, pet: { docs: pets, ...petWords } }));
+writeFileSync(out, JSON.stringify({ cards, days, hashes, rngSeq, streaks, demo, same, chapters, games, live, doodle: { judges, brushes, fills, choices, games: doodles }, coasters: coasterSteps, escape, record, watch: { looks, ...watch }, wall: { doodles: wallDoodles }, room: { scenes: roomScenes, fires, visits, seasons }, snaps, recaps: { cases: recaps, months: recapMonths }, wheres, buckets, voices, carromFrames, ranks, pet: { docs: pets, ...petWords }, tapes }));
 console.log(`wrote ${cards.length} card days, ${streaks.length} streaks, ${demo.length} demo rooms, ${games.length} game moves, ${live.length} live games, ${doodles.length} doodle moves to ${out}`);

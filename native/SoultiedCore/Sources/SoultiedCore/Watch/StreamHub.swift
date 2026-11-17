@@ -154,7 +154,7 @@ public final class StreamHub {
         case "send":
             if let e = m["e"] as? Doc { send(e) }
         case "watched":
-            if let t = m["title"] as? Doc { watched(t, pos: m.num("pos") ?? 0) }
+            if let t = m["title"] as? Doc { watched(t, pos: m.num("pos") ?? 0, dur: m.num("dur") ?? 0) }
         case "bye":
             byeAt = clock()
             playerHere = false
@@ -231,11 +231,11 @@ public final class StreamHub {
 
     // MARK: - what you've watched together
 
-    private func watched(_ t: Doc, pos: Double) {
+    private func watched(_ t: Doc, pos: Double, dur: Double) {
         guard let key = t.str("key"), !key.isEmpty else { return }
         let show = t.str("show") ?? ""
         let episode = t.str("episode") ?? ""
-        place?.saveWatched(key: key, showKey: t.str("showKey") ?? key, show: show, episode: episode, url: t.str("url") ?? "", pos: pos)
+        place?.saveWatched(key: key, showKey: t.str("showKey") ?? key, show: show, episode: episode, url: t.str("url") ?? "", pos: pos, dur: dur)
         // one line in your shared history per episode a day (only one of you writes it, as on the website)
         let day = Day.today(Date(timeIntervalSince1970: clock() / 1000))
         let k = "\(key)|\(day)"

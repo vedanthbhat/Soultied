@@ -152,6 +152,11 @@ export class Engine {
     return this.a.pos ? this.a.pos(v) : v.currentTime;
   }
 
+  /** how long it is, in seconds, for Continue watching (0 where the site stitches ads into the <video>'s clock) */
+  private dur(v: HTMLVideoElement | null | undefined): number {
+    return v && !this.a.pos && Number.isFinite(v.duration) && v.duration > 60 ? v.duration : 0;
+  }
+
   /* ---------------- who's here ---------------- */
 
   get me() {
@@ -249,7 +254,7 @@ export class Engine {
   }
 
   private leave = () => {
-    if (this.together >= TOGETHER_COUNTS_AFTER && this.title) this.out({ kind: 'watched', title: this.title, pos: this.at(this.v) });
+    if (this.together >= TOGETHER_COUNTS_AFTER && this.title) this.out({ kind: 'watched', title: this.title, pos: this.at(this.v), dur: this.dur(this.v) });
     this.send({ type: 'bye' });
   };
 
@@ -511,14 +516,14 @@ export class Engine {
       const crossed = this.together >= TOGETHER_COUNTS_AFTER && this.lastWatched === 0;
       if (crossed || (this.lastWatched && now - this.lastWatched > 300_000)) {
         this.lastWatched = now;
-        this.out({ kind: 'watched', title: this.title, pos: this.at(this.v) });
+        this.out({ kind: 'watched', title: this.title, pos: this.at(this.v), dur: this.dur(this.v) });
       }
     }
   }
 
   private changedTitle(key: string | null) {
     const from = this.key;
-    if (from && this.title && this.together >= TOGETHER_COUNTS_AFTER) this.out({ kind: 'watched', title: this.title, pos: this.at(this.v) });
+    if (from && this.title && this.together >= TOGETHER_COUNTS_AFTER) this.out({ kind: 'watched', title: this.title, pos: this.at(this.v), dur: this.dur(this.v) });
     if (key) {
       this.hadTitle = true;
       // something you put on yourself (not where your person took you)

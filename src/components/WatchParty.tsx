@@ -25,6 +25,10 @@ import { stuckMessage } from '../watch/call';
 import { PixelPanel } from './PixelPanel';
 import { StreamPanel } from './StreamPanel';
 import { PlusCard } from './PlusCard';
+import { TapeShelf } from './TapeShelf';
+import { useStreamHub } from '../stream/StreamHub';
+import { usePlus } from '../plus/usePlus';
+import { continueTapes, resumeAt, resumeUrl, tapeVideoId, youTubeTapePatch, type Tape } from '../watch/tapes';
 
 /**
  * Watch together (YouTube). The camera swings round behind the couch; the
@@ -145,6 +149,10 @@ const TvRoom: React.FC<{ onExit: () => void; mode: Mode }> = ({ onExit, mode }) 
   const [chatOpen, setChatOpen] = useState(false);
   const [streamOpen, setStreamOpen] = useState(false);
   const [plusOpen, setPlusOpen] = useState(false);
+  // Continue watching: the tapes, and (with something on the TV) whether they're showing
+  const hub = useStreamHub();
+  const plus = usePlus();
+  const [tapesOpen, setTapesOpen] = useState(false);
   // karaoke night: who's singing now, what's up next, and finding songs
   const [queue, setQueue] = useState<KaraokeSong[]>([]);
   const [nowSong, setNowSong] = useState<KaraokeSong | null>(null);
@@ -539,6 +547,45 @@ const TvRoom: React.FC<{ onExit: () => void; mode: Mode }> = ({ onExit, mode }) 
     };
   }, [me, send, saveKey]);
 
+  // Continue watching: where you got to, every half a minute while it plays, when it stops, and as you leave
+  // (one of you keeps it: whoever's leading, or you on your own)
+  const saveTapeRef = useRef(hub?.saveTape);
+  saveTapeRef.current = hub?.saveTape;
+  useEffect(() => {
+    if (karaoke) return;
+    let last = { id: '', pos: -1, at: 0 };
+    // (it's played since it was last kept: just opening the TV with last night's video waiting keeps nothing)
+    let played = false;
+    const keep = (leaving: boolean) => {
+      const p = playerRef.current;
+      const id = videoIdRef.current;
+      const save = saveTapeRef.current;
+      if (!p || !id || !save) return;
+      if (partnerHereRef.current && leaderRef.current !== me) return;
+      try {
+        const st = p.getPlayerState();
+        const playing = st === YTState.PLAYING;
+        if (playing) played = true;
+        const dur = p.getDuration?.() || 0;
+        const pos = st === YTState.ENDED && dur > 0 ? dur : p.getCurrentTime();
+        const now = Date.now();
+        if (!played || !(pos > 0) || (id === last.id && Math.abs(pos - last.pos) < 2)) return;
+        if (!leaving && playing && now - last.at < 30000) return;
+        if (!leaving && !playing && st !== YTState.PAUSED && st !== YTState.ENDED) return;
+        last = { id, pos, at: now };
+        played = playing;
+        save(youTubeTapePatch(id, p.getVideoData?.()?.title || '', pos, dur, partnerHereRef.current ? 'both' : me, now));
+      } catch {
+        // the player's gone: nothing to keep
+      }
+    };
+    const t = window.setInterval(() => keep(false), 2000);
+    return () => {
+      window.clearInterval(t);
+      keep(true);
+    };
+  }, [karaoke, me]);
+
   useEffect(
     () => () => {
       try {
@@ -578,6 +625,21 @@ const TvRoom: React.FC<{ onExit: () => void; mode: Mode }> = ({ onExit, mode }) 
     }
     setLink('');
     loadVideo(id, parseYouTubeStart(link));
+  };
+
+  // the tapes on the shelf (not the one that's on), and carrying on with one
+  const tapes = useMemo(
+    () => (hub && !karaoke ? continueTapes(hub.log, Date.now(), 8).filter((t) => !tapeVideoId(t) || tapeVideoId(t) !== videoId) : []),
+    [hub, karaoke, videoId]
+  );
+  const pickTape = (t: Tape) => {
+    const id = tapeVideoId(t);
+    if (id) {
+      setTapesOpen(false);
+      loadVideo(id, resumeAt(t.pos));
+    } else if (hub?.extension === 'present' && plus.takeNight()) window.open(resumeUrl(t), '_blank', 'noopener');
+    // (no extension yet, or the month's free nights are used up: the Netflix / Prime panel says what to do)
+    else setStreamOpen(true);
   };
 
   const takeOff = () => {
@@ -984,6 +1046,10 @@ const TvRoom: React.FC<{ onExit: () => void; mode: Mode }> = ({ onExit, mode }) 
         )}
       </form>
       )}
+      {/* Continue watching: always on a phone (there's room to scroll); on a computer while the TV's empty, or asked for */}
+      {!karaoke && tapes.length > 0 && (stacked || !videoId || tapesOpen) && (
+        <TapeShelf tapes={tapes} onPick={pickTape} me={me} theirName={partnerName} scale={2} />
+      )}
       <div className="flex items-center gap-2 flex-wrap">
         {/* on a phone there's no room beside the link box */}
         {videoId && stacked && (
@@ -1007,6 +1073,11 @@ const TvRoom: React.FC<{ onExit: () => void; mode: Mode }> = ({ onExit, mode }) 
         {!karaoke && (
           <button className="px-btn px-btn--paper px-btn--small" onClick={() => setStreamOpen(true)} title="Watch Netflix, Prime Video, JioHotstar and more together">
             Netflix / Prime
+          </button>
+        )}
+        {!karaoke && !stacked && videoId && tapes.length > 0 && (
+          <button className="px-btn px-btn--paper px-btn--small" aria-expanded={tapesOpen} onClick={() => setTapesOpen((o) => !o)}>
+            Continue watching
           </button>
         )}
         {audioBlocked && view?.remote && (

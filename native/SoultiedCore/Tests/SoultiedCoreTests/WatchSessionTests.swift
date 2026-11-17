@@ -227,4 +227,70 @@ final class WatchSessionTests: XCTestCase {
         a.takeOff()
         XCTAssertNil(WatchSession(me: "ua", myName: "Aanya", mySeat: .left, sid: "s1", channel: { nil }, clock: { [unowned self] in self.now }, defaults: defaults).videoId)
     }
+
+    /// Continue watching: where you got to is kept every half a minute while it plays, when it pauses and as
+    /// you leave, by one of you; just opening Watch with last night's video waiting keeps nothing
+    func testKeepingYourPlace() {
+        var kept: [(String, Double, Double, Bool)] = []
+        let a = session("ua", .left), b = session("ub", .right)
+        a.onProgress = { id, _, pos, dur, together in kept.append((id, pos, dur, together)) }
+        b.onProgress = { _, _, _, _, _ in XCTFail("only the one leading keeps it") }
+        a.start()
+        b.start()
+        XCTAssertNil(a.putOn("https://youtu.be/dQw4w9WgXcQ?t=60"))
+        let pa = FakePlayer(clock: { [unowned self] in self.now }), pb = FakePlayer(clock: { [unowned self] in self.now })
+        let fa = a.playerWillLoad()!, fb = b.playerWillLoad()!
+        pa.load(fa.videoId, at: fa.start)
+        pb.load(fb.videoId, at: fb.start)
+        a.playerReady(pa)
+        b.playerReady(pb)
+        a.playerChanged(.playing, at: pa.time)
+        later(1400, a, b)
+        XCTAssertEqual(kept.count, 1)
+        XCTAssertEqual(kept[0].0, "dQw4w9WgXcQ")
+        XCTAssertEqual(kept[0].2, 600)
+        XCTAssertTrue(kept[0].3)
+        later(20_000, a, b)
+        XCTAssertEqual(kept.count, 1)
+        later(12_000, a, b)
+        XCTAssertEqual(kept.count, 2)
+        XCTAssertEqual(kept[1].1, 91, accuracy: 1)
+        // she pauses: kept straight away, and not again while it sits there
+        pa.pause()
+        a.playerChanged(.paused, at: pa.time)
+        later(1400, a, b)
+        XCTAssertEqual(kept.count, 3)
+        later(40_000, a, b)
+        a.stop()
+        b.stop()
+        XCTAssertEqual(kept.count, 3)
+
+        // the next evening: the video's waiting where she left it, but nothing's played, so nothing's kept
+        kept.removeAll()
+        let defaults = UserDefaults(suiteName: "watch-test-keep-\(UUID().uuidString)")!
+        defaults.set(["videoId": "dQw4w9WgXcQ", "pos": 300.0], forKey: "soultied_watch_s1")
+        let c = WatchSession(me: "ua", myName: "Aanya", mySeat: .left, sid: "s1", channel: { [db] in db.live("spaces/s1/live/watch/events") }, clock: { [unowned self] in self.now }, defaults: defaults)
+        c.onProgress = { id, _, pos, dur, together in kept.append((id, pos, dur, together)) }
+        c.start()
+        XCTAssertFalse(c.partnerHere)
+        let first = c.playerWillLoad()!
+        XCTAssertFalse(first.autoplay)
+        let pc = FakePlayer(clock: { [unowned self] in self.now })
+        pc.cue(first.videoId, at: first.start)
+        c.playerReady(pc)
+        later(5000, c)
+        c.stop()
+        XCTAssertTrue(kept.isEmpty)
+        // ...on her own this time, it plays to the end: kept as finished, just her
+        c.start()
+        pc.play()
+        c.playerChanged(.playing, at: pc.time)
+        later(1400, c)
+        pc.seek(600)
+        pc.st = .ended
+        later(1400, c)
+        XCTAssertEqual(kept.last?.1, 600)
+        XCTAssertEqual(kept.last?.3, false)
+        XCTAssertTrue(Tapes.done(kept.last!.1, kept.last!.2))
+    }
 }

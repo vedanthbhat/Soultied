@@ -25,15 +25,6 @@ enum WatchService: String, CaseIterable, Identifiable {
     var site: StreamSite? { StreamSite(rawValue: rawValue) }
 }
 
-/// a show you've been watching together on Netflix or Prime Video
-struct StreamShow: Identifiable {
-    let show: String
-    let episode: String
-    let url: URL
-    let at: Double
-    var id: String { url.absoluteString }
-}
-
 /// a site to open, and where
 struct StreamOpen: Identifiable {
     let site: StreamSite
@@ -48,8 +39,8 @@ struct WatchView: View {
     @State private var draft = ""
     @AppStorage("soultied_watch_service") private var serviceRaw = WatchService.youtube.rawValue
     @State private var streaming: StreamOpen?
-    @State private var streamLog: Doc = [:]
-    @State private var logListener: Listener?
+    /// a tape tapped on Home, to carry on with as Watch opens (TapeViews.swift)
+    @State private var cue = WatchCue.shared
     /// the line your person's Netflix / Prime player talks on (what they're watching, for "Join")
     @State private var deck = StreamDeck.shared
     @Environment(\.verticalSizeClass) private var vertical
@@ -67,6 +58,8 @@ struct WatchView: View {
                         DarkHeading(title: "Watch together", sub: service == .youtube ? "YouTube on both your TVs, in sync" : "\(service.name) on both your screens, in sync")
                         picker
                         joinCard
+                        // what you were part way through, on any of the three (not what's on the TV now)
+                        TapeShelf(place: place, tapes: place.tapes.filter { $0.videoId == nil || $0.videoId != session?.videoId }, pick: carryOn)
                     }
                     if let s = session {
                         if let site = service.site {
@@ -98,11 +91,14 @@ struct WatchView: View {
             guard session == nil else { return }
             let s = WatchSession(place: place)
             session = s
+            // Continue watching: where you got to, for both of you (and the website)
+            s.onProgress = { [weak place] id, title, pos, dur, together in
+                place?.saveTape(videoId: id, title: title, pos: pos, dur: dur, together: together)
+            }
             s.start()
             if place.isDemo, let v = Launch.watch { s.putOn(v) }
             // the record player goes quiet while you watch
             RecordDeck.shared.hush(true)
-            logListener = place.watchStreamLog { d in streamLog = d ?? [:] }
             deck.use(place)
             demoPartnerWatching()
             if let v = Launch.service { serviceRaw = v }
@@ -111,13 +107,13 @@ struct WatchView: View {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2) { Orientation.request(.landscapeRight) }
             }
             if place.isDemo, let site = Launch.stream.flatMap(StreamSite.init) { streaming = StreamOpen(site: site, url: nil) }
+            takeCue()
         }
+        .onChange(of: cue.tape?.key) { _, _ in takeCue() }
         .onDisappear {
             session?.stop()
             session = nil
             RecordDeck.shared.hush(false)
-            logListener?.stop()
-            logListener = nil
             deck.done()
         }
         // (the place came round, or your person moved in: the line to their Netflix / Prime player opens)
@@ -308,6 +304,26 @@ struct WatchView: View {
         }
     }
 
+    /// carry on with a tape: YouTube on the TV for you both, from where you stopped; Netflix or Prime Video in
+    /// the app's browser
+    private func carryOn(_ t: Tape) {
+        Haptics.tap()
+        if let id = t.videoId {
+            serviceRaw = WatchService.youtube.rawValue
+            session?.resume(id, at: t.resumeAt)
+        } else if let site = StreamSite(platform: t.platform), let u = URL(string: t.resumeURL) {
+            serviceRaw = site.rawValue
+            watch(site, u)
+        }
+    }
+
+    /// the tape tapped on Home (a moment after Watch opens, so a show's browser has somewhere to open from)
+    private func takeCue() {
+        guard let t = cue.tape else { return }
+        cue.tape = nil
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { carryOn(t) }
+    }
+
     /// Netflix or Prime Video: a movie night (three a month are free; Plus has every night)
     private func watch(_ site: StreamSite, _ url: URL?) {
         if place.takeNight() { streaming = StreamOpen(site: site, url: url) } else { PlusGate.shared.show(.nights) }
@@ -334,7 +350,7 @@ struct WatchView: View {
         }
     }
 
-    /// Netflix or Prime Video: how it works, and the shows you were watching together, to pick up again
+    /// Netflix or Prime Video: how it works (the shows you were part way through are on the shelf up top)
     private func streamPane(_ site: StreamSite) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 8) {
@@ -362,44 +378,7 @@ struct WatchView: View {
                 }
             }
             .pxCard()
-
-            let shows = recent(site)
-            if !shows.isEmpty {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Pick up where you left off").font(.pxHeading).foregroundStyle(Color.inkSoft)
-                    ForEach(shows) { s in
-                        Button {
-                            Haptics.tap()
-                            watch(site, s.url)
-                        } label: {
-                            HStack(spacing: 10) {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(s.show).font(.pxBodyBold).foregroundStyle(Color.inkSoft).lineLimit(1)
-                                    if !s.episode.isEmpty { Text(s.episode).font(.pxSmall).foregroundStyle(Color.muted).lineLimit(1) }
-                                }
-                                Spacer(minLength: 0)
-                                Text("→").font(.pxBodyBold).foregroundStyle(Color.terracottaD)
-                            }
-                            .padding(10)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .pxBox()
-                        }
-                        .buttonStyle(.press)
-                    }
-                }
-                .pxCard()
-            }
         }
-    }
-
-    /// the shows you've been watching together on this site, newest first (meta/stream, shared with the website)
-    private func recent(_ site: StreamSite) -> [StreamShow] {
-        let shows = (streamLog["shows"] as? Doc) ?? [:]
-        let all: [StreamShow] = shows.values.compactMap { v in
-            guard let d = v as? Doc, let u = d.str("url").flatMap({ URL(string: $0) }), site.owns(u) else { return nil }
-            return StreamShow(show: d.str("show") ?? "", episode: d.str("episode") ?? "", url: u, at: Values.num(d["at"]) ?? 0)
-        }
-        return Array(all.sorted { $0.at > $1.at }.prefix(4))
     }
 }
 
@@ -492,6 +471,8 @@ final class YouTubeTV: WatchPlayer {
     private var snapAt = 0.0
     private var snapState: YTState = .unstarted
     private var dur = 0.0
+    /// the video's title, from the player (for Continue watching)
+    private(set) var title = ""
 
     var time: Double { snapState == .playing ? snapTime + max(0, Values.nowMs() - snapAt) / 1000 : snapTime }
     var state: YTState { snapState }
@@ -507,12 +488,14 @@ final class YouTubeTV: WatchPlayer {
 
     func load(_ id: String, at t: Double) {
         guard YouTubeLink.id(id) == id else { return }
+        title = ""
         mark(t, .buffering)
         js("cmd('load','\(id)',\(num(t)))")
     }
 
     func cue(_ id: String, at t: Double) {
         guard YouTubeLink.id(id) == id else { return }
+        title = ""
         mark(t, .cued)
         js("cmd('cue','\(id)',\(num(t)))")
     }
@@ -547,6 +530,7 @@ final class YouTubeTV: WatchPlayer {
         let st = YTState(rawValue: (m["state"] as? Int) ?? -1) ?? .unstarted
         mark((m["time"] as? Double) ?? Double((m["time"] as? Int) ?? 0), st)
         if let d = m["duration"] as? Double { dur = d }
+        if let t = m["title"] as? String, !t.isEmpty { title = t }
         switch kind {
         case "ready": session?.playerReady(self)
         case "state": session?.playerChanged(st, at: snapTime)
@@ -562,7 +546,7 @@ final class YouTubeTV: WatchPlayer {
         <body><div id="p"></div><script>
         var player=null, ready=false;
         function say(m){try{window.webkit.messageHandlers.tv.postMessage(m)}catch(e){}}
-        function snap(kind){if(!player||!ready)return;try{say({kind:kind,state:player.getPlayerState(),time:player.getCurrentTime()||0,duration:player.getDuration()||0})}catch(e){}}
+        function snap(kind){if(!player||!ready)return;try{var d=player.getVideoData&&player.getVideoData();say({kind:kind,state:player.getPlayerState(),time:player.getCurrentTime()||0,duration:player.getDuration()||0,title:(d&&d.title)||''})}catch(e){}}
         function cmd(op,a,b){if(!player||!ready)return;try{
           if(op==='load')player.loadVideoById({videoId:a,startSeconds:b});
           else if(op==='cue')player.cueVideoById({videoId:a,startSeconds:b});

@@ -601,3 +601,22 @@ label {
     transition: none;
   }
 }
+
+/* Continue watching: a tape lifts off the shelf as you point at it (TapeShelf.tsx) */
+.tape-btn > span:first-child {
+  transition: transform 120ms steps(2);
+}
+.tape-btn:hover > span:first-child,
+.tape-btn:focus-visible > span:first-child {
+  transform: translateY(-3px) rotate(-1deg);
+}
+.tape-btn:focus-visible {
+  outline: 3px solid var(--terracotta);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tape-btn:hover > span:first-child,
+  .tape-btn:focus-visible > span:first-child {
+    transform: none;
+  }
+}

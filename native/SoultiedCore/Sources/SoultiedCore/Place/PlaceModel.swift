@@ -42,6 +42,8 @@ public final class PlaceModel {
     public internal(set) var bests = BestsDoc()
     /// the pet you both raise: who looked after it when (meta/pet)
     public internal(set) var petDoc = PetDoc()
+    /// what you've watched together and where you left off, on YouTube, Netflix and Prime Video (meta/stream)
+    public internal(set) var streamDoc: Doc = [:]
     @ObservationIgnored private var rankKey: String?
     @ObservationIgnored private var bestsSent: String?
     @ObservationIgnored private var escapesSynced = false
@@ -152,6 +154,9 @@ public final class PlaceModel {
             db.listen(meta("bucket")) { [weak self] d in
                 self?.bucket = BucketDoc(d)
                 self?.loaded.insert("bucket")
+            },
+            db.listen(meta("stream")) { [weak self] d in
+                self?.streamDoc = d ?? [:]
             },
             db.listen(meta("pet")) { [weak self] d in
                 guard let self else { return }
@@ -967,12 +972,23 @@ public final class PlaceModel {
     /// Netflix / Prime Video together: the episodes and films you've watched as a pair, and where you left off
     /// in each show (the website's TogetherLog, in meta/stream)
     public func watchStreamLog(_ fn: @escaping (Doc?) -> Void) -> Listener { db.listen(meta("stream"), fn) }
-    public func saveWatched(key: String, showKey: String, show: String, episode: String, url: String, pos: Double) {
+    /// (`dur`: how long the episode is, when the player knows; Netflix and Prime only note what you watch together)
+    public func saveWatched(key: String, showKey: String, show: String, episode: String, url: String, pos: Double, dur: Double = 0) {
         let at = Values.nowMs()
         save(meta("stream"), [
             "seen": [key: ["show": show, "episode": episode, "at": at]],
-            "shows": [showKey: ["show": show, "episode": episode, "key": key, "url": url, "pos": pos, "at": at]],
+            "shows": [showKey: ["show": show, "episode": episode, "key": key, "url": url, "pos": pos, "dur": dur > 0 && dur.isFinite ? Int(dur.rounded(.down)) : 0, "by": "both", "at": at]],
         ], "watched")
+    }
+
+    /// Continue watching: what you were part way through, newest first (the app's three sites)
+    public var tapes: [Tape] { Tapes.from(streamDoc, now: now.timeIntervalSince1970 * 1000, max: 6, platforms: Tapes.appPlatforms) }
+
+    /// where you got to in a YouTube video (with your person on the couch, or on your own)
+    public func saveTape(videoId: String, title: String, pos: Double, dur: Double, together: Bool) {
+        let patch = Tapes.youTubePatch(id: videoId, title: title, pos: pos, dur: dur, by: together ? "both" : me, at: Values.nowMs())
+        streamDoc = Values.deepMerge(streamDoc, patch)
+        save(meta("stream"), patch, "where you got to")
     }
     /// a line in what's happened lately ("Watched together: Dark S1:E2 on Netflix.")
     public func noteWatchedTogether(_ description: String) {

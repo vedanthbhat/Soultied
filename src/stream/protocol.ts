@@ -90,7 +90,7 @@ export interface TogetherLog {
   /** episodes and films you've watched together, by key */
   seen: Record<string, { show: string; episode: string; at: number }>;
   /** per show: where the two of you left off */
-  shows: Record<string, { show: string; episode: string; key: string; url: string; pos: number; at: number }>;
+  shows: Record<string, { show: string; episode: string; key: string; url: string; pos: number; at: number; dur?: number; by?: string }>;
 }
 
 export const emptyLog = (): TogetherLog => ({ seen: {}, shows: {} });
@@ -218,7 +218,7 @@ export type HubMsg =
 export type ExtMsg =
   | { kind: 'hello' }
   | { kind: 'send'; e: StreamEvent }
-  | { kind: 'watched'; title: TitleInfo; pos: number }
+  | { kind: 'watched'; title: TitleInfo; pos: number; dur?: number }
   | { kind: 'ptt'; down: boolean }
   | { kind: 'bye' };
 

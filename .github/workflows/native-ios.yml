@@ -207,6 +207,10 @@ jobs:
           # Christmas (1 December to 6 January): the room decorated, red and green, and the switch to take it down
           shot christmas -demo -tab home -christmas
           shot christmas-looks -demo -tab us -looks -christmas
+          # Continue watching: the latest tape on Home (the shelf's at the top of the watch shot)
+          shot home-continue -demo -tab home -scrollHome continue
+          # on FaceTime: the top corner kept clear, with the empty frame where its little window fits
+          shot facetime -demo -tab home -onCall
           # turned sideways as a show starts: Netflix stays up (it used to close for the room)
           shot stream-sideways -demo -tab watch -service netflix -stream netflix -sideways
           # the Starlight look

@@ -22,6 +22,7 @@ import {
   type TitleInfo,
   type TogetherLog,
 } from './protocol';
+import { demoStreamShows } from '../watch/tapes';
 
 /**
  * Your Soultied tab, while you watch Netflix or Prime Video in another tab.
@@ -45,6 +46,8 @@ interface StreamHubValue {
   camsOpen: boolean;
   openCams: () => void;
   log: TogetherLog;
+  /** where you got to in a YouTube video (watch/tapes.ts youTubeTapePatch), for Continue watching */
+  saveTape: (patch: { shows: TogetherLog['shows'] }) => void;
 }
 
 const StreamHubContext = createContext<StreamHubValue | null>(null);
@@ -98,29 +101,43 @@ export const StreamHubProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   /* ---------- what you've watched together ---------- */
 
+  // (always listening, not just while a show's open: Continue watching shows it on the TV and in Watch)
   useEffect(() => {
     const t = cloudTarget();
-    if (!t || !active) return;
+    if (!t) return;
     return store.subscribeStreamLog(t.db, t.sid, setLog);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cloudMode, active, space?.id]);
+  }, [cloudMode, space?.id]);
 
-  const recordWatched = (title: TitleInfo, pos: number) => {
+  /** kept in this browser only (a place that isn't online yet) */
+  const keepLocally = (f: (l: TogetherLog) => TogetherLog) =>
+    setLog((l) => {
+      const next = f(l);
+      try {
+        localStorage.setItem(LOCAL_LOG, JSON.stringify(next));
+      } catch {
+        // storage full: fine, it's a nicety
+      }
+      return next;
+    });
+
+  const saveTape = (patch: { shows: TogetherLog['shows'] }) => {
     const t = cloudTarget();
-    if (t) store.writeWatched(t.db, t.sid, title, pos).catch(() => undefined);
+    if (t) store.writeTape(t.db, t.sid, patch).catch(() => undefined);
+    else keepLocally((l) => ({ ...l, shows: { ...l.shows, ...patch.shows } }));
+  };
+
+  const recordWatched = (title: TitleInfo, pos: number, dur = 0) => {
+    const t = cloudTarget();
+    if (t) store.writeWatched(t.db, t.sid, title, pos, dur).catch(() => undefined);
     else
-      setLog((l) => {
-        const next: TogetherLog = {
-          seen: { ...l.seen, [title.key]: { show: title.show, episode: title.episode, at: Date.now() } },
-          shows: { ...l.shows, [title.showKey]: { show: title.show, episode: title.episode, key: title.key, url: title.url, pos, at: Date.now() } },
-        };
-        try {
-          localStorage.setItem(LOCAL_LOG, JSON.stringify(next));
-        } catch {
-          // storage full: fine, it's a nicety
-        }
-        return next;
-      });
+      keepLocally((l) => ({
+        seen: { ...l.seen, [title.key]: { show: title.show, episode: title.episode, at: Date.now() } },
+        shows: {
+          ...l.shows,
+          [title.showKey]: { show: title.show, episode: title.episode, key: title.key, url: title.url, pos, dur: dur > 0 && Number.isFinite(dur) ? Math.floor(dur) : 0, by: 'both', at: Date.now() },
+        },
+      }));
     // one line in your shared history per episode (only one of you writes it)
     const day = new Date().toDateString();
     const k = `${title.key}|${day}`;
@@ -177,7 +194,7 @@ export const StreamHubProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setActive(true);
       toExt({ kind: 'session', session: sessionRef.current });
     } else if (msg.kind === 'send') send(msg.e);
-    else if (msg.kind === 'watched') recordWatched(msg.title, msg.pos);
+    else if (msg.kind === 'watched') recordWatched(msg.title, msg.pos, msg.dur);
     else if (msg.kind === 'ptt') {
       if (plusRef.current || !msg.down) void callRef.current?.talk(msg.down);
     }
@@ -273,7 +290,13 @@ export const StreamHubProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const partnerWatching = active && Date.now() - partnerSeen < 50000;
   const [audioBlocked, setAudioBlocked] = useState(false);
 
-  const value: StreamHubValue = { extension, active, partnerWatching, call, view, camsOpen: !!pip, openCams, log };
+  // (the demo: a few things already on the shelf)
+  const shownLog = useMemo<TogetherLog>(
+    () => (demo ? { seen: log.seen, shows: { ...demoStreamShows(Date.now(), partnerUser?.id || 'demo-partner').shows, ...log.shows } } : log),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [demo, log, partnerUser?.id]
+  );
+  const value: StreamHubValue = { extension, active, partnerWatching, call, view, camsOpen: !!pip, openCams, log: shownLog, saveTape };
   const partnerName = partnerUser?.name || 'your person';
 
   return (

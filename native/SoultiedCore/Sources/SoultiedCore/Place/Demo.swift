@@ -41,6 +41,8 @@ public enum Demo {
         db.seed("\(p)/meta/decor", ["earned": ["welcome": 240], "bought": Doc(), "placed": Doc(), "petNames": ["ginger": "Biscuit"]])
         // Biscuit: nine days looked after together, and Rohan's fed Biscuit this morning
         db.seed("\(p)/meta/pet", PetDoc.demo(today: today, now: nowMs).doc)
+        // part way through a YouTube video (Rohan carried on with it), an episode of Dark and one of Good Omens
+        db.seed("\(p)/meta/stream", Tapes.demo(now: nowMs, them: them))
         db.seed("\(p)/meta/moods", ["by": [them: ["mood": "missing", "text": "counting the days", "at": nowMs - 2 * 3600e3]], "seen": Doc()])
         db.seed("\(p)/meta/touch", ["items": Doc(), "seen": Doc()])
         // Rohan's taken today's photo (the view from his window)

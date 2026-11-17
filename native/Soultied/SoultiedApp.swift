@@ -69,6 +69,8 @@ enum Launch {
     static var theme: String? { value("-theme") }
     /// -christmas   Christmas in the room out of season (the screenshots)
     static var christmas: Bool { args.contains("-christmas") }
+    /// -onCall   as if on FaceTime: the top corner kept clear, with the frame showing where the video fits
+    static var onCall: Bool { args.contains("-onCall") }
     /// -tour 0   show the first-run tour, at that step (the screenshots; the demo room never shows it otherwise)
     static var tour: Int? { value("-tour").flatMap { Int($0) } }
     /// -record   in the demo room, put the jazz record on; -song <link>, a song from YouTube instead
@@ -136,7 +138,11 @@ struct RootView: View {
             if Launch.demo { app.openDemo() } else { app.start() }
         }
         .onChange(of: phase) { _, now in
-            if now == .active { app.place?.heartbeat() }
+            if now == .active {
+                app.place?.heartbeat()
+                // on FaceTime? show where its little window fits (CallWatch.swift)
+                CallWatch.shared.refresh(flash: true)
+            }
         }
         // signed out, or out of the place: the home-screen widgets go back to asking you to open the app
         .onChange(of: app.phase) { _, now in

@@ -14,7 +14,8 @@ import type { UserProfile } from './types';
 import type { GameKind, Match } from './games/types';
 import { prettyDate } from './letters/engine';
 import { COUCH_STEPS, FIRE_NAMES } from './couch';
-import { StreamChip, StreamHubProvider } from './stream/StreamHub';
+import { StreamChip, StreamHubProvider, useStreamHub } from './stream/StreamHub';
+import { continueTapes, tapeTitle } from './watch/tapes';
 import { GamesProvider, useGames } from './games/GamesContext';
 import { GAMES, otherSeat } from './games/types';
 import { noteFor, waitingLabel } from './games/registry';
@@ -167,6 +168,9 @@ const Home: React.FC = () => {
   const turntable = useTurntable();
   const decor = useDecor();
   const pet = usePet();
+  // Continue watching: the remote on the coffee table offers the last thing you were part way through
+  const hub = useStreamHub();
+  const lastTape = useMemo(() => (hub ? continueTapes(hub.log, Date.now(), 1)[0] : undefined), [hub?.log]);
   // Christmas, 1 December to 6 January (unless it's been turned off on this browser)
   const xmasSeason = christmasSeason(today) || christmasForced();
   const [xmasOff, setXmasOff] = useState(christmasOff);
@@ -256,7 +260,7 @@ const Home: React.FC = () => {
           ? 'Embers · both show up today to light it again'
           : `${FIRE_NAMES[fire.level]} · ${fire.streak} ${fire.streak === 1 ? 'day' : 'days'} in a row`,
       photo: 'Us',
-      remote: 'Watch something together',
+      remote: lastTape ? `Watch together · carry on with ${tapeTitle(lastTape)}` : 'Watch something together',
       door: 'The dark door',
       games: games.waiting.length
         ? games.waiting
@@ -292,7 +296,7 @@ const Home: React.FC = () => {
     if (guest) l.right = guest.id === currentUser.id ? meLabel : themLabel(guest);
     else l.right = `Invite ${space?.partnerPlaceholderName || 'your person'}`;
     return l;
-  }, [welcomeOpen, seatsEmpty, letterBadge, partnerSealed, partnerUser, currentUser, host, guest, space, games.waiting, turntable.on, turntable.track, journeyWaiting, journey.next, journey.unseen, panel, askWaiting, asks.forMe.length, myMood, theirMood, wallNews, pinnedWhat, decor.petName, decor.shown.pet, pet.view.mood, fire.level, fire.streak, snap.stage]);
+  }, [welcomeOpen, seatsEmpty, letterBadge, partnerSealed, partnerUser, currentUser, host, guest, space, games.waiting, turntable.on, turntable.track, journeyWaiting, journey.next, journey.unseen, panel, askWaiting, asks.forMe.length, myMood, theirMood, wallNews, pinnedWhat, decor.petName, decor.shown.pet, pet.view.mood, fire.level, fire.streak, snap.stage, lastTape]);
 
   const onHotspot = (id: HotspotId) => {
     roomSound(id);
