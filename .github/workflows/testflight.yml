@@ -4,7 +4,8 @@
 #
 # Uses the same App Store Connect key as ios.yml, plus two secrets under Settings > Secrets and variables > Actions:
 #   REVIEW_PHONE  a phone number Apple's beta reviewer can call, like +919812345678
-#   TESTER_EMAIL  the email TestFlight sends the invite to (also shown to testers for feedback)
+#   TESTER_EMAIL  the email(s) TestFlight sends invites to, separated by commas (the first is also shown to testers
+#                 for feedback)
 # They're secrets so they stay out of this public repo.
 name: TestFlight for friends and family
 

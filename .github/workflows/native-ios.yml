@@ -204,6 +204,9 @@ jobs:
           shot pet -demo -open pet
           # the pet you both raise, on Home: Rohan's been by, so it's your turn
           shot home-pet -demo -tab home -scrollHome pet
+          # Christmas (1 December to 6 January): the room decorated, red and green, and the switch to take it down
+          shot christmas -demo -tab home -christmas
+          shot christmas-looks -demo -tab us -looks -christmas
           # turned sideways as a show starts: Netflix stays up (it used to close for the room)
           shot stream-sideways -demo -tab watch -service netflix -stream netflix -sideways
           # the Starlight look

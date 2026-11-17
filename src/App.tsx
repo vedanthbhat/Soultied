@@ -26,6 +26,7 @@ import { RanksProvider } from './together/RanksContext';
 import { PetProvider, usePet } from './together/PetContext';
 import { petCareState } from './together/pet';
 import { PetCard } from './components/PetCard';
+import { christmasForced, christmasOff, christmasSeason, setChristmasOff } from './season';
 import { type TouchKind, moodGlyph, moodLine, touchDef, touchSummary } from './together/moods';
 import { MeCard, ThemCard, ago } from './components/SeatCard';
 import { HoldCouch } from './components/HoldCouch';
@@ -166,6 +167,13 @@ const Home: React.FC = () => {
   const turntable = useTurntable();
   const decor = useDecor();
   const pet = usePet();
+  // Christmas, 1 December to 6 January (unless it's been turned off on this browser)
+  const xmasSeason = christmasSeason(today) || christmasForced();
+  const [xmasOff, setXmasOff] = useState(christmasOff);
+  const christmas = xmasSeason && !xmasOff;
+  useEffect(() => {
+    document.documentElement.toggleAttribute('data-festive', christmas);
+  }, [christmas]);
   const together = useTogether();
   const { asks, myMood, theirMood, roomTouch, touchNews, moodNews, lastSent, board, wallNews, snap } = together;
   // which part of the wall opens (the photos, for today's photo)
@@ -503,6 +511,7 @@ const Home: React.FC = () => {
         touch={playTouch}
         pop={seatPop || petPop}
         petCare={welcomeOpen ? null : petCareState(pet.view)}
+        christmas={christmas}
         scoot={scootGo}
         onScooted={(c) => {
           if (scootPending && c * COUCH_STEPS >= couchLevel - 1e-6) {
@@ -669,6 +678,17 @@ const Home: React.FC = () => {
         <>
           <TopNav
             letterUnread={letterUnread}
+            christmas={
+              xmasSeason
+                ? {
+                    on: christmas,
+                    toggle: () => {
+                      setChristmasOff(christmas);
+                      setXmasOff(christmas);
+                    },
+                  }
+                : null
+            }
             onPet={() => {
               openPanel(null);
               setSeatCard('pet');

@@ -14,7 +14,12 @@ import { usePet } from '../together/PetContext';
  * the top edge (or when anything inside it gets keyboard focus). On touch
  * screens a small tab stays visible to open it.
  */
-export const TopNav: React.FC<{ letterUnread: boolean; onPet?: () => void }> = ({ letterUnread, onPet }) => {
+export const TopNav: React.FC<{
+  letterUnread: boolean;
+  onPet?: () => void;
+  /** in December: Christmas in the room, and whether it's on here */
+  christmas?: { on: boolean; toggle: () => void } | null;
+}> = ({ letterUnread, onPet, christmas }) => {
   const { space, currentUser, partnerUser, panel, openPanel, switchActiveUser, cloudMode } = useApp();
   const { waiting } = useGames();
   const turntable = useTurntable();
@@ -188,6 +193,16 @@ export const TopNav: React.FC<{ letterUnread: boolean; onPet?: () => void }> = (
               >
                 {quiet ? 'Sound off' : 'Sound on'}
               </button>
+              {christmas && (
+                <button
+                  className="px-btn px-btn--paper px-btn--small"
+                  aria-pressed={christmas.on}
+                  title={christmas.on ? 'Take the Christmas decorations down (just on this screen)' : 'Put the Christmas decorations back up'}
+                  onClick={christmas.toggle}
+                >
+                  {christmas.on ? 'Christmas ✦' : 'Christmas off'}
+                </button>
+              )}
               <span className="hidden lg:flex items-center gap-2 text-sm text-[var(--muted)]">
                 <span className={`inline-block w-2.5 h-2.5 ${partnerUser?.status === 'online' ? 'bg-[var(--sage)]' : 'bg-[#b9a98f]'}`} />
                 {presence}

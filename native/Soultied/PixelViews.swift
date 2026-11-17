@@ -29,6 +29,24 @@ enum Pixels {
     }
 
     static var heads: [String: CGImage] = [:]
+
+    /// head and shoulders, cut out: the top 24 × 24 of the character from just above the head (hats and all), with
+    /// nothing behind it (the website's AvatarThumb region "bust")
+    static func bust(_ a: AvatarConfig) -> CGImage? {
+        let key = "bust\(a.hashValue)"
+        if let c = heads[key] { return c }
+        let r = renderCharacter(a, .stand)
+        let top = r.headTop - 7, w = r.buf.w
+        var out = [UInt8](repeating: 0, count: w * 24 * 4)
+        for y in 0..<24 where top + y >= 0 && top + y < r.buf.h {
+            let from = ((top + y) * w) * 4
+            out.replaceSubrange((y * w * 4)..<((y + 1) * w * 4), with: r.buf.data[from..<(from + w * 4)])
+        }
+        let c = image(out, w, 24)
+        if heads.count > 50 { heads.removeAll() }
+        heads[key] = c
+        return c
+    }
     /// a character's head and shoulders, for avatars beside names
     static func head(_ a: AvatarConfig) -> CGImage? {
         let key = "\(a.hashValue)"
@@ -92,6 +110,18 @@ struct HeadView: View {
             .frame(width: size, height: size)
             .background(Color.paper2)
             .clipped()
+            .accessibilityHidden(true)
+    }
+}
+
+/// someone's head and shoulders, cut out (no square behind them): the cards for you and your person, and the
+/// couples board
+struct BustView: View {
+    let look: AvatarConfig
+    var size: CGFloat = 36
+    var body: some View {
+        PixelImage(image: Pixels.bust(look), scale: size / 24)
+            .frame(width: size, height: size)
             .accessibilityHidden(true)
     }
 }

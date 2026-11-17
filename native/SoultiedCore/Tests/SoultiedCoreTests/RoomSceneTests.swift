@@ -29,7 +29,7 @@ final class RoomSceneTests: XCTestCase {
             i >= 0 ? Seat(avatar: ls[i], name: "x", status: SeatStatus(rawValue: status ?? "online")!) : .empty
         }
         let scenes = fx["scenes"] as! [Doc]
-        XCTAssertEqual(scenes.count, 21)
+        XCTAssertEqual(scenes.count, 24)
         let renderer = RoomRenderer()
         var bad: [String] = []
         for (n, s) in scenes.enumerated() {
@@ -59,6 +59,7 @@ final class RoomSceneTests: XCTestCase {
                 st.wallArt = WallArtPixels(w: a.int("w")!, h: a.int("h")!, pal: (a["pal"] as! [String]).map { RGB($0) }, px: a.str("px")!)
             }
             st.wallNews = s["wallNews"] as? Bool ?? false
+            st.christmas = s["christmas"] as? Bool ?? false
             if let pc = s["petCare"] as? Doc {
                 st.petCare = PetCareState(fed: pc.bool("fed"), played: pc.bool("played"), cuddled: pc.bool("cuddled"), both: pc.bool("both"), waiting: pc.bool("waiting"), level: pc.int("level")!)
             }
@@ -66,6 +67,14 @@ final class RoomSceneTests: XCTestCase {
             if Double(fnv(buf.data, 0x811C_9DC5)) != s.num("hash")! { bad.append("scene \(n) (flame \(st.flame), t \(s.num("t")!))") }
         }
         XCTAssertEqual(bad, [])
+    }
+
+    /// Christmas: 1 December to 6 January
+    func testChristmas() throws {
+        let (fx, _) = try fixtures()
+        let days = fx["seasons"] as! [[Any]]
+        XCTAssertGreaterThan(days.count, 50)
+        for d in days { XCTAssertEqual(Season.christmas(d[0] as! String), d[1] as? Bool, d[0] as! String) }
     }
 
     func testTheFire() throws {

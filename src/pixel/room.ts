@@ -56,6 +56,9 @@ export interface RoomState {
   wallNews?: boolean;
   /** how the pet's been looked after today (see together/pet.ts): its bowl, ball, blanket, hearts and cushion */
   petCare?: PetCareState | null;
+  /** Christmas (see season.ts): a tree where the plant was, fairy lights on the mantel, stockings, a wreath on the
+   *  dark door, and snow outside */
+  christmas?: boolean;
 }
 
 export interface RoomTouch {
@@ -2187,6 +2190,126 @@ function drawForeground(L: Layer, plant: string) {
 }
 
 /* ------------------------------------------------------------------------ */
+/*  Christmas                                                                 */
+/* ------------------------------------------------------------------------ */
+
+const XMAS_BULBS = ['#ff5a4f', '#ffd36b', '#7ee08a', '#7fb2ff', '#ff9ad5'];
+
+/** a bulb's on most of the time, each to its own rhythm */
+const bulbOn = (t: number, k: number) => Math.sin(t * 2.3 + k * 1.7) > -0.55;
+
+/** fairy lights in three swags under the mantel shelf, two stockings hung from it, and a wreath on the dark door */
+function drawXmasMantel(L: Layer, t: number) {
+  const x0 = FIRE.cx - 34;
+  const x1 = FIRE.cx + 33;
+  const span = (x1 - x0 + 1) / 3;
+  for (let x = x0; x <= x1; x++) {
+    const u = ((x - x0) % span) / span;
+    const y = 61 + Math.round(Math.sin(u * Math.PI) * 3);
+    L.set(x, y, '#2a2620');
+    if ((x - x0) % 4 === 2) {
+      const k = (x - x0) >> 2;
+      const c = XMAS_BULBS[k % XMAS_BULBS.length];
+      if (bulbOn(t, k)) L.glow(x, y + 1, c);
+      else L.set(x, y + 1, mix(c, '#2a2620', 0.6));
+    }
+  }
+  // a little tree at the end of the mantel, past the candles (the one the phone's close-up shows)
+  const mx = FIRE.cx + 29;
+  const mini = ['...s...', '...g...', '..ggg..', '.gGggg.', '..ggg..', '.gggGg.', 'ggggggg', '..bbb..'];
+  mini.forEach((row, j) =>
+    [...row].forEach((k, i) => {
+      if (k === '.') return;
+      if (k === 's') L.glow(mx - 3 + i, 46 + j, '#ffd36b');
+      else L.set(mx - 3 + i, 46 + j, k === 'b' ? '#b23a32' : k === 'G' ? (bulbOn(t, i + j) ? '#ff5a4f' : '#7a2a24') : (i + j) % 2 ? '#2f6b3a' : '#244f2e');
+    })
+  );
+  // the stockings: one each, toes out
+  drawStocking(L, FIRE.cx - 23, '#c0392b', '#8e2a20', -1);
+  drawStocking(L, FIRE.cx + 17, '#2e7d4f', '#1f5a37', 1);
+  // the wreath, high on the dark door: a ring of greens, red berries, a red bow at the bottom
+  const cx = DOOR.x + 12;
+  const cy = DOOR.y + 14;
+  for (let j = -5; j <= 5; j++)
+    for (let i = -5; i <= 5; i++) {
+      const r = i * i + j * j;
+      if (r > 27 || r < 7) continue;
+      L.set(cx + i, cy + j, (i * 3 + j * 5 + 40) % 4 < 2 ? '#2f6b3a' : r > 20 ? '#1f4d2c' : '#4f8f4a');
+    }
+  for (const [i, j] of [[-4, -2], [3, -4], [4, 2], [-2, 4], [0, -5]]) L.set(cx + i, cy + j, '#d9443a');
+  L.rect(cx - 2, cy + 4, 5, 2, '#c0392b');
+  L.set(cx, cy + 4, '#e86a5a');
+  L.set(cx - 2, cy + 6, '#8e2a20');
+  L.set(cx + 2, cy + 6, '#8e2a20');
+}
+
+/** a stocking hung from the mantel at x, its toe pointing `dir` (-1 left, 1 right) */
+function drawStocking(L: Layer, x: number, c: string, cd: string, dir: number) {
+  L.set(x + 2, 61, '#e9e2d4');
+  // the furry cuff, then the leg, then the foot
+  L.rect(x, 62, 6, 2, '#efe8dc');
+  L.hline(x, 63, 6, '#d6cdbd');
+  L.rect(x, 64, 6, 7, c);
+  L.vline(dir < 0 ? x + 5 : x, 64, 7, cd);
+  const fx = dir < 0 ? x - 3 : x;
+  L.rect(fx, 71, 9, 2, c);
+  L.hline(fx + 1, 73, 7, cd);
+  // a stripe across the leg
+  L.hline(x, 67, 6, '#efe8dc');
+}
+
+/** the Christmas tree, where the plant was (a little further in, so a narrower screen still shows it): three tiers
+ *  of fir, baubles, twinkling lights, a star on top, and presents at its foot */
+function drawXmasTree(L: Layer, t: number) {
+  const cx = 50;
+  const top = 110;
+  const half = (j: number) => (j < 12 ? 1 + Math.floor(j * 0.6) : j < 25 ? 4 + Math.floor((j - 12) * 0.6) : 7 + Math.floor((j - 25) * 0.6));
+  for (let j = 0; j < 40; j++) {
+    const h = half(j);
+    for (let i = -h; i <= h; i++) {
+      const edge = i === -h || i === h;
+      const lit = i < -h / 3;
+      const dither = (i + j) % 3 === 0;
+      L.set(cx + i, top + j, edge ? '#1a3f25' : lit ? (dither ? '#3f7d45' : '#4f8f4a') : dither ? '#244f2e' : '#2f6b3a');
+    }
+  }
+  // the trunk and its pot, wrapped like a present
+  L.rect(cx - 1, top + 40, 3, 2, '#5a3a2c');
+  L.rect(cx - 9, top + 42, 18, 16, '#b23a32');
+  L.hline(cx - 10, top + 41, 20, '#cf5a4a');
+  L.hline(cx - 10, top + 42, 20, '#cf5a4a');
+  L.vline(cx + 7, top + 43, 15, '#8e2a20');
+  L.vline(cx, top + 41, 17, '#e2b359');
+  L.hline(cx - 9, top + 49, 18, '#e2b359');
+  // a present beside it
+  L.rect(cx + 12, top + 50, 10, 8, '#2e7d4f');
+  L.hline(cx + 12, top + 50, 10, '#4f9f6a');
+  L.vline(cx + 16, top + 50, 8, '#e9e2d4');
+  L.set(cx + 15, top + 49, '#e9e2d4');
+  L.set(cx + 17, top + 49, '#e9e2d4');
+  // baubles
+  const baubles: Array<[number, number, string]> = [[-3, 14, '#d9443a'], [4, 20, '#e2b359'], [-6, 27, '#7fb2ff'], [2, 31, '#d9443a'], [9, 35, '#e2b359'], [-10, 36, '#d9443a'], [6, 9, '#7fb2ff']];
+  for (const [i, j, c] of baubles) {
+    L.set(cx + i, top + j, c);
+    L.set(cx + i + 1, top + j, c);
+    L.set(cx + i, top + j + 1, mix(c, '#000000', 0.25));
+    L.set(cx + i + 1, top + j + 1, mix(c, '#000000', 0.25));
+    L.set(cx + i, top + j, mix(c, '#ffffff', 0.45));
+  }
+  // lights, in loose garlands across the tiers
+  for (let k = 0; k < 18; k++) {
+    const j = 4 + ((k * 7) % 35);
+    const h = half(j) - 1;
+    const i = -h + ((k * 5) % (2 * h + 1));
+    if (bulbOn(t, k + 3)) L.glow(cx + i, top + j, XMAS_BULBS[k % XMAS_BULBS.length]);
+  }
+  // the star
+  const tw = Math.sin(t * 3) > 0.6;
+  for (const [i, j] of [[0, -4], [-1, -3], [0, -3], [1, -3], [-2, -2], [-1, -2], [0, -2], [1, -2], [2, -2], [-1, -1], [1, -1], [0, -1]])
+    L.glow(cx + i, top + j, tw && i === 0 && j === -2 ? '#fffbe0' : '#ffd36b');
+}
+
+/* ------------------------------------------------------------------------ */
 /*  Lighting                                                                  */
 /* ------------------------------------------------------------------------ */
 
@@ -2292,12 +2415,16 @@ const FRAME = new Layer(ROOM_W, ROOM_H);
 /** Draw one frame of the room for time `t` (seconds). */
 export function renderRoom(state: RoomState, t: number): PixelBuffer {
   const L = FRAME;
-  const d = state.decor || START_DECOR;
+  const d0 = state.decor || START_DECOR;
+  // (Christmas: snow outside, whatever the view; never in the catalogue's pictures)
+  const xmas = !!state.christmas && !state.bare;
+  const d = xmas && d0.view !== 'snow' ? { ...d0, view: 'snow' } : d0;
   L.copyFrom(staticLayer(d));
   drawPainting(L, d.painting, state);
   drawWallArt(L, state, t);
   drawFire(L, t, state.fire, state);
   drawDoorGlow(L, t, state.hover === 'door');
+  if (xmas) drawXmasMantel(L, t);
   drawCandles(L, t);
   drawWeather(L, t, d.view);
   drawPhotoPortrait(L, state);
@@ -2359,7 +2486,8 @@ export function renderRoom(state: RoomState, t: number): PixelBuffer {
   drawTable(L);
   drawSteam(L, t);
   drawLetter(L, t, state.letterUnread, state.hover === 'letter');
-  drawForeground(L, d.plant);
+  if (xmas) drawXmasTree(L, t);
+  else drawForeground(L, d.plant);
 
   applyLighting(L, t, state.fire, state);
   return L;

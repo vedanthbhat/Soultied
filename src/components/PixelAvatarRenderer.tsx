@@ -76,7 +76,8 @@ export const PixelAvatarRenderer: React.FC<PixelAvatarProps> = ({
   );
 };
 
-export type ThumbRegion = 'head' | 'torso' | 'legs' | 'feet' | 'full';
+/** 'bust': head and shoulders, cut out (no square behind it) */
+export type ThumbRegion = 'head' | 'bust' | 'torso' | 'legs' | 'feet' | 'full';
 
 /** Cropped render of an avatar, used for wardrobe option buttons. */
 export const AvatarThumb: React.FC<{ config: AvatarConfig; region: ThumbRegion; size?: number }> = ({
@@ -91,6 +92,8 @@ export const AvatarThumb: React.FC<{ config: AvatarConfig; region: ThumbRegion; 
     const box =
       region === 'head'
         ? { x: 3, y: headTop - 7, w: 18, h: 18 }
+        : region === 'bust'
+        ? { x: 0, y: headTop - 7, w: 24, h: 24 }
         : region === 'torso'
         ? { x: 3, y: headTop + 8, w: 18, h: 18 }
         : region === 'legs'

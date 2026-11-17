@@ -221,7 +221,7 @@ struct AsksCard: View {
         if let a = v.forMe.first {
             Button(action: open) {
                 HStack(alignment: .top, spacing: 14) {
-                    if let l = place.theirLook { HeadView(look: l, size: 44).nudge(every: 4, phase: 0.3) }
+                    if let l = place.theirLook { BustView(look: l, size: 48).nudge(every: 4, phase: 0.3) }
                     VStack(alignment: .leading, spacing: 6) {
                         Text("\(place.theirName) asked you").font(.px(14, 600)).foregroundStyle(Color.muted)
                         Text(a.prompt).font(.pxBodyBold).foregroundStyle(Color.inkSoft).multilineTextAlignment(.leading)

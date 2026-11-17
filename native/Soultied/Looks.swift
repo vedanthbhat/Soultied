@@ -5,7 +5,8 @@ import SoultiedCore
  * The app's two looks. Cozy: paper cards and terracotta around the room's warm dark, like the website.
  * Starlight: the dusk-by-the-sea sky from Soultied's videos and store art, deep purple with pixel stars and a
  * moon, lavender moon-paper cards and violet buttons. The room itself is the same in both. Each phone keeps its
- * own look; Us > The app's look switches it.
+ * own look; Us > The app's look switches it. At Christmas (1 December to 6 January) the room's decorated and the
+ * Cozy look goes red and green; the same card has a switch to take it down.
  */
 
 enum AppLook: String, CaseIterable, Identifiable {
@@ -57,7 +58,19 @@ struct Palette {
     let bar: Color
 
     /// the look that's on
-    static var now: Palette = AppLook.saved().palette
+    static var now: Palette = Looks.palette(AppLook.saved(), christmas: Looks.christmasAtLaunch())
+
+    /// the Cozy look at Christmas (Season.swift): terracotta and sage turn Christmas red and pine, like the
+    /// website's [data-festive]
+    func christmas() -> Palette {
+        Palette(
+            ink: ink, inkSoft: inkSoft, inkDeep: inkDeep, muted: muted, paper: paper, paper2: paper2, paperShade: paperShade,
+            paperHi: paperHi, paperInput: paperInput,
+            terracotta: Color(hex: "#b8433a"), terracottaD: Color(hex: "#8e2f28"), sage: Color(hex: "#5f8a5a"), sageD: Color(hex: "#46704a"),
+            thread: Color(hex: "#b23a32"), butter: butter, cream: cream, room: room, roomBrown: roomBrown, night: night,
+            disabled: disabled, disabledD: disabledD, bubbleMine: bubbleMine, bar: bar
+        )
+    }
 
     static let cozy = Palette(
         ink: Color(hex: "#2b1e1c"), inkSoft: Color(hex: "#3a2a26"), inkDeep: Color(hex: "#241816"), muted: Color(hex: "#7a5a48"),
@@ -86,13 +99,34 @@ struct Palette {
 final class Looks {
     static let shared = Looks()
     private(set) var look = AppLook.saved()
+    /// Christmas taken down on this phone
+    private(set) var christmasOff = UserDefaults.standard.bool(forKey: Looks.christmasKey)
     private init() {}
+
+    fileprivate static let christmasKey = "soultied_christmas_off"
+
+    /// 1 December to 6 January (-christmas for the screenshots)
+    static func christmasSeason() -> Bool { Launch.christmas || Season.christmas(Day.today()) }
+    static func christmasAtLaunch() -> Bool { christmasSeason() && !UserDefaults.standard.bool(forKey: christmasKey) }
+    static func palette(_ l: AppLook, christmas: Bool) -> Palette { christmas && l == .cozy ? l.palette.christmas() : l.palette }
+
+    /// Christmas in the room (and, in the Cozy look, the app's red and green)
+    var christmas: Bool { Looks.christmasSeason() && !christmasOff }
+    /// what the app's drawn in: a change draws it all again (SoultiedApp)
+    var drawnIn: String { look.rawValue + (christmas && look == .cozy ? "-christmas" : "") }
 
     func choose(_ l: AppLook) {
         guard l != look else { return }
         UserDefaults.standard.set(l.rawValue, forKey: AppLook.key)
-        Palette.now = l.palette
+        Palette.now = Looks.palette(l, christmas: christmas)
         look = l
+    }
+
+    func setChristmas(_ on: Bool) {
+        guard on == christmasOff else { return }
+        UserDefaults.standard.set(!on, forKey: Looks.christmasKey)
+        christmasOff = !on
+        Palette.now = Looks.palette(look, christmas: christmas)
     }
 }
 
@@ -213,6 +247,22 @@ struct LookPicker: View {
             Text("Just for this phone. The room looks the same in both.").font(.pxSmall).foregroundStyle(Color.muted)
             HStack(spacing: 10) {
                 ForEach(AppLook.allCases) { swatch($0) }
+            }
+            // in December: Christmas in the room, and in the Cozy look the app's red and green
+            if Looks.christmasSeason() {
+                Toggle(isOn: Binding(get: { looks.christmas }, set: { on in
+                    Haptics.select()
+                    MainView.resume = .us
+                    MainView.showLooks = true
+                    withAnimation(.easeInOut(duration: 0.35)) { looks.setChristmas(on) }
+                })) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Christmas").font(.pxBodyBold).foregroundStyle(Color.inkSoft)
+                        Text("A tree, fairy lights and stockings in the room, snow outside. Just for this phone.").font(.pxTiny).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .tint(Color.sage)
+                .padding(.top, 4)
             }
         }
         .pxCard()

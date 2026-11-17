@@ -127,6 +127,7 @@ struct RoomScene: View {
         st.gamesWaiting = !place.gamesWaiting.isEmpty
         st.music = place.recordOn
         st.petCare = place.petView?.careState
+        st.christmas = Looks.shared.christmas
         return st
     }
 

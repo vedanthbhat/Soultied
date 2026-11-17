@@ -368,7 +368,7 @@ struct MeSheet: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 HStack(spacing: 12) {
-                    HeadView(look: place.myLook, size: 44)
+                    BustView(look: place.myLook, size: 48)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(place.myName).font(.pxHeading).foregroundStyle(Color.inkSoft)
                         Text(place.myMood.map { "You’re \($0.line)" } ?? "How are you feeling?").font(.pxSmall).foregroundStyle(Color.muted)
@@ -427,7 +427,7 @@ struct ThemSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 12) {
-                if let l = place.theirLook { HeadView(look: l, size: 44) }
+                if let l = place.theirLook { BustView(look: l, size: 48) }
                 VStack(alignment: .leading, spacing: 2) {
                     Text(place.theirName).font(.pxHeading).foregroundStyle(Color.inkSoft)
                     Text(statusLine).font(.pxSmall).foregroundStyle(Color.muted)

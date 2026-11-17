@@ -31,6 +31,7 @@ import { renderRoom, type RoomState } from '../src/pixel/room';
 import { START_DECOR } from '../src/decor/catalogue';
 import { fireOf, type CouchState } from '../src/couch';
 import { daysLeft, normalizeVisit, visitLine } from '../src/together/visit';
+import { christmasSeason } from '../src/season';
 import { PET_ACTS, carePatch, demoPet, missingDays, normalizePet, petLevel, petLevelUp, petLine, petReaction, petView, petCareState } from '../src/together/pet';
 import { SNAP_PROMPTS, normalizeSnap, snapPrompt, snapStage } from '../src/together/snap';
 import { type RecapInput, monthRecap, recapMonth } from '../src/together/recap';
@@ -553,6 +554,10 @@ const roomScenes: RoomScene[] = [];
     { left: 6, right: 7, t: 6.1, petCare: { fed: true, played: false, cuddled: false, both: false, waiting: false, level: 4 }, decor: { pet: 'fox' } },
     { left: 8, right: 9, t: 9.42, petCare: { fed: true, played: true, cuddled: true, both: false, waiting: true, level: 1 }, decor: { pet: 'none' } },
     { left: 1, right: 0, t: 4.8, petCare: { fed: false, played: true, cuddled: false, both: true, waiting: false, level: 1 }, decor: { pet: 'bunny' }, bare: true },
+    // Christmas: the tree, the lights and stockings, the wreath, snow whatever the view (not in the catalogue's pictures)
+    { left: 0, right: 1, t: 2.35, christmas: true },
+    { left: 3, right: 4, t: 5.55, christmas: true, closeness: 0.6, decor: { view: 'rain', plant: 'cactus', pet: 'pug' }, petCare: { fed: true, played: true, cuddled: true, both: true, waiting: false, level: 3 } },
+    { left: 5, right: -1, t: 0.9, christmas: true, bare: true, decor: { view: 'aurora' } },
   ];
   const seat = (l: number, status = 'online') => (l >= 0 ? { avatar: looks[l], name: 'x', status } : { avatar: null, name: '', status: 'empty' });
   for (const sc of scenes) {
@@ -576,6 +581,7 @@ const roomScenes: RoomScene[] = [];
       wallArt: sc.wallArt || null,
       wallNews: !!sc.wallNews,
       petCare: sc.petCare || null,
+      christmas: !!sc.christmas,
     } as unknown as RoomState;
     roomScenes.push({ ...sc, hash: fnv(renderRoom(st, sc.t).data, 0x811c9dc5) });
   }
@@ -660,6 +666,14 @@ const pets: Array<{ raw: unknown; doc: unknown; cases: unknown[] }> = [];
     pets.push({ raw, doc: d, cases });
   }
 }
+// Christmas: which days it's on
+const seasons: Array<[string, boolean]> = [];
+for (let i = -5; i < 48; i++) {
+  const day = addDays('2026-11-25', i);
+  seasons.push([day, christmasSeason(day)]);
+}
+for (const day of ['2027-01-07', '2026-07-15', '2028-12-31', '2029-01-01', '2026-02-06']) seasons.push([day, christmasSeason(day)]);
+
 const petWords = {
   levels: [0, 1, 2, 3, 4, 6, 7, 13, 14, 29, 30, 31, 400].map((n) => [n, petLevel(n)]),
   reactions: PET_ACTS.map((a) => [a, petReaction(a, 'Biscuit'), petReaction(a, 'your duckling')]),
@@ -868,5 +882,5 @@ const ranks = {
 };
 
 const out = process.argv[2] || 'native-fixtures.json';
-writeFileSync(out, JSON.stringify({ cards, days, hashes, rngSeq, streaks, demo, same, chapters, games, live, doodle: { judges, brushes, fills, choices, games: doodles }, coasters: coasterSteps, escape, record, watch: { looks, ...watch }, wall: { doodles: wallDoodles }, room: { scenes: roomScenes, fires, visits }, snaps, recaps: { cases: recaps, months: recapMonths }, wheres, buckets, voices, carromFrames, ranks, pet: { docs: pets, ...petWords } }));
+writeFileSync(out, JSON.stringify({ cards, days, hashes, rngSeq, streaks, demo, same, chapters, games, live, doodle: { judges, brushes, fills, choices, games: doodles }, coasters: coasterSteps, escape, record, watch: { looks, ...watch }, wall: { doodles: wallDoodles }, room: { scenes: roomScenes, fires, visits, seasons }, snaps, recaps: { cases: recaps, months: recapMonths }, wheres, buckets, voices, carromFrames, ranks, pet: { docs: pets, ...petWords } }));
 console.log(`wrote ${cards.length} card days, ${streaks.length} streaks, ${demo.length} demo rooms, ${games.length} game moves, ${live.length} live games, ${doodles.length} doodle moves to ${out}`);

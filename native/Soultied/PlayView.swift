@@ -173,7 +173,8 @@ struct UpNextCard: View {
     }
 }
 
-/// every game as a tile: the ones you play whenever you like (and the escape rooms), then the live ones
+/// every game as a tile: while your person's here right now, the live ones first; otherwise the ones you play
+/// whenever you like (and the escape rooms) first
 struct GameGrid: View {
     let place: PlaceModel
     var open: (GameKind) -> Void
@@ -181,19 +182,36 @@ struct GameGrid: View {
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 10), count: 3)
     private var ready: Bool { place.partnerHere || place.isDemo }
+    private var here: Bool { place.them.map { place.status($0) == .online } ?? false }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            label("Anytime", "take turns whenever you’re here")
-            LazyVGrid(columns: columns, spacing: 10) {
-                ForEach(TURN_GAMES) { k in tile(k) }
-                GameTile(title: "Escape rooms", glyph: Icons.door, color: GameColors.escape, tag: nil, action: escape)
+            if here {
+                live(first: true)
+                anytime(first: false)
+            } else {
+                anytime(first: true)
+                live(first: false)
             }
-            label("Live", "when you’re both here at once")
-                .padding(.top, 4)
-            LazyVGrid(columns: columns, spacing: 10) {
-                ForEach(LIVE_GAMES) { k in tile(k) }
-            }
+        }
+    }
+
+    @ViewBuilder
+    private func anytime(first: Bool) -> some View {
+        label("Anytime", "take turns whenever you’re here")
+            .padding(.top, first ? 0 : 4)
+        LazyVGrid(columns: columns, spacing: 10) {
+            ForEach(TURN_GAMES) { k in tile(k) }
+            GameTile(title: "Escape rooms", glyph: Icons.door, color: GameColors.escape, tag: nil, action: escape)
+        }
+    }
+
+    @ViewBuilder
+    private func live(first: Bool) -> some View {
+        label("Live", first ? "\(place.theirName) is here: play together now" : "when you’re both here at once")
+            .padding(.top, first ? 0 : 4)
+        LazyVGrid(columns: columns, spacing: 10) {
+            ForEach(LIVE_GAMES) { k in tile(k) }
         }
     }
 

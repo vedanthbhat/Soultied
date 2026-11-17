@@ -13,7 +13,7 @@ import { useTogether } from '../../together/TogetherContext';
 import { usePlus } from '../../plus/usePlus';
 import { PlusUpsell } from '../PlusUpsell';
 
-export type LettersTab = 'today' | 'journey' | 'ask' | 'afterdark' | 'past';
+export type LettersTab = 'today' | 'journey' | 'afterdark' | 'ask' | 'past';
 
 /* ---------- streak ---------- */
 
@@ -377,8 +377,8 @@ export const LettersPanel: React.FC<{ initialTab?: LettersTab }> = ({ initialTab
   const tabs: Array<{ id: LettersTab; label: string }> = [
     { id: 'today', label: 'Today' },
     { id: 'journey', label: journey.started && (journey.next !== null || journey.unseen !== null) ? '30 days •' : '30 days' },
-    { id: 'ask', label: asks.forMe.length || asks.fresh.length ? `Ask • ${asks.forMe.length + asks.fresh.length}` : 'Ask' },
     { id: 'afterdark', label: afterDarkOpen ? 'After dark ☾' : 'After dark' },
+    { id: 'ask', label: asks.forMe.length || asks.fresh.length ? `Ask • ${asks.forMe.length + asks.fresh.length}` : 'Ask' },
     { id: 'past', label: 'Past' },
   ];
 

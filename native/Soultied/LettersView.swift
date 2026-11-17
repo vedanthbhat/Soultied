@@ -7,7 +7,8 @@ import SoultiedCore
  */
 
 enum LettersTab: String, CaseIterable, Identifiable {
-    case today = "Today", journey = "30 days", ask = "Ask", afterDark = "After dark", past = "Past"
+    // (After dark before Ask: the hotter cards draw people in)
+    case today = "Today", journey = "30 days", afterDark = "After dark", ask = "Ask", past = "Past"
     var id: String { rawValue }
 }
 

@@ -356,9 +356,10 @@ struct RanksSheet: View {
                 .foregroundStyle(medal != nil ? Color.ink : Color.muted)
                 .frame(width: 30, height: 30)
                 .background(medal ?? Color.clear)
-            HStack(spacing: 2) {
-                HeadView(look: r.looks.0, size: 30)
-                HeadView(look: r.looks.1, size: 30)
+            // (the two of them, cut out: head and shoulders, nothing behind)
+            HStack(spacing: -3) {
+                BustView(look: r.looks.0, size: 40)
+                BustView(look: r.looks.1, size: 40)
             }
             VStack(alignment: .leading, spacing: 1) {
                 Text(r.name).font(.pxBodyBold).foregroundStyle(Color.inkSoft).lineLimit(2).minimumScaleFactor(0.85).fixedSize(horizontal: false, vertical: true)

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useGames } from '../../games/GamesContext';
+import { useApp } from '../../context/AppContext';
 import { doodleStale, isLiveInvite, needsMe } from '../../games/registry';
 import { liveStale } from '../../games/live/lobby';
 import type { DoodleState } from '../../games/doodle';
@@ -90,6 +91,9 @@ const Section: React.FC<{ title: string; note: string; games: Shelf[]; card: (g:
 /** The games cupboard: every game for two, and whose move it is in each. */
 export const GameShelf: React.FC<{ onExit: () => void; onOpenDoor: () => void; initial?: GameKind | null }> = ({ onExit, onOpenDoor, initial = null }) => {
   const { matches, mySeat, seatName, ready } = useGames();
+  // your person's here right now: the live games come first; otherwise the ones you can play on your own turn
+  const { partnerUser } = useApp();
+  const here = partnerUser?.status === 'online';
   const [open, setOpen] = useState<GameKind | null>(initial);
   const plus = usePlus();
   /** a Plus game tapped without Plus */
@@ -193,8 +197,9 @@ export const GameShelf: React.FC<{ onExit: () => void; onOpenDoor: () => void; i
           </div>
         )}
         <CouplesBoardCard onOpen={() => setBoard(true)} />
-        <Section title="Play together now" note="For when you’re both here: invite your person and play live." games={LIVE} card={card} />
+        {here && <Section title="Play together now" note={`${partner} is here: invite them and play live.`} games={LIVE} card={card} />}
         <Section title="Take turns" note="Make your move and leave it. They’ll take theirs whenever they’re next here." games={TURNS} card={card} />
+        {!here && <Section title="Play together now" note="For when you’re both here: invite your person and play live." games={LIVE} card={card} />}
         {upsell && (
           <PlusUpsell
             heading={`${upsell} is in Soultied Plus`}

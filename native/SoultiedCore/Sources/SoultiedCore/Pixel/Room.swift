@@ -132,6 +132,9 @@ public struct RoomState {
     public var wallNews = false
     /// how the pet's been looked after today (Together/Pet.swift): its bowl, ball, blanket, hearts and cushion
     public var petCare: PetCareState? = nil
+    /// Christmas (Together/Season.swift): a tree where the plant was, fairy lights on the mantel, stockings, a
+    /// wreath on the dark door, and snow outside
+    public var christmas = false
 
     public init(left: Seat, right: Seat) {
         self.left = left
@@ -352,12 +355,16 @@ public final class RoomRenderer {
 }
 
 func renderRoom(_ L: Layer, _ state: RoomState, _ t: Double) {
-    let d = state.decor
+    // (Christmas: snow outside, whatever the view; never in the catalogue's pictures)
+    let xmas = state.christmas && !state.bare
+    var d = state.decor
+    if xmas { d.view = "snow" }
     L.copyFrom(staticLayer(d))
     drawPainting(L, d.painting, state)
     drawWallArt(L, state, t)
     drawFire(L, t, state.fire, state)
     drawDoorGlow(L, t, state.hover == .door)
+    if xmas { drawXmasMantel(L, t) }
     drawCandles(L, t)
     drawWeather(L, t, d.view)
     drawPhotoPortrait(L, state)
@@ -416,7 +423,7 @@ func renderRoom(_ L: Layer, _ state: RoomState, _ t: Double) {
     drawTable(L)
     drawSteam(L, t)
     drawLetter(L, t, state.letterUnread, state.hover == .letter)
-    drawPlant(L, d.plant)
+    if xmas { drawXmasTree(L, t) } else { drawPlant(L, d.plant) }
 
     applyLighting(L, t, state.fire, state)
 }

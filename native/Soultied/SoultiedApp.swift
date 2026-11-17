@@ -67,6 +67,8 @@ enum Launch {
     static var stream: String? { value("-stream") }
     /// -theme starlight   the app's look (cozy or starlight), for the screenshots
     static var theme: String? { value("-theme") }
+    /// -christmas   Christmas in the room out of season (the screenshots)
+    static var christmas: Bool { args.contains("-christmas") }
     /// -tour 0   show the first-run tour, at that step (the screenshots; the demo room never shows it otherwise)
     static var tour: Int? { value("-tour").flatMap { Int($0) } }
     /// -record   in the demo room, put the jazz record on; -song <link>, a song from YouTube instead
@@ -123,7 +125,7 @@ struct RootView: View {
                     }
                 }
             }
-            .id(looks.look)
+            .id(looks.drawnIn)
             if intro {
                 Intro { intro = false }
                     .zIndex(10)

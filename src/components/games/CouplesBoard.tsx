@@ -62,13 +62,10 @@ const Line: React.FC<{ r: BoardRow; at?: number }> = ({ r, at = 0 }) => (
     >
       {r.rank}
     </span>
-    <span className="flex gap-0.5 shrink-0" aria-hidden="true">
-      <span style={{ background: 'var(--paper-2)' }}>
-        <AvatarThumb config={r.looks[0]} region="head" size={32} />
-      </span>
-      <span style={{ background: 'var(--paper-2)' }}>
-        <AvatarThumb config={r.looks[1]} region="head" size={32} />
-      </span>
+    {/* the two of them, cut out: head and shoulders, nothing behind */}
+    <span className="flex -space-x-2 shrink-0 -my-2" aria-hidden="true">
+      <AvatarThumb config={r.looks[0]} region="bust" size={48} />
+      <AvatarThumb config={r.looks[1]} region="bust" size={48} />
     </span>
     <span className="flex flex-col min-w-0 flex-1">
       <span className="font-bold leading-tight break-words">{r.name}</span>

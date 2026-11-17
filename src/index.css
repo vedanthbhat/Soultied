@@ -48,6 +48,14 @@
   color: var(--ink-soft);
   background-color: #1a1214;
 }
+/* Christmas (season.ts): terracotta and sage turn Christmas red and pine */
+:root[data-festive] {
+  --terracotta: #b8433a;
+  --terracotta-d: #8e2f28;
+  --sage: #5f8a5a;
+  --sage-d: #46704a;
+  --thread: #b23a32;
+}
 
 * {
   box-sizing: border-box;

@@ -8,7 +8,9 @@
 #
 # Reads from the environment:
 #   ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8  the App Store Connect API key (see ios.yml)
-#   REVIEW_PHONE, TESTER_EMAIL             secrets: a phone Apple's beta reviewer can call, and the tester's email
+#   REVIEW_PHONE, TESTER_EMAIL             secrets: a phone Apple's beta reviewer can call, and the testers' emails
+#                                          (one, or several separated by commas: "you@x.com, them@y.com"; the first
+#                                          is also the contact testers and Apple see). Never printed: the logs are public
 #   BUILD_NUMBER                           the build to use (waits for Apple to process it); else the newest one
 #   APP_KIND                               "native" for the native app (so are builds numbered 1000 and up),
 #                                          which changes what testers and the reviewer are told
@@ -20,7 +22,8 @@ API = os.environ.get('ASC_API', 'https://api.appstoreconnect.apple.com')
 APP = '6827933237'  # Soultied in App Store Connect
 GROUP = 'Friends and family'
 PHONE = os.environ.get('REVIEW_PHONE', '').strip()
-EMAIL = os.environ.get('TESTER_EMAIL', '').strip()
+EMAILS = [e for e in (x.strip() for x in os.environ.get('TESTER_EMAIL', '').replace(';', ',').split(',')) if '@' in e]
+EMAIL = EMAILS[0] if EMAILS else ''
 WANT = os.environ.get('BUILD_NUMBER', '').strip()  # set when an iPhone build just finished
 SUMMARY = os.environ.get('GITHUB_STEP_SUMMARY', '/dev/null')
 
@@ -184,17 +187,20 @@ in_group = {b['id'] for b in call('GET', f'/v1/betaGroups/{gid}/relationships/bu
 if bid not in in_group:
     call('POST', f'/v1/betaGroups/{gid}/relationships/builds', {'data': [{'type': 'builds', 'id': bid}]})
 
-# 5. the tester (an invite email goes out once Apple approves the build; any Apple Account can accept it)
-if EMAIL:
-    existing = call('GET', f'/v1/betaTesters?filter[email]={urllib.parse.quote(EMAIL)}&filter[apps]={APP}&limit=5').get('data', [])
-    if existing:
-        tid = existing[0]['id']
-        mine = {t['id'] for t in call('GET', f'/v1/betaGroups/{gid}/relationships/betaTesters?limit=200').get('data', [])}
-        if tid not in mine:
-            call('POST', f'/v1/betaGroups/{gid}/relationships/betaTesters', {'data': [{'type': 'betaTesters', 'id': tid}]})
-    else:
-        call('POST', '/v1/betaTesters', {'data': {'type': 'betaTesters', 'attributes': {'email': EMAIL, 'firstName': 'Vedanth', 'lastName': 'Bhat'}, 'relationships': {'betaGroups': {'data': [{'type': 'betaGroups', 'id': gid}]}}}})
-    say('notice', f'You are a tester in "{GROUP}"')
+# 5. the testers (an invite email goes out once Apple approves the build; any Apple Account can accept it)
+if EMAILS:
+    mine = {t['id'] for t in call('GET', f'/v1/betaGroups/{gid}/relationships/betaTesters?limit=200').get('data', [])}
+    for i, email in enumerate(EMAILS):
+        existing = call('GET', f'/v1/betaTesters?filter[email]={urllib.parse.quote(email)}&filter[apps]={APP}&limit=5').get('data', [])
+        if existing:
+            tid = existing[0]['id']
+            if tid not in mine:
+                call('POST', f'/v1/betaGroups/{gid}/relationships/betaTesters', {'data': [{'type': 'betaTesters', 'id': tid}]})
+        else:
+            # (the first is Vedanth; anyone else is asked their name by TestFlight itself)
+            attrs = {'email': email, 'firstName': 'Vedanth', 'lastName': 'Bhat'} if i == 0 else {'email': email}
+            call('POST', '/v1/betaTesters', {'data': {'type': 'betaTesters', 'attributes': attrs, 'relationships': {'betaGroups': {'data': [{'type': 'betaGroups', 'id': gid}]}}}})
+    say('notice', f'{len(EMAILS)} {"tester is" if len(EMAILS) == 1 else "testers are"} in "{GROUP}"')
 else:
     say('warning', 'No tester email yet: add the TESTER_EMAIL secret and run this again')
 

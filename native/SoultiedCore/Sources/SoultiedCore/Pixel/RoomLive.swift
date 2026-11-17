@@ -1213,3 +1213,129 @@ func applyLighting(_ L: Layer, _ t: Double, _ fire: Double, _ state: RoomState) 
         halo(144, 84, 10, (255, 214, 140), 0.22)
     }
 }
+
+/* ---------- Christmas (src/pixel/room.ts) ---------- */
+
+private let XMAS_BULBS = ["#ff5a4f", "#ffd36b", "#7ee08a", "#7fb2ff", "#ff9ad5"].map { hx($0) }
+
+/// a bulb's on most of the time, each to its own rhythm
+private func bulbOn(_ t: Double, _ k: Int) -> Bool { sin(t * 2.3 + Double(k) * 1.7) > -0.55 }
+
+/// fairy lights in three swags under the mantel shelf, two stockings hung from it, and a wreath on the dark door
+func drawXmasMantel(_ L: Layer, _ t: Double) {
+    let x0 = Int(FireBox.cx) - 34
+    let x1 = Int(FireBox.cx) + 33
+    let span = Double(x1 - x0 + 1) / 3
+    let wire = hx("#2a2620")
+    for x in x0...x1 {
+        let u = Double(x - x0).truncatingRemainder(dividingBy: span) / span
+        let y = 61 + jsRound(sin(u * .pi) * 3)
+        L.S(Double(x), y, wire)
+        if (x - x0) % 4 == 2 {
+            let k = (x - x0) >> 2
+            let c = XMAS_BULBS[k % XMAS_BULBS.count]
+            if bulbOn(t, k) { L.G(Double(x), y + 1, c) } else { L.S(Double(x), y + 1, mix(c, wire, 0.6)) }
+        }
+    }
+    // a little tree at the end of the mantel, past the candles (the one the phone's close-up shows)
+    let mx = FireBox.cx + 29
+    let mini = ["...s...", "...g...", "..ggg..", ".gGggg.", "..ggg..", ".gggGg.", "ggggggg", "..bbb.."]
+    for (j, row) in mini.enumerated() {
+        for (i, k) in row.enumerated() where k != "." {
+            let x = mx - 3 + Double(i), y = 46 + Double(j)
+            if k == "s" { L.G(x, y, hx("#ffd36b")); continue }
+            let c = k == "b" ? hx("#b23a32") : k == "G" ? (bulbOn(t, i + j) ? hx("#ff5a4f") : hx("#7a2a24")) : (i + j) % 2 == 1 ? hx("#2f6b3a") : hx("#244f2e")
+            L.S(x, y, c)
+        }
+    }
+    // the stockings: one each, toes out
+    drawStocking(L, FireBox.cx - 23, hx("#c0392b"), hx("#8e2a20"), -1)
+    drawStocking(L, FireBox.cx + 17, hx("#2e7d4f"), hx("#1f5a37"), 1)
+    // the wreath, high on the dark door: a ring of greens, red berries, a red bow at the bottom
+    let cx = DoorBox.x + 12, cy = DoorBox.y + 14
+    for j in -5...5 {
+        for i in -5...5 {
+            let r = i * i + j * j
+            if r > 27 || r < 7 { continue }
+            L.S(cx + Double(i), cy + Double(j), (i * 3 + j * 5 + 40) % 4 < 2 ? hx("#2f6b3a") : r > 20 ? hx("#1f4d2c") : hx("#4f8f4a"))
+        }
+    }
+    for (i, j) in [(-4.0, -2.0), (3, -4), (4, 2), (-2, 4), (0, -5)] { L.S(cx + i, cy + j, hx("#d9443a")) }
+    L.R(cx - 2, cy + 4, 5, 2, hx("#c0392b"))
+    L.S(cx, cy + 4, hx("#e86a5a"))
+    L.S(cx - 2, cy + 6, hx("#8e2a20"))
+    L.S(cx + 2, cy + 6, hx("#8e2a20"))
+}
+
+/// a stocking hung from the mantel at x, its toe pointing `dir` (-1 left, 1 right)
+private func drawStocking(_ L: Layer, _ x: Double, _ c: RGB, _ cd: RGB, _ dir: Double) {
+    L.S(x + 2, 61, hx("#e9e2d4"))
+    // the furry cuff, then the leg, then the foot
+    L.R(x, 62, 6, 2, hx("#efe8dc"))
+    L.HL(x, 63, 6, hx("#d6cdbd"))
+    L.R(x, 64, 6, 7, c)
+    L.VL(dir < 0 ? x + 5 : x, 64, 7, cd)
+    let fx = dir < 0 ? x - 3 : x
+    L.R(fx, 71, 9, 2, c)
+    L.HL(fx + 1, 73, 7, cd)
+    // a stripe across the leg
+    L.HL(x, 67, 6, hx("#efe8dc"))
+}
+
+/// the Christmas tree, where the plant was (a little further in, so a narrower screen still shows it): three tiers
+/// of fir, baubles, twinkling lights, a star on top, and presents at its foot
+func drawXmasTree(_ L: Layer, _ t: Double) {
+    let cx = 50.0, top = 110.0
+    func half(_ j: Int) -> Int {
+        let jd = Double(j)
+        if j < 12 { return 1 + Int((jd * 0.6).rounded(.down)) }
+        if j < 25 { return 4 + Int(((jd - 12) * 0.6).rounded(.down)) }
+        return 7 + Int(((jd - 25) * 0.6).rounded(.down))
+    }
+    for j in 0..<40 {
+        let h = half(j)
+        for i in -h...h {
+            let edge = i == -h || i == h
+            let lit = Double(i) < -Double(h) / 3
+            let dither = (i + j) % 3 == 0
+            let c = edge ? hx("#1a3f25") : lit ? (dither ? hx("#3f7d45") : hx("#4f8f4a")) : dither ? hx("#244f2e") : hx("#2f6b3a")
+            L.S(cx + Double(i), top + Double(j), c)
+        }
+    }
+    // the trunk and its pot, wrapped like a present
+    L.R(cx - 1, top + 40, 3, 2, hx("#5a3a2c"))
+    L.R(cx - 9, top + 42, 18, 16, hx("#b23a32"))
+    L.HL(cx - 10, top + 41, 20, hx("#cf5a4a"))
+    L.HL(cx - 10, top + 42, 20, hx("#cf5a4a"))
+    L.VL(cx + 7, top + 43, 15, hx("#8e2a20"))
+    L.VL(cx, top + 41, 17, hx("#e2b359"))
+    L.HL(cx - 9, top + 49, 18, hx("#e2b359"))
+    // a present beside it
+    L.R(cx + 12, top + 50, 10, 8, hx("#2e7d4f"))
+    L.HL(cx + 12, top + 50, 10, hx("#4f9f6a"))
+    L.VL(cx + 16, top + 50, 8, hx("#e9e2d4"))
+    L.S(cx + 15, top + 49, hx("#e9e2d4"))
+    L.S(cx + 17, top + 49, hx("#e9e2d4"))
+    // baubles
+    let baubles: [(Double, Double, String)] = [(-3, 14, "#d9443a"), (4, 20, "#e2b359"), (-6, 27, "#7fb2ff"), (2, 31, "#d9443a"), (9, 35, "#e2b359"), (-10, 36, "#d9443a"), (6, 9, "#7fb2ff")]
+    let black = hx("#000000"), white = hx("#ffffff")
+    for (i, j, hex) in baubles {
+        let c = hx(hex)
+        L.S(cx + i, top + j, c)
+        L.S(cx + i + 1, top + j, c)
+        L.S(cx + i, top + j + 1, mix(c, black, 0.25))
+        L.S(cx + i + 1, top + j + 1, mix(c, black, 0.25))
+        L.S(cx + i, top + j, mix(c, white, 0.45))
+    }
+    // lights, in loose garlands across the tiers
+    for k in 0..<18 {
+        let j = 4 + (k * 7) % 35
+        let h = half(j) - 1
+        let i = -h + (k * 5) % (2 * h + 1)
+        if bulbOn(t, k + 3) { L.G(cx + Double(i), top + Double(j), XMAS_BULBS[k % XMAS_BULBS.count]) }
+    }
+    // the star
+    let tw = sin(t * 3) > 0.6
+    let star: [(Double, Double)] = [(0, -4), (-1, -3), (0, -3), (1, -3), (-2, -2), (-1, -2), (0, -2), (1, -2), (2, -2), (-1, -1), (1, -1), (0, -1)]
+    for (i, j) in star { L.G(cx + i, top + j, tw && i == 0 && j == -2 ? hx("#fffbe0") : hx("#ffd36b")) }
+}
