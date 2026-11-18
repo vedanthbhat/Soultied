@@ -176,8 +176,9 @@ final class StreamWebSession: NSObject, WKScriptMessageHandler, WKNavigationDele
     var shown = false
     var page = StreamPageNews()
     let web: WKWebView
-    /// the player's full-screen button was pressed (true) or pressed again (false)
-    @ObservationIgnored var onFullscreen: ((Bool) -> Void)?
+    /// the player's full-screen button was pressed (nil: sideways if upright, upright if sideways), or the player
+    /// asked to come out of full screen (false)
+    @ObservationIgnored var onFullscreen: ((Bool?) -> Void)?
     @ObservationIgnored private weak var hub: StreamHub?
     @ObservationIgnored private var watchers: [NSKeyValueObservation] = []
 
@@ -256,11 +257,6 @@ final class StreamWebSession: NSObject, WKScriptMessageHandler, WKNavigationDele
     /// the show stops when you close the browser (your person's player says you've stepped away)
     func pause() { web.pauseAllMediaPlayback(completionHandler: nil) }
 
-    /// the app turned it upright: the player's told it's out of full screen (so its button shows the right way)
-    func leaveFullscreen() {
-        web.evaluateJavaScript("window.__soultiedFullscreen && window.__soultiedFullscreen(false)", in: nil, in: .page) { _ in }
-    }
-
     /// every line from the page's player is cut, so it connects afresh
     func reset() {
         web.evaluateJavaScript("window.__soultiedAppReset && window.__soultiedAppReset()", in: nil, in: Self.world) { _ in }
@@ -292,7 +288,7 @@ final class StreamWebSession: NSObject, WKScriptMessageHandler, WKNavigationDele
         }
         // the page's news (extension/src/ios/page.ts)
         if d["kind"] as? String == "fullscreen" {
-            onFullscreen?(d["on"] as? Bool ?? false)
+            onFullscreen?(d["toggle"] as? Bool == true ? nil : (d["on"] as? Bool ?? false))
             return
         }
         var p = page
@@ -478,8 +474,10 @@ struct StreamView: View {
     }
 
     /// the player's own full-screen button: sideways, edge to edge, the bar out of the way at once; pressed again,
-    /// upright with the bar (as the phone button does)
-    private func fullscreen(_ on: Bool) {
+    /// upright with the bar (as the phone button does). The page itself is left alone (extension/src/ios/page.ts).
+    private func fullscreen(_ want: Bool?) {
+        let on = want ?? !(sideways || locked)
+        Haptics.tap()
         if on {
             upright = false
             turnSideways()
@@ -500,7 +498,6 @@ struct StreamView: View {
             upright = true
             locked = false
             OrientationGate.shared.setCover(.portrait)
-            session?.leaveFullscreen()
         } else {
             upright = false
             turnSideways()
@@ -517,7 +514,6 @@ struct StreamView: View {
 
     private func close() {
         session?.onFullscreen = nil
-        session?.leaveFullscreen()
         session?.pause()
         deck.done()
         barTimer?.cancel()

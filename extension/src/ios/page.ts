@@ -10,8 +10,8 @@
  *   so it can say plainly when a site won't play here.
  * - Answer the players' full-screen button. On the iPhone it would hand the video to a full-screen window of
  *   WebKit's own, which goes black with these players and fights the app turning sideways, so the app switches
- *   that off. Instead the player's told it's full screen, its box fills the window, and the app turns sideways,
- *   edge to edge, with its bar out of the way (and back upright when you come out of full screen).
+ *   that off. Instead the button turns the app sideways, edge to edge, with its bar out of the way, and pressed
+ *   again turns it back upright. The page itself isn't touched.
  */
 type W = Window & {
   ManagedMediaSource?: typeof MediaSource;
@@ -65,41 +65,10 @@ if (!w.__soultiedPage) {
     }
   };
 
-  // full screen, the app's way (under Soultied's own overlay, which sits at 2147483600)
-  let full: Element | null = null;
-  const fullStyle = document.createElement('style');
-  fullStyle.textContent =
-    '[data-soultied-full]{position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;' +
-    'max-width:none!important;max-height:none!important;margin:0!important;transform:none!important;z-index:2147483000!important;background:#000!important}';
-  const keepStyle = () => {
-    if (!fullStyle.isConnected) (document.head || document.documentElement).append(fullStyle);
-  };
-  const fullChanged = (el: Element | null) => {
-    for (const type of ['fullscreenchange', 'webkitfullscreenchange']) {
-      try {
-        (el && el.isConnected ? el : document).dispatchEvent(new Event(type, { bubbles: true }));
-      } catch {
-        // nothing listening that can hear it
-      }
-    }
-  };
-  /** the page (its button) or the app (its turn-upright button) puts something full screen, or takes it out */
-  const setFull = (el: Element | null, fromPage: boolean) => {
-    if (full === el) return;
-    const was = full;
-    full = el;
-    was?.removeAttribute('data-soultied-full');
-    // (the page itself already fills the window)
-    if (el && el !== document.documentElement && el !== document.body) {
-      keepStyle();
-      el.setAttribute('data-soultied-full', '');
-    }
-    fullChanged(el || was);
-    if (fromPage) tell({ kind: 'fullscreen', on: !!el });
-  };
-  (w as unknown as { __soultiedFullscreen?: (on: boolean) => void }).__soultiedFullscreen = (on: boolean) => {
-    if (!on) setFull(null, false);
-  };
+  // The players' full-screen button turns the app sideways, edge to edge (or back upright), and that's all: the
+  // page itself is left exactly as it is, and the player's never told it went full screen. Anything that moves
+  // the picture into a new layer (WebKit's own full screen, or restyling the player's box to fill the window)
+  // turns these protected pictures black while the sound and subtitles carry on.
   const put = (o: object, k: string, value: unknown) => {
     try {
       Object.defineProperty(o, k, { configurable: true, writable: true, value });
@@ -107,39 +76,33 @@ if (!w.__soultiedPage) {
       // locked by the browser: left as it is
     }
   };
-  const reads = (o: object, k: string, get: (this: Element | Document) => unknown) => {
+  const reads = (o: object, k: string, get: () => unknown) => {
     try {
       Object.defineProperty(o, k, { configurable: true, get });
     } catch {
       // locked by the browser: left as it is
     }
   };
-  const enter = function (this: Element) {
-    setFull(this, true);
+  /** the button: sideways if upright, upright if sideways (the app decides which) */
+  const flip = () => {
+    tell({ kind: 'fullscreen', toggle: true });
     return Promise.resolve();
   };
-  const leave = () => {
-    setFull(null, true);
+  const upright = () => {
+    tell({ kind: 'fullscreen', on: false });
     return Promise.resolve();
   };
-  for (const k of ['requestFullscreen', 'webkitRequestFullscreen', 'webkitRequestFullScreen']) put(Element.prototype, k, enter);
-  for (const k of ['exitFullscreen', 'webkitExitFullscreen', 'webkitCancelFullScreen']) put(Document.prototype, k, leave);
+  for (const k of ['requestFullscreen', 'webkitRequestFullscreen', 'webkitRequestFullScreen']) put(Element.prototype, k, flip);
+  for (const k of ['exitFullscreen', 'webkitExitFullscreen', 'webkitCancelFullScreen']) put(Document.prototype, k, upright);
   // (the video's own full screen, as the iPhone's Safari has it)
-  for (const k of ['webkitEnterFullscreen', 'webkitEnterFullScreen'])
-    put(HTMLVideoElement.prototype, k, function (this: HTMLVideoElement) {
-      setFull(this, true);
-    });
-  for (const k of ['webkitExitFullscreen', 'webkitExitFullScreen'])
-    put(HTMLVideoElement.prototype, k, function (this: HTMLVideoElement) {
-      if (full === this) setFull(null, true);
-    });
-  for (const k of ['fullscreenElement', 'webkitFullscreenElement', 'webkitCurrentFullScreenElement']) reads(Document.prototype, k, () => full);
-  for (const k of ['fullscreen', 'webkitIsFullScreen']) reads(Document.prototype, k, () => !!full);
+  for (const k of ['webkitEnterFullscreen', 'webkitEnterFullScreen']) put(HTMLVideoElement.prototype, k, flip);
+  for (const k of ['webkitExitFullscreen', 'webkitExitFullScreen']) put(HTMLVideoElement.prototype, k, upright);
+  // the button's there to press, and nothing's ever full screen
   for (const k of ['fullscreenEnabled', 'webkitFullscreenEnabled']) reads(Document.prototype, k, () => true);
+  for (const k of ['fullscreenElement', 'webkitFullscreenElement', 'webkitCurrentFullScreenElement']) reads(Document.prototype, k, () => null);
+  for (const k of ['fullscreen', 'webkitIsFullScreen']) reads(Document.prototype, k, () => false);
   reads(HTMLVideoElement.prototype, 'webkitSupportsFullscreen', () => true);
-  reads(HTMLVideoElement.prototype, 'webkitDisplayingFullscreen', function (this: Element | Document) {
-    return full === this;
-  });
+  reads(HTMLVideoElement.prototype, 'webkitDisplayingFullscreen', () => false);
 
   // what this phone offers the site
   const eme = typeof navigator.requestMediaKeySystemAccess === 'function';
