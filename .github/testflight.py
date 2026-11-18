@@ -19,7 +19,7 @@ import json, os, sys, time, urllib.error, urllib.parse, urllib.request
 import jwt
 
 API = os.environ.get('ASC_API', 'https://api.appstoreconnect.apple.com')
-APP = '6827933237'  # Soultied in App Store Connect
+APP = '6836223812'  # Soultied in App Store Connect (Vedanth's own account, team WM7BVM25PV)
 GROUP = 'Friends and family'
 PHONE = os.environ.get('REVIEW_PHONE', '').strip()
 EMAILS = [e for e in (x.strip() for x in os.environ.get('TESTER_EMAIL', '').replace(';', ',').split(',')) if '@' in e]

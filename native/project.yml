@@ -15,7 +15,7 @@ settings:
     # (builds sent to TestFlight are numbered 1000 + the run's number instead; see .github/workflows/native-ios.yml)
     CURRENT_PROJECT_VERSION: "1"
     # the app's bundle id; its home-screen widgets are this + .widget, and the keychain group they share is this + .shared
-    APP_BUNDLE_ID: app.soultied
+    APP_BUNDLE_ID: app.soultied.ios
     ENABLE_USER_SCRIPT_SANDBOXING: NO
 
 packages:
@@ -36,14 +36,16 @@ targets:
       - path: Soultied
       # what the app and its widgets both use (WidgetShare, and the widgets' faces for the screenshots)
       - path: Shared
-      # the pixel font, Firebase's settings and the icon live elsewhere in the repo; the app uses them as they are
+      # the pixel font and the icon live elsewhere in the repo; the app uses them as they are
       # (the icon's picture is drawn by scripts/ios-assets.mjs before a build)
       - path: ../public/fonts/PixelifySans-Variable.ttf
         buildPhase: resources
       # the record's Night in Venice, for the first tour (so it plays straight away, even offline)
       - path: ../public/audio/night-in-venice.mp3
         buildPhase: resources
-      - path: ../ios/App/App/GoogleService-Info.plist
+      # Firebase's settings for this app (app.soultied.ios, in the soultied-c1543 project): made from
+      # Firebase/GoogleService-Info.json before the build (.github/workflows/native-ios.yml)
+      - path: Firebase/GoogleService-Info.plist
         buildPhase: resources
       - path: ../ios/App/App/Assets.xcassets
         buildPhase: resources
@@ -79,7 +81,7 @@ targets:
         UIStatusBarStyle: UIStatusBarStyleLightContent
         CFBundleURLTypes:
           # Google sign-in hands back to the app through this address (REVERSED_CLIENT_ID in GoogleService-Info.plist)
-          - CFBundleURLSchemes: [com.googleusercontent.apps.244397778893-sej2cpv7mis4279vdoh7eh8u2g510bj3]
+          - CFBundleURLSchemes: [com.googleusercontent.apps.244397778893-dh2799q823nuthn9bkurh75biu58puoj]
           # a tap on a home-screen widget: soultied://doodle, soultied://photos
           - CFBundleURLSchemes: [soultied]
         SoultiedKeychainGroup: $(DEVELOPMENT_TEAM).$(APP_BUNDLE_ID).shared

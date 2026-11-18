@@ -95,6 +95,9 @@ jobs:
 
       - name: Make the Xcode project
         run: |
+          # Firebase's settings for the app (kept as JSON in native/Firebase, which the web editor can open; the app
+          # wants them as GoogleService-Info.plist)
+          plutil -convert xml1 native/Firebase/GoogleService-Info.json -o native/Firebase/GoogleService-Info.plist
           brew list xcodegen >/dev/null 2>&1 || brew install xcodegen
           cd native && xcodegen generate
 
@@ -158,8 +161,8 @@ jobs:
           mkdir -p "$RUNNER_TEMP/shots"
           shot() {
             name=$1; shift
-            xcrun simctl terminate "$dev" app.soultied 2>/dev/null || true
-            xcrun simctl launch "$dev" app.soultied "$@"
+            xcrun simctl terminate "$dev" app.soultied.ios 2>/dev/null || true
+            xcrun simctl launch "$dev" app.soultied.ios "$@"
             sleep 9
             xcrun simctl io "$dev" screenshot "$RUNNER_TEMP/shots/$name.png"
           }

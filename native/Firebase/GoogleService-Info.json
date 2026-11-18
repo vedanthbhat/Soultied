@@ -1,0 +1,16 @@
+{
+  "CLIENT_ID": "244397778893-dh2799q823nuthn9bkurh75biu58puoj.apps.googleusercontent.com",
+  "REVERSED_CLIENT_ID": "com.googleusercontent.apps.244397778893-dh2799q823nuthn9bkurh75biu58puoj",
+  "API_KEY": "AIzaSyDXpZ9i6tZDCeB0jdlw-6uPknaMmmEqOtM",
+  "GCM_SENDER_ID": "244397778893",
+  "PLIST_VERSION": "1",
+  "BUNDLE_ID": "app.soultied.ios",
+  "PROJECT_ID": "soultied-c1543",
+  "STORAGE_BUCKET": "soultied-c1543.firebasestorage.app",
+  "IS_ADS_ENABLED": false,
+  "IS_ANALYTICS_ENABLED": false,
+  "IS_APPINVITE_ENABLED": true,
+  "IS_GCM_ENABLED": true,
+  "IS_SIGNIN_ENABLED": true,
+  "GOOGLE_APP_ID": "1:244397778893:ios:a54e14de889199ecd44684"
+}

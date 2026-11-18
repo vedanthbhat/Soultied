@@ -74,7 +74,7 @@ enum WidgetShare {
         var checked: Double?
     }
 
-    /// TEAMID.app.soultied.shared, from each one's Info.plist (nothing in a build made without a team)
+    /// TEAMID.app.soultied.ios.shared, from each one's Info.plist (nothing in a build made without a team)
     static var group: String? {
         guard let g = Bundle.main.object(forInfoDictionaryKey: "SoultiedKeychainGroup") as? String, !g.isEmpty, !g.hasPrefix("$("), !g.hasPrefix(".") else { return nil }
         return g
