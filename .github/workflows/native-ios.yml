@@ -27,6 +27,8 @@ on:
       - 'native/**'
       - 'scripts/native-*'
       - '.github/native-shots.py'
+      # (and the script that sets the build up in TestFlight)
+      - '.github/testflight.py'
       - 'scripts/ios-assets.mjs'
       - 'src/letters/**'
       # (the app's Netflix / Prime Video browser runs the extension's player)

@@ -154,14 +154,18 @@ bid, number = build['id'], build['attributes']['version']
 native = os.environ.get('APP_KIND', '').strip() == 'native' or (number.isdigit() and int(number) >= 1000)
 DESCRIPTION, WHATS_NEW, NOTES = texts(native)
 
-# 2. what testers see about the app (needed before outside testers can get builds)
+# 2. what testers see about the app (needed before outside testers can get builds), in the app's own language
+#    (Apple wants that one: English (U.K.) for Soultied) and in American English too
 contact = EMAIL or 'hello@soultied.app'
-upsert_one(
-    f'/v1/apps/{APP}/betaAppLocalizations', 'betaAppLocalizations',
-    {'description': DESCRIPTION, 'feedbackEmail': contact, 'marketingUrl': 'https://soultied.app/',
-     'privacyPolicyUrl': 'https://soultied.app/privacy/'},
-    {'app': ref('apps', APP)}, match=lambda a: a.get('locale') == 'en-US', create_attrs={'locale': 'en-US'},
-)
+primary = call('GET', f'/v1/apps/{APP}?fields[apps]=primaryLocale')['data']['attributes'].get('primaryLocale') or 'en-US'
+LOCALES = list(dict.fromkeys([primary, 'en-US']))
+for loc in LOCALES:
+    upsert_one(
+        f'/v1/apps/{APP}/betaAppLocalizations', 'betaAppLocalizations',
+        {'description': DESCRIPTION, 'feedbackEmail': contact, 'marketingUrl': 'https://soultied.app/',
+         'privacyPolicyUrl': 'https://soultied.app/privacy/'},
+        {'app': ref('apps', APP)}, match=lambda a, loc=loc: a.get('locale') == loc, create_attrs={'locale': loc},
+    )
 
 # 3. who Apple's beta reviewer can contact, and how to sign in
 detail = call('GET', f'/v1/apps/{APP}/betaAppReviewDetail')['data']
@@ -172,10 +176,11 @@ if PHONE:
 call('PATCH', f'/v1/betaAppReviewDetails/{detail["id"]}', {'data': {'type': 'betaAppReviewDetails', 'id': detail['id'], 'attributes': review}})
 say('notice', 'Test information and beta review details are filled in' + ('' if PHONE else ' (no contact phone yet: add the REVIEW_PHONE secret)'))
 
-upsert_one(
-    f'/v1/builds/{bid}/betaBuildLocalizations', 'betaBuildLocalizations', {'whatsNew': WHATS_NEW},
-    {'build': ref('builds', bid)}, match=lambda a: a.get('locale') == 'en-US', create_attrs={'locale': 'en-US'},
-)
+for loc in LOCALES:
+    upsert_one(
+        f'/v1/builds/{bid}/betaBuildLocalizations', 'betaBuildLocalizations', {'whatsNew': WHATS_NEW},
+        {'build': ref('builds', bid)}, match=lambda a, loc=loc: a.get('locale') == loc, create_attrs={'locale': loc},
+    )
 
 # 4. the group for people outside the Apple team, and the build in it
 groups = call('GET', f'/v1/apps/{APP}/betaGroups?limit=50').get('data', [])
