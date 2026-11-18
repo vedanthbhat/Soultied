@@ -148,7 +148,7 @@ public final class DoodleSession {
             return
         }
         stroke = (x, y)
-        put(DoodleGuess.brushLine(x, y, x, y, size: tool == .erase ? max(2, size) : size), inkKey)
+        put(DoodleGuess.brushLine(x, y, x, y, size: DoodleGuess.brushSize(size, rubber: tool == .erase)), inkKey)
     }
 
     public func penMove(_ x: Int, _ y: Int) {
@@ -160,7 +160,7 @@ public final class DoodleSession {
         }
         let x = max(0, min(DoodleGuess.w - 1, x)), y = max(0, min(DoodleGuess.h - 1, y))
         if x == s.x && y == s.y { return }
-        put(DoodleGuess.brushLine(s.x, s.y, x, y, size: tool == .erase ? max(2, size) : size), inkKey)
+        put(DoodleGuess.brushLine(s.x, s.y, x, y, size: DoodleGuess.brushSize(size, rubber: tool == .erase)), inkKey)
         stroke = (x, y)
     }
 
@@ -211,7 +211,7 @@ public final class DoodleSession {
         // the round's picture stays with it for the look back at the end
         if st.phase == "reveal", let r = st.rounds.last {
             let k = "\(m.id):\(st.round)"
-            if let p = r.pixels, p != pixels, R.key == k, !iDraw { pixels = p }
+            if let p = DoodleGuess.full(r.pixels), p != pixels, R.key == k, !iDraw { pixels = p }
             if iDraw, r.pixels == nil, R.key == k, kept != k {
                 kept = k
                 save(Play.doodleKeepDrawing(m, pixels))
@@ -272,7 +272,8 @@ public final class DoodleSession {
             c.subscribe { [weak self] e in
                 guard let self, e.str("by") != me, let mid = e.str("mid"), let n = e.int("n"), let r = e.int("r"), let ops = e["ops"] as? [Any] else { return }
                 let key = "\(mid):\(r)"
-                self.ink[key, default: [:]][n] = ops.compactMap { DoodleGuess.InkOp($0) }
+                // (ink from an older app, drawn on the coarser page, is made today's size)
+                self.ink[key, default: [:]][n] = DoodleGuess.fullOps(ops.compactMap { DoodleGuess.InkOp($0) }, g: e.int("g"))
                 if key == self.R.key { self.recompute() }
             }
         }
@@ -290,7 +291,7 @@ public final class DoodleSession {
     /// a saved page arrived (or was already here): the person drawing picks up where they were; the guesser lays it under the ink
     private func takeDoc(_ d: Doc?) {
         if let d { lastDoc = d }
-        guard let d, !R.key.isEmpty, d.str("mid") == R.mid, d.int("r") == R.r, let px = d.str("pixels"), px.utf8.count == DoodleGuess.w * DoodleGuess.h else { return }
+        guard let d, !R.key.isEmpty, d.str("mid") == R.mid, d.int("r") == R.r, let px = DoodleGuess.full(d.str("pixels")) else { return }
         let n = d.int("n") ?? 0
         if R.drawer {
             // only when coming back to a round already under way, never over what you've drawn since
@@ -323,7 +324,7 @@ public final class DoodleSession {
         let now = clock()
         // counts up through the round, and keeps counting up if you come back halfway through
         nRef = max(nRef + 1, Int(now - (R.startedAt > 0 ? R.startedAt : now)))
-        chan?.send(["by": place.me, "at": now, "mid": R.mid, "r": R.r, "n": nRef, "ops": ops])
+        chan?.send(["by": place.me, "at": now, "mid": R.mid, "r": R.r, "n": nRef, "ops": ops, "g": DoodleGuess.w])
         dirty = true
     }
 
@@ -335,7 +336,7 @@ public final class DoodleSession {
         place.saveDoodleCanvas(d)
     }
 
-    /// the demo room's partner draws too: four cells at a time, a colour at a time
+    /// the demo room's partner draws too: a few cells at a time (2 × 2 of the first page's), a colour at a time
     private func botDraws(_ now: Double) {
         guard demo, drawing, !iDraw, let m = match, let st = state, let word = st.word else {
             bot = nil
@@ -354,8 +355,8 @@ public final class DoodleSession {
             bot = (rk, strokes, 0, 0, now)
         }
         guard var b = bot, b.i < b.strokes.count, now - b.at >= 130 else { return }
-        let bit = b.strokes[b.i..<min(b.i + 4, b.strokes.count)]
-        b.i += 4
+        let bit = b.strokes[b.i..<min(b.i + 16, b.strokes.count)]
+        b.i += 16
         b.n += 1
         b.at = now
         bot = b

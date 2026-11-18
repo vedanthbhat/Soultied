@@ -49,9 +49,37 @@ final class DoodleGuessTests: XCTestCase {
         XCTAssertEqual(DoodleGuess.unpack(DoodleGuess.pack(cells)), cells)
         let p = DoodleGuess.apply(DoodleGuess.blank, [DoodleGuess.InkOp(c: "r", s: DoodleGuess.pack(cells)), DoodleGuess.InkOp(c: ".", s: DoodleGuess.pack([cells[0]]))])
         XCTAssertEqual(p.filter { $0 == "r" }.count, cells.count - 1)
-        XCTAssertEqual(DoodleGuess.apply(p, [DoodleGuess.InkOp(c: "y", s: "*")]), String(repeating: "y", count: 1200))
+        XCTAssertEqual(DoodleGuess.apply(p, [DoodleGuess.InkOp(c: "y", s: "*")]), String(repeating: "y", count: 80 * 60))
         XCTAssertEqual(DoodleGuess.shape("ice cream", hint: true), "I _ _   _ _ _ _ _")
-        XCTAssertEqual(DoodleGuess.botStrokes("fish").count, 56 * 4)
+        // the pretend partner's drawings, 4 × 4 a cell of the art now, and still on the page
+        XCTAssertEqual(DoodleGuess.botStrokes("fish").count, 56 * 16)
+        for k in DoodleGuess.botKeys { XCTAssertTrue(DoodleGuess.botStrokes(k).allSatisfy { $0.0 >= 0 && $0.0 < DoodleGuess.w * DoodleGuess.h }, k) }
+    }
+
+    /// the page is finer now (80 × 60): drawings and ink from older apps (40 × 30) are made today's size, as the website does
+    func testOlderAppsPagesAndInk() throws {
+        let fx = try fixtures()
+        XCTAssertEqual(DoodleGuess.w * DoodleGuess.h, 4 * DoodleGuess.oldW * DoodleGuess.oldH)
+        for z in fx["sizes"] as! [[Any]] {
+            let n = z.map { Int(Values.num($0)!) }
+            XCTAssertEqual(DoodleGuess.brushSize(n[0], rubber: false), n[1])
+            XCTAssertEqual(DoodleGuess.brushSize(n[0], rubber: true), n[2])
+        }
+        let olds = fx["olds"] as! [Doc]
+        XCTAssertEqual(olds.count, 30)
+        for o in olds {
+            XCTAssertEqual(DoodleGuess.full(o.str("px")), o.str("full"))
+            let ops = (o["ops"] as! [Any]).compactMap { DoodleGuess.InkOp($0) }
+            let want = (o["fullOps"] as! [Any]).compactMap { DoodleGuess.InkOp($0) }
+            XCTAssertEqual(DoodleGuess.fullOps(ops, g: o.int("g")), want)
+        }
+        // a cell of the old page covers four of today's
+        let old = String(repeating: ".", count: 41) + "k" + String(repeating: ".", count: 1200 - 42)
+        let big = Array(try XCTUnwrap(DoodleGuess.full(old)).utf8)
+        XCTAssertEqual(big.filter { $0 == UInt8(ascii: "k") }.count, 4)
+        for (x, y) in [(2, 2), (3, 2), (2, 3), (3, 3)] { XCTAssertEqual(big[y * 80 + x], UInt8(ascii: "k")) }
+        XCTAssertNil(DoodleGuess.full("..."))
+        XCTAssertEqual(DoodleGuess.unpack(DoodleGuess.fullOps([DoodleGuess.InkOp(c: "k", s: DoodleGuess.pack([41]))], g: nil)[0].s).sorted(), [162, 163, 242, 243])
     }
 
     func testGamesMatchTheWebsite() throws {
@@ -223,6 +251,55 @@ final class DoodleSessionTests: XCTestCase {
         XCTAssertEqual(pa.games[.doodle]?.last, "ran out of time")
         XCTAssertNil(st.rounds.last?.secs)
         XCTAssertEqual(st.rounds.last?.pixels, sb.pixels)
+        sa.close()
+        sb.close()
+    }
+
+    /// someone on an older app draws on the coarser page: its ink and saved page show up today's size
+    func testInkFromAnOlderApp() async throws {
+        let db = Demo.backend()
+        db.synchronous = true
+        let pa = PlaceModel(db: db, sid: Demo.sid, me: Demo.me)
+        let pb = PlaceModel(db: db, sid: Demo.sid, me: Demo.them)
+        pa.start()
+        pb.start()
+        await settle()
+        let now = { 1_790_000_000_000.0 }
+        let sa = DoodleSession(place: pa, clock: now)
+        let sb = DoodleSession(place: pb, clock: now)
+        sa.sync()
+        sb.sync()
+        sa.start()
+        for _ in 0..<2 {
+            await settle()
+            sa.sync()
+            sb.sync()
+        }
+        let st = try XCTUnwrap(sa.state)
+        sa.choose(st.choices[0])
+        for _ in 0..<2 {
+            await settle()
+            sa.sync()
+            sb.sync()
+        }
+        XCTAssertTrue(sb.drawing && !sb.iDraw)
+        let m = try XCTUnwrap(sa.match)
+        // the older app's ink: no page width, cells on the 40-wide page
+        let line = try XCTUnwrap(pa.liveChannel("doodle"))
+        line.send(["by": Demo.me, "at": now(), "mid": m.id, "r": 1, "n": 1, "ops": [["c": "k", "s": DoodleGuess.pack([0, 41])]]])
+        await settle()
+        let seen = Array(sb.pixels.utf8)
+        XCTAssertEqual(seen.count, 80 * 60)
+        XCTAssertEqual(seen.filter { $0 == UInt8(ascii: "k") }.count, 8)
+        XCTAssertEqual(seen[3 * 80 + 3], UInt8(ascii: "k"))
+        XCTAssertEqual(seen[4 * 80 + 4], UInt8(ascii: "."))
+        // and its saved page, 40 × 30, laid under the ink since
+        let page = String(repeating: "y", count: 40) + String(repeating: ".", count: 1160)
+        pa.saveDoodleCanvas(["mid": m.id, "r": 1, "n": 5, "pixels": page])
+        await settle()
+        XCTAssertEqual(sb.pixels, DoodleGuess.full(page))
+        XCTAssertEqual(sb.pixels.filter { $0 == "y" }.count, 160)
+        line.close()
         sa.close()
         sb.close()
     }

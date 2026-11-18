@@ -216,6 +216,12 @@ if state == 'READY_FOR_BETA_SUBMISSION':
         call('POST', '/v1/betaAppReviewSubmissions', {'data': {'type': 'betaAppReviewSubmissions', 'relationships': {'build': ref('builds', bid)}}})
         state = call('GET', f'/v1/builds/{bid}/buildBetaDetail')['data']['attributes'].get('externalBuildState')
     except Refused as e:
+        # one build at a time goes through beta review: this one waits its turn (and once a build of this version
+        # has been through, Apple usually lets the next ones straight out)
+        if 'already in beta review' in e.text.lower() or 'another build' in e.text.lower():
+            say('notice', f'Build {number} waits: another build is still in Apple\'s beta review. Once that one is approved, '
+                'run this job again (or the next build goes out) to send this one to the testers.')
+            sys.exit(0)
         say('error', f'Apple did not take build {number} for beta review: {e.text}')
         sys.exit(1)
 say('notice', f'Build {number} for outside testers: {state}')

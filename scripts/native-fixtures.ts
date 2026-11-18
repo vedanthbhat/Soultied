@@ -19,7 +19,7 @@ import { TUG } from '../src/games/tug';
 import { RPS } from '../src/games/rps';
 import { QUICK } from '../src/games/quickdraw';
 import { COUNTDOWN_MS, type LiveDef, seeded } from '../src/games/live/lobby';
-import { WORDS, brushLine, fillCells, judge, pickChoices } from '../src/games/doodle';
+import { DH, DW, OLD_DH, OLD_DW, WORDS, brushLine, brushSize, fillCells, fullCanvas, fullOps, judge, packCells, pickChoices } from '../src/games/doodle';
 import { COASTERS } from '../src/games/coasters';
 import { KITCHEN } from '../src/games/kitchen';
 import { ROOMS } from '../src/escape/rooms';
@@ -29,6 +29,7 @@ import { parseYouTubeId, parseYouTubeStart } from '../src/watch/youtubeLink';
 import { renderWatchRoom, type WatchState } from '../src/pixel/watchRoom';
 import { renderRoom, type RoomState } from '../src/pixel/room';
 import { START_DECOR } from '../src/decor/catalogue';
+import { TOUCHES } from '../src/together/moods';
 import { fireOf, type CouchState } from '../src/couch';
 import { daysLeft, normalizeVisit, visitLine } from '../src/together/visit';
 import { christmasSeason } from '../src/season';
@@ -321,16 +322,30 @@ for (let i = 0; i < 1500; i++) {
   judges.push([g, w, judge(g, w)]);
 }
 const brushes = Array.from({ length: 400 }, () => {
-  const a = [int(50) - 5, int(40) - 5, int(50) - 5, int(40) - 5, 1 + int(3)];
+  const a = [int(DW + 10) - 5, int(DH + 10) - 5, int(DW + 10) - 5, int(DH + 10) - 5, 1 + int(6)];
   return [...a, brushLine(a[0], a[1], a[2], a[3], a[4])];
 });
 const fills = Array.from({ length: 60 }, () => {
   const cols = ['.', 'k', 'r', 'y'];
   let p = '';
-  for (let i = 0; i < 40 * 30; i++) p += i % 40 === 0 || int(5) === 0 ? pickOf(cols) : p[i - 1];
-  const start = int(40 * 30);
+  for (let i = 0; i < DW * DH; i++) p += i % DW === 0 || int(5) === 0 ? pickOf(cols) : p[i - 1];
+  const start = int(DW * DH);
   return [p, start, fillCells(p, start)];
 });
+// drawings and ink from older apps, on the first, coarser page, made today's size; and the brush sizes offered
+const olds = Array.from({ length: 30 }, (_, k) => {
+  const cols = ['.', 'k', 'r', 'y', 'w'];
+  let p = '';
+  for (let i = 0; i < OLD_DW * OLD_DH; i++) p += int(4) === 0 ? pickOf(cols) : p[i - 1] || '.';
+  // (now and then one that isn't a page at all)
+  const px = k === 0 ? p.slice(1) : k === 1 ? '.'.repeat(DW * DH) : p;
+  const ops = Array.from({ length: 1 + int(3) }, () =>
+    int(5) === 0 ? { c: pickOf(cols), s: '*' } : { c: pickOf(cols), s: packCells(Array.from({ length: 1 + int(20) }, () => int(OLD_DW * OLD_DH + 3) - 1)) }
+  );
+  const g = pickOf([undefined, OLD_DW, DW]);
+  return { px, full: fullCanvas(px), ops, g: g ?? null, fullOps: fullOps(ops, g) };
+});
+const sizes = [1, 2, 3].map((pick) => [pick, brushSize(pick, false), brushSize(pick, true)]);
 const choices = Array.from({ length: 200 }, () => {
   const seed = int(2 ** 31);
   const avoid = Array.from({ length: int(6) }, () => pickOf(WORDS));
@@ -559,6 +574,21 @@ const roomScenes: RoomScene[] = [];
     { left: 0, right: 1, t: 2.35, christmas: true },
     { left: 3, right: 4, t: 5.55, christmas: true, closeness: 0.6, decor: { view: 'rain', plant: 'cactus', pet: 'pug' }, petCare: { fed: true, played: true, cuddled: true, both: true, waiting: false, level: 3 } },
     { left: 5, right: -1, t: 0.9, christmas: true, bare: true, decor: { view: 'aurora' } },
+    // every touch its own way, from either side, apart and already snug, at moments through it (the room's clock
+    // at moments the scenes above already use: the firelight's flicker isn't what's being checked here)
+    ...TOUCHES.flatMap((d, k) =>
+      // (none right on a moment something starts or stops, where a rounding error either side would tell)
+      [0.13, 0.37, 0.61, 0.67, 0.81, 0.97, 1.21, 1.57, 1.91, 2.31, 2.73].map((age, i) => {
+        const t = [7.9, 2.7, 5.1, 20.2, 11.45, 1.3, 3.3][(k + i) % 7];
+        return {
+          left: (k + i) % 16,
+          right: (k + i + 5) % 16,
+          t,
+          closeness: i % 3 === 2 ? 1 : i % 3 === 1 ? 0.4 : 0,
+          touch: { kind: d.id, together: d.together, from: i % 2 ? 'right' : 'left', at: t - age, glyph: { rows: d.rows, pal: d.pal } },
+        };
+      })
+    ),
   ];
   const seat = (l: number, status = 'online') => (l >= 0 ? { avatar: looks[l], name: 'x', status } : { avatar: null, name: '', status: 'empty' });
   for (const sc of scenes) {
@@ -949,5 +979,5 @@ const ranks = {
 };
 
 const out = process.argv[2] || 'native-fixtures.json';
-writeFileSync(out, JSON.stringify({ cards, days, hashes, rngSeq, streaks, demo, same, chapters, games, live, doodle: { judges, brushes, fills, choices, games: doodles }, coasters: coasterSteps, escape, record, watch: { looks, ...watch }, wall: { doodles: wallDoodles }, room: { scenes: roomScenes, fires, visits, seasons }, snaps, recaps: { cases: recaps, months: recapMonths }, wheres, buckets, voices, carromFrames, ranks, pet: { docs: pets, ...petWords }, tapes }));
+writeFileSync(out, JSON.stringify({ cards, days, hashes, rngSeq, streaks, demo, same, chapters, games, live, doodle: { judges, brushes, fills, choices, games: doodles, olds, sizes }, coasters: coasterSteps, escape, record, watch: { looks, ...watch }, wall: { doodles: wallDoodles }, room: { scenes: roomScenes, fires, visits, seasons }, snaps, recaps: { cases: recaps, months: recapMonths }, wheres, buckets, voices, carromFrames, ranks, pet: { docs: pets, ...petWords }, tapes }));
 console.log(`wrote ${cards.length} card days, ${streaks.length} streaks, ${demo.length} demo rooms, ${games.length} game moves, ${live.length} live games, ${doodles.length} doodle moves to ${out}`);

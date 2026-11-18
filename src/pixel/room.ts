@@ -2077,7 +2077,93 @@ function drawMoodBubble(L: Layer, g: Glyph, cx: number, headY: number, side: 'le
   );
 }
 
-/** A touch's picture, floating up from between them (or popping over the one who got booped). */
+/** How a touch moves them on the couch: heads leaning in (or away), a hop, both rocking together. `p` comes in
+ *  as they'd sit anyway and is changed in place. */
+function touchPose(tc: RoomTouch, age: number, holding: boolean, p: { leanL: number; leanR: number; liftL: number; liftR: number; sway: number }) {
+  const fromL = tc.from === 'left';
+  if (tc.kind === 'boop') {
+    // whoever sent it leans right over; the other flinches back, with a little hop
+    if (age < 0.6) {
+      if (fromL) p.leanL = 3;
+      else p.leanR = -3;
+    }
+    if (age >= 0.3 && age < 0.9) {
+      if (fromL) p.leanR = 1;
+      else p.leanL = -1;
+    }
+    if (age >= 0.3 && age < 0.45) {
+      if (fromL) p.liftR = 1;
+      else p.liftL = 1;
+    }
+    return;
+  }
+  if (!holding) return;
+  const a = age - 0.5;
+  if (tc.kind === 'hug') {
+    // heads together, rocking side to side
+    p.leanL = 2;
+    p.leanR = -2;
+    if (a < 1.6) p.sway = Math.round(Math.sin(a * 5));
+  } else if (tc.kind === 'kiss') {
+    // a peck, then close
+    p.leanL = a >= 0.12 && a < 0.42 ? 3 : 2;
+    p.leanR = -p.leanL;
+  } else if (tc.kind === 'forehead') {
+    // whoever sent it sits up and leans over; the other stays still
+    if (fromL) {
+      p.leanL = 3;
+      p.leanR = 0;
+      p.liftL = 1;
+    } else {
+      p.leanR = -3;
+      p.leanL = 0;
+      p.liftR = 1;
+    }
+  } else if (tc.kind === 'highfive') {
+    // sitting up, and a hop together as their hands meet
+    p.leanL = 0;
+    p.leanR = 0;
+    if (a >= 0.05 && a < 0.3) {
+      p.liftL = 1;
+      p.liftR = 1;
+    }
+  } else if (tc.kind === 'hands') {
+    // side by side, heads up
+    p.leanL = 0;
+    p.leanR = 0;
+  }
+}
+
+/** a little heart, 3 across */
+const MINI_HEART = ['#.#', '###', '.#.'];
+function miniHeart(L: Layer, x: number, y: number, c: string, a: number) {
+  const x0 = Math.round(x);
+  const y0 = Math.round(y);
+  MINI_HEART.forEach((row, j) =>
+    [...row].forEach((k, i) => {
+      if (k === '#') L.glow(x0 + i, y0 + j, c, a);
+    })
+  );
+}
+
+/** a twinkle: one bright pixel, or a little plus */
+function twinkle(L: Layer, x: number, y: number, c: string, a: number, big: boolean) {
+  const x0 = Math.round(x);
+  const y0 = Math.round(y);
+  L.glow(x0, y0, c, a);
+  if (!big) return;
+  const b = Math.round(a * 0.6);
+  L.glow(x0 - 1, y0, c, b);
+  L.glow(x0 + 1, y0, c, b);
+  L.glow(x0, y0 - 1, c, b);
+  L.glow(x0, y0 + 1, c, b);
+}
+
+/** fading in over `inn` seconds and out over the last `out` of `len`, 0 to 255 */
+const fadeAt = (e: number, len: number, inn: number, out: number) =>
+  e < 0 || e > len ? 0 : Math.round(255 * Math.min(1, inn > 0 ? e / inn : 1, out > 0 ? (len - e) / out : 1));
+
+/** A touch's picture and its little extras: each one its own (see touchPose for how they move). */
 function drawTouchFx(L: Layer, tc: RoomTouch, age: number, lx: number, rx: number, headL: number, headR: number) {
   const g = tc.glyph;
   const gw = Math.max(...g.rows.map((r) => r.length));
@@ -2088,29 +2174,119 @@ function drawTouchFx(L: Layer, tc: RoomTouch, age: number, lx: number, rx: numbe
         if (c) L.glow(Math.round(x) + i, Math.round(y) + j, c, a);
       })
     );
+  const mid = (lx + rx) / 2;
+  const top = Math.min(headL || 999, headR || 999);
+  const topY = top < 999 ? top : COUCH.seatY - 30;
+  const fromL = tc.from === 'left';
+  // the one it was for
+  const toX = fromL ? rx : lx;
+  const toY = (fromL ? headR : headL) || COUCH.seatY - 30;
+  /** the picture rising from (x, y), from `start` seconds in */
+  const rise = (x: number, y: number, start: number) => {
+    if (age < start) return;
+    const k = age - start;
+    const a = Math.round(255 * Math.min(1, Math.max(0, (TOUCH_LEN - age) / 0.7)));
+    put(x - Math.floor(gw / 2) + Math.sin(k * 4) * 1.2, y - k * 5, a);
+  };
+
   if (tc.kind === 'boop') {
-    // a "!" over the one who got booped
-    if (age < 0.35 || age > 1.6) return;
-    const tx = tc.from === 'left' ? rx : lx;
-    const hy = (tc.from === 'left' ? headR : headL) || COUCH.seatY - 30;
-    put(tx - Math.floor(gw / 2), hy - 9 - Math.min(2, (age - 0.35) * 6), 255);
+    // a "!" over the one who got booped, and stars round their face
+    if (age >= 0.35 && age <= 1.6) put(toX - Math.floor(gw / 2), toY - 9 - Math.min(2, (age - 0.35) * 6), 255);
+    if (age >= 0.35 && age < 0.95) {
+      const e = age - 0.35;
+      const stars = [
+        [-7, 3],
+        [7, 2],
+        [-5, -2],
+        [6, -3],
+      ];
+      stars.forEach(([dx, dy], i) => {
+        if (Math.floor(e * 10 + i) % 2 === 0) twinkle(L, toX + dx * (1 + e * 0.5), toY + 5 + dy, '#f2d66b', fadeAt(e, 0.6, 0, 0.25), i % 2 === 0);
+      });
+    }
     return;
   }
   if (tc.kind === 'highfive') {
-    // a flash where their hands meet, then it floats off
+    // the clap: a burst of rays between them, a flash over their heads, and it floats off
+    const cy = topY + 3;
+    if (age >= 0.55 && age < 1.15) {
+      const e = age - 0.55;
+      const d = 4 + e * 14;
+      const a = fadeAt(e, 0.6, 0, 0.45);
+      for (const [dx, dy] of [
+        [1, 0],
+        [1, 1],
+        [0, 1],
+        [-1, 1],
+        [-1, 0],
+        [-1, -1],
+        [0, -1],
+        [1, -1],
+      ]) {
+        L.glow(Math.round(mid + dx * d), Math.round(cy + dy * d), '#f2d66b', a);
+        L.glow(Math.round(mid + dx * (d + 1)), Math.round(cy + dy * (d + 1)), '#fff1c9', a);
+      }
+    }
     if (age < 0.55) return;
     const a = age < 1.1 ? (Math.floor(age * 12) % 2 ? 255 : 170) : Math.round(255 * Math.max(0, (TOUCH_LEN - age) / (TOUCH_LEN - 1.1)));
-    put((lx + rx) / 2 - Math.floor(gw / 2), COUCH.seatY - 34 - Math.max(0, age - 1.1) * 5, a);
+    put(mid - Math.floor(gw / 2), COUCH.seatY - 34 - Math.max(0, age - 1.1) * 5, a);
     return;
   }
-  // a hug, a kiss, a forehead kiss, holding hands: rises from between them once they're close
-  const start = 0.55;
-  if (age < start) return;
-  const k = age - start;
-  const a = Math.round(255 * Math.min(1, Math.max(0, (TOUCH_LEN - age) / 0.7)));
-  const top = Math.min(headL || 999, headR || 999);
-  const y = (top < 999 ? top - 8 : COUCH.seatY - 38) - k * 5;
-  put((lx + rx) / 2 - Math.floor(gw / 2) + Math.sin(k * 4) * 1.2, y, a);
+  if (tc.kind === 'hug') {
+    // little hearts squeezed out to either side, then the big one rises
+    for (let i = 0; i < 4; i++) {
+      const s = age - 0.6 - i * 0.2;
+      if (s < 0 || s > 0.9) continue;
+      const side = i % 2 ? 1 : -1;
+      miniHeart(L, mid - 1 + side * (6 + s * 9), topY + 9 - s * 8, i % 2 ? '#ef8f88' : '#d9534f', fadeAt(s, 0.9, 0, 0.4));
+    }
+    rise(mid, topY - 8, 0.9);
+    return;
+  }
+  if (tc.kind === 'kiss') {
+    // a twinkle where they meet, then the kiss rises with little hearts trailing after
+    if (age >= 0.62 && age < 1.0) twinkle(L, mid, topY + 3, Math.floor((age - 0.62) * 14) % 2 ? '#ef8f88' : '#fff1c9', 255, true);
+    for (let i = 0; i < 3; i++) {
+      const s = age - 1.15 - i * 0.3;
+      if (s < 0 || s > 1.2) continue;
+      miniHeart(L, mid - 1 + Math.sin(s * 6 + i) * 2, topY - 1 - s * 8, '#ef8f88', fadeAt(s, 1.2, 0.15, 0.5));
+    }
+    rise(mid, topY - 8, 0.95);
+    return;
+  }
+  if (tc.kind === 'forehead') {
+    // a soft glow over their forehead, twinkling round it, and the kiss rises from there
+    if (age >= 0.6 && age < 2.2) {
+      const e = age - 0.6;
+      const arc = [
+        [-5, 0],
+        [-3, -2],
+        [0, -3],
+        [3, -2],
+        [5, 0],
+      ];
+      const lit = Math.floor(e * 7) % arc.length;
+      arc.forEach(([dx, dy], i) => twinkle(L, toX + dx, toY - 2 + dy, '#fff1c9', i === lit ? fadeAt(e, 1.6, 0.2, 0.4) : Math.round(fadeAt(e, 1.6, 0.2, 0.4) * 0.45), i === lit));
+    }
+    rise(toX, toY - 9, 1.0);
+    return;
+  }
+  if (tc.kind === 'hands') {
+    // the two hearts, linked, where their hands are, beating; now and then a little one floats up over them
+    const hy = COUCH.seatY - 11;
+    if (age >= 0.55) {
+      const beat = Math.floor((age - 0.55) * 3) % 2 ? -1 : 0;
+      put(mid - Math.floor(gw / 2), hy + beat, Math.round(255 * Math.min(1, Math.max(0, (TOUCH_LEN - age) / 0.7))));
+    }
+    for (let i = 0; i < 2; i++) {
+      const s = age - 0.9 - i * 0.6;
+      if (s < 0 || s > 1.1) continue;
+      miniHeart(L, mid - 1 + (i % 2 ? 2 : -2) + Math.sin(s * 5), topY - 4 - s * 8, '#e0685f', fadeAt(s, 1.1, 0.15, 0.45));
+    }
+    return;
+  }
+  // anything else: rises from between them once they're close
+  rise(mid, topY - 8, 0.55);
 }
 
 function drawEmptySeat(L: Layer, cx: number, t: number, hover: boolean) {
@@ -2449,25 +2625,17 @@ export function renderRoom(state: RoomState, t: number): PixelBuffer {
   const lift = (state.scooting || sliding) && Math.floor(t * 8) % 2 === 0 ? 1 : 0;
   const snug = closeness >= 1 && !state.scooting && !leftEmpty && !rightEmpty;
   const holding = pull >= 1;
-  let leanL = snug || holding ? 1 : 0;
-  let leanR = snug || holding ? -1 : 0;
-  if (holding && (tc!.kind === 'kiss' || tc!.kind === 'forehead')) {
-    leanL = 2;
-    leanR = -2;
-  }
-  // a boop: whoever sent it leans over for a moment
-  if (playing && tc!.kind === 'boop' && age < 1.1) {
-    if (tc!.from === 'left') leanL = Math.max(leanL, 2);
-    else leanR = Math.min(leanR, -2);
-  }
+  // each touch its own way: leaning in (or away), a hop, rocking together
+  const pose = { leanL: snug || holding ? 1 : 0, leanR: snug || holding ? -1 : 0, liftL: lift, liftR: lift, sway: 0 };
+  if (playing) touchPose(tc!, age, holding, pose);
   const moods = state.moods || {};
   if (!state.bare) {
     let headL = 0;
     let headR = 0;
     if (leftEmpty) drawEmptySeat(L, lx, t, state.hover === 'left');
-    else headL = seatCharacter(L, state.left, lx, t, 0, state.hover === 'left', lift, leanL, !!moods.left);
+    else headL = seatCharacter(L, state.left, lx + pose.sway, t, 0, state.hover === 'left', pose.liftL, pose.leanL, !!moods.left);
     if (rightEmpty) drawEmptySeat(L, rx, t, state.hover === 'right');
-    else headR = seatCharacter(L, state.right, rx, t, 1.7, state.hover === 'right', lift, leanR, !!moods.right);
+    else headR = seatCharacter(L, state.right, rx + pose.sway, t, 1.7, state.hover === 'right', pose.liftR, pose.leanR, !!moods.right);
     drawThread(L, state, t, lx, rx);
     const heartAt = state.heartAt ?? -1;
     if (playing) drawTouchFx(L, tc!, age, lx, rx, headL, headR);

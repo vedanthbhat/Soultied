@@ -4,6 +4,7 @@ import { useStreamHub } from '../stream/StreamHub';
 import { useTurntable } from '../music/TurntableContext';
 import { ARTIST, LICENSE, LICENSE_URL, SOURCE_URL } from '../music/records';
 import { describeYouTubeError, loadYouTubeApi, YTPlayer, YTState } from '../watch/youtube';
+import { songStalled, songStep, songSync } from '../music/songSync';
 import { Sprite } from './games/Pixel';
 
 const RECORD = ['..kkkkk..', '.kkgkgkk.', 'kkkkkkkkk', 'kgkrrrkgk', 'kkkrwrkkk', 'kgkrrrkgk', 'kkkkkkkkk', '.kkgkgkk.', '..kkkkk..'];
@@ -12,8 +13,6 @@ const PAL = { k: '#1f1718', g: '#3a3035', r: '#b8674f', w: '#efdcb8' };
 /** YouTube's player has to stay visible, at least 200 by 200, with nothing on top of it. */
 const PLAYER_W = 240;
 const PLAYER_H = 200;
-/** how far apart the two of you can drift before it nudges back (seconds) */
-const DRIFT = 2.5;
 
 const Spin: React.FC<{ on: boolean }> = ({ on }) => (
   <span className={`shrink-0 ${on ? 'np-spin' : ''}`} aria-hidden="true">
@@ -220,6 +219,8 @@ const SongPlayer: React.FC<{
   want.current = { play, volume };
   const endedRef = useRef(false);
   const tries = useRef(0);
+  /** how it's been keeping up (see music/songSync.ts) */
+  const sync = useRef(songSync());
 
   const at = () => Math.max(0, (Date.now() - startedAt) / 1000);
 
@@ -235,18 +236,17 @@ const SongPlayer: React.FC<{
       return;
     }
     const st = p.getPlayerState();
+    // (a tap to listen starts it whatever it's doing)
+    const step = fromGesture && want.current.play && st !== YTState.PLAYING ? 'seekPlay' : songStep(sync.current, st, p.getCurrentTime?.() || 0, at(), Date.now(), want.current.play);
     if (!want.current.play) {
-      if (st === YTState.PLAYING || st === YTState.BUFFERING) p.pauseVideo();
+      if (step === 'pause') p.pauseVideo();
       cb.current.onHearing(false);
       return;
     }
-    if (st === YTState.PLAYING) {
-      tries.current = 0;
-      if (Math.abs(p.getCurrentTime() - at()) > DRIFT) p.seekTo(at(), true);
-      return;
-    }
-    if (st === YTState.BUFFERING && !fromGesture) return;
-    p.seekTo(at(), true);
+    if (st === YTState.PLAYING) tries.current = 0;
+    if (step === 'seek') p.seekTo(at(), true);
+    if (step !== 'play' && step !== 'seekPlay') return;
+    if (step === 'seekPlay') p.seekTo(at(), true);
     p.playVideo();
     // still not playing after a couple of tries: the browser wants a tap first
     if (++tries.current >= 3 && !fromGesture) cb.current.onBlocked(true);
@@ -287,6 +287,7 @@ const SongPlayer: React.FC<{
                 const t = e.target.getVideoData?.().title;
                 if (t) cb.current.onTitle(t);
               } else if (e.data === YTState.PAUSED) cb.current.onHearing(false);
+              else if (e.data === YTState.BUFFERING) songStalled(sync.current, Date.now());
               else if (e.data === YTState.ENDED && !endedRef.current) {
                 endedRef.current = true;
                 cb.current.onHearing(false);

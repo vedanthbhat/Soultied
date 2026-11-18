@@ -11,8 +11,12 @@ import Foundation
  */
 
 public enum DoodleGuess {
-    public static let w = 40
-    public static let h = 30
+    /// the page: 80 × 60 (finer than the first 40 × 30, which was too coarse to draw much on a phone)
+    public static let w = 80
+    public static let h = 60
+    /// the first page, which drawings and ink from older apps are still on
+    public static let oldW = 40
+    public static let oldH = 30
     public static let rounds = 6
     public static let drawSeconds = 80
     /// the first letter shows up as a hint with this many seconds left
@@ -24,6 +28,29 @@ public enum DoodleGuess {
     public static let inkNames: [Character: String] = ["k": "black", "r": "red", "y": "yellow", "g": "green", "b": "blue", "p": "pink", "n": "brown", "w": "white"]
     public static let paper = "#f4e8d0"
     public static var blank: String { String(repeating: ".", count: w * h) }
+
+    /// a page at today's size (each cell of one from an older app made 2 × 2), or nil for something that isn't one
+    public static func full(_ px: String?) -> String? {
+        guard let px else { return nil }
+        let a = Array(px.utf8)
+        if a.count == w * h { return px }
+        guard a.count == oldW * oldH else { return nil }
+        var out = [UInt8]()
+        out.reserveCapacity(w * h)
+        for y in 0..<h {
+            let row = (y >> 1) * oldW
+            for x in 0..<w { out.append(a[row + (x >> 1)]) }
+        }
+        return String(decoding: out, as: UTF8.self)
+    }
+
+    /// the brush sizes offered (thin, medium, thick), as the size brushLine takes; the rubber's a little bigger
+    public static let penSizes = [1, 2, 4]
+    public static let rubberSizes = [3, 4, 6]
+    public static func brushSize(_ pick: Int, rubber: Bool) -> Int {
+        let i = max(0, min(2, pick - 1))
+        return (rubber ? rubberSizes : penSizes)[i]
+    }
 
     public static let words = [
         "airport", "suitcase", "train", "postcard", "envelope", "phone", "coffee", "pizza", "popcorn", "couch", "fireplace", "moon",
@@ -176,6 +203,21 @@ public enum DoodleGuess {
         public var doc: Doc { ["c": String(c), "s": s] }
     }
 
+    /// ink from an older app (drawn on the 40 × 30 page) laid onto today's: each cell becomes the 2 × 2 it covers.
+    /// `g` is how wide the page it was drawn on is (nil: an older app's)
+    public static func fullOps(_ ops: [InkOp], g: Int?) -> [InkOp] {
+        if g == w { return ops }
+        return ops.map { op in
+            if op.s == "*" { return op }
+            var out: [Int] = []
+            for c in unpack(op.s) where c >= 0 && c < oldW * oldH {
+                let x = (c % oldW) * 2, y = (c / oldW) * 2
+                out += [y * w + x, y * w + x + 1, (y + 1) * w + x, (y + 1) * w + x + 1]
+            }
+            return InkOp(c: op.c, s: pack(out))
+        }
+    }
+
     public static func apply(_ pixels: String, _ ops: [InkOp]) -> String {
         var p = pixels
         for op in ops { p = op.s == "*" ? String(repeating: op.c, count: w * h) : paint(p, unpack(op.s), op.c) }
@@ -200,7 +242,8 @@ public enum DoodleGuess {
     /// the pretend partner's drawing of `key`, centred, as (cell, colour)
     public static func botStrokes(_ key: String) -> [(Int, Character)] {
         let art = botDoodles[key] ?? botDoodles["sun"]!
-        let scale = 2
+        // (drawn for the first page at 2 × 2 a cell, so twice that now)
+        let scale = 2 * w / oldW
         let aw = art[0].count * scale, ah = art.count * scale
         let ox = (w - aw) / 2, oy = (h - ah) / 2
         var out: [(Int, Character)] = []

@@ -390,21 +390,14 @@ func renderRoom(_ L: Layer, _ state: RoomState, _ t: Double) {
     let lift: Double = (state.scooting || sliding) && Int(fl(t * 8)) % 2 == 0 ? 1 : 0
     let snug = closeness >= 1 && !state.scooting && !leftEmpty && !rightEmpty
     let holding = pull >= 1
-    var leanL: Double = snug || holding ? 1 : 0
-    var leanR: Double = snug || holding ? -1 : 0
-    if holding && (tc!.kind == "kiss" || tc!.kind == "forehead") {
-        leanL = 2
-        leanR = -2
-    }
-    // a boop: whoever sent it leans over for a moment
-    if playing && tc!.kind == "boop" && age < 1.1 {
-        if tc!.from == .left { leanL = max(leanL, 2) } else { leanR = min(leanR, -2) }
-    }
+    // each touch its own way: leaning in (or away), a hop, rocking together
+    var pose = TouchPose(leanL: snug || holding ? 1 : 0, leanR: snug || holding ? -1 : 0, liftL: lift, liftR: lift)
+    if playing { touchPose(tc!, age, holding, &pose) }
     if !state.bare {
         var headL = 0.0
         var headR = 0.0
-        if leftEmpty { drawEmptySeat(L, lx, t, state.hover == .left) } else { headL = seatCharacter(L, state.left, lx, t, 0, state.hover == .left, lift, leanL, state.moodLeft != nil) }
-        if rightEmpty { drawEmptySeat(L, rx, t, state.hover == .right) } else { headR = seatCharacter(L, state.right, rx, t, 1.7, state.hover == .right, lift, leanR, state.moodRight != nil) }
+        if leftEmpty { drawEmptySeat(L, lx, t, state.hover == .left) } else { headL = seatCharacter(L, state.left, lx + pose.sway, t, 0, state.hover == .left, pose.liftL, pose.leanL, state.moodLeft != nil) }
+        if rightEmpty { drawEmptySeat(L, rx, t, state.hover == .right) } else { headR = seatCharacter(L, state.right, rx + pose.sway, t, 1.7, state.hover == .right, pose.liftR, pose.leanR, state.moodRight != nil) }
         drawThread(L, state, t, lx, rx)
         let heartAt = state.heartAt
         if playing { drawTouchFx(L, tc!, age, lx, rx, headL, headR) }

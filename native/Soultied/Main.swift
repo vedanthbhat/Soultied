@@ -91,6 +91,8 @@ struct MainView: View {
                     if tab == .us { UsView(app: app, place: place) }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                // on a call: every tab sits under a band with a frame where FaceTime's window fits (CallWatch.swift)
+                .callBand(place)
                 // Soultied Plus, when something under the tabs asks for it (Plus.swift)
                 .plusSheet(place)
                 if !tvSideways { TabBar(tab: $tab, place: place) }
@@ -104,16 +106,14 @@ struct MainView: View {
             }
             Toasts(place: place, onHome: roomSideways || (tab == .home && sheet == nil), onLetter: { go(.letters) })
                 .padding(.bottom, roomSideways || tvSideways ? 12 : 84)
-            // on FaceTime: where its little window fits, for a few seconds (CallWatch.swift)
-            if !sideways { CallSlot(name: place.theirName) }
         }
-        .fullScreenCover(isPresented: $escape) { EscapeScreen(place: place) }
+        .fullScreenCover(isPresented: $escape) { EscapeScreen(place: place).callBand(place) }
         .sheet(item: $sheet) { s in
             sheetView(s)
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Color.paper)
         }
-        .fullScreenCover(item: $game) { k in GameScreen(place: place, kind: k) }
+        .fullScreenCover(item: $game) { k in GameScreen(place: place, kind: k).callBand(place) }
         // the record player: its sound follows the place's record, whichever tab you're on
         .onAppear {
             RecordDeck.shared.attach(place)

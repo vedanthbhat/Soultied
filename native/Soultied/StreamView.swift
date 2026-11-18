@@ -176,6 +176,8 @@ final class StreamWebSession: NSObject, WKScriptMessageHandler, WKNavigationDele
     var shown = false
     var page = StreamPageNews()
     let web: WKWebView
+    /// the player's full-screen button was pressed (true) or pressed again (false)
+    @ObservationIgnored var onFullscreen: ((Bool) -> Void)?
     @ObservationIgnored private weak var hub: StreamHub?
     @ObservationIgnored private var watchers: [NSKeyValueObservation] = []
 
@@ -192,7 +194,9 @@ final class StreamWebSession: NSObject, WKScriptMessageHandler, WKNavigationDele
         cfg.mediaTypesRequiringUserActionForPlayback = []
         cfg.allowsPictureInPictureMediaPlayback = true
         cfg.defaultWebpagePreferences.preferredContentMode = .desktop
-        cfg.preferences.isElementFullscreenEnabled = true
+        // (the players' full-screen button is answered in the page instead: WebKit's own full-screen window goes
+        // black with these players and fights the app turning sideways; see extension/src/ios/page.ts)
+        cfg.preferences.isElementFullscreenEnabled = false
         cfg.preferences.javaScriptCanOpenWindowsAutomatically = true
         let ucc = cfg.userContentController
         // in the page itself, before the site's code: the iPhone's managed media source under the usual name
@@ -252,6 +256,11 @@ final class StreamWebSession: NSObject, WKScriptMessageHandler, WKNavigationDele
     /// the show stops when you close the browser (your person's player says you've stepped away)
     func pause() { web.pauseAllMediaPlayback(completionHandler: nil) }
 
+    /// the app turned it upright: the player's told it's out of full screen (so its button shows the right way)
+    func leaveFullscreen() {
+        web.evaluateJavaScript("window.__soultiedFullscreen && window.__soultiedFullscreen(false)", in: nil, in: .page) { _ in }
+    }
+
     /// every line from the page's player is cut, so it connects afresh
     func reset() {
         web.evaluateJavaScript("window.__soultiedAppReset && window.__soultiedAppReset()", in: nil, in: Self.world) { _ in }
@@ -282,6 +291,10 @@ final class StreamWebSession: NSObject, WKScriptMessageHandler, WKNavigationDele
             return
         }
         // the page's news (extension/src/ios/page.ts)
+        if d["kind"] as? String == "fullscreen" {
+            onFullscreen?(d["on"] as? Bool ?? false)
+            return
+        }
         var p = page
         switch d["kind"] as? String {
         case "offers":
@@ -434,6 +447,7 @@ struct StreamView: View {
         h.onOpenHub = { leave() }
         let s = deck.session(for: site, hub: h)
         session = s
+        s.onFullscreen = { on in fullscreen(on) }
         if let start { s.go(start) } else if s.web.url == nil { s.go(site.home) }
         // already warm and nowhere new to go: no curtain
         if s.shown && start == nil { curtain = false }
@@ -463,6 +477,22 @@ struct StreamView: View {
         OrientationGate.shared.setCover(.allButUpsideDown)
     }
 
+    /// the player's own full-screen button: sideways, edge to edge, the bar out of the way at once; pressed again,
+    /// upright with the bar (as the phone button does)
+    private func fullscreen(_ on: Bool) {
+        if on {
+            upright = false
+            turnSideways()
+            barTimer?.cancel()
+            withAnimation(.easeOut(duration: 0.25)) { barShown = false }
+        } else {
+            upright = true
+            locked = false
+            OrientationGate.shared.setCover(.portrait)
+            showBar(stay: true)
+        }
+    }
+
     /// the bar's phone button: upright (and kept that way this time), or back to sideways
     private func flip() {
         Haptics.tap()
@@ -470,6 +500,7 @@ struct StreamView: View {
             upright = true
             locked = false
             OrientationGate.shared.setCover(.portrait)
+            session?.leaveFullscreen()
         } else {
             upright = false
             turnSideways()
@@ -485,6 +516,8 @@ struct StreamView: View {
     }
 
     private func close() {
+        session?.onFullscreen = nil
+        session?.leaveFullscreen()
         session?.pause()
         deck.done()
         barTimer?.cancel()

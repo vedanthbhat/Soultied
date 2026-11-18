@@ -15,7 +15,7 @@ struct DoodlePage: View {
         var data = [UInt8](repeating: 255, count: w * h * 4)
         let paper = RGB(DoodleGuess.paper)
         let inks = DoodleGuess.inks.mapValues { RGB($0) }
-        for (i, b) in pixels.utf8.enumerated() where i < w * h {
+        for (i, b) in (DoodleGuess.full(pixels) ?? DoodleGuess.blank).utf8.enumerated() where i < w * h {
             let c = inks[Character(UnicodeScalar(b))] ?? paper
             data[i * 4] = c.r
             data[i * 4 + 1] = c.g

@@ -19,7 +19,6 @@ struct HomeView: View {
     var openGame: (GameKind) -> Void = { _ in }
     @Environment(\.displayScale) private var displayScale
     /// on FaceTime: its little window sits in the top corner, so the jar of stitches moves out of its way
-    @State private var call = CallWatch.shared
 
     var body: some View {
         GeometryReader { geo in
@@ -109,10 +108,8 @@ struct HomeView: View {
             }
             .accessibilityLabel("\(place.stitches) stitches. Decorate the room.")
         }
-        .padding(.leading, 16)
-        .padding(.trailing, call.onCall ? CallSlot.width + 20 : 16)
+        .padding(.horizontal, 16)
         .padding(.vertical, 10)
-        .animation(.easeOut(duration: 0.25), value: call.onCall)
     }
 
     /// your names, just under the couch: tap yourself for your mood, your person to send a touch

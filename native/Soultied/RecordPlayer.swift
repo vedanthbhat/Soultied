@@ -24,6 +24,8 @@ final class RecordDeck {
     private(set) var mutedForMe: Bool
     /// a song from YouTube is playing here (its player says so)
     var songHearing = false
+    /// a song's player is open here (so the sound stays on music while it stops to fetch)
+    @ObservationIgnored var songOpen = false
 
     @ObservationIgnored private weak var place: PlaceModel?
     @ObservationIgnored private var player: AVAudioPlayer?
@@ -212,12 +214,15 @@ final class RecordDeck {
 
     /// Music plays with the ring switch on silent, like any music app, and mixes with whatever else is playing.
     /// Otherwise the room's little sounds follow the switch (see Chiptune).
+    ///
+    /// Only changed when it needs to be: changing it while a song's coming out of YouTube's player makes the
+    /// sound drop for a moment, and it was being set again on every hiccup. While a song's player is open
+    /// (and not muted here) it stays on music, even while the song stops to fetch.
     func session(_ music: Bool) {
         let s = AVAudioSession.sharedInstance()
-        if music {
-            try? s.setCategory(.playback, options: [.mixWithOthers])
-        } else {
-            try? s.setCategory(.ambient, options: [.mixWithOthers])
+        let want: AVAudioSession.Category = music || songHearing || (songOpen && !mutedForMe) ? .playback : .ambient
+        if s.category != want || s.mode != .default || !s.categoryOptions.contains(.mixWithOthers) {
+            try? s.setCategory(want, mode: .default, options: [.mixWithOthers])
         }
         try? s.setActive(true)
     }
@@ -381,7 +386,7 @@ private struct SongCard: View {
                         place.songTitle(song.id, t)
                     },
                     onHearing: { on in
-                        deck.songHearing = on
+                        if deck.songHearing != on { deck.songHearing = on }
                         deck.session(on || deck.hearing)
                     },
                     onEnded: { place.songEnded(song.id) },
@@ -419,11 +424,15 @@ private struct SongCard: View {
         }
         .onAppear {
             // music plays with the ring switch on silent (set before the player starts)
-            if listening && !deck.mutedForMe { deck.session(true) }
+            if listening {
+                deck.songOpen = true
+                if !deck.mutedForMe { deck.session(true) }
+            }
         }
         .onDisappear {
             // (only the card whose player was playing)
             guard listening else { return }
+            deck.songOpen = false
             deck.songHearing = false
             deck.sync()
         }
@@ -580,6 +589,9 @@ struct SongPlayer: UIViewRepresentable {
 
     final class Coordinator: NSObject, WKScriptMessageHandler {
         var parent: SongPlayer
+        /// what the page was last told (play, volume): it's only told again when that changes, not every time
+        /// the screen around it is drawn again
+        var told: (play: Bool, volume: Int)?
         init(_ p: SongPlayer) { parent = p }
 
         func userContentController(_ c: WKUserContentController, didReceive message: WKScriptMessage) {
@@ -608,13 +620,20 @@ struct SongPlayer: UIViewRepresentable {
         w.scrollView.bounces = false
         // from soultied.app's address, which YouTube's player expects to be told where it's playing
         w.loadHTMLString(Self.page(id: id, startedAt: startedAt, volume: volume, play: play), baseURL: URL(string: "https://soultied.app/"))
+        context.coordinator.told = (play, Self.loud(volume))
         return w
     }
 
     func updateUIView(_ w: WKWebView, context: Context) {
-        context.coordinator.parent = self
-        w.evaluateJavaScript("window.want && want(\(play ? "true" : "false"), \(Int((volume * 100).rounded())))", completionHandler: nil)
+        let c = context.coordinator
+        c.parent = self
+        let v = Self.loud(volume)
+        if let t = c.told, t.play == play, t.volume == v { return }
+        c.told = (play, v)
+        w.evaluateJavaScript("window.want && want(\(play ? "true" : "false"), \(v))", completionHandler: nil)
     }
+
+    private static func loud(_ volume: Double) -> Int { Int((min(1, max(0, volume)) * 100).rounded()) }
 
     static func dismantleUIView(_ w: WKWebView, coordinator: Coordinator) {
         w.evaluateJavaScript("window.stop && stop()", completionHandler: nil)
@@ -622,28 +641,43 @@ struct SongPlayer: UIViewRepresentable {
         coordinator.parent.onHearing(false)
     }
 
-    /// the player page: lines the song up with the shared start every second and a half, as the website does
+    /// the player page: keeps the song at the shared spot without making it stutter (the website's
+    /// music/songSync.ts: a few seconds out is fine, a nudge only once it's stayed out, and none for a while
+    /// after a nudge or after YouTube had to stop and fetch)
     static func page(id: String, startedAt: Double, volume: Double, play: Bool) -> String {
         let startMs = String(format: "%.0f", startedAt)
         return """
         <!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
         <style>html,body{margin:0;height:100%;background:#000;overflow:hidden}#p{width:100%;height:100%}</style></head>
         <body><div id="p"></div><script>
-        var startedAt=\(startMs), wantPlay=\(play ? "true" : "false"), vol=\(Int((volume * 100).rounded())), player=null, ready=false, ended=false, tries=0, DRIFT=2.5;
+        var startedAt=\(startMs), wantPlay=\(play ? "true" : "false"), vol=\(loud(volume)), player=null, ready=false, ended=false;
+        var DRIFT=5, CHECKS=2, SETTLE=12000, off=0, calm=0, heard=null;
         function say(m){try{window.webkit.messageHandlers.song.postMessage(m)}catch(e){}}
+        function hear(on){if(heard===on)return;heard=on;say({kind:'hearing',on:on})}
         function at(){return Math.max(0,(Date.now()-startedAt)/1000)}
         function title(){try{var d=player.getVideoData();if(d&&d.title)say({kind:'title',title:d.title})}catch(e){}}
+        function cur(){try{return player.getCurrentTime()||0}catch(e){return 0}}
+        function stalled(){off=0;calm=Date.now()+SETTLE}
         function line(){
           if(!player||!ready||ended)return;
           var dur=player.getDuration?player.getDuration():0;
-          if(dur>0&&at()>dur-0.4){ended=true;say({kind:'hearing',on:false});say({kind:'ended'});return}
-          var st=player.getPlayerState();
-          if(!wantPlay){if(st===1||st===3)player.pauseVideo();say({kind:'hearing',on:false});return}
-          if(st===1){tries=0;if(Math.abs(player.getCurrentTime()-at())>DRIFT)player.seekTo(at(),true);return}
-          if(st===3)return;
-          player.seekTo(at(),true);player.playVideo();tries++;
+          if(dur>0&&at()>dur-0.4){ended=true;hear(false);say({kind:'ended'});return}
+          var st=player.getPlayerState(), now=Date.now();
+          if(!wantPlay){off=0;if(st===1||st===3)player.pauseVideo();hear(false);return}
+          if(st===1){
+            if(now<calm||Math.abs(cur()-at())<=DRIFT){off=0;return}
+            if(++off<CHECKS)return;
+            off=0;calm=now+SETTLE;player.seekTo(at(),true);return;
+          }
+          if(st===3){stalled();return}
+          off=0;calm=now+SETTLE;
+          if(Math.abs(cur()-at())>DRIFT)player.seekTo(at(),true);
+          player.playVideo();
         }
-        function want(p,v){wantPlay=p;vol=v;if(ready){try{player.setVolume(v)}catch(e){}}line()}
+        function want(p,v){
+          if(v!==vol){vol=v;if(ready){try{player.setVolume(v)}catch(e){}}}
+          if(p!==wantPlay){wantPlay=p;line()}
+        }
         function stop(){ended=true;try{player.stopVideo()}catch(e){}}
         function onYouTubeIframeAPIReady(){
           player=new YT.Player('p',{videoId:'\(id)',width:'100%',height:'100%',
@@ -651,11 +685,12 @@ struct SongPlayer: UIViewRepresentable {
             events:{
               onReady:function(e){ready=true;try{e.target.setVolume(vol)}catch(x){}title();line()},
               onStateChange:function(e){
-                if(e.data===1){say({kind:'hearing',on:true});title()}
-                else if(e.data===2)say({kind:'hearing',on:false});
-                else if(e.data===0&&!ended){ended=true;say({kind:'hearing',on:false});say({kind:'ended'})}
+                if(e.data===1){hear(true);title()}
+                else if(e.data===2)hear(false);
+                else if(e.data===3)stalled();
+                else if(e.data===0&&!ended){ended=true;hear(false);say({kind:'ended'})}
               },
-              onError:function(e){say({kind:'hearing',on:false});say({kind:'error',code:e.data})}
+              onError:function(e){hear(false);say({kind:'error',code:e.data})}
             }});
           setInterval(line,1500);
         }

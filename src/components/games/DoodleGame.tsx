@@ -21,7 +21,10 @@ import {
   blankCanvas,
   botStrokes,
   brushLine,
+  brushSize,
   fillCells,
+  fullCanvas,
+  fullOps,
   packCells,
   paint,
 } from '../../games/doodle';
@@ -44,8 +47,8 @@ const INK_ORDER = ['k', 'r', 'y', 'g', 'b', 'p', 'n', 'w'];
 const INK_NAMES: Record<string, string> = { k: 'black', r: 'red', y: 'yellow', g: 'green', b: 'blue', p: 'pink', n: 'brown', w: 'white' };
 type Tool = 'pen' | 'fill' | 'erase';
 
-/** A finished drawing, small. */
-const Drawing: React.FC<{ pixels: string; scale?: number; label?: string }> = ({ pixels, scale = 3, label }) => (
+/** A finished drawing, small (one from an older app, on the coarser page, made today's size). */
+const Drawing: React.FC<{ pixels: string; scale?: number; label?: string }> = ({ pixels, scale = 1.5, label }) => (
   <PixelArt
     w={DW}
     h={DH}
@@ -55,7 +58,8 @@ const Drawing: React.FC<{ pixels: string; scale?: number; label?: string }> = ({
     deps={[pixels]}
     paint={(px) => {
       px(0, 0, DW, DH, PAPER);
-      for (let i = 0; i < pixels.length; i++) if (pixels[i] !== '.' && INKS[pixels[i]]) px(i % DW, Math.floor(i / DW), 1, 1, INKS[pixels[i]]);
+      const p = fullCanvas(pixels) ?? '';
+      for (let i = 0; i < p.length; i++) if (p[i] !== '.' && INKS[p[i]]) px(i % DW, Math.floor(i / DW), 1, 1, INKS[p[i]]);
     }}
   />
 );
@@ -159,18 +163,19 @@ export const DoodleGame: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     (d: DoodleCanvas | null) => {
       if (d) lastDoc.current = d;
       const R = roundRef.current;
-      if (!d || !R.key || d.mid !== R.mid || d.r !== R.r || typeof d.pixels !== 'string' || d.pixels.length !== DW * DH) return;
+      const px = d ? fullCanvas(d.pixels) : null;
+      if (!d || !px || !R.key || d.mid !== R.mid || d.r !== R.r) return;
       if (R.drawer) {
         // only when coming back to a round already under way, never over what you've drawn since
         if (d.n > nRef.current) {
-          pix.current = d.pixels;
+          pix.current = px;
           nRef.current = d.n;
           drawAll();
         }
         return;
       }
       if (d.n <= base.current.n) return;
-      base.current = { n: d.n, pixels: d.pixels };
+      base.current = { n: d.n, pixels: px };
       const got = ink.current.get(R.key);
       if (got) for (const n of [...got.keys()]) if (n <= d.n) got.delete(n);
       recompute();
@@ -232,7 +237,8 @@ export const DoodleGame: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       const key = `${e.mid}:${e.r}`;
       let got = ink.current.get(key);
       if (!got) ink.current.set(key, (got = new Map()));
-      got.set(e.n, e.ops);
+      // (ink from an older app, drawn on the coarser page, is made today's size)
+      got.set(e.n, fullOps(e.ops, e.g));
       if (key === roundRef.current.key) recompute();
     });
     return () => {
@@ -261,7 +267,7 @@ export const DoodleGame: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     pending.current = [];
     // counts up through the round, and keeps counting up if you reload halfway through
     nRef.current = Math.max(nRef.current + 1, Date.now() - (R.startedAt || Date.now()));
-    ch?.send({ by: me, at: Date.now(), mid: R.mid, r: R.r, n: nRef.current, ops });
+    ch?.send({ by: me, at: Date.now(), mid: R.mid, r: R.r, n: nRef.current, ops, g: DW });
     dirty.current = true;
   }, [me]);
 
@@ -311,14 +317,14 @@ export const DoodleGame: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     }
     e.currentTarget.setPointerCapture(e.pointerId);
     stroke.current = p;
-    put(brushLine(p.x, p.y, p.x, p.y, tool === 'erase' ? Math.max(2, size) : size), inkKey);
+    put(brushLine(p.x, p.y, p.x, p.y, brushSize(size, tool === 'erase')), inkKey);
   };
   const onMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const s = stroke.current;
     if (!s || !(drawing && iDraw)) return;
     const p = cellAt(e);
     if (p.x === s.x && p.y === s.y) return;
-    put(brushLine(s.x, s.y, p.x, p.y, tool === 'erase' ? Math.max(2, size) : size), inkKey);
+    put(brushLine(s.x, s.y, p.x, p.y, brushSize(size, tool === 'erase')), inkKey);
     stroke.current = p;
   };
   const onUp = () => {
@@ -342,8 +348,9 @@ export const DoodleGame: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     let n = 0;
     const t = window.setInterval(() => {
       if (i >= strokes.length) return window.clearInterval(t);
-      const bit = strokes.slice(i, i + 4);
-      i += 4;
+      // (a few cells at a time: 2 × 2 of the first page's, which it was drawn for)
+      const bit = strokes.slice(i, i + 16);
+      i += 16;
       let got = ink.current.get(rk);
       if (!got) ink.current.set(rk, (got = new Map()));
       got.set(++n, bit.map(([cell, c]) => ({ c, s: packCells([cell]) })));
@@ -408,9 +415,10 @@ export const DoodleGame: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     const r = st.rounds[st.rounds.length - 1];
     if (!r) return;
     const k = `${m.id}:${st.round}`;
-    if (r.pixels && r.pixels !== pix.current && roundRef.current.key === k && !iDraw) {
+    const keptPx = fullCanvas(r.pixels);
+    if (keptPx && keptPx !== pix.current && roundRef.current.key === k && !iDraw) {
       // show what was kept, if we saw less of it
-      pix.current = r.pixels;
+      pix.current = keptPx;
       drawAll();
     }
     if (iDraw && !r.pixels && roundRef.current.key === k && kept.current !== k) {
@@ -751,9 +759,9 @@ export const DoodleGame: React.FC<{ onBack: () => void }> = ({ onBack }) => {
           {over.state.rounds.map((r, i) => (
             <figure key={i} className="px-box m-0 p-2 flex flex-col gap-1.5 items-center" style={{ color: 'var(--ink-soft)' }}>
               {r.pixels ? (
-                <Drawing pixels={r.pixels} scale={3} label={`${seatName(r.drawer)}’s drawing of ${r.word}`} />
+                <Drawing pixels={r.pixels} label={`${seatName(r.drawer)}’s drawing of ${r.word}`} />
               ) : (
-                <div style={{ width: DW * 3, height: DH * 3, background: PAPER, boxShadow: '0 0 0 2px #d8c7a4' }} />
+                <div style={{ width: DW * 1.5, height: DH * 1.5, background: PAPER, boxShadow: '0 0 0 2px #d8c7a4' }} />
               )}
               <figcaption className="text-center leading-tight">
                 <strong>{r.word}</strong>
@@ -766,7 +774,7 @@ export const DoodleGame: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         </div>
       ) : m && phase === 'lobby' ? (
         <div className="flex justify-center py-6">
-          <Drawing pixels={blankCanvas()} scale={4} />
+          <Drawing pixels={blankCanvas()} scale={2} />
         </div>
       ) : null}
     </GameFrame>

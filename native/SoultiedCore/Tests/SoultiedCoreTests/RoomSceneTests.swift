@@ -29,7 +29,7 @@ final class RoomSceneTests: XCTestCase {
             i >= 0 ? Seat(avatar: ls[i], name: "x", status: SeatStatus(rawValue: status ?? "online")!) : .empty
         }
         let scenes = fx["scenes"] as! [Doc]
-        XCTAssertEqual(scenes.count, 24)
+        XCTAssertEqual(scenes.count, 90)
         let renderer = RoomRenderer()
         var bad: [String] = []
         for (n, s) in scenes.enumerated() {

@@ -997,7 +997,94 @@ func drawMoodBubble(_ L: Layer, _ g: Glyph, _ cx: Double, _ headY: Double, _ sid
     }
 }
 
-/** A touch's picture, floating up from between them (or popping over the one who got booped). */
+/// how a touch moves them on the couch (the website's touchPose)
+struct TouchPose {
+    var leanL: Double
+    var leanR: Double
+    var liftL: Double
+    var liftR: Double
+    var sway: Double = 0
+}
+
+/** How a touch moves them on the couch: heads leaning in (or away), a hop, both rocking together. `p` comes in
+ *  as they'd sit anyway and is changed in place. */
+func touchPose(_ tc: RoomTouch, _ age: Double, _ holding: Bool, _ p: inout TouchPose) {
+    let fromL = tc.from == .left
+    if tc.kind == "boop" {
+        // whoever sent it leans right over; the other flinches back, with a little hop
+        if age < 0.6 { if fromL { p.leanL = 3 } else { p.leanR = -3 } }
+        if age >= 0.3 && age < 0.9 { if fromL { p.leanR = 1 } else { p.leanL = -1 } }
+        if age >= 0.3 && age < 0.45 { if fromL { p.liftR = 1 } else { p.liftL = 1 } }
+        return
+    }
+    if !holding { return }
+    let a = age - 0.5
+    switch tc.kind {
+    case "hug":
+        // heads together, rocking side to side
+        p.leanL = 2
+        p.leanR = -2
+        if a < 1.6 { p.sway = jsRound(sin(a * 5)) }
+    case "kiss":
+        // a peck, then close
+        p.leanL = a >= 0.12 && a < 0.42 ? 3 : 2
+        p.leanR = -p.leanL
+    case "forehead":
+        // whoever sent it sits up and leans over; the other stays still
+        if fromL {
+            p.leanL = 3
+            p.leanR = 0
+            p.liftL = 1
+        } else {
+            p.leanR = -3
+            p.leanL = 0
+            p.liftR = 1
+        }
+    case "highfive":
+        // sitting up, and a hop together as their hands meet
+        p.leanL = 0
+        p.leanR = 0
+        if a >= 0.05 && a < 0.3 {
+            p.liftL = 1
+            p.liftR = 1
+        }
+    case "hands":
+        // side by side, heads up
+        p.leanL = 0
+        p.leanR = 0
+    default:
+        break
+    }
+}
+
+/// a little heart, 3 across
+private let MINI_HEART: [[Character]] = [Array("#.#"), Array("###"), Array(".#.")]
+func miniHeart(_ L: Layer, _ x: Double, _ y: Double, _ c: RGB, _ a: Double) {
+    let x0 = jsRound(x), y0 = jsRound(y)
+    for (j, row) in MINI_HEART.enumerated() {
+        for (i, k) in row.enumerated() where k == "#" { L.G(x0 + Double(i), y0 + Double(j), c, a) }
+    }
+}
+
+/// a twinkle: one bright pixel, or a little plus
+func twinkle(_ L: Layer, _ x: Double, _ y: Double, _ c: RGB, _ a: Double, _ big: Bool) {
+    let x0 = jsRound(x), y0 = jsRound(y)
+    L.G(x0, y0, c, a)
+    if !big { return }
+    let b = jsRound(a * 0.6)
+    L.G(x0 - 1, y0, c, b)
+    L.G(x0 + 1, y0, c, b)
+    L.G(x0, y0 - 1, c, b)
+    L.G(x0, y0 + 1, c, b)
+}
+
+/// fading in over `inn` seconds and out over the last `out` of `len`, 0 to 255
+func fadeAt(_ e: Double, _ len: Double, _ inn: Double, _ out: Double) -> Double {
+    if e < 0 || e > len { return 0 }
+    return jsRound(255 * min(1, inn > 0 ? e / inn : 1, out > 0 ? (len - e) / out : 1))
+}
+
+/** A touch's picture and its little extras: each one its own (see touchPose for how they move). */
 func drawTouchFx(_ L: Layer, _ tc: RoomTouch, _ age: Double, _ lx: Double, _ rx: Double, _ headL: Double, _ headR: Double) {
     let g = tc.glyph
     let gw = g.width
@@ -1008,30 +1095,92 @@ func drawTouchFx(_ L: Layer, _ tc: RoomTouch, _ age: Double, _ lx: Double, _ rx:
             }
         }
     }
-    if tc.kind == "boop" {
-        // a "!" over the one who got booped
-        if age < 0.35 || age > 1.6 { return }
-        let tx = tc.from == .left ? rx : lx
-        let h0 = tc.from == .left ? headR : headL
-        let hy = h0 != 0 ? h0 : CouchBox.seatY - 30
-        put(tx - fl(gw / 2), hy - 9 - min(2, (age - 0.35) * 6), 255)
-        return
+    let mid = (lx + rx) / 2
+    let top = min(headL != 0 ? headL : 999, headR != 0 ? headR : 999)
+    let topY = top < 999 ? top : CouchBox.seatY - 30
+    let fromL = tc.from == .left
+    // the one it was for
+    let toX = fromL ? rx : lx
+    let toH = fromL ? headR : headL
+    let toY = toH != 0 ? toH : CouchBox.seatY - 30
+    /// the picture rising from (x, y), from `start` seconds in
+    func rise(_ x: Double, _ y: Double, _ start: Double) {
+        if age < start { return }
+        let k = age - start
+        let a = jsRound(255 * min(1, max(0, (TOUCH_LEN - age) / 0.7)))
+        put(x - fl(gw / 2) + sin(k * 4) * 1.2, y - k * 5, a)
     }
-    if tc.kind == "highfive" {
-        // a flash where their hands meet, then it floats off
+
+    switch tc.kind {
+    case "boop":
+        // a "!" over the one who got booped, and stars round their face
+        if age >= 0.35 && age <= 1.6 { put(toX - fl(gw / 2), toY - 9 - min(2, (age - 0.35) * 6), 255) }
+        if age >= 0.35 && age < 0.95 {
+            let e = age - 0.35
+            let stars: [(Double, Double)] = [(-7, 3), (7, 2), (-5, -2), (6, -3)]
+            for (i, st) in stars.enumerated() where Int(fl(e * 10 + Double(i))) % 2 == 0 {
+                twinkle(L, toX + st.0 * (1 + e * 0.5), toY + 5 + st.1, hx("#f2d66b"), fadeAt(e, 0.6, 0, 0.25), i % 2 == 0)
+            }
+        }
+    case "highfive":
+        // the clap: a burst of rays between them, a flash over their heads, and it floats off
+        let cy = topY + 3
+        if age >= 0.55 && age < 1.15 {
+            let e = age - 0.55
+            let d = 4 + e * 14
+            let a = fadeAt(e, 0.6, 0, 0.45)
+            for (dx, dy) in [(1.0, 0.0), (1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1), (1, -1)] {
+                L.G(jsRound(mid + dx * d), jsRound(cy + dy * d), hx("#f2d66b"), a)
+                L.G(jsRound(mid + dx * (d + 1)), jsRound(cy + dy * (d + 1)), hx("#fff1c9"), a)
+            }
+        }
         if age < 0.55 { return }
         let a = age < 1.1 ? (Int(fl(age * 12)) % 2 != 0 ? 255 : 170) : jsRound(255 * max(0, (TOUCH_LEN - age) / (TOUCH_LEN - 1.1)))
-        put((lx + rx) / 2 - fl(gw / 2), CouchBox.seatY - 34 - max(0, age - 1.1) * 5, a)
-        return
+        put(mid - fl(gw / 2), CouchBox.seatY - 34 - max(0, age - 1.1) * 5, a)
+    case "hug":
+        // little hearts squeezed out to either side, then the big one rises
+        for i in 0..<4 {
+            let s = age - 0.6 - Double(i) * 0.2
+            if s < 0 || s > 0.9 { continue }
+            let side: Double = i % 2 != 0 ? 1 : -1
+            miniHeart(L, mid - 1 + side * (6 + s * 9), topY + 9 - s * 8, hx(i % 2 != 0 ? "#ef8f88" : "#d9534f"), fadeAt(s, 0.9, 0, 0.4))
+        }
+        rise(mid, topY - 8, 0.9)
+    case "kiss":
+        // a twinkle where they meet, then the kiss rises with little hearts trailing after
+        if age >= 0.62 && age < 1.0 { twinkle(L, mid, topY + 3, hx(Int(fl((age - 0.62) * 14)) % 2 != 0 ? "#ef8f88" : "#fff1c9"), 255, true) }
+        for i in 0..<3 {
+            let s = age - 1.15 - Double(i) * 0.3
+            if s < 0 || s > 1.2 { continue }
+            miniHeart(L, mid - 1 + sin(s * 6 + Double(i)) * 2, topY - 1 - s * 8, hx("#ef8f88"), fadeAt(s, 1.2, 0.15, 0.5))
+        }
+        rise(mid, topY - 8, 0.95)
+    case "forehead":
+        // a soft glow over their forehead, twinkling round it, and the kiss rises from there
+        if age >= 0.6 && age < 2.2 {
+            let e = age - 0.6
+            let arc: [(Double, Double)] = [(-5, 0), (-3, -2), (0, -3), (3, -2), (5, 0)]
+            let lit = Int(fl(e * 7)) % arc.count
+            let f = fadeAt(e, 1.6, 0.2, 0.4)
+            for (i, d) in arc.enumerated() { twinkle(L, toX + d.0, toY - 2 + d.1, hx("#fff1c9"), i == lit ? f : jsRound(f * 0.45), i == lit) }
+        }
+        rise(toX, toY - 9, 1.0)
+    case "hands":
+        // the two hearts, linked, where their hands are, beating; now and then a little one floats up over them
+        let hy = CouchBox.seatY - 11
+        if age >= 0.55 {
+            let beat: Double = Int(fl((age - 0.55) * 3)) % 2 != 0 ? -1 : 0
+            put(mid - fl(gw / 2), hy + beat, jsRound(255 * min(1, max(0, (TOUCH_LEN - age) / 0.7))))
+        }
+        for i in 0..<2 {
+            let s = age - 0.9 - Double(i) * 0.6
+            if s < 0 || s > 1.1 { continue }
+            miniHeart(L, mid - 1 + (i % 2 != 0 ? 2 : -2) + sin(s * 5), topY - 4 - s * 8, hx("#e0685f"), fadeAt(s, 1.1, 0.15, 0.45))
+        }
+    default:
+        // anything else: rises from between them once they're close
+        rise(mid, topY - 8, 0.55)
     }
-    // a hug, a kiss, a forehead kiss, holding hands: rises from between them once they're close
-    let start = 0.55
-    if age < start { return }
-    let k = age - start
-    let a = jsRound(255 * min(1, max(0, (TOUCH_LEN - age) / 0.7)))
-    let top = min(headL != 0 ? headL : 999, headR != 0 ? headR : 999)
-    let y = (top < 999 ? top - 8 : CouchBox.seatY - 38) - k * 5
-    put((lx + rx) / 2 - fl(gw / 2) + sin(k * 4) * 1.2, y, a)
 }
 
 func drawEmptySeat(_ L: Layer, _ cx: Double, _ t: Double, _ hover: Bool) {

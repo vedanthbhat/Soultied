@@ -6,8 +6,12 @@ import type { Seat } from './types';
  * the six drawings you got between you.
  */
 
-export const DW = 40;
-export const DH = 30;
+/** the page: 80 × 60 (finer than the first 40 × 30, which was too coarse to draw much on a phone) */
+export const DW = 80;
+export const DH = 60;
+/** the first page, which drawings and ink from older apps are still on */
+export const OLD_DW = 40;
+export const OLD_DH = 30;
 export const ROUNDS = 6;
 export const DRAW_SECONDS = 80;
 
@@ -24,6 +28,27 @@ export const INKS: Record<string, string> = {
 };
 export const PAPER = '#f4e8d0';
 export const blankCanvas = () => '.'.repeat(DW * DH);
+
+/** A page at today's size (each cell of one from an older app made 2 × 2), or null for something that isn't one. */
+export function fullCanvas(px: unknown): string | null {
+  if (typeof px !== 'string') return null;
+  if (px.length === DW * DH) return px;
+  if (px.length !== OLD_DW * OLD_DH) return null;
+  let out = '';
+  for (let y = 0; y < DH; y++) {
+    const row = px.slice((y >> 1) * OLD_DW, ((y >> 1) + 1) * OLD_DW);
+    for (let x = 0; x < DW; x++) out += row[x >> 1];
+  }
+  return out;
+}
+
+/** The brush sizes offered (thin, medium, thick), as the size brushLine takes; the rubber is a little bigger. */
+export const PEN_SIZES = [1, 2, 4];
+export const RUBBER_SIZES = [3, 4, 6];
+export const brushSize = (pick: number, rubber: boolean) => {
+  const i = Math.max(0, Math.min(2, Math.round(pick) - 1));
+  return (rubber ? RUBBER_SIZES : PEN_SIZES)[i];
+};
 
 export type DoodlePhase = 'lobby' | 'choosing' | 'drawing' | 'reveal';
 
@@ -196,6 +221,24 @@ export interface DoodleInk {
   r: number;
   n: number;
   ops: InkOp[];
+  /** how wide the page it was drawn on is (missing: an older app's, OLD_DW) */
+  g?: number;
+}
+
+/** Ink from an older app (drawn on the 40 × 30 page) laid onto today's: each cell becomes the 2 × 2 it covers. */
+export function fullOps(ops: InkOp[], g?: number): InkOp[] {
+  if (g === DW) return ops;
+  return ops.map((op) => {
+    if (op.s === '*') return op;
+    const out: number[] = [];
+    for (const c of unpackCells(op.s)) {
+      if (!(c >= 0 && c < OLD_DW * OLD_DH)) continue;
+      const x = (c % OLD_DW) * 2;
+      const y = Math.floor(c / OLD_DW) * 2;
+      out.push(y * DW + x, y * DW + x + 1, (y + 1) * DW + x, (y + 1) * DW + x + 1);
+    }
+    return { c: op.c, s: packCells(out) };
+  });
 }
 
 /** The drawing as saved every few seconds (so someone arriving late sees it all). */
@@ -294,7 +337,8 @@ export const BOT_WORDS: Record<string, string> = { sun: 'sun', house: 'house', t
 /** The pretend partner's drawing of `key`, centred, as a list of (cell, colour). */
 export function botStrokes(key: string): Array<[number, string]> {
   const art = BOT_DOODLES[key] || BOT_DOODLES.sun;
-  const scale = 2;
+  // (drawn for the first page at 2 × 2 a cell, so twice that now)
+  const scale = (2 * DW) / OLD_DW;
   const w = art[0].length * scale;
   const h = art.length * scale;
   const ox = Math.floor((DW - w) / 2);
