@@ -44,6 +44,11 @@ public final class PlaceModel {
     public internal(set) var petDoc = PetDoc()
     /// what you've watched together and where you left off, on YouTube, Netflix and Prime Video (meta/stream)
     public internal(set) var streamDoc: Doc = [:]
+    /// notifications: each of your phones, and what each of you wants to hear about (meta/push, functions/push.js)
+    public internal(set) var pushDoc: Doc = [:]
+    /// tells your person's phone (the app sends it to Soultied's server, which decides whether and what it says):
+    /// a kind (letter, ask, answer, touch, turn, live, watch, wall, voice, snap, pet) and a little about it
+    @ObservationIgnored public var nudger: ((_ kind: String, _ args: Doc) -> Void)?
     @ObservationIgnored private var rankKey: String?
     @ObservationIgnored private var bestsSent: String?
     @ObservationIgnored private var escapesSynced = false
@@ -157,6 +162,9 @@ public final class PlaceModel {
             },
             db.listen(meta("stream")) { [weak self] d in
                 self?.streamDoc = d ?? [:]
+            },
+            db.listen(meta("push")) { [weak self] d in
+                self?.pushDoc = d ?? [:]
             },
             db.listen(meta("pet")) { [weak self] d in
                 guard let self else { return }
@@ -440,6 +448,7 @@ public final class PlaceModel {
         letters = l
         save(path("letters/\(LetterDay.docId(kind, key))"), doc, "seal")
         if both, let t = them { opened(kind, day, partner: t) }
+        nudge("letter", ["stage": both ? "open" : "waiting", "letter": kind.rawValue])
     }
 
     private func opened(_ kind: LetterKind, _ day: LetterDay, partner: String) {
@@ -577,6 +586,7 @@ public final class PlaceModel {
     public func postSnap(photo: String, w: Int, h: Int, caption: String) {
         let words = String(caption.trimmingCharacters(in: .whitespacesAndNewlines).prefix(SNAP_CAPTION_MAX))
         save(meta(snapDocName(today)), ["by": [me: ["photo": photo, "w": w, "h": h, "caption": words, "at": Values.nowMs()] as Doc]], "your photo")
+        nudge("snap")
     }
 
     /// one of today's photos, up on the wall with the rest (`thumb` a smaller copy for the grid)
@@ -780,6 +790,7 @@ public final class PlaceModel {
         save(meta("touch"), ["items": items], "touch")
         playing = t
         if !reply { demoPartner?.touched(kind) }
+        nudge("touch", ["touch": kind.rawValue, "reply": reply])
     }
 
     public func markTouchesSeen() {
@@ -812,6 +823,7 @@ public final class PlaceModel {
         let item: Doc = ["id": id, "by": me, "prompt": p, "options": opts.count >= 2 ? Array(opts.prefix(4)) : [String](), "at": at, "answers": [me: m.doc], "seen": Doc()]
         save(meta("asks"), ["items": [id: item]], "ask")
         demoPartner?.asked(id, options: opts.count >= 2 ? opts : [])
+        nudge("ask", ["prompt": p])
     }
 
     public func answerAsk(_ a: Ask, _ mine: AskAnswer) {
@@ -820,6 +832,7 @@ public final class PlaceModel {
         m.at = Values.nowMs()
         save(meta("asks"), ["items": [a.id: ["answers": [me: m.doc]]]], "answer")
         if let t = them, a.answers[t] != nil { activity(.new(.questionRevealed, "A question, answered", "“\(a.prompt)”")) }
+        nudge("answer", ["prompt": a.prompt])
     }
 
     public func markAskSeen(_ a: Ask) {
@@ -845,6 +858,7 @@ public final class PlaceModel {
         // (your person's home-screen widget looks here for your latest doodle)
         if kind == .doodle, let ref { d["drew"] = [me: ["id": ref, "at": at]] }
         save(meta("board"), d, "wall")
+        if kind != .voice { nudge("wall", ["what": kind.rawValue]) }
     }
 
     /* ---------- voice notes ---------- */
@@ -860,6 +874,7 @@ public final class PlaceModel {
         let id = Values.newKey("voice-")
         db.setLater(meta(id), VoiceNote.doc(by: me, secs: secs, audio: b64, peaks: peaksFrom(levels)), self)
         pinned(.voice)
+        nudge("voice", ["secs": secs])
         return true
     }
 
@@ -1012,6 +1027,13 @@ public final class PlaceModel {
         if justEnded, let w = m.winnerSeat { m.wins[w, default: 0] += 1 }
         games[m.kind] = m
         db.setLater(meta(m.kind.docName), m.doc, self)
+        // your move made it their turn (or you've asked them to play a live game): tell them
+        if writer == mySeat {
+            let other: Side = mySeat == .a ? .b : .a
+            if Play.needsMe(m, other, now: m.updatedAt) && !Play.needsMe(prev, other, now: m.updatedAt) {
+                nudge(Play.isLiveInvite(m.kind) ? "live" : "turn", ["game": m.kind.info.name])
+            }
+        }
         if justEnded {
             let line = Play.endLine(m, name: seatName)
             if !line.isEmpty { activity(.new(.playedGame, m.kind.info.name, line)) }
@@ -1175,6 +1197,8 @@ public final class PlaceModel {
     @discardableResult
     public func carePet(_ act: PetAct) -> (reaction: String, levelUp: String?)? {
         guard decor.pet != "none", let patch = petDoc.carePatch(today: today, me: me, them: them, act: act, now: Values.nowMs()) else { return nil }
+        // the first thing you do for it today, before your person's been by: their turn
+        if let v = petView, v.mine.isEmpty, v.theirs.isEmpty { nudge("pet", ["act": act.rawValue, "pet": petCallName]) }
         let before = Pet.level(petDoc.bond).level
         petDoc = PetDoc(Values.deepMerge(petDoc.doc, patch))
         save(meta("pet"), patch, "the pet")
@@ -1188,6 +1212,37 @@ public final class PlaceModel {
     private func countPetDays() {
         guard let p = petDoc.missingDays(me: me, them: them) else { return }
         save(meta("pet"), p, "the pet")
+    }
+
+    /* ---------- notifications on your person's phone (functions/push.js) ---------- */
+
+    /// tell your person's phone (not in the demo room, and only once they've moved in)
+    public func nudge(_ kind: String, _ args: Doc = [:]) {
+        guard !isDemo, partnerHere else { return }
+        nudger?(kind, args)
+    }
+
+    /// what you've turned off (letters, touches, games, watch, wall, pet: all on until you say)
+    public var pushPrefs: [String: Bool] {
+        ((pushDoc["prefs"] as? Doc)?[me] as? Doc)?.compactMapValues { $0 as? Bool } ?? [:]
+    }
+    public func pushOn(_ group: String) -> Bool { pushPrefs[group] ?? true }
+    public func setPush(_ group: String, _ on: Bool) {
+        let patch: Doc = ["prefs": [me: [group: on]]]
+        pushDoc = Values.deepMerge(pushDoc, patch)
+        save(meta("push"), patch, "notifications")
+    }
+
+    /// this phone, for notifications: its token from Firebase, and its time zone (so nothing arrives at night)
+    public func savePushDevice(token: String, tz: String) {
+        guard !isDemo, !token.isEmpty else { return }
+        let key = "ios" + String(Shuffle.hashStr(token), radix: 36)
+        let known = ((pushDoc["devices"] as? Doc)?[me] as? Doc)?[key] as? Doc
+        // (once a day is plenty to say it's still here)
+        if known?.str("token") == token, known?.str("tz") == tz, Values.nowMs() - (known?.num("at") ?? 0) < 86_400_000 { return }
+        let patch: Doc = ["devices": [me: [key: ["token": token, "tz": tz, "platform": "ios", "at": Values.nowMs()] as Doc]]]
+        pushDoc = Values.deepMerge(pushDoc, patch)
+        save(meta("push"), patch, "notifications")
     }
 
     /* ---------- you two ---------- */

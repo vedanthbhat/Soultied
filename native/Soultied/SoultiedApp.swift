@@ -142,6 +142,8 @@ struct RootView: View {
                 app.place?.heartbeat()
                 // on FaceTime? show where its little window fits (CallWatch.swift)
                 CallWatch.shared.refresh(flash: true)
+                // notifications may have been turned on or off in Settings meanwhile (Push.swift)
+                Push.shared.refresh()
             }
         }
         // signed out, or out of the place: the home-screen widgets go back to asking you to open the app

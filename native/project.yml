@@ -57,6 +57,8 @@ targets:
       path: Soultied/Soultied.entitlements
       properties:
         com.apple.developer.applesignin: [Default]
+        # notifications (Push.swift); an App Store build gets "production" when it's exported
+        aps-environment: development
         # its own group first (so where Firebase and Google keep things doesn't move), then the one it shares
         # with its widgets (WidgetShare.swift)
         keychain-access-groups:
@@ -102,6 +104,9 @@ targets:
         product: FirebaseAuth
       - package: Firebase
         product: FirebaseFirestore
+      # notifications (Push.swift)
+      - package: Firebase
+        product: FirebaseMessaging
       - package: GoogleSignIn
         product: GoogleSignIn
       # the home-screen widgets, inside the app

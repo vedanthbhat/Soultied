@@ -4,7 +4,8 @@ import * as store from '../cloud/store';
 import type { UserProfile } from '../types';
 import type { GameKind, Match, Seat } from './types';
 import { GAMES, otherSeat } from './types';
-import { botAct, botDelay, botTurn, endLine, needsMe } from './registry';
+import { botAct, botDelay, botTurn, endLine, isLiveInvite, needsMe } from './registry';
+import { nudge } from '../cloud/push';
 
 export const GAME_KINDS = Object.keys(GAMES) as GameKind[];
 
@@ -103,8 +104,14 @@ export const GamesProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       matchesRef.current = { ...matchesRef.current, [m.kind]: m };
       setMatches((p) => ({ ...p, [m.kind]: m }));
       const o = cloudMode ? cloudTarget() : null;
-      if (o) store.writeGame(o.db, o.sid, m).catch((e) => console.warn('[soultied] game', e));
-      else {
+      if (o) {
+        store.writeGame(o.db, o.sid, m).catch((e) => console.warn('[soultied] game', e));
+        // your move made it their turn (or you've asked them to play a live game): tell their phone
+        const other = otherSeat(mySeat);
+        if (writer === mySeat && partnerUser && needsMe(m, other) && !needsMe(prev, other)) {
+          nudge(o.sid, isLiveInvite(m.kind) ? 'live' : 'turn', { game: GAMES[m.kind].name });
+        }
+      } else {
         try {
           localStorage.setItem(localKey(sid), JSON.stringify({ ...loadLocal(sid), [m.kind]: m }));
         } catch {
@@ -119,7 +126,7 @@ export const GamesProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [cloudMode, sid, seatName]
+    [cloudMode, sid, seatName, mySeat, partnerUser]
   );
   const save = useCallback((m: Match) => commit(m, mySeat), [commit, mySeat]);
 

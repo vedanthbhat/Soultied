@@ -28,7 +28,8 @@ import { PlusCard } from './PlusCard';
 import { TapeShelf } from './TapeShelf';
 import { useStreamHub } from '../stream/StreamHub';
 import { usePlus } from '../plus/usePlus';
-import { continueTapes, resumeAt, resumeUrl, tapeVideoId, youTubeTapePatch, type Tape } from '../watch/tapes';
+import { continueTapes, resumeAt, resumeUrl, tapeTitle, tapeVideoId, youTubeTapePatch, type Tape } from '../watch/tapes';
+import { nudge } from '../cloud/push';
 
 /**
  * Watch together (YouTube). The camera swings round behind the couch; the
@@ -116,7 +117,7 @@ export const WatchParty: React.FC<{ onExit: () => void; mode?: Mode }> = ({ onEx
 };
 
 const TvRoom: React.FC<{ onExit: () => void; mode: Mode }> = ({ onExit, mode }) => {
-  const { currentUser, partnerUser, space, openLive, hasPlus, openPanel } = useApp();
+  const { currentUser, partnerUser, space, openLive, hasPlus, openPanel, cloudMode, demo } = useApp();
   const karaoke = mode === 'karaoke';
   const me = currentUser.id;
   const roomId = space?.id || 'solo';
@@ -625,6 +626,12 @@ const TvRoom: React.FC<{ onExit: () => void; mode: Mode }> = ({ onExit, mode }) 
     }
     setLink('');
     loadVideo(id, parseYouTubeStart(link));
+    tellPartner();
+  };
+
+  /** not on the couch yet: a nudge on their phone to come and watch */
+  const tellPartner = (title = '') => {
+    if (!karaoke && cloudMode && !demo && partnerUser && !partnerHereRef.current) nudge(space?.id, 'watch', title ? { title } : {});
   };
 
   // the tapes on the shelf (not the one that's on), and carrying on with one
@@ -637,6 +644,7 @@ const TvRoom: React.FC<{ onExit: () => void; mode: Mode }> = ({ onExit, mode }) 
     if (id) {
       setTapesOpen(false);
       loadVideo(id, resumeAt(t.pos));
+      tellPartner(tapeTitle(t));
     } else if (hub?.extension === 'present' && plus.takeNight()) window.open(resumeUrl(t), '_blank', 'noopener');
     // (no extension yet, or the month's free nights are used up: the Netflix / Prime panel says what to do)
     else setStreamOpen(true);

@@ -30,6 +30,7 @@ struct UsView: View {
                         RecapCard(place: place).id("recap").popIn(0.24)
                     }
                     you.popIn(0.3)
+                    NotificationsCard(place: place).id("notifications")
                     PlusCardView(place: place)
                     LookPicker().id("looks")
                     history

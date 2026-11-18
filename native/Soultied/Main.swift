@@ -54,6 +54,8 @@ struct MainView: View {
     @State private var tour = Tour.shared
     @State private var covers = Covers.shared
     @State private var widgetLink = WidgetLink.shared
+    /// a tapped notification, to open where it's about (Push.swift)
+    @State private var push = Push.shared
     /// what Watch together's on (YouTube's TV turns sideways into a big screen)
     @AppStorage("soultied_watch_service") private var watchService = WatchService.youtube.rawValue
     @Environment(\.verticalSizeClass) private var vertical
@@ -116,11 +118,14 @@ struct MainView: View {
         .onAppear {
             RecordDeck.shared.attach(place)
             PlusStore.shared.start(place)
+            Push.shared.use(place)
+            openFromPush()
             if Launch.plus { PlusGate.shared.reason = .plain }
             if Launch.demo && Launch.record { place.playRecord() }
             if Launch.demo, let s = Launch.song { _ = place.playSong(s) }
         }
         .onChange(of: place.turntable) { _, _ in RecordDeck.shared.sync() }
+        .onChange(of: push.open) { _, _ in openFromPush() }
         .onDisappear { RecordDeck.shared.detach() }
         // the first-run tour: what to tap to go where (Tour.swift)
         .overlayPreferenceValue(TourSpots.self) { spots in
@@ -149,6 +154,23 @@ struct MainView: View {
         game = nil
         escape = false
         sheet = t == .photos ? .photos : .doodle
+    }
+
+    /// a tap on a notification: where it's about
+    private func openFromPush() {
+        guard let to = push.open else { return }
+        push.open = nil
+        game = nil
+        escape = false
+        sheet = nil
+        switch to {
+        case "letters": tab = .letters
+        case "play": tab = .play
+        case "watch": tab = .watch
+        case "wall": sheet = .wall
+        case "pet": sheet = .pet
+        default: tab = .home
+        }
     }
 
     func go(_ t: AppTab) {

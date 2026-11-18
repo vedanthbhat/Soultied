@@ -16,7 +16,8 @@ export const APPLE_ROOT_G3 = '63343ABFB89A6A03EBB57E9B3F5FA7BE7C4F5C756F3017B3A8
 
 /** what Soultied sells in the app */
 export const APPLE = {
-  bundleId: 'app.soultied',
+  /** the app's own (the first is now the app's; the second, the TestFlight builds from before the move) */
+  bundleIds: ['app.soultied.ios', 'app.soultied'],
   products: { 'app.soultied.plus.month': 'month', 'app.soultied.plus.year': 'year' },
 };
 
@@ -84,7 +85,7 @@ export function accountToken(uid) {
 
 /** A checked transaction that gives Plus: which plan, until when, and its numbers. */
 export function checkTransaction(tx, { uid, now = Date.now() } = {}) {
-  if (!tx || tx.bundleId !== APPLE.bundleId) throw new AppleError('bundle');
+  if (!tx || !APPLE.bundleIds.includes(tx.bundleId)) throw new AppleError('bundle');
   const plan = APPLE.products[tx.productId];
   if (!plan) throw new AppleError('product');
   if (tx.revocationDate) throw new AppleError('refunded', 402);

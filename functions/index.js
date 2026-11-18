@@ -11,6 +11,9 @@
  *               until the subscription's period ends
  *   appleNotify POST from Apple (App Store Server Notifications, version 2): renewals push Plus's end
  *               date on, refunds take it away
+ *   pushNote    POST {sid, kind, args} from the app or soultied.app, signed in: a notification on your
+ *               person's iPhone (you sealed today's letter, sent a hug, made your move…); push.js decides
+ *               whether, and what it says
  *
  * Keys live in Google's Secret Manager (RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET and
  * DODO_API_KEY); the GitHub Action that deploys this puts them there ("unset" for a
@@ -26,6 +29,8 @@ import { onRequest } from 'firebase-functions/v2/https';
 import { getAuth } from 'firebase-admin/auth';
 import { dodoApi, PlusError, plusService, razorpayApi } from './plus.js';
 import { APPLE, AppleError, checkTransaction, verifyAppleJws } from './apple.js';
+import { getMessaging } from 'firebase-admin/messaging';
+import { PUSH_GROUP, pushMessage, pushPlan, pushText } from './push.js';
 
 initializeApp();
 
@@ -210,7 +215,7 @@ export const appleNotify = onRequest(APPLE_OPTS, async (req, res) => {
   try {
     const n = verifyAppleJws(req.body?.signedPayload);
     const info = n.data?.signedTransactionInfo ? verifyAppleJws(n.data.signedTransactionInfo) : null;
-    if (!info || info.bundleId !== APPLE.bundleId) return res.json({ ok: true, ignored: true });
+    if (!info || !APPLE.bundleIds.includes(info.bundleId)) return res.json({ ok: true, ignored: true });
     const db = getFirestore();
     const original = String(info.originalTransactionId || '');
     const sub = await db.collection('appleSubs').doc(original).get();
@@ -237,5 +242,54 @@ export const appleNotify = onRequest(APPLE_OPTS, async (req, res) => {
   } catch (e) {
     logger.warn('App Store notification', e?.code || e);
     return res.status(e instanceof AppleError ? 400 : 500).json({ error: e?.code || 'failed' });
+  }
+});
+
+/* ---------- notifications on your person's iPhone ---------- */
+
+const PUSH_OPTS = { region: 'asia-south1', cors: ORIGINS, maxInstances: 10, memory: '256MiB', timeoutSeconds: 20 };
+
+export const pushNote = onRequest(PUSH_OPTS, async (req, res) => {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'method' });
+  let who;
+  try {
+    who = await getAuth().verifyIdToken(String(req.get('authorization') || '').replace(/^Bearer\s+/i, ''));
+  } catch {
+    return res.status(401).json({ error: 'signin' });
+  }
+  const sid = String(req.body?.sid || '');
+  const kind = String(req.body?.kind || '');
+  const args = req.body?.args && typeof req.body.args === 'object' ? req.body.args : {};
+  if (!sid || !PUSH_GROUP[kind]) return res.status(400).json({ error: 'kind' });
+  try {
+    const db = getFirestore();
+    const space = await db.collection('spaces').doc(sid).get();
+    const members = space.exists ? space.data().members || [] : [];
+    if (!members.includes(who.uid)) return res.status(403).json({ error: 'place' });
+    const to = members.find((m) => m !== who.uid);
+    if (!to) return res.json({ ok: true, sent: 0, why: 'alone' });
+    const me = await db.collection('spaces').doc(sid).collection('members').doc(who.uid).get();
+    const text = pushText(kind, args, me.exists ? me.data().name : '');
+    if (!text) return res.status(400).json({ error: 'kind' });
+    const ref = db.collection('spaces').doc(sid).collection('meta').doc('push');
+    // decided (and the time noted) in one go, so two taps at once send one notification
+    const plan = await db.runTransaction(async (tx) => {
+      const p = pushPlan((await tx.get(ref)).data(), { from: who.uid, to, kind, args });
+      if (p.send) tx.set(ref, { sent: { [p.key]: Date.now() } }, { merge: true });
+      return p;
+    });
+    if (!plan.send) return res.json({ ok: true, sent: 0, why: plan.why });
+    const out = await getMessaging().sendEachForMulticast({ ...pushMessage(kind, text, sid), tokens: plan.tokens });
+    // phones that have gone (the app deleted, notifications reset): forget them
+    const gone = {};
+    out.responses.forEach((r, i) => {
+      const c = r.error?.code || '';
+      if (c === 'messaging/registration-token-not-registered' || c === 'messaging/invalid-registration-token') gone[plan.keys[i]] = FieldValue.delete();
+    });
+    if (Object.keys(gone).length) await ref.set({ devices: { [to]: gone } }, { merge: true });
+    return res.json({ ok: true, sent: out.successCount });
+  } catch (e) {
+    logger.error('pushNote', e);
+    return res.status(500).json({ error: 'failed' });
   }
 });

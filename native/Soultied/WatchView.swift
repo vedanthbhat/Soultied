@@ -191,6 +191,7 @@ struct WatchView: View {
         if s.putOn(link) == nil {
             Haptics.tap()
             link = ""
+            if !s.partnerHere { place.nudge("watch") }
         }
     }
 
@@ -311,6 +312,8 @@ struct WatchView: View {
         if let id = t.videoId {
             serviceRaw = WatchService.youtube.rawValue
             session?.resume(id, at: t.resumeAt)
+            // (not on the couch yet: a nudge to come and watch)
+            if session?.partnerHere == false { place.nudge("watch", ["title": t.title]) }
         } else if let site = StreamSite(platform: t.platform), let u = URL(string: t.resumeURL) {
             serviceRaw = site.rawValue
             watch(site, u)

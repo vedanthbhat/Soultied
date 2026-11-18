@@ -50,6 +50,19 @@ Once, in App Store Connect (only the account holder can do the first two):
 
 Testing: TestFlight purchases use the sandbox and cost nothing; a year renews every hour there. Check `appleSubs` and the place's `plus` in Firestore afterwards.
 
+## Notifications on your person's iPhone
+
+`pushNote` (in `push.js`, no keys of its own): when you seal today's letter, send a hug, make your move, put something on the TV, pin something up, leave a voice note, take today's photo or look after the pet, the iPhone app or soultied.app sends `{sid, kind, args}` with your Firebase sign-in. The function checks you're in that place, then decides from `spaces/{sid}/meta/push`:
+
+- **their phones:** `devices[uid][key] = {token, tz, platform, at}`, kept by the iPhone app (Push.swift)
+- **their switches:** `prefs[uid][group] = false` turns a group off (letters, touches, games, watch, wall, pet)
+- **not at night:** nothing between 11pm and 8am in their time zone
+- **not too often:** a gap per kind (and per game, per show), remembered in `sent`
+
+The words are written here, not in the apps. Phones that have gone (the app deleted) are forgotten when Firebase says so.
+
+Once, for Apple's side: an APNs key (developer.apple.com → Keys, Apple Push Notifications service, Sandbox & Production) uploaded in Firebase → Project settings → Cloud Messaging → the `app.soultied.ios` app, in both the development and production slots.
+
 ## Testing it
 
 - Razorpay test mode: pay with Razorpay's test cards or UPI `success@razorpay`.

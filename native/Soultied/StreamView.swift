@@ -701,8 +701,17 @@ final class OrientationGate {
     }
 }
 
-/// the app's delegate: here only to say which ways the screen may turn
+/// the app's delegate: which ways the screen may turn, and notifications (Push.swift)
 final class AppDelegate: NSObject, UIApplicationDelegate {
+    func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        Push.shared.start()
+        return true
+    }
+
+    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        Push.shared.apnsToken(deviceToken)
+    }
+
     func application(_ application: UIApplication, supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
         OrientationGate.shared.mask
     }

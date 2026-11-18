@@ -214,6 +214,8 @@ jobs:
           shot home-continue -demo -tab home -scrollHome continue
           # on FaceTime: the top corner kept clear, with the empty frame where its little window fits
           shot facetime -demo -tab home -onCall
+          # notifications: the switches in Us (on a fresh simulator, the button to turn them on)
+          shot us-notifications -demo -tab us -scrollUs notifications
           # turned sideways as a show starts: Netflix stays up (it used to close for the room)
           shot stream-sideways -demo -tab watch -service netflix -stream netflix -sideways
           # the Starlight look

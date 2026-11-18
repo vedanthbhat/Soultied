@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { useSharedDoc } from './useSharedDoc';
+import { nudge } from '../cloud/push';
 import { carePatch, demoPet, missingDays, normalizePet, petLevel, bondOf, petView, type PetAct, type PetDoc, type PetPatch, type PetView } from './pet';
 
 /**
@@ -19,7 +20,7 @@ export interface PetApi {
 const PetCtx = createContext<PetApi | null>(null);
 
 export const PetProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { currentUser, partnerUser, today } = useApp();
+  const { currentUser, partnerUser, today, space } = useApp();
   const me = currentUser.id;
   const them = partnerUser?.id || null;
   const shared = useSharedDoc<PetDoc>('pet', normalizePet, demoPet);
@@ -41,12 +42,16 @@ export const PetProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const d = docRef.current;
       const p: PetPatch | null = carePatch(d, today, me, them, act, Date.now());
       if (!p) return null;
+      // the first thing done for it today, before your person's been by: their turn (tell their phone)
+      const v = petView(d, today, me, them);
+      if (shared.mode === 'cloud' && them && !Object.keys(v.mine).length && !Object.keys(v.theirs).length) nudge(space?.id, 'pet', { act });
       const before = petLevel(bondOf(d)).level;
       write(p as never);
       const after = petLevel(bondOf(d) + (p.days ? Object.keys(p.days).length : 0)).level;
       return { before, after };
     },
-    [today, me, them, write]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [today, me, them, write, shared.mode, space?.id]
   );
 
   const value = useMemo<PetApi>(() => ({ ready, doc, view, care }), [ready, doc, view, care]);

@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { newKey, useSharedDoc } from './useSharedDoc';
+import { nudge } from '../cloud/push';
 import { type Ask, type AskAnswer, type AsksView, DEMO_REPLIES, demoAsks, normalizeAsks, viewAsks } from './asks';
 import {
   type MoodEntry,
@@ -143,6 +144,7 @@ export const TogetherProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const at = Date.now();
       const item: Ask = { id, by: me, prompt: prompt.trim(), options, at, answers: { [me]: { ...mine, at } }, seen: {} };
       write({ items: { [id]: item } });
+      if (asksDoc.mode === 'cloud' && them) nudge(space?.id, 'ask', { prompt: item.prompt });
       // the demo room: Rohan answers a moment later
       if (asksDoc.mode === 'demo' && them) {
         window.setTimeout(() => {
@@ -153,7 +155,7 @@ export const TogetherProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         }, 3500);
       }
     },
-    [me, them, write, asksDoc.mode]
+    [me, them, write, asksDoc.mode, space?.id]
   );
 
   const answerAsk = useCallback<TogetherValue['answerAsk']>(
@@ -164,8 +166,9 @@ export const TogetherProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       if (them && item.answers[them] && partnerUser) {
         addActivity({ type: 'question_revealed', title: 'A question, answered', description: `“${item.prompt}”` });
       }
+      if (asksDoc.mode === 'cloud' && them) nudge(space?.id, 'answer', { prompt: item.prompt });
     },
-    [asksDoc.doc, me, them, write, addActivity, partnerUser]
+    [asksDoc.doc, me, them, write, addActivity, partnerUser, asksDoc.mode, space?.id]
   );
 
   const markAskSeen = useCallback<TogetherValue['markAskSeen']>(
@@ -227,6 +230,7 @@ export const TogetherProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       writeTouch({ items: { ...drop, [t.id]: t } });
       setRoomTouch(t);
       touchSound(kind);
+      if (touchDoc.mode === 'cloud' && them) nudge(space?.id, 'touch', { touch: kind, reply });
       // the demo room: Rohan sends one straight back (but doesn't answer a reply, or you'd go on forever)
       if (touchDoc.mode === 'demo' && them && !reply) {
         window.setTimeout(() => {
@@ -235,7 +239,7 @@ export const TogetherProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         }, 2800);
       }
     },
-    [me, them, writeTouch, touchDoc.mode]
+    [me, them, writeTouch, touchDoc.mode, space?.id]
   );
 
   // a touch just came in (or was waiting when you arrived): the room plays it once
@@ -267,8 +271,9 @@ export const TogetherProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     (kind, ref) => {
       const at = Date.now();
       writeBoard({ last: { [me]: { at, kind } }, ...(kind === 'doodle' && ref ? { drew: { [me]: { id: ref, at } } } : {}) });
+      if (boardDoc.mode === 'cloud' && them) nudge(space?.id, kind === 'voice' ? 'voice' : 'wall', kind === 'voice' ? {} : { what: kind });
     },
-    [me, writeBoard]
+    [me, writeBoard, boardDoc.mode, them, space?.id]
   );
   const hangArt = useCallback<TogetherValue['hangArt']>((art) => writeBoard({ art: art ? { ...art } : null }), [writeBoard]);
 
@@ -297,8 +302,11 @@ export const TogetherProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     };
   }, [snapDoc.doc, me, them, today, space?.id]);
   const postSnap = useCallback<TogetherValue['postSnap']>(
-    (shot) => writeSnap({ by: { [me]: { ...shot, caption: shot.caption.trim().slice(0, SNAP_CAPTION_MAX), at: Date.now() } } }),
-    [me, writeSnap]
+    (shot) => {
+      writeSnap({ by: { [me]: { ...shot, caption: shot.caption.trim().slice(0, SNAP_CAPTION_MAX), at: Date.now() } } });
+      if (snapDoc.mode === 'cloud' && them) nudge(space?.id, 'snap');
+    },
+    [me, writeSnap, snapDoc.mode, them, space?.id]
   );
 
   /* ---------- holding the couch ---------- */

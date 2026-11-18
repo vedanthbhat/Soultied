@@ -38,6 +38,8 @@ struct HomeView: View {
                         VStack(spacing: 18) {
                             // (the cards come in one after another as Home opens)
                             touches.id("touches").popIn()
+                            // would you like a nudge when they've been by? (Push.swift)
+                            PushAskCard(place: place).popIn(0.04)
                             if place.partnerHere { SnapCard(place: place).id("snap").popIn(0.06) }
                             // (counting down to a day: near the top; no day set yet: a nudge further down)
                             if place.partnerHere && place.visitDays != nil { CountdownCard(place: place).id("countdown").popIn(0.12) }

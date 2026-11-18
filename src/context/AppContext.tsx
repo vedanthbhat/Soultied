@@ -27,6 +27,7 @@ import { CloudDb, CloudUser, cloud, cloudEnabled, describeAuthError, signInAsTes
 import * as store from '../cloud/store';
 import { LiveChannel, browserChannel, firestoreChannel } from '../cloud/live';
 import { redeemForPlace } from '../cloud/plus';
+import { nudge } from '../cloud/push';
 import type { PlusReply } from '../stream/protocol';
 
 /**
@@ -659,6 +660,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const now = new Date().toISOString();
       const both = !!partnerId && !!d.by[partnerId]?.sealedAt;
       store.writeMyLetter(o.db, o.sid, o.uid, kind, d, { sealedAt: now, ...(both ? { seenAt: now } : {}) }, both ? now : undefined).catch(warn('seal'));
+      // your person's phone: your turn, or your letters are open
+      if (partnerId) nudge(o.sid, 'letter', { stage: both ? 'open' : 'waiting', letter: kind });
       if (both && partnerId && kind === 'daily') {
         const opened: LetterDay = { ...d, by: { ...d.by, [o.uid]: { ...mine, sealedAt: now } } };
         const sc = scoreDay(opened, o.uid, partnerId);
