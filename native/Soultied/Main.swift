@@ -31,7 +31,7 @@ enum RoomSheet: String, Identifiable {
     /// the decor catalogue, open at the pet (choosing a different one, or naming it)
     case petDecor
     /// the wall, open at the doodle pad or the photos (a tap on a home-screen widget)
-    case doodle, photos
+    case doodle, photos, countdown
     var id: String { rawValue }
 }
 
@@ -153,7 +153,11 @@ struct MainView: View {
         widgetLink.open = nil
         game = nil
         escape = false
-        sheet = t == .photos ? .photos : .doodle
+        switch t {
+        case .photos: sheet = .photos
+        case .doodle: sheet = .doodle
+        case .countdown: sheet = .countdown
+        }
     }
 
     /// a tap on a notification: where it's about
@@ -227,6 +231,7 @@ struct MainView: View {
         case .letters: LettersView(place: place, start: .today)
         case .wall: WallView(place: place)
         case .doodle: WallView(place: place, start: .doodle)
+        case .countdown: VisitSheet(place: place)
         case .photos: WallView(place: place, start: .photos)
         case .decor: DecorView(place: place)
         case .play: PlayView(place: place)

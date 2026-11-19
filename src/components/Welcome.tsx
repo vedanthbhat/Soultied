@@ -183,7 +183,7 @@ export const Welcome: React.FC<Props> = ({ initialJoinCode, nudge = 0, onDraftSe
                 Soultied
               </h1>
             </div>
-            <p className="m-0 text-lg font-semibold leading-snug text-balance text-[var(--ink-soft)]">A shared home for long-distance couples.</p>
+            <p className="m-0 text-lg font-semibold leading-snug text-balance text-[var(--ink-soft)]">A little place for the two of you.</p>
             <p className="m-0 -mt-1 leading-snug text-balance text-[var(--muted)]">
               A daily letter, games for two, a record player and movie nights.
             </p>
