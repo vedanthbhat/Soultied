@@ -1,3 +1,4 @@
+import { InviteDoodle } from './wall/InviteDoodle';
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { PixelAvatarRenderer } from './PixelAvatarRenderer';
@@ -36,14 +37,7 @@ export const SpacePanel: React.FC = () => {
                 <PixelAvatarRenderer config={partnerUser.avatar} size={120} flipped />
                 <span className="text-sm font-semibold mt-1">{partnerUser.name}</span>
               </>
-            ) : (
-              <>
-                <div className="px-inset flex items-center justify-center text-3xl text-[var(--terracotta)]" style={{ width: 60, height: 120 }}>
-                  +
-                </div>
-                <span className="text-sm font-semibold mt-1 text-[var(--muted)]">{space.partnerPlaceholderName}</span>
-              </>
-            )}
+            ) : null}
           </div>
         </div>
         <div className="flex-1 min-w-[220px]">
@@ -63,7 +57,7 @@ export const SpacePanel: React.FC = () => {
             <div className="flex gap-3">
               <input className="px-input text-sm" readOnly value={inviteLink} onFocus={(e) => e.currentTarget.select()} aria-label="Invite link" />
               <button className="px-btn px-btn--sage shrink-0" onClick={() => copy('link', inviteLink)}>
-                {copied === 'link' ? 'Copied!' : 'Copy link'}
+                {copied === 'link' ? 'Link copied!' : 'Invite your person'}
               </button>
             </div>
           </div>
@@ -82,6 +76,7 @@ export const SpacePanel: React.FC = () => {
               </button>
             </div>
           </div>
+          <InviteDoodle />
           {!cloudMode && (
             <p className="text-xs text-[var(--muted)]">
               {cloudEnabled

@@ -64,7 +64,7 @@ const StreakStrip: React.FC = () => {
       {streak.mendable && (
         <div className="px-inset p-3 flex items-center gap-3 flex-wrap justify-between">
           <span className="text-sm leading-snug">
-            Yesterday’s letter didn’t get opened. You can mend one missed day a week so the streak survives.
+            You can mend one day this week if you like.
           </span>
           <button className="px-btn px-btn--small" onClick={mendStreak}>
             <PixelIcon name="stitch" scale={2} /> Mend the streak

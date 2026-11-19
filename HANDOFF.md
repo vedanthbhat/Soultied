@@ -1,7 +1,16 @@
 # Handoff
 
-Shared between Claude and Codex. Update this at every checkpoint. Everything is on `main` (Claude pushes through
-Google AI Studio's GitHub sync), so pull before you start and push small commits.
+Shared between Claude and Codex. Update this at every checkpoint. Claude uses Google AI Studio’s GitHub sync on `main`. The couples-app changes are on
+`review/couples-widgets` in [draft PR #1](https://github.com/vedanthbhat/Soultied/pull/1). Check the current branch before editing.
+
+## Couples-app review checkpoint · 19 November 2026
+
+1. **Widgets.** Small and medium Doodle and Countdown use the bundled Pixelify Sans. Countdown opens the shared plan editor.
+2. **Invite.** Sharing the invite is the primary action. The optional drawing uses the existing wall and picture frame. On iPhone the empty seat and Home invite buttons open the invite directly.
+3. **Us.** Six tiles open details. The onboarding answer selects date or distance. People in the same city or home get date questions.
+4. **Recap and Home.** The monthly tile features a saved memory, then an opened letter if available. Matching picks are still in the recap. Home gives unread partner activity priority and uses gentler copy after missed days.
+
+Web checks passed for TypeScript and the production bundle. At a 390 × 844 viewport the demo opened and closed all six tiles and Settings, showed the recap metric and toggled a notification preference. In a local-mode build a fresh host drew and pinned a doodle from the invite, returned to the invite and reached the date question after selecting “We live together.” Live two-account delivery and the iPhone simulator still need verification on this branch. The original Plus and record-player work below is still open.
 
 ## Current goal
 

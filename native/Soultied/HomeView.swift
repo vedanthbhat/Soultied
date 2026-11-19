@@ -16,6 +16,7 @@ struct HomeView: View {
     var listening = true
     var go: (AppTab) -> Void
     var onRoom: (HotspotId) -> Void
+    var invite: () -> Void
     var openGame: (GameKind) -> Void = { _ in }
     @Environment(\.displayScale) private var displayScale
     /// on FaceTime: its little window sits in the top corner, so the jar of stitches moves out of its way
@@ -33,6 +34,9 @@ struct HomeView: View {
                             // (added to the spots inside it, which a plain anchorPreference would replace)
                             .transformAnchorPreference(key: TourSpots.self, value: .bounds) { $0["room"] = $1 }
                         nameplates
+                        if place.wallNews != nil {
+                            WallCard(place: place, open: { onRoom(.board) }).padding(.horizontal, 16)
+                        }
 
                         VStack(spacing: 18) {
                             // (the cards come in one after another as Home opens)
@@ -43,7 +47,7 @@ struct HomeView: View {
                             // (counting down to a day: near the top; no day set yet: a nudge further down)
                             if place.partnerHere && place.visitDays != nil { CountdownCard(place: place).id("countdown").popIn(0.12) }
                             if place.recordOn { RecordCard(place: place, listening: listening, open: { onRoom(.music) }).popIn(0.14) }
-                            LetterCard(place: place, open: { go(.letters) }).popIn(0.18)
+                            LetterCard(place: place, open: place.partnerHere ? { go(.letters) } : invite).popIn(0.18)
                             AsksCard(place: place, open: { go(.letters) }).popIn(0.22)
                             // what you were part way through: one tap carries on in Watch (TapeViews.swift)
                             ContinueCard(place: place) { t in
@@ -53,10 +57,10 @@ struct HomeView: View {
                             .id("continue").popIn(0.23)
                             PetHomeCard(place: place, open: { onRoom(.pet) }).id("pet").popIn(0.24)
                             GameCard(place: place, open: openGame).popIn(0.26)
-                            WallCard(place: place, open: { onRoom(.board) }).popIn(0.3)
+                            if place.wallNews == nil { WallCard(place: place, open: { onRoom(.board) }).popIn(0.3) }
                             StreakCard(place: place).popIn(0.34)
                             if !place.recordOn { RecordCard(place: place, open: { onRoom(.music) }).popIn(0.38) }
-                            CouchCard(place: place, invite: { go(.us) }).popIn(0.42)
+                            CouchCard(place: place, invite: invite).popIn(0.42)
                             if place.partnerHere && place.visitDays == nil { CountdownCard(place: place).popIn(0.46) }
                         }
                         .padding(.horizontal, 16)
@@ -345,7 +349,7 @@ struct StreakCard: View {
             }
             if s.mendable != nil {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Yesterday’s letter didn’t get opened. You can mend one missed day a week so the streak survives.").font(.pxSmall).foregroundStyle(Color.inkSoft)
+                    Text("You can mend one day this week if you like.").font(.pxSmall).foregroundStyle(Color.inkSoft)
                     Button {
                         place.mendStreak()
                         Haptics.success()

@@ -23,7 +23,7 @@ private func ans(_ pairs: [(String, String)]) -> [AboutAnswer] { pairs.map { Abo
 
 private let ABOUT: [AboutQuestion] = [
     AboutQuestion(id: "far", ask: { _ in "How far apart are you?" }, answers: ans([
-        ("city", "Same city, different places"), ("hours", "A few hours away"), ("country", "Different countries"), ("zones", "Different time zones"),
+        ("together", "We live together"), ("city", "Same city, different places"), ("hours", "A few hours away"), ("country", "Different countries"), ("zones", "Different time zones"),
     ])),
     AboutQuestion(id: "often", ask: { _ in "How often do you get to see each other?" }, answers: ans([
         ("weeks", "Most weeks"), ("month", "Every month or so"), ("months", "Every few months"), ("unsure", "We’re not sure yet"),
@@ -77,10 +77,18 @@ struct AboutSheet: View {
         .onAppear { if place.visitDays != nil, let d = localDate(place.visit.date) { visit = d } }
     }
 
+    private var nearby: Bool { answers["far"] == "city" || answers["far"] == "together" }
+
+    private func prompt(_ q: AboutQuestion) -> String {
+        if nearby && q.id == "often" { return "How often do you make time for a date?" }
+        if nearby && q.id == "miss" { return "What do you love doing together?" }
+        return q.ask(place.theirName)
+    }
+
     private func question(_ q: AboutQuestion) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("ABOUT THE TWO OF YOU").font(.px(12, 600)).kerning(1.6).foregroundStyle(Color.terracottaD)
-            Text(q.ask(place.theirName)).font(.pxTitle).foregroundStyle(Color.inkSoft).fixedSize(horizontal: false, vertical: true)
+            Text(prompt(q)).font(.pxTitle).foregroundStyle(Color.inkSoft).fixedSize(horizontal: false, vertical: true)
             ForEach(q.answers) { a in
                 Button {
                     answers[q.id] = a.id
@@ -99,7 +107,7 @@ struct AboutSheet: View {
     private var nextTime: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("ABOUT THE TWO OF YOU").font(.px(12, 600)).kerning(1.6).foregroundStyle(Color.terracottaD)
-            Text("When will you see \(place.theirName) next?").font(.pxTitle).foregroundStyle(Color.inkSoft).fixedSize(horizontal: false, vertical: true)
+            Text(nearby ? "When’s your next date?" : "When will you see \(place.theirName) next?").font(.pxTitle).foregroundStyle(Color.inkSoft).fixedSize(horizontal: false, vertical: true)
             Text(place.visitDays != nil
                  ? "There’s already a day set. Keep it, or pick another."
                  : "You’ll both count down to it, in Soultied and on your widgets.")
@@ -140,8 +148,9 @@ struct AboutSheet: View {
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
             .pxInset()
+            if !place.partnerHere { InviteCard(place: place) }
             if let d = place.visitDays {
-                Text(d > 1 ? "And \(d) days till you’re together. The countdown’s on your Home." : "And you’re together very soon. The countdown’s on your Home.")
+                Text(nearby ? "Your next date is on the countdown." : d > 1 ? "And \(d) days till you’re together. The countdown’s on your Home." : "And you’re together very soon. The countdown’s on your Home.")
                     .font(.pxBody).foregroundStyle(Color.inkSoft).fixedSize(horizontal: false, vertical: true)
             }
             if !place.hasPlus {
@@ -153,7 +162,7 @@ struct AboutSheet: View {
                 Text("Every movie night, game and escape room, for both of you. One of you having it covers you both.")
                     .font(.pxSmall).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
             }
-            Button(place.hasPlus ? "Into the room →" : "Maybe later") { finish() }.buttonStyle(.px(.paper, wide: true))
+            Button("Into the room →") { finish() }.buttonStyle(.px(.paper, wide: true))
         }
     }
 

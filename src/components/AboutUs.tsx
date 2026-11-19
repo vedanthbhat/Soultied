@@ -44,6 +44,7 @@ export const AboutUs: React.FC<{ onDone: () => void }> = ({ onDone }) => {
   // the question for this step: two taps, then the date, then two more
   const question = step < 2 ? ABOUT[step] : step > 2 && step < ABOUT_STEPS ? ABOUT[step - 1] : null;
   const left = daysLeft(visit, today);
+  const nearby = answers.far === 'city' || answers.far === 'together';
   const fit = aboutFit(answers.miss, name);
   const offerPlus = !hasPlus && cloudMode && !inApp();
 
@@ -59,7 +60,7 @@ export const AboutUs: React.FC<{ onDone: () => void }> = ({ onDone }) => {
         {question && (
           <>
             <div className="text-xs font-semibold tracking-[0.16em] text-[var(--terracotta-d,#9c4a2c)]">ABOUT THE TWO OF YOU</div>
-            <h2 className="m-0 text-2xl leading-tight">{question.ask(name)}</h2>
+            <h2 className="m-0 text-2xl leading-tight">{nearby && question.id === 'often' ? 'How often do you make time for a date?' : nearby && question.id === 'miss' ? 'What do you love doing together?' : question.ask(name)}</h2>
             <div className="flex flex-col gap-2">
               {question.answers.map((a) => (
                 <button key={a.id} className={`px-btn w-full text-left ${answers[question.id] === a.id ? 'px-btn--sage' : 'px-btn--paper'}`} onClick={() => answer(question.id, a.id)}>
@@ -83,7 +84,7 @@ export const AboutUs: React.FC<{ onDone: () => void }> = ({ onDone }) => {
             }}
           >
             <div className="text-xs font-semibold tracking-[0.16em] text-[var(--terracotta-d,#9c4a2c)]">ABOUT THE TWO OF YOU</div>
-            <h2 className="m-0 text-2xl leading-tight">When will you see {name} next?</h2>
+            <h2 className="m-0 text-2xl leading-tight">{nearby ? 'When’s your next date?' : `When will you see ${name} next?`}</h2>
             <p className="m-0 text-sm text-[var(--muted)]">{already ? 'There’s already a day set. Keep it, or pick another.' : 'You’ll both count down to it, here and on the iPhone app’s widgets.'}</p>
             <label>
               <span className="px-label">The day</span>
@@ -113,7 +114,7 @@ export const AboutUs: React.FC<{ onDone: () => void }> = ({ onDone }) => {
               <div className="font-bold">Start with: {fit.title}</div>
               <div className="text-sm text-[var(--muted)]">{fit.line}</div>
             </div>
-            {left !== null && <p className="m-0 text-sm">{left > 1 ? `And ${left} days till you’re together. The countdown’s on your Us page.` : 'And you’re together very soon. The countdown’s on your Us page.'}</p>}
+            {left !== null && <p className="m-0 text-sm">{nearby ? "Your next date is on the countdown." : left > 1 ? `And ${left} days till you’re together. The countdown’s on your Us page.` : 'And you’re together very soon. The countdown’s on your Us page.'}</p>}
             {offerPlus && (
               <>
                 <button className="px-btn w-full" onClick={() => finish(true)}>

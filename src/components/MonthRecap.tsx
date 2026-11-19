@@ -21,7 +21,7 @@ const statsOf = (r: Recap) => [
   { n: String(r.days), label: r.days === 1 ? 'day you both showed up' : 'days you both showed up' },
   { n: String(r.bestStreak), label: r.bestStreak === 1 ? 'day in a row, at best' : 'days in a row, at best' },
   { n: String(r.letters), label: r.letters === 1 ? 'letter opened together' : 'letters opened together' },
-  { n: r.sync === null ? '–' : `${r.sync}%`, label: 'in sync' },
+  { n: r.sync === null ? '–' : `${r.sync}%`, label: 'matching picks' },
   { n: String(r.photos), label: r.photos === 1 ? 'photo pinned up' : 'photos pinned up' },
   { n: String(r.doodles + r.notes), label: 'doodles and notes' },
 ];
@@ -31,7 +31,7 @@ const shortOf = (r: Recap) => [
   { n: String(r.days), label: 'days both here' },
   { n: String(r.bestStreak), label: 'in a row, at best' },
   { n: String(r.letters), label: 'letters together' },
-  { n: r.sync === null ? '–' : `${r.sync}%`, label: 'in sync' },
+  { n: r.sync === null ? '–' : `${r.sync}%`, label: 'matching picks' },
   { n: String(r.photos), label: r.photos === 1 ? 'photo' : 'photos' },
   { n: String(r.doodles + r.notes), label: 'doodles & notes' },
 ];

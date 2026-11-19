@@ -243,7 +243,7 @@ const Home: React.FC = () => {
           ? 'Your letter is open ✉'
           : letterBadge === 'answer'
             ? partnerSealed
-              ? `${partnerUser?.name} is waiting on today’s letter ✉`
+              ? `${partnerUser?.name} left you a letter ✉`
               : 'Today’s letter ✉'
             : askWaiting
               ? asks.forMe.length
@@ -576,7 +576,7 @@ const Home: React.FC = () => {
           <div className="px-box px-shadow px-fade px-3 py-2 flex items-center gap-3 flex-wrap justify-center">
             <PixelIcon name="envelope" scale={2} />
             <span className="text-sm leading-snug flex-1 min-w-[180px]">
-              {partnerUser.name} pinned {pinnedWhat} up on the wall for you.
+              {partnerUser.name} left you {pinnedWhat}.
             </span>
             <button
               className="px-btn px-btn--sage px-btn--small"
