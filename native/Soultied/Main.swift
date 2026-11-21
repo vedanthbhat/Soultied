@@ -27,11 +27,11 @@ enum AppTab: String, CaseIterable, Identifiable {
 
 /// what the room can open as a sheet (sideways, or from a tap on the couch)
 enum RoomSheet: String, Identifiable {
-    case me, them, letters, wall, decor, play, us, music, watch, pet
+    case me, them, invite, letters, wall, decor, play, us, music, watch, pet
     /// the decor catalogue, open at the pet (choosing a different one, or naming it)
     case petDecor
     /// the wall, open at the doodle pad or the photos (a tap on a home-screen widget)
-    case doodle, photos
+    case doodle, photos, countdown
     var id: String { rawValue }
 }
 
@@ -80,7 +80,7 @@ struct MainView: View {
             // phone turns (Netflix going sideways used to close it)
             VStack(spacing: 0) {
                 ZStack {
-                    HomeView(place: place, paused: tab != .home || sheet != nil || game != nil || roomSideways, listening: tab == .home && game == nil && !escape && !roomSideways, go: go, onRoom: { open($0, sheet: false) }, openGame: { k in
+                    HomeView(place: place, paused: tab != .home || sheet != nil || game != nil || roomSideways, listening: tab == .home && game == nil && !escape && !roomSideways, go: go, onRoom: { open($0, sheet: false) }, invite: { sheet = .invite }, openGame: { k in
                         if place.canPlay(k) { game = k } else { PlusGate.shared.show(.game(k.info.name)) }
                     })
                         .opacity(tab == .home ? 1 : 0)
@@ -153,7 +153,11 @@ struct MainView: View {
         widgetLink.open = nil
         game = nil
         escape = false
-        sheet = t == .photos ? .photos : .doodle
+        switch t {
+        case .photos: sheet = .photos
+        case .doodle: sheet = .doodle
+        case .countdown: sheet = .countdown
+        }
     }
 
     /// a tap on a notification: where it's about
@@ -189,7 +193,7 @@ struct MainView: View {
         case .left, .right:
             let who: String? = id == .left ? place.hostId : place.guestId
             guard let uid = who else {
-                show(.us, .us)
+                sheet = .invite
                 return
             }
             Haptics.tap()
@@ -227,10 +231,12 @@ struct MainView: View {
         case .letters: LettersView(place: place, start: .today)
         case .wall: WallView(place: place)
         case .doodle: WallView(place: place, start: .doodle)
+        case .countdown: VisitSheet(place: place)
         case .photos: WallView(place: place, start: .photos)
         case .decor: DecorView(place: place)
         case .play: PlayView(place: place)
         case .us: UsView(app: app, place: place)
+        case .invite: ScrollView { InviteCard(place: place).padding(16) }
         case .music: RecordSheet(place: place, hostsSong: roomSideways).presentationDetents([.medium, .large])
         case .watch: WatchView(place: place)
         case .pet: PetSheet(place: place, choose: { sheet = .petDecor }).presentationDetents([.medium, .large])

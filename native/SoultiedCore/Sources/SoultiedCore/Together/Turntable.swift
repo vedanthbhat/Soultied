@@ -19,7 +19,9 @@ public struct RecordTrack: Sendable, Equatable, Identifiable {
 
     public var id: String { slug }
     /// the same 96 kbps MP3 the website plays
-    public var url: URL { URL(string: "https://soultied.app/audio/\(slug).mp3")! }
+    public var url: URL { Records.tracks.contains(self)
+        ? URL(string: "https://soultied.app/audio/\(slug).mp3")!
+        : URL(string: "https://soultied.app/audio/shelf/\(slug).wav")! }
 }
 
 /// The record: five soft jazz tracks by Kevin MacLeod (incompetech.com), CC BY 4.0. The credit shows whenever
@@ -33,6 +35,36 @@ public enum Records {
         RecordTrack(slug: "cool-vibes", title: "Cool Vibes", secs: 218.448),
     ]
 
+    public static let shelf: [(id: String, title: String, tracks: [RecordTrack])] = [
+        ("jazz", "Jazz café", tracks),
+        ("lofi", "Lo-fi evening", [
+            RecordTrack(slug: "lofi-1", title: "Window Seat", secs: 48),
+            RecordTrack(slug: "lofi-2", title: "Last Train", secs: 48),
+            RecordTrack(slug: "lofi-3", title: "Lamp Light", secs: 48),
+        ]),
+        ("piano", "Soft piano", [
+            RecordTrack(slug: "piano-1", title: "Little Hours", secs: 48),
+            RecordTrack(slug: "piano-2", title: "Two Teacups", secs: 48),
+            RecordTrack(slug: "piano-3", title: "First Light", secs: 48),
+        ]),
+        ("acoustic", "Acoustic morning", [
+            RecordTrack(slug: "acoustic-1", title: "Open Window", secs: 48),
+            RecordTrack(slug: "acoustic-2", title: "Sunday Walk", secs: 48),
+            RecordTrack(slug: "acoustic-3", title: "Golden Hour", secs: 48),
+        ]),
+        ("rain", "Rainy day", [
+            RecordTrack(slug: "rain-1", title: "Rain on Glass", secs: 48),
+            RecordTrack(slug: "rain-2", title: "Under One Roof", secs: 48),
+            RecordTrack(slug: "rain-3", title: "After the Shower", secs: 48),
+        ]),
+        ("arcade", "Retro arcade", [
+            RecordTrack(slug: "arcade-1", title: "Extra Heart", secs: 48),
+            RecordTrack(slug: "arcade-2", title: "Player Two", secs: 48),
+            RecordTrack(slug: "arcade-3", title: "Save Point", secs: 48),
+        ]),
+    ]
+    public static func selection(_ id: String) -> [RecordTrack] { shelf.first { $0.id == id }?.tracks ?? tracks }
+
     public static let artist = "Kevin MacLeod"
     public static let sourceURL = URL(string: "https://incompetech.com")!
     public static let license = "CC BY 4.0"
@@ -45,26 +77,23 @@ public enum Records {
     public static let recordMs: Double = tracks.reduce(0) { $0 + $1.secs * 1000 }
 
     /// where each track starts on the record, in milliseconds
-    static let starts: [Double] = {
-        var acc: [Double] = []
-        for i in tracks.indices { acc.append(i == 0 ? 0 : acc[i - 1] + tracks[i - 1].secs * 1000) }
-        return acc
-    }()
-
-    /// what's playing at `now` on a record that started at `startedAt` (it goes round and round)
-    public static func whereAt(_ startedAt: Double, _ now: Double) -> (index: Int, offset: Double) {
-        var into = (now - startedAt).truncatingRemainder(dividingBy: recordMs)
-        if into < 0 { into += recordMs }
-        for i in stride(from: tracks.count - 1, through: 0, by: -1) where into >= starts[i] {
-            return (i, (into - starts[i]) / 1000)
+    public static func whereAt(_ startedAt: Double, _ now: Double, album: String = "jazz") -> (index: Int, offset: Double) {
+        let songs = selection(album)
+        let duration = songs.reduce(0.0) { $0 + $1.secs * 1000 }
+        var ms = (now - startedAt).truncatingRemainder(dividingBy: duration)
+        if ms < 0 { ms += duration }
+        for (index, track) in songs.enumerated() {
+            if ms < track.secs * 1000 { return (index, ms / 1000) }
+            ms -= track.secs * 1000
         }
         return (0, 0)
     }
 
     /// the startedAt that puts track `index` right at its beginning at `now`
-    public static func startFor(_ index: Int, _ now: Double) -> Double {
+    public static func startFor(_ index: Int, _ now: Double, album: String = "jazz") -> Double {
+        let tracks = selection(album)
         let n = tracks.count
-        return now - starts[((index % n) + n) % n]
+        return now - tracks.prefix(((index % n) + n) % n).reduce(0.0) { $0 + $1.secs * 1000 }
     }
 }
 
@@ -82,6 +111,7 @@ public struct TurntableState: Sendable, Equatable {
         }
     }
 
+    public var album = "jazz"
     public var on = false
     /// when the first track (or the song's first second) would have played (epoch ms)
     public var startedAt: Double = 0
@@ -103,6 +133,7 @@ public struct TurntableState: Sendable, Equatable {
 
     public init?(_ raw: Doc?) {
         guard let r = raw else { return nil }
+        album = r.str("album") ?? "jazz"
         on = r.bool("on")
         startedAt = r.num("startedAt") ?? 0
         by = r.str("by") ?? ""
@@ -121,7 +152,7 @@ public struct TurntableState: Sendable, Equatable {
             if let t = yt.title { s["title"] = t }
             song = s
         }
-        return ["on": on, "startedAt": startedAt, "by": by, "at": at, "next": next, "yt": song]
+        return ["album": album, "on": on, "startedAt": startedAt, "by": by, "at": at, "next": next, "yt": song]
     }
 
     /// playing, for both of you (a record left on goes quiet after two hours)
@@ -130,15 +161,17 @@ public struct TurntableState: Sendable, Equatable {
     /// the jazz record's track right now (nil while it's off or a song from YouTube is on)
     public func track(_ now: Double) -> RecordTrack? {
         guard isOn(now), yt == nil else { return nil }
-        return Records.tracks[Records.whereAt(startedAt, now).index]
+        return Records.selection(album)[Records.whereAt(startedAt, now, album: album).index]
     }
 
     /* ---------- what each button writes (src/music/TurntableContext.tsx) ---------- */
 
     /// put the jazz record on, from the track after the last one heard
-    public static func jazz(_ prev: TurntableState?, by me: String, now: Double) -> TurntableState {
-        let next = prev.map { $0.next % Records.tracks.count } ?? 0
-        return TurntableState(on: true, startedAt: Records.startFor(next, now), by: me, at: now, next: next, yt: nil)
+    public static func jazz(_ prev: TurntableState?, by me: String, now: Double, album: String = "jazz") -> TurntableState {
+        let next = prev?.album == album ? (prev?.next ?? 0) % Records.selection(album).count : 0
+        var t = TurntableState(on: true, startedAt: Records.startFor(next, now, album: album), by: me, at: now, next: next, yt: nil)
+        t.album = album
+        return t
     }
 
     /// put a song from YouTube on (nil if the link isn't one)
@@ -151,16 +184,18 @@ public struct TurntableState: Sendable, Equatable {
     /// lift the needle (nil if nothing's playing); the record starts from the next track next time
     public func lifted(by me: String, now: Double) -> TurntableState? {
         guard isOn(now) else { return nil }
-        let n = Records.tracks.count
-        let next = yt != nil ? next % n : (Records.whereAt(startedAt, now).index + 1) % n
-        return TurntableState(on: false, startedAt: startedAt, by: me, at: now, next: next, yt: nil)
+        let n = Records.selection(album).count
+        let next = yt != nil ? next % n : (Records.whereAt(startedAt, now, album: album).index + 1) % n
+        var t = TurntableState(on: false, startedAt: startedAt, by: me, at: now, next: next, yt: nil)
+        t.album = album
+        return t
     }
 
     /// on to the next track of the record (nil for a song, or when it's off)
     public func skipped(by me: String, now: Double) -> TurntableState? {
         guard isOn(now), yt == nil else { return nil }
         var t = self
-        t.startedAt = Records.startFor(Records.whereAt(startedAt, now).index + 1, now)
+        t.startedAt = Records.startFor(Records.whereAt(startedAt, now, album: album).index + 1, now, album: album)
         t.by = me
         t.at = now
         return t

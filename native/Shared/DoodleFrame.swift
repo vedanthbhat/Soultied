@@ -226,7 +226,7 @@ struct DoodleCard: View {
     private var who: String { name.isEmpty ? "your person" : name }
     private var title: String {
         if !setUp { return "Your person’s doodles" }
-        return px == nil ? "Nothing from \(who) yet" : "From \(who)"
+        return px == nil ? "A doodle for \(who)" : "From \(who)"
     }
     private var subtitle: String {
         if !setUp { return "Open Soultied and pair up: their doodles hang here." }
@@ -235,8 +235,8 @@ struct DoodleCard: View {
     }
     private var caption: String {
         if !setUp { return "Open Soultied" }
-        guard px != nil else { return "Nothing yet" }
-        return at.map { "\(who) · \(WidgetShare.ago($0, now: now))" } ?? who
+        guard px != nil else { return "Draw them one" }
+        return "From \(who)"
     }
     private var chip: String { !setUp ? "Open Soultied" : px == nil ? "Draw them one" : "Draw one back" }
 
@@ -245,7 +245,7 @@ struct DoodleCard: View {
         switch size {
         case .small:
             VStack(spacing: 7) {
-                FramedDoodle(px: px, look: look, band: 6)
+                FramedDoodle(px: px, look: look, band: 4)
                     .padding(.top, 12)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 Text(caption)
@@ -254,10 +254,10 @@ struct DoodleCard: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
             }
-            .padding(12)
+            .padding(9)
         case .medium:
             HStack(spacing: 14) {
-                FramedDoodle(px: px, look: look, band: 7)
+                FramedDoodle(px: px, look: look, band: 5)
                     .padding(.top, 12)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 VStack(alignment: .leading, spacing: 4) {

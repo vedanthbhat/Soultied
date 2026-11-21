@@ -1,8 +1,9 @@
+import { useSharedDoc } from '../together/useSharedDoc';
 import React, { useEffect, useRef, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { useStreamHub } from '../stream/StreamHub';
 import { useTurntable } from '../music/TurntableContext';
-import { ARTIST, LICENSE, LICENSE_URL, SOURCE_URL } from '../music/records';
+import { shelf, TRACKS, ARTIST, LICENSE, LICENSE_URL, SOURCE_URL } from '../music/records';
 import { describeYouTubeError, loadYouTubeApi, YTPlayer, YTState } from '../watch/youtube';
 import { songStalled, songStep, songSync } from '../music/songSync';
 import { Sprite } from './games/Pixel';
@@ -64,14 +65,14 @@ const RecordCard: React.FC<{ who: string; fromThem: boolean }> = ({ who, fromThe
       <span className="flex flex-col min-w-0 leading-tight">
         <span className="font-semibold truncate">{tt.track.title}</span>
         <span className="text-xs text-[var(--muted)]">
-          {ARTIST} (
+          {TRACKS.includes(tt.track) ? <>{ARTIST} (
           <a className="underline" href={SOURCE_URL} target="_blank" rel="noreferrer">
             incompetech.com
           </a>
           ) ·{' '}
           <a className="underline" href={LICENSE_URL} target="_blank" rel="noreferrer">
             {LICENSE}
-          </a>
+          </a></> : "Soultied originals"}
         </span>
         {fromThem && !tt.blocked && <span className="text-xs text-[var(--muted)]">{who} put this on</span>}
       </span>
@@ -89,8 +90,8 @@ const RecordCard: React.FC<{ who: string; fromThem: boolean }> = ({ who, fromThe
           Next
         </button>
         <Volume />
-        <button className="px-btn px-btn--paper px-btn--small" onClick={tt.openPicker} title="Put on a song from YouTube instead">
-          A song instead
+        <button className="px-btn px-btn--paper px-btn--small" onClick={tt.openPicker} title="Choose a record">
+          Record shelf
         </button>
         <button className="px-btn px-btn--paper px-btn--small" onClick={tt.toggle}>
           Lift the needle
@@ -332,7 +333,17 @@ const SongPlayer: React.FC<{
 };
 
 /** Choosing what goes on: the jazz record, or a song from YouTube. */
+function songDoc(raw: unknown) {
+  try {
+    const url = new URL((raw as {url:string}).url);
+    if (url.origin === 'https://music.apple.com' && !url.username && !url.password &&
+        (url.pathname.includes('/song/') || (url.pathname.includes('/album/') && url.searchParams.get('i')))) return {url:url.href};
+  } catch {}
+  return {url:''};
+}
 const RecordPicker: React.FC = () => {
+  const {hasPlus} = useApp();
+  const song = useSharedDoc("ourSong", songDoc, () => ({url:""}));
   const tt = useTurntable();
   const [link, setLink] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -346,7 +357,7 @@ const RecordPicker: React.FC = () => {
   return (
     <div className="fixed inset-0 z-50 px-ui flex items-center justify-center p-4" style={{ background: 'rgba(29, 21, 18, 0.45)' }} onClick={tt.closePicker}>
       <div
-        className="px-box px-shadow px-pop w-full max-w-[460px] p-5 flex flex-col gap-4"
+        className="px-box px-shadow px-pop w-full max-w-[460px] max-h-[90dvh] overflow-y-auto p-5 flex flex-col gap-4"
         role="dialog"
         aria-modal="true"
         aria-labelledby="picker-title"
@@ -357,55 +368,31 @@ const RecordPicker: React.FC = () => {
             <h2 id="picker-title" className="text-2xl font-bold m-0 leading-tight">
               The record player
             </h2>
-            <p className="m-0 text-sm text-[var(--muted)]">Whatever you put on plays for both of you, in sync.</p>
+            <p className="m-0 text-sm text-[var(--muted)]">Pick a record to listen together, in sync.</p>
           </div>
           <button className="px-btn px-btn--paper px-btn--small" onClick={tt.closePicker} aria-label="Close">
             ✕
           </button>
         </div>
 
-        <div className="px-inset p-3 flex items-center gap-3">
-          <Sprite rows={RECORD} pal={PAL} scale={4} />
-          <span className="flex flex-col min-w-0 leading-tight flex-1">
-            <strong>Our jazz record</strong>
-            <span className="text-sm text-[var(--muted)]">Five soft jazz tracks, round and round.</span>
-          </span>
-          <button className="px-btn px-btn--small shrink-0" onClick={tt.playJazz}>
-            Put it on
-          </button>
-        </div>
-
-        <form
-          className="flex flex-col gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            setError(tt.playYouTube(link));
-          }}
-        >
-          <label htmlFor="song-link" className="font-semibold">
-            A song from YouTube
-          </label>
-          <span className="text-sm text-[var(--muted)] -mt-1">Paste a link from YouTube or YouTube Music.</span>
-          <div className="flex gap-2 flex-wrap">
-            <input
-              id="song-link"
-              className="px-input flex-1 min-w-[12rem]"
-              value={link}
-              onChange={(e) => {
-                setLink(e.target.value);
-                setError(null);
-              }}
-              placeholder="https://music.youtube.com/watch?v=…"
-              autoComplete="off"
-              spellCheck={false}
-              autoFocus
-            />
-            <button className="px-btn" type="submit" disabled={!link.trim()}>
-              Play
-            </button>
-          </div>
-          {error && <p className="m-0 text-sm text-[#7f3835]">{error}</p>}
-        </form>
+        <div className="grid grid-cols-2 gap-2">{shelf.map(record =>
+          <button key={record.id} className="px-inset p-3 text-left" onClick={() => tt.playJazz(record.id)}>
+            <Sprite rows={RECORD} pal={PAL} scale={3} />
+            <strong className="block">{record.title}</strong><small>{record.tracks.length} tracks</small>
+          </button>)}</div>
+        <section className="px-inset p-3 grid gap-2">
+          <strong>Our song</strong>
+          {hasPlus ? <>
+            <small>Pick one song for both of you. Each person listens with their own Apple Music subscription.</small>
+            {song.doc.url && <a href={song.doc.url} className="px-link" target="_blank" rel="noopener">Listen in Apple Music</a>}
+            <form onSubmit={e => { e.preventDefault(); const selection=songDoc({url:link.trim()});
+              if (!selection.url) {setError("Copy the song’s link from Apple Music."); return;}
+              song.write(selection); setLink(""); setError(null); }}>
+              <input className="px-input w-full" aria-label="Apple Music song link" placeholder="Paste an Apple Music song link" value={link} onChange={e=>setLink(e.target.value)} />
+              <button className="px-btn px-btn--small mt-2" disabled={!song.ready || !link.trim()}>Save our song</button>
+            </form>{error && <small role="alert">{error}</small>}
+          </> : <small>Save your Apple Music song with Soultied Plus.</small>}
+        </section>
       </div>
     </div>
   );

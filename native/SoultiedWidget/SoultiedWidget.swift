@@ -256,11 +256,11 @@ struct CountdownWidgetView: View {
             case .accessoryCircular: CountdownRound(u: u)
             case .accessoryRectangular: LockRow(glyph: UsGlyphs.calendar, title: u.count.map { $0.n == "Today" ? "Today" : "\($0.n) \($0.label.split(separator: " ").first ?? "")" } ?? "Next time together", sub: u.count.map { $0.n == "Today" ? $0.label : $0.label.split(separator: " ").dropFirst().joined(separator: " ") } ?? "Set the day in Soultied")
             case .accessoryInline: Text(u.countLine)
-            default: CountdownFace(u: u)
+            default: CountdownFace(u: u, medium: family == .systemMedium)
             }
         }
         .containerBackground(for: .widget) { Backdrop(family: family, color: Color(red: 0.98, green: 0.95, blue: 0.89)) }
-        .widgetURL(homeURL)
+        .widgetURL(URL(string: "soultied://countdown"))
     }
 }
 
@@ -269,7 +269,7 @@ struct CountdownWidget: Widget {
         StaticConfiguration(kind: WidgetShare.countdownKind, provider: UsProvider()) { CountdownWidgetView(entry: $0) }
             .configurationDisplayName("Countdown")
             .description("The days till you’re next together (or how long you’ve been together).")
-            .supportedFamilies([.systemSmall, .accessoryCircular, .accessoryRectangular, .accessoryInline])
+            .supportedFamilies([.systemSmall, .systemMedium, .accessoryCircular, .accessoryRectangular, .accessoryInline])
             .contentMarginsDisabled()
     }
 }
