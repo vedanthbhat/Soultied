@@ -53,7 +53,15 @@ struct AboutSheet: View {
     @State private var answers: [String: String] = [:]
     @State private var visit = Calendar.current.date(byAdding: .day, value: 21, to: Date()) ?? Date()
 
+    @State private var passedOffer = false
+
     var body: some View {
+        if step >= ABOUT.count + 1 && !place.hasPlus && !passedOffer {
+            PlusSheet(place: place, onboardingLine: "You picked “" + (ABOUT.first { $0.id == "miss" }?.answers.first { $0.id == answers["miss"] }?.label ?? "time together") + "”", continueOnboarding: { passedOffer = true })
+        } else { questions }
+    }
+
+    private var questions: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 Dots(n: min(step + 1, ABOUT.count + 1), of: ABOUT.count + 1)
@@ -152,15 +160,6 @@ struct AboutSheet: View {
             if let d = place.visitDays {
                 Text(nearby ? "Your next date is on the countdown." : d > 1 ? "And \(d) days till you’re together. The countdown’s on your Home." : "And you’re together very soon. The countdown’s on your Home.")
                     .font(.pxBody).foregroundStyle(Color.inkSoft).fixedSize(horizontal: false, vertical: true)
-            }
-            if !place.hasPlus {
-                Button("Try Soultied Plus free →") {
-                    finish()
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { PlusGate.shared.show(.plain) }
-                }
-                .buttonStyle(.px(.terracotta, wide: true))
-                Text("Every movie night, game and escape room, for both of you. One of you having it covers you both.")
-                    .font(.pxSmall).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
             }
             Button("Into the room →") { finish() }.buttonStyle(.px(.paper, wide: true))
         }

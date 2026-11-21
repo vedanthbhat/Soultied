@@ -11,3 +11,4 @@ coverage/
 
 # copied in by scripts/ios-assets.mjs
 ios-web/fonts
+/public/audio/shelf/

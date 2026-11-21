@@ -143,12 +143,15 @@ export const UsPage: React.FC = () => {
       </div>
       <div className="grid grid-cols-2 gap-2">
         {tiles.map(([label, value, icon]) => (
-          <button key={label} className="px-inset text-left p-3 min-h-[72px]" onClick={() => setDetail(label)}>
+          <button key={label} className="px-inset min-w-0 text-left p-3 min-h-[72px]" onClick={() => label === "You" ? openPanel("wardrobe") : setDetail(label)}>
             <span className="flex items-center gap-2 text-xs uppercase text-[var(--terracotta-d)]">
-              <PixelIcon name={icon} scale={2} />
+              {label === "You" ? <PixelAvatarRenderer config={currentUser.avatar} size={30} /> : <PixelIcon name={icon} scale={2} />}
               {label}
             </span>
-            <strong className="block mt-1 leading-tight line-clamp-2">{value}</strong>
+            {label === "Our list" ? <div className="mt-1">
+              {bucketView(bucket).todo.slice(0,2).map(item => <div key={item.id} className="truncate">• {item.text}</div>)}
+              {!bucketView(bucket).todo.length && "Add your first idea"}
+            </div> : <strong className="block mt-1 leading-tight line-clamp-2">{value}</strong>}
           </button>
         ))}
       </div>
@@ -216,7 +219,7 @@ export const UsPage: React.FC = () => {
               </p>
             </>
           )}
-          {detail === 'You' && (
+          {detail === 'Settings' && (
             <>
               <button className="px-btn" onClick={() => openPanel('wardrobe')}>
                 Change my look

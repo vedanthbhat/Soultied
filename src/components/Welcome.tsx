@@ -1,3 +1,4 @@
+import { AboutUs } from './AboutUs';
 import { InviteDoodle } from './wall/InviteDoodle';
 import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { InvitePreview, useApp } from '../context/AppContext';
@@ -24,6 +25,7 @@ const BLANK = 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 
 
 export const Welcome: React.FC<Props> = ({ initialJoinCode, nudge = 0, onDraftSeats, onDone }) => {
   const { createSpace, lookupInvite, joinWithCode, loadDemo, inviteLink, space, cloudEnabled, cloudStatus, signIn, authError, signedInEmail } = useApp();
+  const [asked, setAsked] = useState(false);
   const [step, setStep] = useState<Step>(initialJoinCode ? 'join' : 'welcome');
   // online, you sign in with Google before building a place or taking a seat
   const needSignIn = cloudEnabled && cloudStatus === 'signedOut';
@@ -264,6 +266,8 @@ export const Welcome: React.FC<Props> = ({ initialJoinCode, nudge = 0, onDraftSe
         </div>
       </div>
     );
+
+  if (step === 'invite' && space && !asked) return <AboutUs onDone={() => setAsked(true)} />;
 
   return (
     <div className="fixed inset-0 z-40 pointer-events-none px-ui flex items-end md:items-center p-3 md:p-6">

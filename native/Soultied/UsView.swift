@@ -9,7 +9,6 @@ import SoultiedCore
 struct UsView: View {
     let app: AppModel
     let place: PlaceModel
-    @State private var editingLook = false
     @State private var editingPlace = false
     @State private var confirmDelete = false
     @State private var deleteFailed = false
@@ -62,7 +61,7 @@ struct UsView: View {
             } else if let target = Launch.scrollUs { panel = Panel(rawValue: target) }
         }
         .sheet(item: $panel) { selected in
-            ScrollView {
+            if selected == .you { LookSheet(place: place).presentationBackground(Color.paper) } else { ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     HStack { Spacer(); Button("Done") { panel = nil }.buttonStyle(.px(.paper, small: true)) }
                     switch selected {
@@ -73,7 +72,7 @@ struct UsView: View {
                     case .recap: RecapCard(place: place)
                     case .lately: history
                     case .notifications: NotificationsCard(place: place)
-                    case .you: you.sheet(isPresented: $editingLook) { LookSheet(place: place).presentationBackground(Color.paper) }
+                    case .you: EmptyView()
                     case .invite: InviteCard(place: place)
                     case .settings:
                         LookPicker()
@@ -87,7 +86,7 @@ struct UsView: View {
                             }
                     }
                 }.padding(16)
-            }.presentationDragIndicator(.visible).presentationBackground(Color.paper)
+            }.presentationDragIndicator(.visible).presentationBackground(Color.paper) }
         }
         .background(RoomBackground())
         .sheet(isPresented: $editingPlace) { PlaceSheet(place: place).presentationDetents([.medium]).presentationBackground(Color.paper) }
@@ -108,9 +107,17 @@ struct UsView: View {
     private func tile(_ label: String, _ value: String, _ icon: Glyph, _ target: Panel) -> some View {
         Button { panel = target } label: {
             VStack(alignment: .leading, spacing: 7) {
-                HStack { GlyphView(glyph: icon, scale: 2); Text(label).font(.pxSmall) }
+                HStack {
+                    if target == .you { HeadView(look: place.myLook, size: 28) } else { GlyphView(glyph: icon, scale: 2) }
+                    Text(label).font(.pxSmall)
+                }
                     .foregroundStyle(Color.terracottaD)
-                Text(value).font(.pxBodyBold).foregroundStyle(Color.inkSoft).lineLimit(2)
+                if target == .list {
+                    if place.bucket.view.todo.isEmpty { Text("Add your first idea").font(.pxSmall) }
+                    ForEach(place.bucket.view.todo.prefix(2)) { item in
+                        Text("• " + item.text).font(.pxBodyBold).lineLimit(1).truncationMode(.tail)
+                    }
+                } else { Text(value).font(.pxBodyBold).foregroundStyle(Color.inkSoft).lineLimit(2) }
             }.frame(maxWidth: .infinity, minHeight: 52, maxHeight: .infinity, alignment: .leading).pxCard()
         }.buttonStyle(.press)
     }
@@ -132,23 +139,8 @@ struct UsView: View {
             HStack {
                 Button("Edit our place") { editingPlace = true }.buttonStyle(.px(.paper, small: true, wide: true))
                 Button("Decorate the room") { decorating = true }.buttonStyle(.px(.terracotta, small: true, wide: true))
-            }
+            }.evenRow()
         }.foregroundStyle(Color.inkSoft).pxCard()
-    }
-
-    private var you: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("You").font(.pxHeading).foregroundStyle(Color.inkSoft)
-            HStack(spacing: 12) {
-                HeadView(look: place.myLook, size: 44)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(place.myName).font(.pxBodyBold).foregroundStyle(Color.inkSoft)
-                    Text(place.myMood.map { "Feeling \($0.line)" } ?? "No mood up right now").font(.pxSmall).foregroundStyle(Color.muted)
-                }
-            }
-            Button("Change my look and name") { editingLook = true }.buttonStyle(.px(.terracotta, small: true, wide: true))
-        }
-        .pxCard()
     }
 
     private var history: some View {

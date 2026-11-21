@@ -367,6 +367,9 @@ private struct PlusHero: View {
 struct PlusSheet: View {
     let place: PlaceModel
     var reason: PlusReason = .plain
+    var onboardingLine: String? = nil
+    var continueOnboarding: (() -> Void)? = nil
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var store = PlusStore.shared
     @State private var managing = false
     /// the plan picked (the year, to start with)
@@ -375,58 +378,42 @@ struct PlusSheet: View {
     @Environment(\.openURL) private var openURL
 
     var body: some View {
-        ScrollViewReader { proxy in
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                PlusHero(place: place)
-
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(store.thanks ? "Thank you! Plus is on" : reason.title == PlusReason.plain.title ? "Everything, for both of you" : reason.title)
-                        .font(.pxTitle).foregroundStyle(Color.inkSoft).fixedSize(horizontal: false, vertical: true)
-                    Text(store.thanks ? "Everything below is open now, for both of you." : reason.title == PlusReason.plain.title ? "Every movie night, every game and escape room, cameras and voice. One of you gets it, and you both have it." : reason.line)
-                        .font(.pxBody).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
+        GeometryReader { geo in
+            VStack(spacing: 0) {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 14) {
+                        if let line = onboardingLine {
+                            Image("plus-popcorn").resizable().interpolation(.none).scaledToFit()
+                                .accessibilityLabel("Movie night on your couch")
+                            Text(line).font(.pxHeading)
+                        } else { PlusHero(place: place) }
+                        Text(reason.title).font(.pxTitle)
+                        if onboardingLine == nil { Text(reason.line).font(.pxBody) }
+                        Text("One of you pays, you both get it.").font(.pxBodyBold)
+                        features
+                        if onboardingLine == nil { compare }
+                        Text(fineprint).font(.pxTiny)
+                    }.padding(16)
                 }
-
-                features
-                both
-
-                Group {
-                    if place.hasPlus {
-                        on
-                    } else {
-                        plans
-                    }
-                }
-                .id("plans")
-
-                if let p = store.problem {
-                    Text(p).font(.pxSmall).foregroundStyle(Color.terracottaD).fixedSize(horizontal: false, vertical: true)
-                }
-
-                compare
-
-                HStack(spacing: 16) {
-                    Button("Terms") { openURL(URL(string: "https://soultied.app/terms/")!) }
-                    Button("Privacy") { openURL(URL(string: "https://soultied.app/privacy/")!) }
-                    Spacer()
-                    if !place.isDemo {
-                        Button("Restore purchases") { Task { await store.restore() } }.disabled(store.busy)
-                    }
-                }
-                .font(.px(13, 600))
-                .foregroundStyle(Color.terracottaD)
-
-                Button(store.thanks || place.hasPlus ? "Lovely" : "Not now") { dismiss() }
-                    .buttonStyle(.px(.paper, small: true, wide: true))
-            }
-            .padding(20)
-        }
-        .onAppear {
-            // (the screenshots: down at the plans)
-            if Launch.args.contains("-plusPlans") {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1) { proxy.scrollTo("plans", anchor: .top) }
-            }
-        }
+                Divider()
+                ScrollView {
+                    VStack(spacing: 7) {
+                        if place.hasPlus { on } else { plans }
+                        if let problem = store.problem { Text(problem).font(.pxSmall) }
+                        Button(continueOnboarding == nil ? "Not now" : place.hasPlus ? "Continue" : "Continue with the free version") {
+                            if let next = continueOnboarding { next() } else { dismiss() }
+                        }.buttonStyle(.px(.paper, small: true, wide: true))
+                        if onboardingLine != nil && !place.hasPlus {
+                            Text("No hard feelings. Spoiler alert: Plus is so much more fun ;)").font(.pxTiny)
+                        }
+                        HStack {
+                            Link("Terms", destination: URL(string: "https://soultied.app/terms/")!)
+                            Link("Privacy", destination: URL(string: "https://soultied.app/privacy/")!)
+                            if !place.isDemo { Button("Restore purchases") { Task { await store.restore() } }.disabled(store.busy) }
+                        }.font(.pxSmall)
+                    }.padding(12)
+                }.frame(maxHeight: min(geo.size.height * 0.48, 300))
+            }.foregroundStyle(Color.inkSoft).background(Color.paper)
         }
         .task { await store.load() }
         .onDisappear { store.thanks = false }
@@ -436,7 +423,7 @@ struct PlusSheet: View {
     /* what's in it */
 
     private var features: some View {
-        let all = PlusFeature.all
+        let all = Array(PlusFeature.all.prefix(onboardingLine == nil ? 6 : 5))
         return Grid(horizontalSpacing: 12, verticalSpacing: 12) {
             ForEach(0..<(all.count + 1) / 2, id: \.self) { r in
                 GridRow {
@@ -535,8 +522,7 @@ struct PlusSheet: View {
 
     private var plans: some View {
         VStack(alignment: .leading, spacing: 10) {
-            planCard(year: true)
-            planCard(year: false)
+            HStack { planCard(year: true); planCard(year: false) }
             Button {
                 Haptics.tap()
                 guard !place.isDemo, let p = yearly ? store.year : store.month else { return }
@@ -549,14 +535,14 @@ struct PlusSheet: View {
                 }
             }
             .buttonStyle(.px(.terracotta, wide: true))
+            .nudge(!reduceMotion && yearly && store.trial, every: 3)
             .disabled(store.busy || (!place.isDemo && (yearly ? store.year : store.month) == nil))
             if place.isDemo {
                 Text("This is the demo room, so everything’s open to try. In your own place, either of you can get Plus, and it covers you both.")
                     .font(.pxSmall).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
             }
             if store.loading { Text("Asking the App Store for prices…").font(.pxTiny).foregroundStyle(Color.muted) }
-            Text(fineprint)
-                .font(.pxTiny).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
+
         }
     }
 
@@ -566,28 +552,11 @@ struct PlusSheet: View {
             Haptics.tap()
             yearly = year
         } label: {
-            HStack(spacing: 12) {
-                // (a pixel radio button)
-                ZStack {
-                    Rectangle().fill(picked ? Color.terracotta : Color.paperHi)
-                    if picked { Rectangle().fill(Color.cream).frame(width: 6, height: 6) }
-                }
-                .frame(width: 18, height: 18)
-                .overlay(Rectangle().strokeBorder(Color.ink, lineWidth: 2))
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 6) {
-                        Text(year ? "A year" : "A month").font(.px(16, 700)).foregroundStyle(Color.inkSoft)
-                        if year { PixelTag(text: "Save \(saving)%") }
-                    }
-                    Text(year ? (store.trial ? "7 days free, then \(yearPrice) a year" : "\(yearPrice) a year") : "\(monthPrice) a month")
-                        .font(.px(12, 500)).foregroundStyle(Color.muted)
-                }
-                Spacer(minLength: 4)
-                VStack(alignment: .trailing, spacing: 0) {
-                    Text(year ? yearMonthly : monthPrice).font(.px(17, 700)).foregroundStyle(Color.inkSoft)
-                    Text("a month").font(.px(11, 500)).foregroundStyle(Color.muted)
-                }
-            }
+            VStack(alignment: .leading, spacing: 4) {
+                Text(year ? "A year" : "A month").font(.pxSmall)
+                Text(year ? "\(yearPrice) / yr" : "\(monthPrice) / mo").font(.pxBodyBold)
+                if year { Text("\(yearMonthly) a month").font(.pxTiny) }
+            }.frame(maxWidth: .infinity, alignment: .leading)
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(picked ? Color(hex: "#fbe6d6") : Color.paperHi)
