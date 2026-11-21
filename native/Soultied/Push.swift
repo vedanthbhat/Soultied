@@ -110,10 +110,14 @@ extension Push: UNUserNotificationCenterDelegate {
         []
     }
 
-    /// a tap: open where it's about
-    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
-        let where_ = response.notification.request.content.userInfo["open"] as? String
-        await MainActor.run { self.open = where_ ?? "home" }
+    /// Finish the notification response on the main queue, where UIKit restores the scene.
+    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
+                                withCompletionHandler completionHandler: @escaping @Sendable () -> Void) {
+        let destination = response.notification.request.content.userInfo["open"] as? String ?? "home"
+        DispatchQueue.main.async {
+            self.open = destination
+            completionHandler()
+        }
     }
 }
 
