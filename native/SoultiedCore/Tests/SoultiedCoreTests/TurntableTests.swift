@@ -90,6 +90,23 @@ final class TurntableTests: XCTestCase {
         XCTAssertEqual(song.lifted(by: "b", now: now + 5)?.next, 3)
     }
 
+    func testAppleMusicTransport() throws {
+        let selection = try XCTUnwrap(AppleRoomSong(id: "123", title: "Our song", artist: "Artist", duration: 90))
+        var state = TurntableState(by: "a", at: 1000)
+        state.apple = selection.positioned(12, playing: true)
+        let received = try XCTUnwrap(TurntableState(state.doc))
+        let song = try XCTUnwrap(received.apple)
+        XCTAssertEqual(received, state)
+        XCTAssertFalse(received.isOn(3000))
+        XCTAssertNil(received.track(3000))
+        XCTAssertEqual(song.position(at: 3000, since: received.at), 14)
+        let paused = song.positioned(14, playing: false)
+        XCTAssertEqual(paused.position(at: 9000, since: 3000), 14)
+        XCTAssertEqual(paused.positioned(29, playing: true).position(at: 11000, since: 9000), 31)
+        XCTAssertEqual(song.position(at: 100000, since: 1000), 90)
+        XCTAssertNil(TurntableState.jazz(received, by: "b", now: 9000).apple)
+    }
+
     func testTheDocument() {
         let s = TurntableState(on: true, startedAt: 12.5, by: "a", at: 99, next: 2, yt: .init(id: "dQw4w9WgXcQ", title: "Hi"))
         XCTAssertEqual(TurntableState(s.doc), s)

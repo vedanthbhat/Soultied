@@ -27,7 +27,7 @@ public final class PlaceModel {
     public internal(set) var decorDoc = DecorDoc()
     public internal(set) var moods = MoodsDoc()
     /// the next time you'll be together
-    public internal(set) var ourSong: URL?
+    public internal(set) var ourSong: AppleRoomSong?
     public internal(set) var visit = VisitDoc()
     /// today's photo (a new one each day)
     public internal(set) var snapDoc = SnapDoc()
@@ -154,7 +154,7 @@ public final class PlaceModel {
                 self?.loaded.insert("moods")
             },
             db.listen(meta("ourSong")) { [weak self] d in
-                self?.ourSong = Self.appleSong(d?.str("url") ?? "")
+                self?.ourSong = AppleRoomSong(d)
             },
             db.listen(meta("visit")) { [weak self] d in
                 self?.visit = VisitDoc(d)
@@ -1061,19 +1061,19 @@ public final class PlaceModel {
     }
 
     /// put the jazz record on, from the track after the last one heard
-    private static func appleSong(_ text: String) -> URL? {
-        guard let url = URL(string: text.trimmingCharacters(in: .whitespacesAndNewlines)),
-              url.scheme == "https", url.host?.lowercased() == "music.apple.com",
-              url.user == nil, url.password == nil,
-              url.pathComponents.contains("song") || (url.pathComponents.contains("album") &&
-                URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.contains(where: { $0.name == "i" && !($0.value ?? "").isEmpty }) == true) else { return nil }
-        return url
+    public func chooseAppleSong(_ song: AppleRoomSong) {
+        guard hasPlus else { return }
+        save(meta("ourSong"), song.doc, "your song")
+        controlAppleSong(song, position: 0, playing: true)
     }
 
-    public func saveOurSong(_ text: String) -> Bool {
-        guard hasPlus, let url = Self.appleSong(text) else { return false }
-        save(meta("ourSong"), ["url": url.absoluteString], "your song")
-        return true
+    public func controlAppleSong(_ song: AppleRoomSong, position: Double, playing: Bool) {
+        guard hasPlus else { return }
+        let now = Values.nowMs()
+        // Legacy clients see a stopped record and remain silent.
+        var state = TurntableState(by: me, at: now)
+        state.apple = song.positioned(position, playing: playing)
+        turn(state)
     }
 
     public func playRecord(_ album: String = "jazz") { turn(.jazz(turntable, by: me, now: Values.nowMs(), album: album)) }

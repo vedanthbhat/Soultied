@@ -1,4 +1,3 @@
-import { useSharedDoc } from '../together/useSharedDoc';
 import React, { useEffect, useRef, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { useStreamHub } from '../stream/StreamHub';
@@ -333,20 +332,8 @@ const SongPlayer: React.FC<{
 };
 
 /** Choosing what goes on: the jazz record, or a song from YouTube. */
-function songDoc(raw: unknown) {
-  try {
-    const url = new URL((raw as {url:string}).url);
-    if (url.origin === 'https://music.apple.com' && !url.username && !url.password &&
-        (url.pathname.includes('/song/') || (url.pathname.includes('/album/') && url.searchParams.get('i')))) return {url:url.href};
-  } catch {}
-  return {url:''};
-}
 const RecordPicker: React.FC = () => {
-  const {hasPlus} = useApp();
-  const song = useSharedDoc("ourSong", songDoc, () => ({url:""}));
   const tt = useTurntable();
-  const [link, setLink] = useState('');
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && tt.closePicker();
@@ -382,16 +369,7 @@ const RecordPicker: React.FC = () => {
           </button>)}</div>
         <section className="px-inset p-3 grid gap-2">
           <strong>Our song</strong>
-          {hasPlus ? <>
-            <small>Pick one song for both of you. Each person listens with their own Apple Music subscription.</small>
-            {song.doc.url && <a href={song.doc.url} className="px-link" target="_blank" rel="noopener">Listen in Apple Music</a>}
-            <form onSubmit={e => { e.preventDefault(); const selection=songDoc({url:link.trim()});
-              if (!selection.url) {setError("Copy the song’s link from Apple Music."); return;}
-              song.write(selection); setLink(""); setError(null); }}>
-              <input className="px-input w-full" aria-label="Apple Music song link" placeholder="Paste an Apple Music song link" value={link} onChange={e=>setLink(e.target.value)} />
-              <button className="px-btn px-btn--small mt-2" disabled={!song.ready || !link.trim()}>Save our song</button>
-            </form>{error && <small role="alert">{error}</small>}
-          </> : <small>Save your Apple Music song with Soultied Plus.</small>}
+          <small>Connect Apple Music in Soultied on iPhone to choose and play your song together.</small>
         </section>
       </div>
     </div>

@@ -34,7 +34,7 @@ final class RecordDeck {
     @ObservationIgnored private var fetching: Set<String> = []
     @ObservationIgnored private var awake = true
     /// quiet while you're watching something together
-    @ObservationIgnored private var hushed = false
+    private(set) var hushed = false
     private let ender = Ender()
     /// on its way down to silence (and a pause)
     @ObservationIgnored private var fadingOut = false
@@ -294,7 +294,10 @@ struct RecordCard: View {
         let t = place.turntable
         let on = place.recordOn
         VStack(alignment: .leading, spacing: 12) {
-            if on, let t, let song = t.yt {
+            if let t, let apple = t.apple {
+                RoomSongControls(place: place, state: t, song: apple)
+                if let open { Button("Record shelf", action: open).buttonStyle(.px(.paper, small: true)) }
+            } else if on, let t, let song = t.yt {
                 SongCard(place: place, state: t, song: song, listening: listening, open: open)
             } else if on, let t, let track = t.track(Values.nowMs()) {
                 jazz(t, track)
@@ -501,8 +504,7 @@ struct RecordSheet: View {
     /// sideways there's no Home behind this, so a song plays here
     var hostsSong = false
     @Environment(\.dismiss) private var dismiss
-    @State private var link = ""
-    @State private var error: String?
+    @State private var choosing = false
 
     var body: some View {
         ScrollView {
@@ -511,10 +513,10 @@ struct RecordSheet: View {
                     Text("The record player").font(.pxTitle).foregroundStyle(Color.inkSoft)
                     Text("Pick a record to listen together, in sync.").font(.pxBody).foregroundStyle(Color.muted)
                 }
-                if place.recordOn {
+                if place.recordOn || place.turntable?.apple != nil {
                     RecordCard(place: place, listening: hostsSong)
                 }
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 3), spacing: 10) {
                     ForEach(Records.shelf, id: \.id) { record in
                         Button {
                             Haptics.tap()
@@ -525,29 +527,25 @@ struct RecordSheet: View {
                         } label: {
                             VStack(alignment: .leading, spacing: 6) {
                                 GlyphView(glyph: Icons.record, scale: 3)
-                                Text(record.title).font(.pxBodyBold)
+                                if place.recordOn && place.turntable?.album == record.id { Text("PLAYING").font(.pxTiny) }
+                                Text(record.title).font(.pxSmall)
                                 Text("\(record.tracks.count) tracks").font(.pxSmall)
                             }.frame(maxWidth: .infinity, alignment: .leading).pxCard()
                         }.buttonStyle(.press)
                     }
                 }
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Our song").font(.pxHeading)
-                    if place.hasPlus {
-                        Text("Save one Apple Music song for both of you. Each person listens with their own Apple Music subscription.").font(.pxSmall)
-                        if let url = place.ourSong { Link("Listen in Apple Music", destination: url).font(.pxBodyBold) }
-                        PixelField(placeholder: "Paste an Apple Music song link", text: $link, limit: 500)
-                            .keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
-                        Button("Save our song") {
-                            if place.saveOurSong(link) { link = ""; error = nil }
-                            else { error = "Copy the song’s link from Apple Music." }
-                        }.buttonStyle(.px(.terracotta, small: true)).disabled(link.isEmpty)
-                        if let error { Text(error).font(.pxSmall) }
-                    } else { Text("Save your Apple Music song with Soultied Plus.").font(.pxSmall) }
+                HStack {
+                    VStack(alignment: .leading) {
+                        Text("Our song").font(.pxHeading)
+                        Text(place.ourSong?.title ?? "Apple Music for both of you").font(.pxSmall)
+                    }
+                    Spacer()
+                    Button("Choose") { choosing = true }.buttonStyle(.px(.terracotta, small: true))
                 }.pxCard()
             }
             .padding(20)
         }
+        .sheet(isPresented: $choosing) { RoomSongPicker(place: place) }
         .scrollDismissesKeyboard(.interactively)
     }
 }

@@ -124,6 +124,7 @@ struct MainView: View {
             if Launch.demo && Launch.record { place.playRecord() }
             if Launch.demo, let s = Launch.song { _ = place.playSong(s) }
         }
+        .modifier(RoomMusicPlayback(place: place))
         .onChange(of: place.turntable) { _, _ in RecordDeck.shared.sync() }
         .onChange(of: push.open) { _, _ in openFromPush() }
         .onDisappear { RecordDeck.shared.detach() }

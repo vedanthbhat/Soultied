@@ -111,6 +111,7 @@ public struct TurntableState: Sendable, Equatable {
         }
     }
 
+    public var apple: AppleRoomSong?
     public var album = "jazz"
     public var on = false
     /// when the first track (or the song's first second) would have played (epoch ms)
@@ -133,6 +134,7 @@ public struct TurntableState: Sendable, Equatable {
 
     public init?(_ raw: Doc?) {
         guard let r = raw else { return nil }
+        apple = AppleRoomSong(r["apple"] as? Doc)
         album = r.str("album") ?? "jazz"
         on = r.bool("on")
         startedAt = r.num("startedAt") ?? 0
@@ -152,7 +154,9 @@ public struct TurntableState: Sendable, Equatable {
             if let t = yt.title { s["title"] = t }
             song = s
         }
-        return ["album": album, "on": on, "startedAt": startedAt, "by": by, "at": at, "next": next, "yt": song]
+        var result: Doc = ["album": album, "on": on, "startedAt": startedAt, "by": by, "at": at, "next": next, "yt": song]
+        if let apple { result["apple"] = apple.doc }
+        return result
     }
 
     /// playing, for both of you (a record left on goes quiet after two hours)
