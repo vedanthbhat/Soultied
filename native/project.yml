@@ -41,6 +41,11 @@ targets:
       - path: ../public/fonts/PixelifySans-Variable.ttf
         buildPhase: resources
       # the record's Night in Venice, for the first tour (so it plays straight away, even offline)
+      - path: ../public/plus-popcorn.png
+        buildPhase: resources
+      - path: ../public/audio/shelf
+        type: folder
+        buildPhase: resources
       - path: ../public/audio/night-in-venice.mp3
         buildPhase: resources
       # Firebase's settings for this app (app.soultied.ios, in the soultied-c1543 project): made from

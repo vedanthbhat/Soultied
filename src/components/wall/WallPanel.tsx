@@ -17,13 +17,13 @@ import {
   demoMemories,
   demoNotes,
   doodleArt,
-  doodleFields,
   normalizeMemories,
   normalizeNote,
   normalizePhoto,
 } from '../../together/wall';
 import { todayKey } from '../../letters/engine';
-import { DoodleImage, DoodlePad } from './DoodlePad';
+import { WallDoodle } from './InviteDoodle';
+import { DoodleImage } from './DoodlePad';
 import { PhotosTab } from './PhotosTab';
 import { VoicesTab } from './VoicesTab';
 
@@ -453,17 +453,7 @@ export const WallPanel: React.FC<{ initialTab?: WallTab }> = ({ initialTab = 'no
         />
       )}
       {tab === 'doodle' && (
-        <DoodlePad
-          partnerName={partnerName}
-          onCancel={() => setTab('notes')}
-          onSend={(px, hang) => {
-            const id = newKey('note-');
-            notes.put(id, { by: currentUser.id, kind: 'doodle', ...doodleFields(px), paper: 0, at: Date.now(), loved: {}, kept: false });
-            pinned('doodle', id);
-            if (hang) hangArt(doodleArt(px, id, currentUser.id));
-            setTab('notes');
-          }}
-        />
+        <WallDoodle notes={notes} onDone={() => setTab('notes')} />
       )}
       {tab === 'voices' && <VoicesTab me={currentUser} partnerName={partnerName} onPinned={() => pinned('voice')} />}
       {tab === 'photos' && <PhotosTab photos={photos} me={currentUser} partner={partnerUser} onHang={hangArt} onPinned={() => pinned('photo')} />}

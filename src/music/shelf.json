@@ -1,0 +1,107 @@
+[
+  {
+    "id": "lofi",
+    "title": "Lo-fi evening",
+    "tracks": [
+      {
+        "slug": "lofi-1",
+        "title": "Window Seat",
+        "secs": 48
+      },
+      {
+        "slug": "lofi-2",
+        "title": "Last Train",
+        "secs": 48
+      },
+      {
+        "slug": "lofi-3",
+        "title": "Lamp Light",
+        "secs": 48
+      }
+    ]
+  },
+  {
+    "id": "piano",
+    "title": "Soft piano",
+    "tracks": [
+      {
+        "slug": "piano-1",
+        "title": "Little Hours",
+        "secs": 48
+      },
+      {
+        "slug": "piano-2",
+        "title": "Two Teacups",
+        "secs": 48
+      },
+      {
+        "slug": "piano-3",
+        "title": "First Light",
+        "secs": 48
+      }
+    ]
+  },
+  {
+    "id": "acoustic",
+    "title": "Acoustic morning",
+    "tracks": [
+      {
+        "slug": "acoustic-1",
+        "title": "Open Window",
+        "secs": 48
+      },
+      {
+        "slug": "acoustic-2",
+        "title": "Sunday Walk",
+        "secs": 48
+      },
+      {
+        "slug": "acoustic-3",
+        "title": "Golden Hour",
+        "secs": 48
+      }
+    ]
+  },
+  {
+    "id": "rain",
+    "title": "Rainy day",
+    "tracks": [
+      {
+        "slug": "rain-1",
+        "title": "Rain on Glass",
+        "secs": 48
+      },
+      {
+        "slug": "rain-2",
+        "title": "Under One Roof",
+        "secs": 48
+      },
+      {
+        "slug": "rain-3",
+        "title": "After the Shower",
+        "secs": 48
+      }
+    ]
+  },
+  {
+    "id": "arcade",
+    "title": "Retro arcade",
+    "tracks": [
+      {
+        "slug": "arcade-1",
+        "title": "Extra Heart",
+        "secs": 48
+      },
+      {
+        "slug": "arcade-2",
+        "title": "Player Two",
+        "secs": 48
+      },
+      {
+        "slug": "arcade-3",
+        "title": "Save Point",
+        "secs": 48
+      }
+    ]
+  }
+]

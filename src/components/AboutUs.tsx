@@ -5,7 +5,7 @@ import { ABOUT, ABOUT_STEPS, aboutFit } from '../together/about';
 import { daysLeft } from '../together/visit';
 import { addDays } from '../letters/engine';
 import { inApp } from '../cloud/firebase';
-import { PlusUpsell } from './PlusUpsell';
+import { PERKS } from '../plus/rules';
 
 /**
  * About the two of you: five quick questions the first time you're in your place (the iPhone app asks the same
@@ -20,30 +20,18 @@ export const AboutUs: React.FC<{ onDone: () => void }> = ({ onDone }) => {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const already = daysLeft(visit, today) !== null;
   const [date, setDate] = useState(() => (already ? visit.date : addDays(today, 21)));
-  const [plus, setPlus] = useState(false);
+
 
   const answer = (id: string, a: string) => {
     setAnswers((s) => ({ ...s, [id]: a }));
     setStep((s) => s + 1);
   };
-  const finish = (thenPlus = false) => {
-    saveAbout(answers);
-    if (thenPlus) setPlus(true);
-    else onDone();
-  };
-
-  if (plus)
-    return (
-      <PlusUpsell
-        heading="Soultied Plus"
-        blurb="Every movie night, game and escape room, and cameras and voice, for both of you. One of you having it covers you both."
-        onClose={onDone}
-      />
-    );
+  const finish = () => { saveAbout(answers); onDone(); };
 
   // the question for this step: two taps, then the date, then two more
   const question = step < 2 ? ABOUT[step] : step > 2 && step < ABOUT_STEPS ? ABOUT[step - 1] : null;
-  const left = daysLeft(visit, today);
+
+  const nearby = answers.far === 'city' || answers.far === 'together';
   const fit = aboutFit(answers.miss, name);
   const offerPlus = !hasPlus && cloudMode && !inApp();
 
@@ -59,7 +47,7 @@ export const AboutUs: React.FC<{ onDone: () => void }> = ({ onDone }) => {
         {question && (
           <>
             <div className="text-xs font-semibold tracking-[0.16em] text-[var(--terracotta-d,#9c4a2c)]">ABOUT THE TWO OF YOU</div>
-            <h2 className="m-0 text-2xl leading-tight">{question.ask(name)}</h2>
+            <h2 className="m-0 text-2xl leading-tight">{nearby && question.id === 'often' ? 'How often do you make time for a date?' : nearby && question.id === 'miss' ? 'What do you love doing together?' : question.ask(name)}</h2>
             <div className="flex flex-col gap-2">
               {question.answers.map((a) => (
                 <button key={a.id} className={`px-btn w-full text-left ${answers[question.id] === a.id ? 'px-btn--sage' : 'px-btn--paper'}`} onClick={() => answer(question.id, a.id)}>
@@ -83,7 +71,7 @@ export const AboutUs: React.FC<{ onDone: () => void }> = ({ onDone }) => {
             }}
           >
             <div className="text-xs font-semibold tracking-[0.16em] text-[var(--terracotta-d,#9c4a2c)]">ABOUT THE TWO OF YOU</div>
-            <h2 className="m-0 text-2xl leading-tight">When will you see {name} next?</h2>
+            <h2 className="m-0 text-2xl leading-tight">{nearby ? 'When’s your next date?' : `When will you see ${name} next?`}</h2>
             <p className="m-0 text-sm text-[var(--muted)]">{already ? 'There’s already a day set. Keep it, or pick another.' : 'You’ll both count down to it, here and on the iPhone app’s widgets.'}</p>
             <label>
               <span className="px-label">The day</span>
@@ -105,28 +93,18 @@ export const AboutUs: React.FC<{ onDone: () => void }> = ({ onDone }) => {
           </form>
         )}
 
-        {step >= ABOUT_STEPS && (
-          <>
-            <div className="text-xs font-semibold tracking-[0.16em] text-[var(--terracotta-d,#9c4a2c)]">THANK YOU</div>
-            <h2 className="m-0 text-2xl leading-tight">Your place is ready for the two of you.</h2>
-            <div className="px-inset p-3 leading-snug">
-              <div className="font-bold">Start with: {fit.title}</div>
-              <div className="text-sm text-[var(--muted)]">{fit.line}</div>
-            </div>
-            {left !== null && <p className="m-0 text-sm">{left > 1 ? `And ${left} days till you’re together. The countdown’s on your Us page.` : 'And you’re together very soon. The countdown’s on your Us page.'}</p>}
-            {offerPlus && (
-              <>
-                <button className="px-btn w-full" onClick={() => finish(true)}>
-                  See Soultied Plus →
-                </button>
-                <p className="m-0 text-xs text-[var(--muted)]">Every movie night, game and escape room, for both of you. One of you having it covers you both.</p>
-              </>
-            )}
-            <button className="px-btn px-btn--paper w-full" onClick={() => finish()}>
-              {offerPlus ? 'Maybe later' : 'Into the room →'}
-            </button>
-          </>
-        )}
+        {step >= ABOUT_STEPS && <>
+          <img src="/plus-popcorn.png" alt="A couple sharing popcorn on the couch" style={{imageRendering:'pixelated'}} />
+          <h2 className="text-2xl font-bold">{offerPlus ? 'Soultied Plus' : 'Your place is ready'}</h2>
+          <p>You picked “{ABOUT.find(q => q.id === 'miss')?.answers.find(a => a.id === answers.miss)?.label}”. {fit.line}</p>
+          {offerPlus && <>
+            <strong>One of you pays, you both get it.</strong>
+            <ul>{PERKS.slice(0,5).map(perk => <li key={perk.title}>{perk.title}</li>)}</ul>
+            <a href="/plus/" target="_blank" rel="noopener" className="px-btn text-center">See plans and prices</a>
+          </>}
+          <button className="px-btn px-btn--paper" onClick={finish}>{offerPlus ? 'Continue with the free version' : 'Continue'}</button>
+          {offerPlus && <small>No hard feelings. Spoiler alert: Plus is so much more fun ;)</small>}
+        </>}
 
         {step > 0 && step < ABOUT_STEPS && (
           <button className="px-btn px-btn--paper px-btn--small self-start" onClick={() => setStep((s) => s - 1)}>

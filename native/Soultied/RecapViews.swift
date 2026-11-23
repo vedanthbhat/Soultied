@@ -8,6 +8,19 @@ import SoultiedCore
  * and the month in numbers.
  */
 
+extension PlaceModel {
+    var recapMemory: String {
+        let month = recapMonth(today).month
+        if let memory = memoryItems.values.filter({ $0.day.hasPrefix(month) }).max(by: { ($0.day, $0.id) < ($1.day, $1.id) }) {
+            return memory.title
+        }
+        if let day = letters.daily.values.filter({ $0.opened && $0.dateKey.hasPrefix(month) }).map(\.dateKey).max() {
+            return "Your letter on \(Day.pretty(day))"
+        }
+        return "Your month together"
+    }
+}
+
 private struct RecapStat: Identifiable {
     let id: String
     let n: String
@@ -19,7 +32,7 @@ private func stats(_ r: Recap) -> [RecapStat] {
         RecapStat(id: "days", n: "\(r.days)", label: r.days == 1 ? "day you both showed up" : "days you both showed up"),
         RecapStat(id: "run", n: "\(r.bestStreak)", label: r.bestStreak == 1 ? "day in a row, at best" : "days in a row, at best"),
         RecapStat(id: "letters", n: "\(r.letters)", label: r.letters == 1 ? "letter opened together" : "letters opened together"),
-        RecapStat(id: "sync", n: r.sync.map { "\($0)%" } ?? "–", label: "in sync"),
+        RecapStat(id: "sync", n: r.sync.map { "\($0)%" } ?? "–", label: "matching picks"),
         RecapStat(id: "photos", n: "\(r.photos)", label: r.photos == 1 ? "photo pinned up" : "photos pinned up"),
         RecapStat(id: "notes", n: "\(r.doodles + r.notes)", label: "doodles and notes"),
     ]
@@ -31,7 +44,7 @@ private func shortStats(_ r: Recap) -> [RecapStat] {
         RecapStat(id: "days", n: "\(r.days)", label: "days both here"),
         RecapStat(id: "run", n: "\(r.bestStreak)", label: "in a row, at best"),
         RecapStat(id: "letters", n: "\(r.letters)", label: "letters together"),
-        RecapStat(id: "sync", n: r.sync.map { "\($0)%" } ?? "–", label: "in sync"),
+        RecapStat(id: "sync", n: r.sync.map { "\($0)%" } ?? "–", label: "matching picks"),
         RecapStat(id: "photos", n: "\(r.photos)", label: r.photos == 1 ? "photo" : "photos"),
         RecapStat(id: "notes", n: "\(r.doodles + r.notes)", label: "doodles & notes"),
     ]
@@ -55,7 +68,7 @@ struct RecapCard: View {
                 GlyphView(glyph: Icons.heart, scale: 3)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title(r, done: done)).font(.pxHeading).foregroundStyle(Color.inkSoft)
-                    Text("You and \(place.theirName), in numbers").font(.pxTiny).foregroundStyle(Color.muted)
+                    Text(place.recapMemory).font(.pxTiny).foregroundStyle(Color.muted)
                 }
             }
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {

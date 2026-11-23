@@ -1,3 +1,5 @@
+import { AboutUs } from './AboutUs';
+import { InviteDoodle } from './wall/InviteDoodle';
 import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { InvitePreview, useApp } from '../context/AppContext';
 import { AvatarConfig } from '../types';
@@ -23,6 +25,7 @@ const BLANK = 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 
 
 export const Welcome: React.FC<Props> = ({ initialJoinCode, nudge = 0, onDraftSeats, onDone }) => {
   const { createSpace, lookupInvite, joinWithCode, loadDemo, inviteLink, space, cloudEnabled, cloudStatus, signIn, authError, signedInEmail } = useApp();
+  const [asked, setAsked] = useState(false);
   const [step, setStep] = useState<Step>(initialJoinCode ? 'join' : 'welcome');
   // online, you sign in with Google before building a place or taking a seat
   const needSignIn = cloudEnabled && cloudStatus === 'signedOut';
@@ -183,7 +186,7 @@ export const Welcome: React.FC<Props> = ({ initialJoinCode, nudge = 0, onDraftSe
                 Soultied
               </h1>
             </div>
-            <p className="m-0 text-lg font-semibold leading-snug text-balance text-[var(--ink-soft)]">A shared home for long-distance couples.</p>
+            <p className="m-0 text-lg font-semibold leading-snug text-balance text-[var(--ink-soft)]">A little place for the two of you.</p>
             <p className="m-0 -mt-1 leading-snug text-balance text-[var(--muted)]">
               A daily letter, games for two, a record player and movie nights.
             </p>
@@ -263,6 +266,8 @@ export const Welcome: React.FC<Props> = ({ initialJoinCode, nudge = 0, onDraftSe
         </div>
       </div>
     );
+
+  if (step === 'invite' && space && !asked) return <AboutUs onDone={() => setAsked(true)} />;
 
   return (
     <div className="fixed inset-0 z-40 pointer-events-none px-ui flex items-end md:items-center p-3 md:p-6">
@@ -381,7 +386,7 @@ export const Welcome: React.FC<Props> = ({ initialJoinCode, nudge = 0, onDraftSe
                 <div className="flex gap-3 items-stretch">
                   <input className="px-input text-sm" readOnly value={inviteLink} onFocus={(e) => e.currentTarget.select()} aria-label="Invite link" />
                   <button className="px-btn px-btn--sage shrink-0" onClick={() => copy('link')}>
-                    {copied === 'link' ? 'Copied!' : 'Copy'}
+                    {copied === 'link' ? 'Link copied!' : 'Invite your person'}
                   </button>
                 </div>
               </div>
@@ -395,6 +400,7 @@ export const Welcome: React.FC<Props> = ({ initialJoinCode, nudge = 0, onDraftSe
                 </div>
                 <p className="text-sm text-[var(--muted)] mt-2">Valid for 7 days. You can find it again under “Invite” in the menu.</p>
               </div>
+              <InviteDoodle />
               <button className="px-btn text-lg mt-1" onClick={onDone}>
                 Step inside →
               </button>

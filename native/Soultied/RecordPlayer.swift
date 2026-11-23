@@ -34,7 +34,7 @@ final class RecordDeck {
     @ObservationIgnored private var fetching: Set<String> = []
     @ObservationIgnored private var awake = true
     /// quiet while you're watching something together
-    @ObservationIgnored private var hushed = false
+    private(set) var hushed = false
     private let ender = Ender()
     /// on its way down to silence (and a pause)
     @ObservationIgnored private var fadingOut = false
@@ -135,14 +135,15 @@ final class RecordDeck {
             return
         }
         problem = nil
-        let n = Records.tracks.count
-        var (index, offset) = Records.whereAt(t.startedAt, Values.nowMs())
+        let tracks = Records.selection(t.album)
+        let n = tracks.count
+        var (index, offset) = Records.whereAt(t.startedAt, Values.nowMs(), album: t.album)
         // right at the end of a track: on to the next one rather than replaying the last moment
-        if offset > Records.tracks[index].secs - 0.4 {
+        if offset > tracks[index].secs - 0.4 {
             index = (index + 1) % n
             offset = 0
         }
-        let track = Records.tracks[index]
+        let track = tracks[index]
         guard let file = cached(track) else {
             loading = true
             fetch(track)
@@ -181,7 +182,7 @@ final class RecordDeck {
         }
         hearing = true
         // the next track, ready for when this one ends
-        fetch(Records.tracks[(index + 1) % n])
+        fetch(tracks[(index + 1) % n])
     }
 
     private func fadeOut() {
@@ -234,14 +235,15 @@ final class RecordDeck {
     }
 
     private func cached(_ t: RecordTrack) -> URL? {
-        let u = folder.appendingPathComponent("\(t.slug).mp3")
+        if let local = Bundle.main.url(forResource: t.slug, withExtension: "wav", subdirectory: "shelf") { return local }
+        let u = folder.appendingPathComponent(t.url.lastPathComponent)
         return FileManager.default.fileExists(atPath: u.path) ? u : nil
     }
 
     private func fetch(_ t: RecordTrack) {
         guard cached(t) == nil, !fetching.contains(t.slug) else { return }
         fetching.insert(t.slug)
-        let dest = folder.appendingPathComponent("\(t.slug).mp3")
+        let dest = folder.appendingPathComponent(t.url.lastPathComponent)
         // (the deck lives as long as the app, so holding on to it here is fine)
         let deck = self
         Task {
@@ -292,7 +294,10 @@ struct RecordCard: View {
         let t = place.turntable
         let on = place.recordOn
         VStack(alignment: .leading, spacing: 12) {
-            if on, let t, let song = t.yt {
+            if let t, let apple = t.apple {
+                RoomSongControls(place: place, state: t, song: apple)
+                if let open { Button("Record shelf", action: open).buttonStyle(.px(.paper, small: true)) }
+            } else if on, let t, let song = t.yt {
                 SongCard(place: place, state: t, song: song, listening: listening, open: open)
             } else if on, let t, let track = t.track(Values.nowMs()) {
                 jazz(t, track)
@@ -327,7 +332,7 @@ struct RecordCard: View {
             SpinningRecord(on: deck.hearing)
             VStack(alignment: .leading, spacing: 3) {
                 Text(track.title).font(.pxBodyBold).foregroundStyle(Color.inkSoft)
-                RecordCredit()
+                if t.album == "jazz" { RecordCredit() } else { Text("Soultied originals").font(.pxTiny) }
                 if let who = byLine(t) { Text(who).font(.pxSmall).foregroundStyle(Color.muted) }
             }
             Spacer(minLength: 0)
@@ -499,68 +504,48 @@ struct RecordSheet: View {
     /// sideways there's no Home behind this, so a song plays here
     var hostsSong = false
     @Environment(\.dismiss) private var dismiss
-    @State private var link = ""
-    @State private var error: String?
+    @State private var choosing = false
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("The record player").font(.pxTitle).foregroundStyle(Color.inkSoft)
-                    Text("Whatever you put on plays for both of you, in sync.").font(.pxBody).foregroundStyle(Color.muted)
+                    Text("Pick a record to listen together, in sync.").font(.pxBody).foregroundStyle(Color.muted)
                 }
-                if place.recordOn {
+                if place.recordOn || place.turntable?.apple != nil {
                     RecordCard(place: place, listening: hostsSong)
                 }
-                HStack(spacing: 12) {
-                    GlyphView(glyph: Icons.record, scale: 4)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Our jazz record").font(.pxBodyBold).foregroundStyle(Color.inkSoft)
-                        Text("Five soft jazz tracks, round and round.").font(.pxSmall).foregroundStyle(Color.muted)
-                    }
-                    Spacer(minLength: 0)
-                    Button("Put it on") {
-                        Haptics.tap()
-                        place.playRecord()
-                        RecordDeck.shared.bind(place)
-                        if RecordDeck.shared.mutedForMe { RecordDeck.shared.setMuted(false) }
-                        dismiss()
-                    }
-                    .buttonStyle(.px(.terracotta, small: true))
-                }
-                .padding(12)
-                .pxInset()
-
-                VStack(alignment: .leading, spacing: 8) {
-                    PixelLabel(text: "A song from YouTube")
-                    Text("Paste a link from YouTube or YouTube Music (Share > Copy link).").font(.pxSmall).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
-                    PixelField(placeholder: "https://music.youtube.com/watch?v=…", text: $link, limit: 300)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .keyboardType(.URL)
-                        .onChange(of: link) { _, _ in error = nil }
-                    if let e = error { Text(e).font(.pxSmall).foregroundStyle(Color.thread).fixedSize(horizontal: false, vertical: true) }
-                    HStack(spacing: 8) {
-                        Button("Paste") {
-                            if let s = UIPasteboard.general.string { link = s }
-                        }
-                        .buttonStyle(.px(.paper, small: true))
-                        Button("Play") {
-                            error = place.playSong(link)
-                            if error == nil {
-                                Haptics.tap()
-                                if RecordDeck.shared.mutedForMe { RecordDeck.shared.setMuted(false) }
-                                link = ""
-                                dismiss()
-                            }
-                        }
-                        .buttonStyle(.px(.terracotta, small: true, wide: true))
-                        .disabled(link.trimmingCharacters(in: .whitespaces).isEmpty)
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 3), spacing: 10) {
+                    ForEach(Records.shelf, id: \.id) { record in
+                        Button {
+                            Haptics.tap()
+                            place.playRecord(record.id)
+                            RecordDeck.shared.bind(place)
+                            RecordDeck.shared.setMuted(false)
+                            dismiss()
+                        } label: {
+                            VStack(alignment: .leading, spacing: 6) {
+                                GlyphView(glyph: Icons.record, scale: 3)
+                                if place.recordOn && place.turntable?.album == record.id { Text("PLAYING").font(.pxTiny) }
+                                Text(record.title).font(.pxSmall)
+                                Text("\(record.tracks.count) tracks").font(.pxSmall)
+                            }.frame(maxWidth: .infinity, alignment: .leading).pxCard()
+                        }.buttonStyle(.press)
                     }
                 }
+                HStack {
+                    VStack(alignment: .leading) {
+                        Text("Our song").font(.pxHeading)
+                        Text(place.ourSong?.title ?? "Apple Music for both of you").font(.pxSmall)
+                    }
+                    Spacer()
+                    Button("Choose") { choosing = true }.buttonStyle(.px(.terracotta, small: true))
+                }.pxCard()
             }
             .padding(20)
         }
+        .sheet(isPresented: $choosing) { RoomSongPicker(place: place) }
         .scrollDismissesKeyboard(.interactively)
     }
 }

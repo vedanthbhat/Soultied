@@ -27,6 +27,7 @@ public final class PlaceModel {
     public internal(set) var decorDoc = DecorDoc()
     public internal(set) var moods = MoodsDoc()
     /// the next time you'll be together
+    public internal(set) var ourSong: AppleRoomSong?
     public internal(set) var visit = VisitDoc()
     /// today's photo (a new one each day)
     public internal(set) var snapDoc = SnapDoc()
@@ -151,6 +152,9 @@ public final class PlaceModel {
             db.listen(meta("moods")) { [weak self] d in
                 self?.moods = MoodsDoc(d)
                 self?.loaded.insert("moods")
+            },
+            db.listen(meta("ourSong")) { [weak self] d in
+                self?.ourSong = AppleRoomSong(d)
             },
             db.listen(meta("visit")) { [weak self] d in
                 self?.visit = VisitDoc(d)
@@ -1057,7 +1061,22 @@ public final class PlaceModel {
     }
 
     /// put the jazz record on, from the track after the last one heard
-    public func playRecord() { turn(.jazz(turntable, by: me, now: Values.nowMs())) }
+    public func chooseAppleSong(_ song: AppleRoomSong) {
+        guard hasPlus else { return }
+        save(meta("ourSong"), song.doc, "your song")
+        controlAppleSong(song, position: 0, playing: true)
+    }
+
+    public func controlAppleSong(_ song: AppleRoomSong, position: Double, playing: Bool) {
+        guard hasPlus else { return }
+        let now = Values.nowMs()
+        // Legacy clients see a stopped record and remain silent.
+        var state = TurntableState(by: me, at: now)
+        state.apple = song.positioned(position, playing: playing)
+        turn(state)
+    }
+
+    public func playRecord(_ album: String = "jazz") { turn(.jazz(turntable, by: me, now: Values.nowMs(), album: album)) }
 
     /// put a song from YouTube on instead; what's wrong with the link, if it isn't one
     public func playSong(_ link: String) -> String? {

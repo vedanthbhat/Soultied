@@ -9,7 +9,6 @@ import SoultiedCore
 struct UsView: View {
     let app: AppModel
     let place: PlaceModel
-    @State private var editingLook = false
     @State private var editingPlace = false
     @State private var confirmDelete = false
     @State private var deleteFailed = false
@@ -17,90 +16,131 @@ struct UsView: View {
     @State private var decorating = false
     @Environment(\.openURL) private var openURL
 
+    private enum Panel: String, Identifiable {
+        case apart, list, recap, lately, you, notifications, settings, invite
+        var id: String { rawValue }
+    }
+    @State private var panel: Panel?
+    private var near: Bool { ["city", "together"].contains(place.aboutMine?["far"] ?? "") }
+
     var body: some View {
-        ScrollViewReader { proxy in
+        GeometryReader { geometry in
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    DarkHeading(title: "Us", sub: place.space?.name)
-                    couple.popIn()
-                    if !place.partnerHere { InviteCard(place: place).popIn(0.08) }
-                    if place.partnerHere {
-                        ApartCard(place: place).id("apart").popIn(0.08)
-                        BucketCard(place: place).id("list").popIn(0.16)
-                        RecapCard(place: place).id("recap").popIn(0.24)
+                VStack(spacing: 10) {
+                    HStack {
+                        DarkHeading(title: "Us", sub: place.space?.name)
+                        Spacer()
+                        Button("Settings") { panel = .settings }.buttonStyle(.px(.paper, small: true))
                     }
-                    you.popIn(0.3)
-                    NotificationsCard(place: place).id("notifications")
-                    PlusCardView(place: place)
-                    LookPicker().id("looks")
-                    history
-                    account
+                    couple
+                    Grid(horizontalSpacing: 10, verticalSpacing: 10) {
+                        GridRow {
+                            tile(near ? "Our next date" : "How far", planLine, UsGlyphs.calendar, .apart)
+                            tile("Our list", "\(place.bucket.view.todo.count) to do", Icons.star, .list)
+                        }
+                        GridRow {
+                            tile("This month", place.recapMemory, Icons.heart, .recap)
+                            tile("Lately", place.activities.first?.title ?? "Your room is ready", Icons.envelope, .lately)
+                        }
+                        GridRow {
+                            tile("You", place.myName, Icons.us, .you)
+                            tile("Nudges", "Your preferences", Icons.seal, .notifications)
+                        }
+                    }
+                    Button(place.hasPlus ? "Your Soultied Plus plan" : "Explore Soultied Plus") { PlusGate.shared.show(.plain) }
+                        .buttonStyle(.px(.paper, wide: true))
                 }
-                .padding(16)
-                .padding(.bottom, 100)
+                .padding(14)
+                .frame(minHeight: geometry.size.height)
             }
-            .onAppear {
-                // (after picking a look, or the screenshots: the picker in view)
-                if MainView.showLooks || Launch.args.contains("-looks") {
-                    MainView.showLooks = false
-                    DispatchQueue.main.async { proxy.scrollTo("looks", anchor: .center) }
-                } else if let to = Launch.scrollUs {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { proxy.scrollTo(to, anchor: .top) }
-                }
-            }
+        }
+        .onAppear {
+            if MainView.showLooks || Launch.args.contains("-looks") {
+                MainView.showLooks = false
+                panel = .settings
+            } else if let target = Launch.scrollUs { panel = Panel(rawValue: target) }
+        }
+        .sheet(item: $panel) { selected in
+            if selected == .you { LookSheet(place: place).presentationBackground(Color.paper) } else { ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack { Spacer(); Button("Done") { panel = nil }.buttonStyle(.px(.paper, small: true)) }
+                    switch selected {
+                    case .apart:
+                        CountdownCard(place: place)
+                        if place.partnerHere { ApartCard(place: place) }
+                    case .list: BucketCard(place: place)
+                    case .recap: RecapCard(place: place)
+                    case .lately: history
+                    case .notifications: NotificationsCard(place: place)
+                    case .you: EmptyView()
+                    case .invite: InviteCard(place: place)
+                    case .settings:
+                        LookPicker()
+                        account
+                            .confirmationDialog("Delete your Soultied account?", isPresented: $confirmDelete, titleVisibility: .visible) {
+                                Button("Delete my account", role: .destructive) {
+                                    Task { deleteFailed = !(await app.deleteAccount()) }
+                                }
+                            } message: {
+                                Text("Your name and look come off the couch, and your account is deleted. \(place.partnerHere ? "\(place.theirName) keeps the place and your letters together." : "") This can’t be undone.")
+                            }
+                    }
+                }.padding(16)
+            }.presentationDragIndicator(.visible).presentationBackground(Color.paper) }
         }
         .background(RoomBackground())
-        .sheet(isPresented: $editingLook) { LookSheet(place: place).presentationBackground(Color.paper) }
         .sheet(isPresented: $editingPlace) { PlaceSheet(place: place).presentationDetents([.medium]).presentationBackground(Color.paper) }
         .sheet(isPresented: $decorating) { DecorView(place: place).presentationDragIndicator(.visible).presentationBackground(Color.paper) }
-        .confirmationDialog("Delete your Soultied account?", isPresented: $confirmDelete, titleVisibility: .visible) {
-            Button("Delete my account", role: .destructive) {
-                Task { deleteFailed = !(await app.deleteAccount()) }
-            }
-        } message: {
-            Text("Your name and look come off the couch, and your account is deleted. \(place.partnerHere ? "\(place.theirName) keeps the place and your letters together." : "") This can’t be undone.")
+    }
+
+    private var planLine: String {
+        if !near, let km = place.apartKm {
+            return apartLabel(km, miles: countsInMiles(region: Locale.current.region?.identifier))
         }
+        if let days = place.visitDays {
+            if !place.visit.what.isEmpty { return place.visit.what }
+            return days == 0 ? "Today" : "In \(days) days"
+        }
+        return near ? "Plan a date" : "Plan your next visit"
+    }
+
+    private func tile(_ label: String, _ value: String, _ icon: Glyph, _ target: Panel) -> some View {
+        Button { panel = target } label: {
+            VStack(alignment: .leading, spacing: 7) {
+                HStack {
+                    if target == .you { HeadView(look: place.myLook, size: 28) } else { GlyphView(glyph: icon, scale: 2) }
+                    Text(label).font(.pxSmall)
+                }
+                    .foregroundStyle(Color.terracottaD)
+                if target == .list {
+                    if place.bucket.view.todo.isEmpty { Text("Add your first idea").font(.pxSmall) }
+                    ForEach(place.bucket.view.todo.prefix(2)) { item in
+                        Text("• " + item.text).font(.pxBodyBold).lineLimit(1).truncationMode(.tail)
+                    }
+                } else { Text(value).font(.pxBodyBold).foregroundStyle(Color.inkSoft).lineLimit(2) }
+            }.frame(maxWidth: .infinity, minHeight: 52, maxHeight: .infinity, alignment: .leading).pxCard()
+        }.buttonStyle(.press)
     }
 
     private var couple: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .bottom, spacing: 18) {
-                // (the two of you shift your weight a little, out of step)
-                CharacterView(look: place.myLook, scale: 3).sway(lift: 2, tilt: 1.5, period: 3.2)
-                if let l = place.theirLook {
-                    CharacterView(look: l, scale: 3).sway(lift: 2, tilt: 1.5, period: 3.2, phase: 0.45)
-                }
-                Spacer()
-            }
-            .frame(maxWidth: .infinity)
-            Text(place.partnerHere ? "\(place.myName) & \(place.theirName)" : place.myName).font(.pxTitle).foregroundStyle(Color.inkSoft)
-            if let t = place.space?.togetherSince, let d = place.daysTogether {
-                CountUp(value: d) { "Together since \(Day.pretty(t, long: true)) \(t.prefix(4)) · \($0.formatted()) days" }.font(.pxBody).foregroundStyle(Color.muted)
-            }
-            if let s = place.space {
-                Text("In your little place since \(Day.pretty(s.startKey)) \(s.startKey.prefix(4)) · \(place.streak.together) letters opened together").font(.pxSmall).foregroundStyle(Color.muted)
-            }
+        VStack(spacing: 8) {
             HStack(spacing: 8) {
+                CharacterView(look: place.myLook, scale: 2)
+                if let look = place.theirLook { CharacterView(look: look, scale: 2) }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(place.partnerHere ? "\(place.myName) & \(place.theirName)" : place.myName).font(.pxHeading)
+                    if let days = place.daysTogether { Text("\(days) days together").font(.pxSmall) }
+                }
+                Spacer(minLength: 0)
+            }
+            if !place.partnerHere {
+                Button("Invite your person") { panel = .invite }.buttonStyle(.px(.terracotta, small: true, wide: true))
+            }
+            HStack {
                 Button("Edit our place") { editingPlace = true }.buttonStyle(.px(.paper, small: true, wide: true))
                 Button("Decorate the room") { decorating = true }.buttonStyle(.px(.terracotta, small: true, wide: true))
             }.evenRow()
-        }
-        .pxCard()
-    }
-
-    private var you: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("You").font(.pxHeading).foregroundStyle(Color.inkSoft)
-            HStack(spacing: 12) {
-                HeadView(look: place.myLook, size: 44)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(place.myName).font(.pxBodyBold).foregroundStyle(Color.inkSoft)
-                    Text(place.myMood.map { "Feeling \($0.line)" } ?? "No mood up right now").font(.pxSmall).foregroundStyle(Color.muted)
-                }
-            }
-            Button("Change my look and name") { editingLook = true }.buttonStyle(.px(.terracotta, small: true, wide: true))
-        }
-        .pxCard()
+        }.foregroundStyle(Color.inkSoft).pxCard()
     }
 
     private var history: some View {
@@ -142,7 +182,7 @@ struct UsView: View {
                 }
             }
             HStack(spacing: 8) {
-                Button("Show me around again") { Tour.shared.start() }
+                Button("Show me around again") { panel = nil; Tour.shared.start() }
                     .buttonStyle(.px(.paper, small: true, wide: true))
                 // the little sounds when you press things and move around the room (the haptics stay)
                 Button(soundsOff ? "Sounds: off" : "Sounds: on") {
@@ -167,6 +207,7 @@ struct UsView: View {
 struct InviteCard: View {
     let place: PlaceModel
     @State private var copied = false
+    @State private var doodling = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -180,7 +221,7 @@ struct InviteCard: View {
                     .padding(10).frame(maxWidth: .infinity).pxInset()
                 HStack(spacing: 10) {
                     ShareLink(item: URL(string: link)!, message: Text("Come sit with me on our little couch in Soultied: \(link)")) {
-                        Text("Send the invite")
+                        Text("Invite your person")
                     }
                     .buttonStyle(.px(.terracotta, small: true, wide: true))
                     Button(copied ? "Copied" : "Copy the code") {
@@ -190,6 +231,11 @@ struct InviteCard: View {
                     }
                     .buttonStyle(.px(.paper, small: true, wide: true))
                 }.evenRow()
+                Button("Leave them a doodle") { doodling = true }.buttonStyle(.px(.paper, small: true))
+                    .sheet(isPresented: $doodling) {
+                        ScrollView { DoodlePanel(place: place) { doodling = false }.padding(16) }
+                            .presentationDragIndicator(.visible).presentationBackground(Color.paper)
+                    }
                 Text("It works for a week. You can make a fresh one any time.").font(.pxTiny).foregroundStyle(Color.muted)
             }
         }

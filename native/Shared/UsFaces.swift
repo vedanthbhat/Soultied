@@ -36,6 +36,7 @@ struct UsNow {
     /// the next time you're together
     var visitDays: Int?
     var visitWhat = ""
+    var planDate: Date?
     /// your person's mood (nil once it's a day old), and how long ago they said it
     var mood: MoodEntry?
     var moodAgo = ""
@@ -70,6 +71,7 @@ struct UsNow {
         let v = VisitDoc(date: u.visitDate, what: u.visitWhat)
         visitDays = v.daysLeft(today: today)
         visitWhat = u.visitWhat
+        if let days = visitDays { planDate = Calendar.current.date(byAdding: .day, value: days, to: date) }
         themTz = u.themTz ?? ""
         apartKm = u.apartKm
         let ms = date.timeIntervalSince1970 * 1000
@@ -92,6 +94,7 @@ struct UsNow {
         u.daysTogether = 518
         u.visitDays = 12
         u.visitWhat = "Goa"
+        u.planDate = Calendar.current.date(byAdding: .day, value: 12, to: Date())
         u.mood = MoodEntry(mood: .missing, text: "counting the days", at: Date().timeIntervalSince1970 * 1000 - 2 * 3600e3)
         u.moodAgo = "2 hours ago"
         // Aanya in Bengaluru, Rohan in London
@@ -227,23 +230,47 @@ struct PaperFace<Content: View>: View {
 /// the next time you're together: a big number (or the days you've been together)
 struct CountdownFace: View {
     let u: UsNow
+    var medium = false
     var body: some View {
         PaperFace {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 6) {
-                    glyphView(UsGlyphs.calendar, 2.5)
-                    Text(u.visitDays != nil ? "Next time" : "Together").font(WidgetFont.px(11, bold: true)).foregroundStyle(mutedU).lineLimit(1)
+            if let date = u.planDate, let days = u.visitDays {
+                let layout = medium ? AnyLayout(HStackLayout(spacing: 14)) : AnyLayout(VStackLayout(alignment: .leading, spacing: 5))
+                layout {
+                    VStack(spacing: 0) {
+                        Text(date.formatted(.dateTime.month(.abbreviated)).uppercased())
+                            .font(WidgetFont.px(11, bold: true)).foregroundStyle(.white)
+                            .frame(maxWidth: .infinity).background(hexC("#ad5a44"))
+                        Text(date.formatted(.dateTime.day())).font(WidgetFont.px(medium ? 34 : 21, bold: true))
+                    }
+                    .frame(width: medium ? 66 : 44)
+                    .background(hexC("#fff8e9"))
+                    .overlay(Rectangle().strokeBorder(inkU, lineWidth: 2))
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(u.visitWhat.isEmpty ? "Our next date" : u.visitWhat)
+                            .font(WidgetFont.px(medium ? 21 : 16, bold: true)).lineLimit(2).minimumScaleFactor(0.75)
+                        Text(days == 0 ? "Today" : days == 1 ? "Tomorrow" : "\(days) days to go").font(WidgetFont.px(14))
+                        if medium { Text(date.formatted(.dateTime.weekday(.wide))).font(WidgetFont.px(12)).foregroundStyle(mutedU) }
+                    }
                 }
-                Spacer(minLength: 0)
-                if let c = u.count {
-                    Text(c.n).font(WidgetFont.px(c.n.count > 3 ? 38 : 46, bold: true)).foregroundStyle(inkU).lineLimit(1).minimumScaleFactor(0.6)
-                    Text(c.label).font(WidgetFont.px(13)).foregroundStyle(inkU).lineLimit(2).minimumScaleFactor(0.8)
-                } else {
-                    Text(u.setUp ? "When do you see each other next?" : "Open Soultied").font(WidgetFont.px(14, bold: true)).foregroundStyle(inkU).fixedSize(horizontal: false, vertical: true)
-                    Text("Set the day in Soultied").font(WidgetFont.px(11)).foregroundStyle(mutedU)
+                .foregroundStyle(inkU)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            } else {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
+                        glyphView(UsGlyphs.calendar, 2.5)
+                        Text(u.visitDays != nil ? "Next time" : "Together").font(WidgetFont.px(11, bold: true)).foregroundStyle(mutedU).lineLimit(1)
+                    }
+                    Spacer(minLength: 0)
+                    if let c = u.count {
+                        Text(c.n).font(WidgetFont.px(c.n.count > 3 ? 38 : 46, bold: true)).foregroundStyle(inkU).lineLimit(1).minimumScaleFactor(0.6)
+                        Text(c.label).font(WidgetFont.px(13)).foregroundStyle(inkU).lineLimit(2).minimumScaleFactor(0.8)
+                    } else {
+                        Text(u.setUp ? "When do you see each other next?" : "Open Soultied").font(WidgetFont.px(14, bold: true)).foregroundStyle(inkU).fixedSize(horizontal: false, vertical: true)
+                        Text("Set the day in Soultied").font(WidgetFont.px(11)).foregroundStyle(mutedU)
+                    }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         }
     }
 }

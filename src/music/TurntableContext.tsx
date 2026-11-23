@@ -2,7 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import { useApp } from '../context/AppContext';
 import * as store from '../cloud/store';
 import { useStreamHub } from '../stream/StreamHub';
-import { TRACKS, Track, TurntableState, startFor, trackUrl, whereAt } from './records';
+import { tracksFor, TRACKS, Track, TurntableState, startFor, trackUrl, whereAt } from './records';
 import { parseYouTubeId, parseYouTubeStart } from '../watch/youtube';
 
 /** A record left on switches itself off after a while, so nobody walks back in to music hours later. */
@@ -22,7 +22,7 @@ interface TurntableValue {
   picking: boolean;
   openPicker: () => void;
   closePicker: () => void;
-  playJazz: () => void;
+  playJazz: (album?: string) => void;
   /** put a YouTube song on for both of you; an error to show if the link isn't one */
   playYouTube: (link: string) => string | null;
   /** the song's title, once its player knows it */
@@ -198,13 +198,14 @@ export const TurntableProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         return;
       }
       const now = Date.now();
-      let { index, offset } = whereAt(r.startedAt, now);
+      const tracks = tracksFor(r.album);
+      let { index, offset } = whereAt(r.startedAt, now, tracks);
       // right at the end of a track: go on to the next one rather than replaying the last moment
-      if (offset > TRACKS[index].secs - 0.4) {
-        index = (index + 1) % TRACKS.length;
+      if (offset > tracks[index].secs - 0.4) {
+        index = (index + 1) % tracks.length;
         offset = 0;
       }
-      const t = TRACKS[index];
+      const t = tracks[index];
       const el = audio();
       if (el.dataset.slug !== t.slug) {
         el.src = trackUrl(t);
@@ -218,8 +219,8 @@ export const TurntableProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         el.onloadedmetadata = () => {
           const r2 = recRef.current;
           if (!r2) return;
-          const w = whereAt(r2.startedAt, Date.now());
-          if (TRACKS[w.index].slug === el.dataset.slug && Math.abs(el.currentTime - w.offset) > 1.5) el.currentTime = w.offset;
+          const w = whereAt(r2.startedAt, Date.now(), tracksFor(r2.album));
+          if (tracksFor(r2.album)[w.index].slug === el.dataset.slug && Math.abs(el.currentTime - w.offset) > 1.5) el.currentTime = w.offset;
         };
       } else if (el.readyState >= 1 && Math.abs(el.currentTime - offset) > 4) {
         el.currentTime = offset;
@@ -289,8 +290,8 @@ export const TurntableProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const now = Date.now();
     const r = recRef.current;
     if (!isOn(r, now)) return;
-    const next = r!.yt ? r!.next % TRACKS.length : (whereAt(r!.startedAt, now).index + 1) % TRACKS.length;
-    write({ on: false, startedAt: r!.startedAt, by: me, at: now, next, yt: null });
+    const next = r!.yt ? r!.next % TRACKS.length : (whereAt(r!.startedAt, now, tracksFor(r!.album)).index + 1) % tracksFor(r!.album).length;
+    write({ album: r!.album || "jazz", on: false, startedAt: r!.startedAt, by: me, at: now, next, yt: null });
     sync();
   }, [me, write, sync]);
 
@@ -299,11 +300,12 @@ export const TurntableProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     prefsRef.current = { ...prefsRef.current, muted: false };
   };
 
-  const playJazz = useCallback(() => {
+  const playJazz = useCallback((album = "jazz") => {
     const now = Date.now();
     const r = recRef.current;
-    const next = r ? r.next % TRACKS.length : 0;
-    write({ on: true, startedAt: startFor(next, now), by: me, at: now, next, yt: null });
+    const tracks = tracksFor(album);
+    const next = r && (r.album || "jazz") === album ? r.next % tracks.length : 0;
+    write({ album, on: true, startedAt: startFor(next, now, tracks), by: me, at: now, next, yt: null });
     unmuteForMe();
     setPicking(false);
     // start the sound inside the click, so the browser lets it play
@@ -353,8 +355,8 @@ export const TurntableProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const now = Date.now();
     const r = recRef.current;
     if (!isOn(r, now) || r!.yt) return;
-    const { index } = whereAt(r!.startedAt, now);
-    write({ ...r!, startedAt: startFor(index + 1, now), by: me, at: now });
+    const { index } = whereAt(r!.startedAt, now, tracksFor(r!.album));
+    write({ ...r!, startedAt: startFor(index + 1, now, tracksFor(r!.album)), by: me, at: now });
     sync(true);
   }, [me, write, sync]);
 
@@ -378,7 +380,7 @@ export const TurntableProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   );
 
   const now = Date.now();
-  const track = on && rec && !ytNow ? TRACKS[whereAt(rec.startedAt, now).index] : null;
+  const track = on && rec && !ytNow ? tracksFor(rec.album)[whereAt(rec.startedAt, now, tracksFor(rec.album)).index] : null;
   const ytId = ytNow?.id || null;
   const ytTitle = ytNow?.title;
   const yt = useMemo(() => (ytId ? { id: ytId, title: ytTitle } : null), [ytId, ytTitle]);

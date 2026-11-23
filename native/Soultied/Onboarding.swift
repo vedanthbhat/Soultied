@@ -37,7 +37,7 @@ struct WelcomeView: View {
                         .opacity(shown >= 1 ? 1 : 0)
 
                     VStack(alignment: .leading, spacing: 14) {
-                        Text("A shared home for long-distance couples.").font(.px(20, 700)).foregroundStyle(Color.inkSoft)
+                        Text("A little place for the two of you.").font(.px(20, 700)).foregroundStyle(Color.inkSoft)
                         features
                         Text("A letter to open together every day, touches that buzz in their pocket, your wall of notes and photos, shows in sync, and a couch you scoot closer on every day you both show up.")
                             .font(.pxBody).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
