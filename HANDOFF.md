@@ -69,14 +69,21 @@ Claude, 23 Nov, first checkpoint (`95ee153`): PR #1 went onto `main` with these 
     - The invite screen.
     - Us: the quick question shows the next day and saves the answer. A tile opens as a centred card over a blurred
       page, and a click outside closes it.
-- **This checkpoint, iPhone:** syntax-checked only, because Claude has no Swift compiler. The CI run for this push is
-  the first compile. Check its `about`, `about-plus`, `us-list`, `us-apart`, `us-notifications` and
-  `widgets-keepsakes` screenshots.
+- **This checkpoint, iPhone (`1730e48`, CI run #85):**
+  - The build succeeded first time and 100 core tests passed. One new warning: `allowBluetooth` is deprecated in
+    `VoiceViews.swift`.
+  - The `about`, `about-plus`, `us-list`, `us-apart`, `us-notifications` and `widgets-keepsakes` screenshots look
+    right. The Plus picture now shows, and the Us tiles open as floating cards.
+  - The App Store build was made, but sending it to TestFlight failed. Xcode reported "The Internet connection
+    appears to be offline", then "No profiles for 'app.soultied.ios' were found" (and the same for the widget). The
+    run before it (`95ee153`) signed and sent fine, so this looks like a network blip. This HANDOFF update re-sends
+    the build.
 - **Not tested:** anything on a real iPhone, two-phone Our song, StoreKit, and the widgets on a real home screen.
 
 ## Next unfinished step
 
-1. Check the CI run and its screenshots, and fix anything that breaks.
+1. Check that this re-send reaches TestFlight. If it fails on signing again, check that the App Store Connect key
+   secrets still belong to the team that owns `app.soultied.ios`.
 2. Vedanth: tick MusicKit under Identifiers › `app.soultied.ios` › App Services.
 3. Vedanth: try the TestFlight build. Run the two-phone Our song checklist below, go through onboarding as a new
    person, and add both new widgets.
