@@ -71,13 +71,15 @@ Claude, 23 Nov, first checkpoint (`95ee153`): PR #1 went onto `main` with these 
       page, and a click outside closes it.
 - **This checkpoint, iPhone (`1730e48`, CI run #85):**
   - The build succeeded first time and 100 core tests passed. One new warning: `allowBluetooth` is deprecated in
-    `VoiceViews.swift`.
+    `VoiceViews.swift` (now `allowBluetoothHFP`, the same option under its new name).
   - The `about`, `about-plus`, `us-list`, `us-apart`, `us-notifications` and `widgets-keepsakes` screenshots look
     right. The Plus picture now shows, and the Us tiles open as floating cards.
   - The App Store build was made, but sending it to TestFlight failed. Xcode reported "The Internet connection
     appears to be offline", then "No profiles for 'app.soultied.ios' were found" (and the same for the widget). The
-    run before it (`95ee153`) signed and sent fine, so this looks like a network blip. This HANDOFF update re-sends
-    the build.
+    run before it (`95ee153`) signed and sent fine, so this looks like a network blip.
+  - The first re-send (`16ad648`) never ran: the iPhone workflow only starts when files under `native/` (and a few
+    others) change, and that push only touched HANDOFF.md. The Bluetooth rename above touches `native/`, so its push
+    builds and sends the app again.
 - **Not tested:** anything on a real iPhone, two-phone Our song, StoreKit, and the widgets on a real home screen.
 
 ## Next unfinished step
@@ -111,7 +113,9 @@ within about 1 s of each other by ear.
 - Never commit `zz-test.config.ts`. New files use LF line endings.
 - Keep the TypeScript and Swift versions in step. Shared logic gets fixtures in `scripts/native-fixtures.ts` and
   matching tests in `native/SoultiedCore/Tests`.
-- Put `[testflight]` in a commit message to send an iPhone build. CI screenshots go to the `native-shots` branch.
+- Put `[testflight]` in a commit message to send an iPhone build. The push must change something the iPhone workflow
+  watches (`native/**` and the other paths in `native-ios.yml`), or nothing runs. CI screenshots go to the
+  `native-shots` branch.
 - Words: cosy, but clear about what a feature does. Explain anything Soultied-only (stitches, After dark) the first
   time it comes up.
 - Style rules:
