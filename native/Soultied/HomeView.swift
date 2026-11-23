@@ -39,10 +39,14 @@ struct HomeView: View {
                         }
 
                         VStack(spacing: 18) {
+                            // (before your person's here: their seat comes first)
+                            if !place.partnerHere && !place.isDemo { SeatCard(place: place, invite: invite).popIn() }
                             // (the cards come in one after another as Home opens)
                             touches.id("touches").popIn()
                             // would you like a nudge when they've been by? (Push.swift)
                             PushAskCard(place: place).popIn(0.04)
+                            // one more quick question about the two of you, a day at a time (AboutViews.swift)
+                            QuickAskCard(place: place).popIn(0.05)
                             if place.partnerHere { SnapCard(place: place).id("snap").popIn(0.06) }
                             // (counting down to a day: near the top; no day set yet: a nudge further down)
                             if place.partnerHere && place.visitDays != nil { CountdownCard(place: place).id("countdown").popIn(0.12) }

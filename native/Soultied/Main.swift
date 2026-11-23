@@ -30,8 +30,8 @@ enum RoomSheet: String, Identifiable {
     case me, them, invite, letters, wall, decor, play, us, music, watch, pet
     /// the decor catalogue, open at the pet (choosing a different one, or naming it)
     case petDecor
-    /// the wall, open at the doodle pad or the photos (a tap on a home-screen widget)
-    case doodle, photos, countdown
+    /// the wall, open at the doodle pad, the photos, the voice notes or the memories (a tap on a home-screen widget)
+    case doodle, photos, countdown, voices, memories
     var id: String { rawValue }
 }
 
@@ -106,7 +106,10 @@ struct MainView: View {
             }
             Toasts(place: place, onHome: roomSideways || (tab == .home && sheet == nil), onLetter: { go(.letters) })
                 .padding(.bottom, roomSideways || tvSideways ? 12 : 84)
+            // a card floating over everything, with the screen blurred behind it (the Us tiles: FloatingCard.swift)
+            FloatingCardHost()
         }
+        .onChange(of: tab) { _, _ in FloatingCard.shared.close() }
         .fullScreenCover(isPresented: $escape) { EscapeScreen(place: place).callBand(place) }
         .sheet(item: $sheet) { s in
             sheetView(s)
@@ -133,6 +136,9 @@ struct MainView: View {
             Group {
                 if tour.active && !sideways && sheet == nil && game == nil && !escape {
                     TourOverlay(tour: tour, place: place, spots: spots)
+                } else if tab == .home && !sideways && sheet == nil && game == nil && !escape && !place.isDemo && RoomHints.wanted {
+                    // a new place: the letter, the record player and the pet glow until they've been opened
+                    RoomHints(spots: spots)
                 }
             }
         }
@@ -158,6 +164,8 @@ struct MainView: View {
         case .photos: sheet = .photos
         case .doodle: sheet = .doodle
         case .countdown: sheet = .countdown
+        case .voices: sheet = .voices
+        case .memories: sheet = .memories
         }
     }
 
@@ -190,6 +198,7 @@ struct MainView: View {
         }
         Chiptune.shared.room(id)
         Haptics.tap()
+        RoomHints.visited(id)
         switch id {
         case .left, .right:
             let who: String? = id == .left ? place.hostId : place.guestId
@@ -234,6 +243,8 @@ struct MainView: View {
         case .doodle: WallView(place: place, start: .doodle)
         case .countdown: VisitSheet(place: place)
         case .photos: WallView(place: place, start: .photos)
+        case .voices: WallView(place: place, start: .voices)
+        case .memories: WallView(place: place, start: .memories)
         case .decor: DecorView(place: place)
         case .play: PlayView(place: place)
         case .us: UsView(app: app, place: place)

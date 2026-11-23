@@ -156,7 +156,8 @@ struct WelcomeView: View {
 struct SetupView: View {
     let app: AppModel
     enum Step { case choose, names, look, join, joinLook }
-    @State private var step: Step = .choose
+    /// (straight to your names: an invite code is a link on that screen, and an invite link opens Join)
+    @State private var step: Step = .names
     @State private var myName = ""
     @State private var theirName = ""
     @State private var placeName = ""
@@ -208,11 +209,12 @@ struct SetupView: View {
         }
     }
 
+    /// the two of you: just your names (the place's name and the day you got together are in Us › Edit our place)
     private var names: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Dots(n: 1, of: 3)
-            Text("First, the two of you.").font(.pxTitle).foregroundStyle(Color.inkSoft)
-            Text("Just names for now. You can change everything later.").font(.pxBody).foregroundStyle(Color.muted)
+            Dots(n: 1, of: 4)
+            Text("The two of you").font(.pxTitle).foregroundStyle(Color.inkSoft)
+            Text("Names now. Everything else can wait.").font(.pxBody).foregroundStyle(Color.muted)
             VStack(alignment: .leading, spacing: 6) {
                 PixelLabel(text: "Your name")
                 PixelField(placeholder: "e.g. Vedanth", text: $myName, limit: 24)
@@ -221,29 +223,23 @@ struct SetupView: View {
                 PixelLabel(text: "Your person’s name")
                 PixelField(placeholder: "We’ll save them a seat", text: $theirName, limit: 24)
             }
-            VStack(alignment: .leading, spacing: 6) {
-                PixelLabel(text: "Name your place")
-                PixelField(placeholder: "Our Little Place", text: $placeName, limit: 40)
+            Button("Next: your character →") { step = .look }
+                .buttonStyle(.px(.terracotta, wide: true))
+                .disabled(myName.trimmingCharacters(in: .whitespaces).isEmpty)
+            Divider().overlay(Color.paperShade)
+            Button("Got an invite from your person? Take your seat") { step = .join }
+                .font(.px(14, 700)).foregroundStyle(Color.terracottaD).underline()
+            HStack(spacing: 18) {
+                Button("Peek at a demo room") { app.openDemo() }
+                Button("Sign out") { app.signOut() }
             }
-            Toggle(isOn: $sayWhen) { Text("Say when you got together").font(.pxBody).foregroundStyle(Color.inkSoft) }
-                .tint(Color.sage)
-            if sayWhen {
-                DatePicker("Together since", selection: $since, in: ...Date(), displayedComponents: .date)
-                    .font(.pxBody).foregroundStyle(Color.inkSoft).tint(Color.terracotta)
-            }
-            HStack {
-                Button("Back") { step = .choose }.buttonStyle(.px(.paper, small: true))
-                Spacer()
-                Button("Next: your character →") { step = .look }
-                    .buttonStyle(.px(.terracotta, wide: true))
-                    .disabled(myName.trimmingCharacters(in: .whitespaces).isEmpty)
-            }
+            .font(.pxSmall).foregroundStyle(Color.muted)
         }
     }
 
     private func lookStep(join: Bool) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            Dots(n: join ? 2 : 2, of: join ? 2 : 3)
+            Dots(n: 2, of: join ? 2 : 4)
             Text("Make your little character.").font(.pxTitle).foregroundStyle(Color.inkSoft)
             Text(join ? "This is you on the couch, next to \(invite?.hostName ?? "them")." : "This is you on the couch. Your person makes theirs when they join.")
                 .font(.pxBody).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
@@ -303,7 +299,7 @@ struct SetupView: View {
             HStack {
                 Button("Back") {
                     invite = nil
-                    step = .choose
+                    step = .names
                 }
                 .buttonStyle(.px(.paper, small: true))
                 Spacer()

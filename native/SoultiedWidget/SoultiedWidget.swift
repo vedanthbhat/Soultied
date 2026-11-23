@@ -13,6 +13,8 @@ import SoultiedCore
  *   Countdown      the days till you're next together (or the days you've been together)
  *   Their mood     how your person's feeling
  *   Us             all three, side by side
+ *   Their voice    your person's newest voice note (tap: it plays in Soultied)
+ *   Memories       a memory from your wall each day, the ones from this day in other years first
  * The app leaves a way in (WidgetShare, a keychain group they share); the widgets look for new things
  * themselves (Firestore's REST API, signed in with Firebase's refresh token), every 20 minutes or so as iOS
  * allows, and straight away when the app sees something new.
@@ -28,6 +30,8 @@ struct SoultiedWidgets: WidgetBundle {
         MoodWidget()
         UsWidget()
         ApartWidget()
+        VoiceWidget()
+        MemoryWidget()
     }
 }
 
@@ -169,6 +173,117 @@ struct BoardWidget: Widget {
         .description("Your newest wall photos, pinned up as Polaroids.")
         .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
         .contentMarginsDisabled()
+    }
+}
+
+/* ---------- their voice ---------- */
+
+struct VoiceEntry: TimelineEntry {
+    let date: Date
+    let setUp: Bool
+    let name: String
+    let voice: VoiceNow?
+}
+
+struct VoiceProvider: TimelineProvider {
+    func placeholder(in context: Context) -> VoiceEntry { VoiceEntry(date: Date(), setUp: true, name: "Rohan", voice: .demo) }
+
+    func getSnapshot(in context: Context, completion: @escaping (VoiceEntry) -> Void) {
+        let s = WidgetShare.load()
+        let v = Fetch.cachedVoice()
+        if context.isPreview && v == nil {
+            completion(placeholder(in: context))
+            return
+        }
+        completion(VoiceEntry(date: Date(), setUp: s.config != nil, name: s.config?.themName ?? "", voice: v))
+    }
+
+    func getTimeline(in context: Context, completion: @escaping (Timeline<VoiceEntry>) -> Void) {
+        Task {
+            let v = await Fetch.freshVoice()
+            let s = WidgetShare.load()
+            let now = Date()
+            // (the same note, its "3 hours ago" kept true for a few hours, while iOS lets it look again)
+            let entries = (0..<6).map { VoiceEntry(date: now.addingTimeInterval(Double($0) * 30 * 60), setUp: s.config != nil, name: s.config?.themName ?? "", voice: v) }
+            completion(Timeline(entries: entries, policy: .after(now.addingTimeInterval(20 * 60))))
+        }
+    }
+}
+
+struct VoiceWidgetView: View {
+    @Environment(\.widgetFamily) private var family
+    let entry: VoiceEntry
+    var body: some View {
+        VoiceFace(voice: entry.voice, name: entry.name, setUp: entry.setUp, medium: family == .systemMedium, now: entry.date)
+            .containerBackground(for: .widget) { Color(red: 0.984, green: 0.953, blue: 0.886) }
+            .widgetURL(URL(string: "soultied://voices"))
+    }
+}
+
+struct VoiceWidget: Widget {
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: WidgetShare.voiceKind, provider: VoiceProvider()) { VoiceWidgetView(entry: $0) }
+            .configurationDisplayName("Their voice")
+            .description("The newest voice note your person left you. Tap it to listen.")
+            .supportedFamilies([.systemSmall, .systemMedium])
+            .contentMarginsDisabled()
+    }
+}
+
+/* ---------- memories ---------- */
+
+struct MemoryEntry: TimelineEntry {
+    let date: Date
+    let setUp: Bool
+    let memory: MemoryNow?
+}
+
+struct MemoryProvider: TimelineProvider {
+    func placeholder(in context: Context) -> MemoryEntry { MemoryEntry(date: Date(), setUp: true, memory: .demo) }
+
+    func getSnapshot(in context: Context, completion: @escaping (MemoryEntry) -> Void) {
+        let m = Fetch.cachedMemory(on: Date())
+        if context.isPreview && m == nil {
+            completion(placeholder(in: context))
+            return
+        }
+        completion(MemoryEntry(date: Date(), setUp: WidgetShare.load().config != nil, memory: m))
+    }
+
+    func getTimeline(in context: Context, completion: @escaping (Timeline<MemoryEntry>) -> Void) {
+        let now = Date()
+        // (now, and each of the next two midnights: a different memory each day)
+        var dates = [now]
+        var day = Calendar.current.startOfDay(for: now)
+        for _ in 0..<2 {
+            day = Calendar.current.date(byAdding: .day, value: 1, to: day) ?? day.addingTimeInterval(86400)
+            dates.append(day.addingTimeInterval(5))
+        }
+        Task {
+            await Fetch.freshMemories(for: dates)
+            let setUp = WidgetShare.load().config != nil
+            completion(Timeline(entries: dates.map { MemoryEntry(date: $0, setUp: setUp, memory: Fetch.cachedMemory(on: $0)) }, policy: .after(now.addingTimeInterval(60 * 60))))
+        }
+    }
+}
+
+struct MemoryWidgetView: View {
+    @Environment(\.widgetFamily) private var family
+    let entry: MemoryEntry
+    var body: some View {
+        MemoryFace(memory: entry.memory, setUp: entry.setUp, size: family.faceSize, now: entry.date)
+            .containerBackground(for: .widget) { Color(red: 0.984, green: 0.953, blue: 0.886) }
+            .widgetURL(URL(string: "soultied://memories"))
+    }
+}
+
+struct MemoryWidget: Widget {
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: WidgetShare.memoryKind, provider: MemoryProvider()) { MemoryWidgetView(entry: $0) }
+            .configurationDisplayName("Memories")
+            .description("A memory from your wall each day. On the day something happened, it comes back.")
+            .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
+            .contentMarginsDisabled()
     }
 }
 
@@ -567,6 +682,106 @@ enum Fetch {
             // offline: keep what's there
         }
         return WidgetShare.load()
+    }
+
+    /* their voice */
+
+    private static var voiceFile: URL { cacheDir.appendingPathComponent("voice.json") }
+
+    /// your person's newest voice note that's still up, from what was last fetched
+    static func cachedVoice() -> VoiceNow? {
+        guard WidgetShare.load().config != nil, let d = try? Data(contentsOf: voiceFile) else { return nil }
+        return try? JSONDecoder().decode(VoiceNow.self, from: d)
+    }
+
+    /// looks for your person's newest voice note (just how long it is, its loudness and when; the sound stays put)
+    static func freshVoice() async -> VoiceNow? {
+        let s = WidgetShare.load()
+        guard let c = s.config else {
+            try? FileManager.default.removeItem(at: voiceFile)
+            return nil
+        }
+        do {
+            let t = try await token(c)
+            let q: JSON = [
+                "from": [["collectionId": "meta"]],
+                "select": picking(["by", "at", "secs", "peaks", "heard", "gone"]),
+                "where": idsStarting(c, "voice-"),
+                "orderBy": newestFirst("__name__"),
+                "limit": 12,
+            ]
+            let rows = try await query(c, t, q)
+            if let row = rows.first(where: { $0.1["by"] as? String == c.them && $0.1["gone"] as? Bool != true }) {
+                let f = row.1
+                let peaks = ((f["peaks"] as? [Any]) ?? []).compactMap { ($0 as? Double).map { min(9, max(0, Int($0))) } }
+                let v = VoiceNow(id: row.0, secs: f["secs"] as? Double ?? 0, at: f["at"] as? Double ?? 0, peaks: peaks,
+                                 heard: (f["heard"] as? [String: Any])?[c.me] != nil)
+                if let d = try? JSONEncoder().encode(v) { try? d.write(to: voiceFile) }
+            } else {
+                try? FileManager.default.removeItem(at: voiceFile)
+            }
+        } catch {
+            // offline: keep what's there
+        }
+        return cachedVoice()
+    }
+
+    /* memories */
+
+    private struct Kept: Codable { var id: String; var title: String; var day: String; var text: String; var photo: String }
+
+    private static var memoriesFile: URL { cacheDir.appendingPathComponent("memories.json") }
+    /// (".jpeg", so the board's tidying up of its ".jpg" photos leaves these alone)
+    private static func memoryPhotoFile(_ id: String) -> URL { cacheDir.appendingPathComponent("memory-\(id).jpeg") }
+
+    private static func keptMemories() -> [Kept] {
+        guard let d = try? Data(contentsOf: memoriesFile), let k = try? JSONDecoder().decode([Kept].self, from: d) else { return [] }
+        return k
+    }
+
+    /// the memory to show on `date`, from what was last fetched
+    static func cachedMemory(on date: Date) -> MemoryNow? {
+        guard WidgetShare.load().config != nil else { return nil }
+        let kept = keptMemories()
+        guard let pick = KeepsakeArt.pick(kept.map { $0.day }, today: KeepsakeArt.today(date)) else { return nil }
+        let m = kept[pick.index]
+        let photo = m.photo.isEmpty ? nil : (try? Data(contentsOf: memoryPhotoFile(m.photo))).flatMap { UIImage(data: $0) }
+        return MemoryNow(title: m.title, day: m.day, text: m.text, photo: photo, onThisDay: pick.onThisDay)
+    }
+
+    /// looks at your memories again, and fetches the photos of the ones coming up on `dates`
+    static func freshMemories(for dates: [Date]) async {
+        let s = WidgetShare.load()
+        guard let c = s.config else {
+            try? FileManager.default.removeItem(at: memoriesFile)
+            return
+        }
+        do {
+            let t = try await token(c)
+            let items = memories(try await get(root(c) + "/meta/memories", t))
+            let kept = items.values
+                .sorted { $0.day == $1.day ? $0.id < $1.id : $0.day < $1.day }
+                .map { Kept(id: $0.id, title: $0.title, day: $0.day, text: $0.text, photo: $0.photo) }
+            if let d = try? JSONEncoder().encode(kept) { try? d.write(to: memoriesFile) }
+            var want = Set<String>()
+            for date in dates {
+                if let pick = KeepsakeArt.pick(kept.map { $0.day }, today: KeepsakeArt.today(date)), !kept[pick.index].photo.isEmpty {
+                    want.insert(kept[pick.index].photo)
+                }
+            }
+            for id in want where !FileManager.default.fileExists(atPath: memoryPhotoFile(id).path) {
+                guard let p = try await get(root(c) + "/meta/\(id)?" + mask(["thumb"]), t), let thumb = p["thumb"] as? String,
+                      let jpeg = small(thumb) else { continue }
+                try? jpeg.write(to: memoryPhotoFile(id))
+            }
+            // (photos of memories that aren't coming up)
+            let keep = Set(want.map { memoryPhotoFile($0).lastPathComponent })
+            for f in (try? FileManager.default.contentsOfDirectory(atPath: cacheDir.path)) ?? [] where f.hasPrefix("memory-") && !keep.contains(f) {
+                try? FileManager.default.removeItem(at: cacheDir.appendingPathComponent(f))
+            }
+        } catch {
+            // offline: keep what's there
+        }
     }
 
     /* our board */

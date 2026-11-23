@@ -64,6 +64,7 @@ export const PERKS: Array<{ title: string; line: string }> = [
   { title: 'Every movie night', line: 'Netflix and Prime Video together as often as you like (three nights a month are free).' },
   { title: 'See and hear each other', line: 'Cameras, voice and karaoke night, on the website and the extension.' },
   { title: 'Every game and escape room', line: 'Coasters, Kitchen Rush, Paper Boats and the rest, and all four rooms behind the dark door.' },
-  { title: 'After dark, hot', line: 'The bolder After dark cards, for when you’ve both picked Hot.' },
-  { title: 'Stitches every month', line: `${BONUS_STITCHES} bonus stitches to decorate with, on the first visit each month.` },
+  { title: 'Bolder After dark questions', line: 'The spicier After dark cards, once you’ve both said you’re in.' },
+  { title: 'More to decorate with', line: `${BONUS_STITCHES} stitches a month (stitches are what you buy decor for your room with).` },
+  { title: 'Our song', line: 'Any song from Apple Music on your record player, in the iPhone app.' },
 ];

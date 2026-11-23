@@ -182,7 +182,18 @@ struct VoicesPanel: View {
             if Launch.args.contains("-voicePlay"), let v = shown.first {
                 _ = player.toggle(v.id, Data(base64Encoded: v.audio))
             }
+            playFromWidget()
         }
+        // (the notes may still be on their way when a tap on the widget opens this)
+        .onChange(of: place.voices.count) { _, _ in playFromWidget() }
+    }
+
+    /// a tap on the voice widget: play your person's newest note straight away
+    private func playFromWidget() {
+        guard WidgetLink.shared.playVoice,
+              let v = place.voices.first(where: { !$0.gone && $0.by != place.me }) else { return }
+        WidgetLink.shared.playVoice = false
+        if player.toggle(v.id, Data(base64Encoded: v.audio)), v.heard[place.me] == nil { place.heardVoice(v.id) }
     }
 
     private var recorder: some View {

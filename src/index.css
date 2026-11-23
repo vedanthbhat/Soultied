@@ -398,6 +398,48 @@ label {
   border: 3px solid var(--paper-2);
 }
 
+/* Onboarding's Plus picture: the fairy lights twinkle and hearts float up (AboutUs.tsx) */
+@keyframes st-twinkle {
+  0%,
+  100% {
+    opacity: 0.3;
+    box-shadow: none;
+  }
+  50% {
+    opacity: 1;
+    box-shadow: 0 0 6px 2px currentColor;
+  }
+}
+@keyframes st-float {
+  0% {
+    transform: translate(0, 6px);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--dx, 0), -30px);
+    opacity: 0;
+  }
+}
+.st-bulb {
+  animation: st-twinkle 2.4s ease-in-out infinite;
+}
+.st-heart {
+  opacity: 0;
+  animation: st-float 3.6s ease-in infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .st-bulb {
+    animation: none;
+    opacity: 1;
+  }
+  .st-heart {
+    animation: none;
+  }
+}
+
 /* Step-y entrance for panels (pixel feel, no blur) */
 @keyframes px-pop {
   0% {

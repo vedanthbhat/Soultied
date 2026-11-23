@@ -1,3 +1,4 @@
+import { QuickAsk } from './QuickAsk';
 import { useTogether } from '../together/TogetherContext';
 import { useSharedDoc } from '../together/useSharedDoc';
 import { demoMemories, normalizeMemories } from '../together/wall';
@@ -117,7 +118,7 @@ export const UsPage: React.FC = () => {
     ['This month', highlight, 'heart'],
     ['Lately', activities[0]?.title || 'Your room is ready', 'envelope'],
     ['You', currentUser.name, 'spool'],
-    ['Nudges', 'Your preferences', 'seal'],
+    ['Nudges', 'What buzzes your phone', 'seal'],
   ];
 
   return (
@@ -141,6 +142,7 @@ export const UsPage: React.FC = () => {
           Settings
         </button>
       </div>
+      <QuickAsk />
       <div className="grid grid-cols-2 gap-2">
         {tiles.map(([label, value, icon]) => (
           <button key={label} className="px-inset min-w-0 text-left p-3 min-h-[72px]" onClick={() => label === "You" ? openPanel("wardrobe") : setDetail(label)}>
@@ -161,7 +163,13 @@ export const UsPage: React.FC = () => {
       <dialog
         ref={dialog}
         aria-label={detail}
-        className="m-auto px-box w-[min(92vw,540px)] max-h-[80dvh] overflow-y-auto p-4 backdrop:bg-black/50"
+        className="m-auto px-box px-pop w-[min(92vw,540px)] max-h-[80dvh] overflow-y-auto p-4 backdrop:bg-[rgba(27,18,20,0.32)] backdrop:backdrop-blur-[3px]"
+        // a card over the page, with the page blurred and see-through behind it; a click outside it closes it
+        onClick={(event) => {
+          if (event.target !== event.currentTarget) return;
+          const r = event.currentTarget.getBoundingClientRect();
+          if (event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom) event.currentTarget.close();
+        }}
         onKeyDown={(event) => {
           if (event.key === 'Escape') event.stopPropagation();
         }}

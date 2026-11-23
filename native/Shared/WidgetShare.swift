@@ -18,6 +18,9 @@ enum WidgetShare {
     static let usKind = "SoultiedUs"
     /// and your person's time, and how far apart you are
     static let apartKind = "SoultiedApart"
+    /// and your person's newest voice note, and a memory from your wall (KeepsakeFaces.swift)
+    static let voiceKind = "SoultiedVoice"
+    static let memoryKind = "SoultiedMemories"
     static var usKinds: [String] { [fireKind, countdownKind, moodKind, usKind, apartKind] }
 
     struct Config: Codable, Equatable {

@@ -192,7 +192,7 @@ struct PlusReason: Identifiable {
         title: "Your free movie nights are used up",
         line: "Netflix and Prime Video together are free \(PlusRules.freeNights) nights a month. Plus has every night, for both of you."
     )
-    static let hot = PlusReason(title: "Hot is in Soultied Plus", line: "Flirty After dark cards are free. Plus adds the bolder Hot ones, once you’ve both picked Hot.")
+    static let hot = PlusReason(title: "The bolder cards are in Plus", line: "The flirty After dark questions are free. Plus adds the bolder ones, once you’ve both said you’re in.")
 }
 
 /// "That's in Plus": any screen under the tabs can ask for the Plus sheet
@@ -244,9 +244,60 @@ private struct PlusFeature: Identifiable {
             PlusFeature(id: "cams", glyph: Icons.camera, title: "See and hear each other", line: "Cameras, voice and karaoke night, on the website and the extension.", tint: "#ddd0ef"),
             PlusFeature(id: "games", glyph: Icons.play, title: "All \(GameKind.allCases.count) games", line: "Coasters, Kitchen Rush, Paper Boats and the rest.", tint: "#cfe3b8"),
             PlusFeature(id: "rooms", glyph: Icons.door, title: "All \(RoomId.allCases.count) escape rooms", line: "Every room behind the dark door, to solve together.", tint: "#f6e39a"),
-            PlusFeature(id: "hot", glyph: Icons.flame, title: "After dark, hot", line: "The bolder cards, once you’ve both picked Hot.", tint: "#f4c2bd"),
-            PlusFeature(id: "stitches", glyph: Icons.spool, title: "\(PlusRules.bonusStitches) stitches a month", line: "Extra to decorate your place with, every month.", tint: "#eadbbd"),
+            PlusFeature(id: "song", glyph: Icons.record, title: "Our song", line: "Any song from Apple Music on your record player, for both of you.", tint: "#e8d0c2"),
+            PlusFeature(id: "hot", glyph: Icons.flame, title: "Bolder After dark", line: "The spicier questions, once you’ve both said you’re in.", tint: "#f4c2bd"),
+            PlusFeature(id: "stitches", glyph: Icons.spool, title: "More to decorate with", line: "\(PlusRules.bonusStitches) stitches a month, the thread you buy decor with.", tint: "#eadbbd"),
         ]
+    }
+}
+
+/// onboarding's Plus: the two of you under a blanket with popcorn, the fairy lights twinkling and hearts floating up
+/// (the picture is a plain file in the app, public/plus-popcorn.png, so it's loaded by UIImage: SwiftUI's Image(name)
+/// only looks in the asset catalogue, and showed nothing)
+private struct PopcornPicture: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private static let picture = UIImage(named: "plus-popcorn")
+    /// where the fairy lights hang (the picture's pixels, across), and their colours
+    private static let bulbs: [CGFloat] = [10, 34, 58, 82, 106, 130, 154, 178, 202, 226, 250, 274, 297, 322, 346]
+    private static let colors = ["#f2d66b", "#f08a8a", "#7fb2d9", "#a8d08d"]
+    private static let drift: [CGFloat] = [-8, 10, 2]
+
+    var body: some View {
+        if let img = Self.picture {
+            GeometryReader { geo in
+                let s = geo.size.width / img.size.width
+                TimelineView(.animation(minimumInterval: 1 / 12, paused: reduceMotion)) { timeline in
+                    let t = timeline.date.timeIntervalSinceReferenceDate
+                    ZStack(alignment: .topLeading) {
+                        Image(uiImage: img).resizable().interpolation(.none)
+                            .frame(width: geo.size.width, height: geo.size.height)
+                        ForEach(Self.bulbs.indices, id: \.self) { i in
+                            let glow: CGFloat = reduceMotion ? 1 : CGFloat(0.5 + 0.5 * sin(t * 2.6 + Double(i) * 0.9))
+                            let c = Color(hex: Self.colors[i % Self.colors.count])
+                            Rectangle().fill(c)
+                                .frame(width: 3 * s, height: 5 * s)
+                                .shadow(color: c, radius: 4 * s * glow)
+                                .opacity(0.35 + 0.65 * glow)
+                                .position(x: Self.bulbs[i] * s, y: 17 * s)
+                        }
+                        if !reduceMotion {
+                            ForEach(0..<3, id: \.self) { k in
+                                let p = CGFloat((t + Double(k) * 1.2).truncatingRemainder(dividingBy: 3.6) / 3.6)
+                                GlyphView(glyph: Icons.heart, scale: max(1, 1.2 * s))
+                                    .opacity(p < 0.15 ? p / 0.15 : (1 - p) / 0.85)
+                                    .position(x: (178 + Self.drift[k] * p) * s, y: (44 - 34 * p) * s)
+                            }
+                        }
+                    }
+                }
+            }
+            .aspectRatio(img.size.width / img.size.height, contentMode: .fit)
+            .clipped()
+            .overlay(alignment: .topLeading) { PixelTag(text: "Soultied Plus").padding(8) }
+            .overlay(Rectangle().strokeBorder(Color.ink, lineWidth: 3))
+            .accessibilityElement()
+            .accessibilityLabel("The two of you on a little sofa under a blanket, sharing popcorn, with fairy lights")
+        }
     }
 }
 
@@ -378,52 +429,111 @@ struct PlusSheet: View {
     @Environment(\.openURL) private var openURL
 
     var body: some View {
-        GeometryReader { geo in
-            VStack(spacing: 0) {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 14) {
-                        if let line = onboardingLine {
-                            Image("plus-popcorn").resizable().interpolation(.none).scaledToFit()
-                                .accessibilityLabel("Movie night on your couch")
-                            Text(line).font(.pxHeading)
-                        } else { PlusHero(place: place) }
-                        Text(reason.title).font(.pxTitle)
-                        if onboardingLine == nil { Text(reason.line).font(.pxBody) }
-                        Text("One of you pays, you both get it.").font(.pxBodyBold)
-                        features
-                        if onboardingLine == nil { compare }
-                        Text(fineprint).font(.pxTiny)
-                    }.padding(16)
-                }
-                Divider()
-                ScrollView {
-                    VStack(spacing: 7) {
-                        if place.hasPlus { on } else { plans }
-                        if let problem = store.problem { Text(problem).font(.pxSmall) }
-                        Button(continueOnboarding == nil ? "Not now" : place.hasPlus ? "Continue" : "Continue with the free version") {
-                            if let next = continueOnboarding { next() } else { dismiss() }
-                        }.buttonStyle(.px(.paper, small: true, wide: true))
-                        if onboardingLine != nil && !place.hasPlus {
-                            Text("No hard feelings. Spoiler alert: Plus is so much more fun ;)").font(.pxTiny)
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    if let line = onboardingLine {
+                        Dots(n: 4, of: 4)
+                        PopcornPicture()
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(store.thanks ? "Thank you! Plus is on" : "Make it feel like the same room")
+                                .font(.pxTitle).foregroundStyle(Color.inkSoft).fixedSize(horizontal: false, vertical: true)
+                            Text(store.thanks ? "Everything’s open now, for both of you." : line)
+                                .font(.pxBody).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
                         }
-                        HStack {
-                            Link("Terms", destination: URL(string: "https://soultied.app/terms/")!)
-                            Link("Privacy", destination: URL(string: "https://soultied.app/privacy/")!)
-                            if !place.isDemo { Button("Restore purchases") { Task { await store.restore() } }.disabled(store.busy) }
-                        }.font(.pxSmall)
-                    }.padding(12)
-                }.frame(maxHeight: min(geo.size.height * 0.48, 300))
-            }.foregroundStyle(Color.inkSoft).background(Color.paper)
+                        perks
+                        Text("One of you pays, you both get it.").font(.px(14, 700)).foregroundStyle(Color.sageD)
+                    } else {
+                        PlusHero(place: place)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(store.thanks ? "Thank you! Plus is on" : reason.title == PlusReason.plain.title ? "Everything, for both of you" : reason.title)
+                                .font(.pxTitle).foregroundStyle(Color.inkSoft).fixedSize(horizontal: false, vertical: true)
+                            Text(store.thanks ? "Everything’s open now, for both of you." : reason.title == PlusReason.plain.title ? "One of you gets it, and you both have it." : reason.line)
+                                .font(.pxBody).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
+                        }
+                        features
+                        compare
+                    }
+                    Text(fineprint).font(.pxTiny).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(16)
+            }
+            bar
         }
+        .foregroundStyle(Color.inkSoft)
+        .background(Color.paper)
         .task { await store.load() }
         .onDisappear { store.thanks = false }
         .manageSubscriptionsSheet(isPresented: $managing)
     }
 
+    /// pinned under the rest, so it's always in view: the plan, the button, the price, and a way on or out
+    private var bar: some View {
+        VStack(spacing: 8) {
+            if place.hasPlus { on } else { plans }
+            if let problem = store.problem {
+                Text(problem).font(.pxSmall).foregroundStyle(Color.terracottaD).fixedSize(horizontal: false, vertical: true)
+            }
+            if let next = continueOnboarding {
+                Button(place.hasPlus ? "Continue" : "Continue with the free version") { next() }
+                    .buttonStyle(.px(.paper, small: true, wide: true))
+                if !place.hasPlus {
+                    Text("No hard feelings. Spoiler alert: Plus is so much more fun ;)").font(.pxTiny).foregroundStyle(Color.muted)
+                }
+            }
+            HStack(spacing: 14) {
+                if continueOnboarding == nil {
+                    Button(store.thanks || place.hasPlus ? "Lovely" : "Not now") { dismiss() }
+                        .font(.px(14, 700)).foregroundStyle(Color.inkSoft)
+                }
+                Spacer(minLength: 0)
+                if !place.isDemo { Button("Restore") { Task { await store.restore() } }.disabled(store.busy) }
+                Link("Terms", destination: URL(string: "https://soultied.app/terms/")!)
+                Link("Privacy", destination: URL(string: "https://soultied.app/privacy/")!)
+            }
+            .font(.px(13, 600))
+            .foregroundStyle(Color.terracottaD)
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 12)
+        .padding(.bottom, 8)
+        .background(Color.paperHi.ignoresSafeArea(edges: .bottom))
+        .overlay(alignment: .top) { Rectangle().fill(Color.ink).frame(height: 3) }
+    }
+
+    /// onboarding's list of what Plus adds, a line each
+    private var perks: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            perk(Icons.tv, "Movie night, every night", "Netflix and Prime Video together, as often as you like")
+            perk(Icons.camera, "See and hear each other", "Cameras and voice while you watch and play")
+            perk(Icons.play, "All \(GameKind.allCases.count) games and \(RoomId.allCases.count) escape rooms",
+                 "Free has \(PlusRules.freeGames.count) games and \(PlusRules.freeRooms.count) room\(PlusRules.freeRooms.count == 1 ? "" : "s")")
+            perk(Icons.record, "Your song, on the record player", "Any song from Apple Music, playing for both of you", new: true)
+            perk(Icons.flame, "Bolder After dark questions", "And \(PlusRules.bonusStitches) stitches a month to decorate your room")
+        }
+    }
+
+    private func perk(_ g: Glyph, _ title: String, _ line: String, new: Bool = false) -> some View {
+        HStack(spacing: 10) {
+            GlyphView(glyph: g, scale: 2)
+                .frame(width: 34, height: 34)
+                .background(Color.paperHi)
+                .overlay(Rectangle().strokeBorder(Color.ink, lineWidth: 2))
+            VStack(alignment: .leading, spacing: 1) {
+                HStack(spacing: 6) {
+                    Text(title).font(.px(15, 700)).foregroundStyle(Color.inkSoft).fixedSize(horizontal: false, vertical: true)
+                    if new { PixelTag(text: "New") }
+                }
+                Text(line).font(.px(12, 500)).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+
     /* what's in it */
 
     private var features: some View {
-        let all = Array(PlusFeature.all.prefix(onboardingLine == nil ? 6 : 5))
+        let all = PlusFeature.all
         return Grid(horizontalSpacing: 12, verticalSpacing: 12) {
             ForEach(0..<(all.count + 1) / 2, id: \.self) { r in
                 GridRow {
@@ -473,8 +583,9 @@ struct PlusSheet: View {
             compareRow("Games", "\(PlusRules.freeGames.count)", "All \(GameKind.allCases.count)")
             compareRow("Escape rooms", "\(PlusRules.freeRooms.count)", "All \(RoomId.allCases.count)")
             compareRow("Cameras and voice", "–", "✓")
-            compareRow("Hot cards", "–", "✓")
-            compareRow("Bonus stitches", "–", "\(PlusRules.bonusStitches) a month", last: true)
+            compareRow("Our song (Apple Music)", "–", "✓")
+            compareRow("Bolder After dark cards", "–", "✓")
+            compareRow("Stitches for decor", "–", "\(PlusRules.bonusStitches) a month", last: true)
         }
         .pxInset()
         .accessibilityElement(children: .contain)
@@ -552,10 +663,15 @@ struct PlusSheet: View {
             Haptics.tap()
             yearly = year
         } label: {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(year ? "A year" : "A month").font(.pxSmall)
-                Text(year ? "\(yearPrice) / yr" : "\(monthPrice) / mo").font(.pxBodyBold)
-                if year { Text("\(yearMonthly) a month").font(.pxTiny) }
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 5) {
+                    Text(year ? "A year" : "A month").font(.pxSmall).foregroundStyle(Color.inkSoft)
+                    if year && store.trial { PixelTag(text: "7 days free") }
+                }
+                Text(year ? "\(yearPrice) a year" : "\(monthPrice) a month").font(.px(16, 700)).foregroundStyle(Color.inkSoft)
+                    .lineLimit(1).minimumScaleFactor(0.7)
+                Text(year ? "works out at \(yearMonthly) a month" : "cancel any time").font(.pxTiny).foregroundStyle(Color.muted)
+                    .lineLimit(1).minimumScaleFactor(0.8)
             }.frame(maxWidth: .infinity, alignment: .leading)
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -602,10 +718,10 @@ struct PlusCardView: View {
                 if place.hasPlus { PixelTag(text: "On") }
             }
             if place.hasPlus, let until = place.plusUntil {
-                Text("Every movie night, cameras and voice, every game and room, After dark’s Hot cards and monthly stitches: on for you both until \(Date(timeIntervalSince1970: until / 1000).formatted(date: .abbreviated, time: .omitted)).")
+                Text("Every movie night, cameras and voice, every game and escape room, Our song, the bolder After dark questions and extra stitches for decor: on for you both until \(Date(timeIntervalSince1970: until / 1000).formatted(date: .abbreviated, time: .omitted)).")
                     .font(.pxSmall).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
             } else {
-                Text("Every movie night, every game and escape room, After dark’s Hot cards and \(PlusRules.bonusStitches) stitches a month. One of you having it covers you both.")
+                Text("Every movie night, every game and escape room, Our song from Apple Music, the bolder After dark questions, and \(PlusRules.bonusStitches) stitches a month to decorate with. One of you having it covers you both.")
                     .font(.pxSmall).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
                 if !place.isDemo {
                     let n = place.night

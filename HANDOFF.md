@@ -1,98 +1,87 @@
 # Handoff
 
-Shared between Claude and Codex. Update it at every checkpoint, and check which branch you're on before editing.
+Shared between Claude and Codex. Update it at every checkpoint.
 
-- `main` is what's live (soultied.app deploys from it). Claude pushes only to `main`, through Google AI Studio's
-  GitHub sync. AI Studio can't push to other branches.
-- On 23 Nov, Vedanth chose to put all of [PR #1](https://github.com/vedanthbhat/Soultied/pull/1)
-  (`review/couples-widgets`) on `main` that way, with Claude's fixes on top. So `main` now has everything, and the
-  branch is behind it. Work on `main`, or start a new `review/...` branch from it.
+- `main` is what's live: soultied.app deploys from it, and `[testflight]` commits build the iPhone app.
+- Claude pushes only to `main`, through Google AI Studio's GitHub sync, which can't push to other branches.
+- PR #1 (`review/couples-widgets`) is on `main` since 23 Nov. The branch is behind `main`, so work on `main`.
 
 ## Current goal
 
-Verify the couples-app work (formerly PR #1) on real iPhones. Our song (Apple Music) matters most:
+Get Soultied ready for the App Store:
 
-- Each partner connects their own Apple Music.
-- Either partner can search for and pick the song.
-- Play, pause, resume and seeking are shared.
-- A partner who joins partway through hears the same spot.
-- Switching to a shelf record stops Apple Music on both phones.
-
-The record shelf now follows Claude's design ("Record player: shelf + Our song" on Vedanth's design canvas, which is
-also what his `Record player shelf + Our song-html.zip` is):
-
-- Six sleeves, each with its own picture, in a 3×2 grid.
-- The playing record has a gold edge and its record peeking out.
-- A "6 records · 20 songs, free to use" header.
-- A dark Our song card with a PLUS badge and a gold Choose button.
-- "NOW PLAYING · <record>" on the card.
+1. Try this build on two iPhones.
+2. Do a final review: checks, security, privacy.
+3. Submit to the App Store.
 
 ## What changed
 
-Claude's checkpoint, 23 Nov 2026, on top of `d17e18f`:
+Claude, 23 Nov, second checkpoint:
 
-- **Crash fix.** Added `NSAppleMusicUsageDescription` to `native/project.yml`. Without it, iOS closes the app as soon
-  as someone taps "Connect Apple Music".
-- **Our song stays in step on slow connections** (`RoomMusic.swift`).
-  - It waits 4 s between corrections.
-  - It aims ahead by how long the last correction took to buffer.
-  - Before this, a buffer of 2 s or more meant the song re-seeked every second and never played.
-- **Our song keeps playing over Control Center and alerts.** Like the record, it stops only when the app goes to the
-  background.
-- **Our song follows the app's Plus rule.** It uses `plusOpen`, so it's open while Plus can't be bought yet, the same
-  as games and escape rooms. When Plus is on sale, it needs Plus.
-- **CI builds `review/**` branches** (`native-ios.yml`), with one concurrency group per branch.
-- **Record shelf design**, on both iPhone and the website:
-  - iPhone: `RecordSleeve` and `RecordSheet` in `RecordPlayer.swift`.
-  - Website: `Sleeve` and `RecordPicker` in `NowPlaying.tsx`.
-  - The turntable context now has `album`.
-  - "Next" is now "Next song". On Home, "A song instead" is now "Records", since YouTube songs are gone from the
-    record player.
+- **Onboarding is shorter.** New people see 4 steps, then the room:
+  1. Your names: yours and your person's.
+  2. Today's character studio, unchanged.
+  3. How far apart are you: big tiles that fill the screen, with the next time you'll see each other right under
+     your answer.
+  4. Plus: the picture now moves (twinkling lights, floating hearts), and the button bar stays pinned at the bottom.
+- **The rest of onboarding moved elsewhere:**
+  - **Invite first.** In the room, the first card is "Save <name>'s seat".
+  - **Tour.** Instead of the 11-step tour, the letter, the record player and the pet glow until they've been opened
+    (`RoomHints`). Us › Show me around still has the tour.
+  - **The other 3 questions.** They come one a day: on Home on iPhone (`QuickAskCard`), on the Us page on the web
+    (`QuickAsk`).
+  - **Place name and the day you got together.** These moved to Us › Edit our place.
+  - **Joining.** Someone joining their person skips the question, because their person already answered it.
+- **Plus picture fix (iPhone).** The picture was loaded with SwiftUI's `Image("plus-popcorn")`. That only looks in the
+  asset catalogue, but the picture is a plain bundled file, so it showed nothing. It now loads with `UIImage(named:)`
+  (`PopcornPicture` in `Plus.swift`).
+- **Plus sheet.** The plans, the button and the links are pinned at the bottom, so nothing gets cut off. The billed
+  price is the biggest price on the screen.
+- **Us tiles open as floating cards** with the screen blurred behind them.
+  - iPhone: `FloatingCard.swift`. The card rises from the bottom, and you close it by dragging, tapping outside it or
+    tapping Done.
+  - Website: a centred `<dialog>` with a blurred backdrop that closes on a click outside it.
+- **Two new home-screen widgets** (`KeepsakeFaces.swift`, `SoultiedWidget.swift`):
+  - **Their voice:** your person's newest voice note. A tap opens Soultied and plays it.
+  - **Memories:** one memory from your wall each day, with memories from this date in past years first.
+- **Clearer words:**
+  - "Hot cards" is now "Bolder After dark questions".
+  - Stitches are explained the first time they're mentioned.
+  - Our song is listed as a Plus feature.
+  - The Nudges tile now says "What buzzes your phone".
 
-Codex, 19–22 Nov:
+Claude, 23 Nov, first checkpoint (`95ee153`): PR #1 went onto `main` with these changes:
 
-- Doodle and Countdown widgets.
-- Invite first in onboarding.
-- Us tiles, Home and the monthly recap.
-- The Plus offer after the questions.
-- The notification-tap crash fix (`8b9d456`).
-- The six-record shelf.
-- Our song with MusicKit (`d17e18f`).
-
-The 15 new shelf tracks are tones that `scripts/record-audio.mjs` makes during the build. They're about 31 MB of WAV,
-which the app bundles and the website serves.
+- The Apple Music crash fix (`NSAppleMusicUsageDescription`).
+- Our song stays in step on slow connections.
+- The record shelf as designed.
 
 ## What was actually tested
 
-Claude, 23 Nov:
-
-- Website: `tsc` and `npm run build` pass. `scripts/native-fixtures.ts` runs.
-- Website record shelf, in the demo room at 390 × 844 with Playwright: it opens, puts Lo-fi evening on, and the card
-  says "NOW PLAYING · LO-FI EVENING". Reopened, Lo-fi shows as playing. No page errors. The iPhone sleeves use the
-  same drawing, but nobody has seen them yet; check CI's `record-sheet` screenshot.
-- Swift: all 131 files parse (tree-sitter: syntax only, no type check).
-  - There was no Swift toolchain this session, so the core tests weren't run.
-  - `d17e18f` has never been compiled. The last iPhone CI run on this branch was `1181c08`: the build succeeded and
-    99 core tests passed.
-- Our song was checked by reading the code:
-  - Native writes replace the whole turntable document (`merge: false`), and so do the website's.
-  - So a shelf record or a YouTube song always removes `apple` on both phones.
-  - A late joiner works out `offset + (now - at)` and seeks to it.
-- Sync loop: simulated with a player that stands still while it buffers. The old loop never played with buffers of
-  2 s or more; the new one lines up after two seeks.
-- **Not checked:** whether MusicKit is enabled for `app.soultied.ios`. The developer portal needs Vedanth to sign in.
-- **Not tested:** anything on a real iPhone or with two phones, StoreKit, and the shelf layout.
-
-Vedanth: the notification-tap crash fix works on his phone.
+- **`95ee153`, iPhone CI:** the build succeeded and 100 core tests passed. The `record-sheet` screenshot matches the
+  design. The website went live and its shelf was checked on soultied.app.
+- **This checkpoint, website:**
+  - `tsc` and the production build pass.
+  - Playwright at 390 × 844 in a local-mode build, with no page errors:
+    - Names only, then the studio, then "How far apart". The answers fill the screen, and the date appears under the
+      chosen answer. The answer is saved.
+    - The Plus step with the moving picture. This was checked in a throwaway build with the offer forced on.
+    - The invite screen.
+    - Us: the quick question shows the next day and saves the answer. A tile opens as a centred card over a blurred
+      page, and a click outside closes it.
+- **This checkpoint, iPhone:** syntax-checked only, because Claude has no Swift compiler. The CI run for this push is
+  the first compile. Check its `about`, `about-plus`, `us-list`, `us-apart`, `us-notifications` and
+  `widgets-keepsakes` screenshots.
+- **Not tested:** anything on a real iPhone, two-phone Our song, StoreKit, and the widgets on a real home screen.
 
 ## Next unfinished step
 
-1. Vedanth: in the developer portal, open Identifiers › `app.soultied.ios` › App Services and tick MusicKit if
-   it isn't already.
-2. Check the iPhone CI run for this push. It has `[testflight]`, so it builds, runs the tests and sends a TestFlight
-   build. Look on the `native-shots` branch for build errors and the `record-sheet` screenshot.
-3. Run the two-iPhone checklist below on that build.
-4. Close PR #1 once `main` is confirmed: everything in it is on `main`.
+1. Check the CI run and its screenshots, and fix anything that breaks.
+2. Vedanth: tick MusicKit under Identifiers › `app.soultied.ios` › App Services.
+3. Vedanth: try the TestFlight build. Run the two-phone Our song checklist below, go through onboarding as a new
+   person, and add both new widgets.
+4. Final review before the App Store (Claude): checks, security and privacy (Firestore rules, keys, what's
+   collected), App Store metadata and screenshots, then submit.
 
 ### Two-iPhone checklist for Our song
 
@@ -101,15 +90,14 @@ within about 1 s of each other by ear.
 
 1. On each phone, go to Record player › Our song › Choose › Connect Apple Music › Allow. It shouldn't crash.
    - If search says "Search couldn't load", MusicKit isn't enabled on the App ID.
-2. A picks a song of 3 minutes or more. B starts it within a few seconds.
+2. Phone A picks a song of 3 minutes or more. Phone B starts it within a few seconds.
 3. B swipes the app away, waits a minute and reopens it. B joins at A's spot, not at 0:00.
 4. B pauses: both stop. A resumes: both carry on from the same spot. B taps +15 sec: both jump.
-5. A goes home for 20 s and comes back. A rejoins at the shared spot.
+5. A goes to the home screen for 20 s and comes back. A rejoins at the shared spot.
 6. A opens Control Center and changes the volume. The song keeps playing.
 7. A taps a shelf record. Apple Music stops on both phones and the record plays on both. Picking "Play …" under Our
    song brings the song back on both.
 8. Start a shelf record on soultied.app while the song plays. It stops on both phones.
-9. Optional: try a weak connection. The song may jump once or twice, then stays put rather than stuttering.
 
 ## Working in this repo
 
@@ -117,6 +105,8 @@ within about 1 s of each other by ear.
 - Keep the TypeScript and Swift versions in step. Shared logic gets fixtures in `scripts/native-fixtures.ts` and
   matching tests in `native/SoultiedCore/Tests`.
 - Put `[testflight]` in a commit message to send an iPhone build. CI screenshots go to the `native-shots` branch.
+- Words: cosy, but clear about what a feature does. Explain anything Soultied-only (stitches, After dark) the first
+  time it comes up.
 - Style rules:
   - Pixelify Sans only.
   - Pixel characters only.

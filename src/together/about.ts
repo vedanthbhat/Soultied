@@ -1,8 +1,11 @@
 /**
- * About the two of you: five quick questions the first time you're in your place, each a tap (and one a date:
- * the next time you'll see each other, which starts the countdown). Then what in Soultied fits what you said.
- * Kept in the place's `meta/about` document, by person: question id to answer id (the iPhone app asks the same).
+ * About the two of you, kept in the place's `meta/about` document, by person: question id to answer id (the iPhone
+ * app asks the same). The first time you're in your place: how far apart you are, and the next time you'll see
+ * each other (which starts the countdown). The other questions come one a day afterwards (QuickAsk), each a tap.
  */
+
+/** the day the last quick question was answered (YYYY-MM-DD, in this browser): one a day */
+export const QUICK_DAY_KEY = 'soultied_quick_day';
 
 export interface AboutQuestion {
   id: string;

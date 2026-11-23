@@ -44,7 +44,7 @@ struct UsView: View {
                         }
                         GridRow {
                             tile("You", place.myName, Icons.us, .you)
-                            tile("Nudges", "Your preferences", Icons.seal, .notifications)
+                            tile("Nudges", "What buzzes your phone", Icons.seal, .notifications)
                         }
                     }
                     Button(place.hasPlus ? "Your Soultied Plus plan" : "Explore Soultied Plus") { PlusGate.shared.show(.plain) }
@@ -58,22 +58,14 @@ struct UsView: View {
             if MainView.showLooks || Launch.args.contains("-looks") {
                 MainView.showLooks = false
                 panel = .settings
-            } else if let target = Launch.scrollUs { panel = Panel(rawValue: target) }
+            } else if let target = Launch.scrollUs.flatMap(Panel.init(rawValue:)) { open(target) }
         }
         .sheet(item: $panel) { selected in
             if selected == .you { LookSheet(place: place).presentationBackground(Color.paper) } else { ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     HStack { Spacer(); Button("Done") { panel = nil }.buttonStyle(.px(.paper, small: true)) }
                     switch selected {
-                    case .apart:
-                        CountdownCard(place: place)
-                        if place.partnerHere { ApartCard(place: place) }
-                    case .list: BucketCard(place: place)
-                    case .recap: RecapCard(place: place)
-                    case .lately: history
-                    case .notifications: NotificationsCard(place: place)
-                    case .you: EmptyView()
-                    case .invite: InviteCard(place: place)
+                    case .apart, .list, .recap, .lately, .notifications, .invite, .you: EmptyView()
                     case .settings:
                         LookPicker()
                         account
@@ -93,6 +85,31 @@ struct UsView: View {
         .sheet(isPresented: $decorating) { DecorView(place: place).presentationDragIndicator(.visible).presentationBackground(Color.paper) }
     }
 
+    /// You and Settings open as a sheet; the rest float up as a card over the page (FloatingCard.swift)
+    private func open(_ target: Panel) {
+        guard Self.floats.contains(target) else { panel = target; return }
+        FloatingCard.shared.show { floating(target) }
+    }
+
+    private static let floats: Set<Panel> = [.apart, .list, .recap, .lately, .notifications, .invite]
+
+    @ViewBuilder
+    private func floating(_ target: Panel) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            switch target {
+            case .apart:
+                CountdownCard(place: place)
+                if place.partnerHere { ApartCard(place: place) }
+            case .list: BucketCard(place: place)
+            case .recap: RecapCard(place: place)
+            case .lately: history
+            case .notifications: NotificationsCard(place: place)
+            case .invite: InviteCard(place: place)
+            case .you, .settings: EmptyView()
+            }
+        }
+    }
+
     private var planLine: String {
         if !near, let km = place.apartKm {
             return apartLabel(km, miles: countsInMiles(region: Locale.current.region?.identifier))
@@ -105,7 +122,7 @@ struct UsView: View {
     }
 
     private func tile(_ label: String, _ value: String, _ icon: Glyph, _ target: Panel) -> some View {
-        Button { panel = target } label: {
+        Button { open(target) } label: {
             VStack(alignment: .leading, spacing: 7) {
                 HStack {
                     if target == .you { HeadView(look: place.myLook, size: 28) } else { GlyphView(glyph: icon, scale: 2) }
@@ -134,7 +151,7 @@ struct UsView: View {
                 Spacer(minLength: 0)
             }
             if !place.partnerHere {
-                Button("Invite your person") { panel = .invite }.buttonStyle(.px(.terracotta, small: true, wide: true))
+                Button("Invite your person") { open(.invite) }.buttonStyle(.px(.terracotta, small: true, wide: true))
             }
             HStack {
                 Button("Edit our place") { editingPlace = true }.buttonStyle(.px(.paper, small: true, wide: true))

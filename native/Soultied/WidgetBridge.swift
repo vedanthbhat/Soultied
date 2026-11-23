@@ -8,16 +8,19 @@ import SoultiedCore
  * The app's side of the home-screen widgets (SoultiedWidget): it leaves them a way in, the last doodle
  * your person sent, and what the fire, countdown and mood widgets show, in the keychain group they share
  * (WidgetShare), and asks iOS to draw them again when something new turns up. A tap on a widget comes back
- * here as soultied://doodle, soultied://photos or soultied://home.
+ * here as soultied://doodle, soultied://photos, soultied://countdown, soultied://voices, soultied://memories or
+ * soultied://home.
  */
 
 /// a tap on one of the widgets
 @Observable
 final class WidgetLink {
     static let shared = WidgetLink()
-    /// which part of the wall to open: the doodle pad or the photos
-    enum Destination { case doodle, photos, countdown }
+    /// which part of the wall to open: the doodle pad, the photos, the voice notes or the memories (or the countdown)
+    enum Destination { case doodle, photos, countdown, voices, memories }
     var open: Destination?
+    /// play your person's newest voice note once the voice notes are open (a tap on the voice widget)
+    var playVoice = false
     private init() {}
 
     /// says whether it was one of ours
@@ -27,6 +30,10 @@ final class WidgetLink {
         case "doodle": open = .doodle
         case "photos": open = .photos
         case "countdown": open = .countdown
+        case "voices":
+            playVoice = true
+            self.open = .voices
+        case "memories": open = .memories
         default: break
         }
         return true
@@ -36,6 +43,9 @@ final class WidgetLink {
 enum WidgetBridge {
     /// what the board widget shows, so it's only drawn again when that changes
     private static var lastPhotos: [String] = []
+    /// and the voice note and memory widgets
+    private static var lastVoice = ""
+    private static var lastMemories: [String] = []
 
     /// (called from the views, on the main thread)
     static func sync(_ place: PlaceModel) {
@@ -82,6 +92,17 @@ enum WidgetBridge {
             lastPhotos = photos
             WidgetCenter.shared.reloadTimelines(ofKind: WidgetShare.boardKind)
         }
+
+        let voice = place.voices.first { $0.by == them && !$0.gone }.map { "\($0.id) \($0.heard[place.me] != nil)" } ?? ""
+        if voice != lastVoice {
+            lastVoice = voice
+            WidgetCenter.shared.reloadTimelines(ofKind: WidgetShare.voiceKind)
+        }
+        let kept = place.memoryItems.values.map { "\($0.id) \($0.day) \($0.title) \($0.photo)" }.sorted()
+        if kept != lastMemories {
+            lastMemories = kept
+            WidgetCenter.shared.reloadTimelines(ofKind: WidgetShare.memoryKind)
+        }
     }
 
     /// signed out, or out of the place: the widgets go back to asking you to open the app
@@ -89,6 +110,8 @@ enum WidgetBridge {
         guard WidgetShare.load().config != nil else { return }
         WidgetShare.clear()
         lastPhotos = []
+        lastVoice = ""
+        lastMemories = []
         WidgetCenter.shared.reloadAllTimelines()
     }
 }
@@ -107,6 +130,8 @@ struct WidgetSync: ViewModifier {
             }
             .onChange(of: place.notes) { _, _ in WidgetBridge.sync(place) }
             .onChange(of: place.photos) { _, _ in WidgetBridge.sync(place) }
+            .onChange(of: place.voices) { _, _ in WidgetBridge.sync(place) }
+            .onChange(of: place.memoryItems) { _, _ in WidgetBridge.sync(place) }
             .onChange(of: place.them) { _, _ in WidgetBridge.sync(place) }
             .onChange(of: place.couch) { _, _ in WidgetBridge.sync(place) }
             .onChange(of: place.moods) { _, _ in WidgetBridge.sync(place) }

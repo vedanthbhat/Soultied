@@ -296,8 +296,8 @@ export const Welcome: React.FC<Props> = ({ initialJoinCode, nudge = 0, onDraftSe
             >
               <Dots n={1} />
               <div>
-                <h2 className="text-3xl font-bold leading-tight">First, the two of you.</h2>
-                <p className="text-[var(--muted)] mt-1">Just names for now. You can change everything later.</p>
+                <h2 className="text-3xl font-bold leading-tight">The two of you</h2>
+                <p className="text-[var(--muted)] mt-1">Names now. Everything else can wait.</p>
               </div>
               <label>
                 <span className="px-label">Your name</span>
@@ -307,16 +307,7 @@ export const Welcome: React.FC<Props> = ({ initialJoinCode, nudge = 0, onDraftSe
                 <span className="px-label">Your person's name</span>
                 <input className="px-input" value={partnerName} onChange={(e) => setPartnerName(e.target.value)} placeholder="Who's the other seat for?" required maxLength={24} />
               </label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                <label>
-                  <span className="px-label">Together since (optional)</span>
-                  <input className="px-input" type="date" value={together} onChange={(e) => setTogether(e.target.value)} max={new Date().toISOString().split('T')[0]} />
-                </label>
-                <label>
-                  <span className="px-label">Name your place</span>
-                  <input className="px-input" value={placeName} onChange={(e) => setPlaceName(e.target.value)} maxLength={32} />
-                </label>
-              </div>
+              {/* (the place's name and the day you got together are on the Us page, whenever you like) */}
               <div className="flex items-center justify-between gap-3 mt-2">
                 <button type="button" className="px-btn px-btn--paper" onClick={() => setStep('welcome')}>
                   Back

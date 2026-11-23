@@ -6,7 +6,7 @@ import SoultiedCore
  * The home-screen widgets, drawn by the app at their real sizes on a pretend home screen, so each build's
  * screenshots show them (a simulator can't put a widget on its home screen from a script).
  *   -widgets doodle | board | empty | us (the fire, the countdown, their mood) | fires (the fire at each strength)
- *   | apart (their time, and how far apart)
+ *   | apart (their time, and how far apart) | keepsakes (their voice, and memories)
  */
 struct WidgetGallery: View {
     let which: String
@@ -64,6 +64,17 @@ struct WidgetGallery: View {
                     }
                     tile(medium) { board(.medium, Self.photos) }
                     tile(large) { board(.large, Array(Self.photos.prefix(3)) + [BoardItem(id: "d", caption: "from Rohan", doodle: Doodle.demo)]) }
+                case "keepsakes":
+                    HStack(spacing: 22) {
+                        tile(small) { VoiceFace(voice: .demo, name: "Rohan", setUp: true) }
+                        tile(small) { MemoryFace(memory: Self.memoryWithPhoto, setUp: true) }
+                    }
+                    tile(medium) { VoiceFace(voice: .demo, name: "Rohan", setUp: true, medium: true) }
+                    tile(medium) { MemoryFace(memory: Self.memoryWithPhoto, setUp: true, size: .medium) }
+                    HStack(spacing: 22) {
+                        tile(small) { MemoryFace(memory: .demo, setUp: true) }
+                        tile(small) { VoiceFace(voice: nil, name: "Rohan", setUp: true) }
+                    }
                 case "empty":
                     HStack(spacing: 22) {
                         tile(small) { doodle(.small, .wood, nil, setUp: false) }
@@ -153,6 +164,17 @@ struct WidgetGallery: View {
     private func board(_ size: WidgetSize, _ items: [BoardItem], setUp: Bool = true) -> some View {
         BoardCard(items: items, size: size, setUp: setUp)
             .background(CorkBoard())
+    }
+
+    /// a memory with one of the pretend photos, from this day a couple of years back
+    private static var memoryWithPhoto: MemoryNow {
+        var m = MemoryNow.demo
+        m.title = "The rainy city trip"
+        m.day = "2024-" + String(KeepsakeArt.today().suffix(5))
+        m.text = "Two umbrellas, one of them broken. Best weekend."
+        m.photo = photos.last?.image
+        m.onThisDay = true
+        return m
     }
 
     /// pretend photos for the demo room's board: a sunset over the sea, chai, the hills, a rainy window
