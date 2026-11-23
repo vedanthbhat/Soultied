@@ -16,7 +16,8 @@ import SoultiedCore
 final class WidgetLink {
     static let shared = WidgetLink()
     /// which part of the wall to open: the doodle pad or the photos
-    var open: WallTab?
+    enum Destination { case doodle, photos, countdown }
+    var open: Destination?
     private init() {}
 
     /// says whether it was one of ours
@@ -25,6 +26,7 @@ final class WidgetLink {
         switch url.host {
         case "doodle": open = .doodle
         case "photos": open = .photos
+        case "countdown": open = .countdown
         default: break
         }
         return true

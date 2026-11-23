@@ -5,7 +5,7 @@
 #   4. when asked, sends the build to TestFlight for the "Friends and family" testers (see below)
 # Anyone can read what happened without signing in: build errors are annotations on the run, and the screenshots
 # (with the build's errors and warnings) are kept on the native-shots branch, replaced every run.
-# Runs when the native app (or the questions it shares with the website) change, or by hand.
+# Runs when the native app (or the questions it shares with the website) change on main or a review/ branch, or by hand.
 #
 # A build goes to TestFlight when it's asked for: Actions > Soultied for iPhone (native) > Run workflow with
 # "Send it to TestFlight" ticked, or a push whose commit message has [testflight] in it. Its build number is 1000
@@ -22,7 +22,8 @@ on:
         type: boolean
         default: false
   push:
-    branches: [main]
+    # (and review branches, so a pull request's iPhone code is built and tested before it's merged)
+    branches: [main, 'review/**']
     paths:
       - 'native/**'
       - 'scripts/native-*'
@@ -38,7 +39,7 @@ on:
 
 # (a newer push stops a run that's only checking; a run sending a build to TestFlight always finishes)
 concurrency:
-  group: ${{ (inputs.testflight || contains(github.event.head_commit.message, '[testflight]')) && format('native-testflight-{0}', github.run_id) || 'native-ios' }}
+  group: ${{ (inputs.testflight || contains(github.event.head_commit.message, '[testflight]')) && format('native-testflight-{0}', github.run_id) || format('native-ios-{0}', github.ref) }}
   cancel-in-progress: true
 
 permissions:

@@ -41,6 +41,11 @@ targets:
       - path: ../public/fonts/PixelifySans-Variable.ttf
         buildPhase: resources
       # the record's Night in Venice, for the first tour (so it plays straight away, even offline)
+      - path: ../public/plus-popcorn.png
+        buildPhase: resources
+      - path: ../public/audio/shelf
+        type: folder
+        buildPhase: resources
       - path: ../public/audio/night-in-venice.mp3
         buildPhase: resources
       # Firebase's settings for this app (app.soultied.ios, in the soultied-c1543 project): made from
@@ -91,6 +96,8 @@ targets:
         NSMicrophoneUsageDescription: So your person can hear you on a call, at karaoke night, and in the voice notes you leave them.
         NSLocationWhenInUseUsageDescription: So the two of you can see how far apart you are. Soultied only keeps the town, never the street.
         NSPhotoLibraryUsageDescription: So you can put your photos on your shared wall.
+        # (asked for by "Connect Apple Music" for Our song; without it iOS closes the app at that tap)
+        NSAppleMusicUsageDescription: So the two of you can play your song together, each from your own Apple Music.
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(APP_BUNDLE_ID)

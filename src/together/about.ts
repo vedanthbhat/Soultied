@@ -19,6 +19,7 @@ const q = (id: string, ask: (name: string) => string, answers: [string, string][
 /** the four tap questions (the date comes third, between `often` and `miss`) */
 export const ABOUT: AboutQuestion[] = [
   q('far', () => 'How far apart are you?', [
+    ['together', 'We live together'],
     ['city', 'Same city, different places'],
     ['hours', 'A few hours away'],
     ['country', 'Different countries'],

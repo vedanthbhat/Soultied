@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { useStreamHub } from '../stream/StreamHub';
 import { useTurntable } from '../music/TurntableContext';
-import { ARTIST, LICENSE, LICENSE_URL, SOURCE_URL } from '../music/records';
+import { shelf, TRACKS, ARTIST, LICENSE, LICENSE_URL, SOURCE_URL } from '../music/records';
 import { describeYouTubeError, loadYouTubeApi, YTPlayer, YTState } from '../watch/youtube';
 import { songStalled, songStep, songSync } from '../music/songSync';
 import { Sprite } from './games/Pixel';
@@ -62,16 +62,19 @@ const RecordCard: React.FC<{ who: string; fromThem: boolean }> = ({ who, fromThe
     <div className="px-box px-shadow px-fade px-3 py-2 flex items-center gap-x-3 gap-y-2 flex-wrap">
       <Spin on={tt.hearing} />
       <span className="flex flex-col min-w-0 leading-tight">
+        <span className="text-[11px] font-bold tracking-wide" style={{ color: '#a84f4b' }}>
+          NOW PLAYING · {(shelf.find((r) => r.id === tt.album)?.title ?? 'Jazz café').toUpperCase()}
+        </span>
         <span className="font-semibold truncate">{tt.track.title}</span>
         <span className="text-xs text-[var(--muted)]">
-          {ARTIST} (
+          {TRACKS.includes(tt.track) ? <>{ARTIST} (
           <a className="underline" href={SOURCE_URL} target="_blank" rel="noreferrer">
             incompetech.com
           </a>
           ) ·{' '}
           <a className="underline" href={LICENSE_URL} target="_blank" rel="noreferrer">
             {LICENSE}
-          </a>
+          </a></> : "Soultied originals"}
         </span>
         {fromThem && !tt.blocked && <span className="text-xs text-[var(--muted)]">{who} put this on</span>}
       </span>
@@ -86,11 +89,11 @@ const RecordCard: React.FC<{ who: string; fromThem: boolean }> = ({ who, fromThe
       {tt.hushed && !tt.mutedForMe && <span className="text-sm">Paused while you watch</span>}
       <span className="flex items-center gap-1.5 flex-wrap">
         <button className="px-btn px-btn--paper px-btn--small" onClick={tt.skip}>
-          Next
+          Next song
         </button>
         <Volume />
-        <button className="px-btn px-btn--paper px-btn--small" onClick={tt.openPicker} title="Put on a song from YouTube instead">
-          A song instead
+        <button className="px-btn px-btn--paper px-btn--small" onClick={tt.openPicker} title="Choose a record">
+          Record shelf
         </button>
         <button className="px-btn px-btn--paper px-btn--small" onClick={tt.toggle}>
           Lift the needle
@@ -331,11 +334,79 @@ const SongPlayer: React.FC<{
   return <div ref={hostRef} className="w-full h-full" />;
 };
 
-/** Choosing what goes on: the jazz record, or a song from YouTube. */
+/** Each record's sleeve on the shelf: its own little picture (the record shelf design, drawn the same on iPhone). */
+const SLEEVES: Record<string, { bg: string; bits: React.CSSProperties[] }> = {
+  // the jazz café: a note on terracotta
+  jazz: { bg: '#8f4b3a', bits: [
+    { left: 18, top: 14, width: 3, height: 22, background: '#f2d48a' },
+    { left: 21, top: 14, width: 8, height: 3, background: '#f2d48a' },
+    { left: 26, top: 17, width: 3, height: 5, background: '#f2d48a' },
+    { left: 11, top: 31, width: 10, height: 7, background: '#f2d48a' },
+  ] },
+  // a night sky: two stars and the moon
+  lofi: { bg: '#4a3a5a', bits: [
+    { left: 10, top: 12, width: 6, height: 6, background: '#f2d48a' },
+    { left: 30, top: 30, width: 4, height: 4, background: '#fff4e2' },
+    { right: 14, top: 16, width: 18, height: 18, clipPath: 'circle(50%)', background: '#f4ecd0' },
+  ] },
+  // piano keys along the bottom
+  piano: { bg: '#fff8ea', bits: [
+    { left: 0, right: 0, bottom: 0, height: 30, background: 'repeating-linear-gradient(90deg, #fff8ea 0 12px, #2b1e1c 12px 15px)' },
+    { left: 9, bottom: 12, width: 6, height: 18, background: '#2b1e1c' },
+    { left: 33, bottom: 12, width: 6, height: 18, background: '#2b1e1c' },
+    { left: 60, bottom: 12, width: 6, height: 18, background: '#2b1e1c' },
+  ] },
+  // the sun coming up over a hill
+  acoustic: { bg: '#8a9a72', bits: [
+    { left: '50%', top: 14, width: 26, height: 26, marginLeft: -13, clipPath: 'circle(50%)', background: '#f2d66b' },
+    { left: 0, right: 0, bottom: 0, height: 22, background: '#6a7856' },
+  ] },
+  // rain on blue
+  rain: { bg: '#5a79a3', bits: [
+    { inset: 0, background: 'repeating-linear-gradient(105deg, transparent 0 9px, rgba(255,255,255,.35) 9px 11px)' },
+  ] },
+  // three blocks falling
+  arcade: { bg: '#2b1e1c', bits: [
+    { left: 12, top: 14, width: 12, height: 12, background: '#e2b359' },
+    { left: 36, top: 30, width: 12, height: 12, background: '#c4453f' },
+    { left: 60, top: 46, width: 12, height: 12, background: '#7fb2d9' },
+  ] },
+};
+
+const Sleeve: React.FC<{ id: string; playing: boolean }> = ({ id, playing }) => {
+  const art = SLEEVES[id] ?? SLEEVES.jazz;
+  return (
+    <span
+      aria-hidden="true"
+      className="relative block overflow-hidden"
+      style={{
+        height: 84,
+        background: art.bg,
+        border: '3px solid #2b1e1c',
+        boxShadow: '3px 3px 0 rgba(0,0,0,.3)',
+        ...(playing ? { outline: '3px solid #e2b359', outlineOffset: 1 } : {}),
+      }}
+    >
+      {art.bits.map((bit, i) => (
+        <span key={i} className="absolute" style={bit} />
+      ))}
+      {playing && (
+        <>
+          {/* (the site squares off every corner, so the circles are clipped instead) */}
+          <span className="absolute" style={{ right: -21, top: 11, width: 60, height: 60, clipPath: 'circle(50%)', background: '#3a3035' }} />
+          <span className="absolute" style={{ right: -18, top: 14, width: 54, height: 54, clipPath: 'circle(50%)', background: '#1f1718' }} />
+          <span className="absolute" style={{ left: 7, bottom: 6, fontSize: 10, fontWeight: 700, color: '#f2d48a' }}>PLAYING</span>
+        </>
+      )}
+    </span>
+  );
+};
+
+const SONGS = shelf.reduce((n, record) => n + record.tracks.length, 0);
+
+/** Choosing what goes on: a record from the shelf (Our song is chosen on iPhone). */
 const RecordPicker: React.FC = () => {
   const tt = useTurntable();
-  const [link, setLink] = useState('');
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && tt.closePicker();
@@ -346,7 +417,7 @@ const RecordPicker: React.FC = () => {
   return (
     <div className="fixed inset-0 z-50 px-ui flex items-center justify-center p-4" style={{ background: 'rgba(29, 21, 18, 0.45)' }} onClick={tt.closePicker}>
       <div
-        className="px-box px-shadow px-pop w-full max-w-[460px] p-5 flex flex-col gap-4"
+        className="px-box px-shadow px-pop w-full max-w-[460px] max-h-[90dvh] overflow-y-auto p-5 flex flex-col gap-4"
         role="dialog"
         aria-modal="true"
         aria-labelledby="picker-title"
@@ -364,48 +435,39 @@ const RecordPicker: React.FC = () => {
           </button>
         </div>
 
-        <div className="px-inset p-3 flex items-center gap-3">
-          <Sprite rows={RECORD} pal={PAL} scale={4} />
-          <span className="flex flex-col min-w-0 leading-tight flex-1">
-            <strong>Our jazz record</strong>
-            <span className="text-sm text-[var(--muted)]">Five soft jazz tracks, round and round.</span>
-          </span>
-          <button className="px-btn px-btn--small shrink-0" onClick={tt.playJazz}>
-            Put it on
-          </button>
+        <div className="flex items-baseline justify-between gap-2">
+          <strong className="text-lg">Records</strong>
+          <small className="text-xs whitespace-nowrap text-[var(--muted)]">
+            {shelf.length} records · {SONGS} songs, free to use
+          </small>
         </div>
-
-        <form
-          className="flex flex-col gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            setError(tt.playYouTube(link));
-          }}
-        >
-          <label htmlFor="song-link" className="font-semibold">
-            A song from YouTube
-          </label>
-          <span className="text-sm text-[var(--muted)] -mt-1">Paste a link from YouTube or YouTube Music.</span>
-          <div className="flex gap-2 flex-wrap">
-            <input
-              id="song-link"
-              className="px-input flex-1 min-w-[12rem]"
-              value={link}
-              onChange={(e) => {
-                setLink(e.target.value);
-                setError(null);
-              }}
-              placeholder="https://music.youtube.com/watch?v=…"
-              autoComplete="off"
-              spellCheck={false}
-              autoFocus
-            />
-            <button className="px-btn" type="submit" disabled={!link.trim()}>
-              Play
-            </button>
-          </div>
-          {error && <p className="m-0 text-sm text-[#7f3835]">{error}</p>}
-        </form>
+        <div className="grid grid-cols-3 gap-x-2.5 gap-y-3">
+          {shelf.map((record) => {
+            const playing = tt.album === record.id;
+            return (
+              <button
+                key={record.id}
+                className="flex flex-col gap-1 text-left"
+                aria-pressed={playing}
+                aria-label={`${record.title}, ${record.tracks.length} songs${playing ? ', playing' : ''}`}
+                onClick={() => tt.playJazz(record.id)}
+              >
+                <Sleeve id={record.id} playing={playing} />
+                <strong className="text-[13px] leading-tight">{record.title}</strong>
+                <small className="text-[11px] text-[var(--muted)]">{record.tracks.length} songs</small>
+              </button>
+            );
+          })}
+        </div>
+        <section className="flex items-center gap-2.5 px-3 py-2.5" style={{ background: '#3a2a2c', border: '3px solid #e2b359', boxShadow: '3px 3px 0 rgba(0,0,0,.3)' }}>
+          <span className="flex flex-col gap-0.5 min-w-0">
+            <strong style={{ color: '#fff4e2' }}>
+              Our song{' '}
+              <span style={{ fontSize: 10, background: '#e2b359', color: '#2b1e1c', padding: '1px 4px', verticalAlign: 2 }}>PLUS</span>
+            </strong>
+            <small style={{ color: '#e8d6bd' }}>Any song from Apple Music, for both of you. Choose it in Soultied on iPhone; you both need Apple Music.</small>
+          </span>
+        </section>
       </div>
     </div>
   );

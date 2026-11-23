@@ -27,6 +27,7 @@ struct WidgetGallery: View {
                         tile(small) { FireFace(u: .demo).background(Color(hex: "#1a1214")) }
                         tile(small) { CountdownFace(u: .demo) }
                     }
+                    tile(medium) { CountdownFace(u: .demo, medium: true) }
                     tile(medium) { UsFace(u: .demo) }
                     HStack(spacing: 22) {
                         tile(small) { MoodFace(u: .demo) }
@@ -132,6 +133,7 @@ struct WidgetGallery: View {
     private static func counting(_ days: Int?) -> UsNow {
         var u = UsNow.demo
         u.visitDays = days
+        u.planDate = days.flatMap { Calendar.current.date(byAdding: .day, value: $0, to: Date()) }
         u.visitWhat = days == nil ? "" : "the airport"
         return u
     }

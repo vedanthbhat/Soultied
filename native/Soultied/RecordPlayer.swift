@@ -34,7 +34,7 @@ final class RecordDeck {
     @ObservationIgnored private var fetching: Set<String> = []
     @ObservationIgnored private var awake = true
     /// quiet while you're watching something together
-    @ObservationIgnored private var hushed = false
+    private(set) var hushed = false
     private let ender = Ender()
     /// on its way down to silence (and a pause)
     @ObservationIgnored private var fadingOut = false
@@ -135,14 +135,15 @@ final class RecordDeck {
             return
         }
         problem = nil
-        let n = Records.tracks.count
-        var (index, offset) = Records.whereAt(t.startedAt, Values.nowMs())
+        let tracks = Records.selection(t.album)
+        let n = tracks.count
+        var (index, offset) = Records.whereAt(t.startedAt, Values.nowMs(), album: t.album)
         // right at the end of a track: on to the next one rather than replaying the last moment
-        if offset > Records.tracks[index].secs - 0.4 {
+        if offset > tracks[index].secs - 0.4 {
             index = (index + 1) % n
             offset = 0
         }
-        let track = Records.tracks[index]
+        let track = tracks[index]
         guard let file = cached(track) else {
             loading = true
             fetch(track)
@@ -181,7 +182,7 @@ final class RecordDeck {
         }
         hearing = true
         // the next track, ready for when this one ends
-        fetch(Records.tracks[(index + 1) % n])
+        fetch(tracks[(index + 1) % n])
     }
 
     private func fadeOut() {
@@ -234,14 +235,15 @@ final class RecordDeck {
     }
 
     private func cached(_ t: RecordTrack) -> URL? {
-        let u = folder.appendingPathComponent("\(t.slug).mp3")
+        if let local = Bundle.main.url(forResource: t.slug, withExtension: "wav", subdirectory: "shelf") { return local }
+        let u = folder.appendingPathComponent(t.url.lastPathComponent)
         return FileManager.default.fileExists(atPath: u.path) ? u : nil
     }
 
     private func fetch(_ t: RecordTrack) {
         guard cached(t) == nil, !fetching.contains(t.slug) else { return }
         fetching.insert(t.slug)
-        let dest = folder.appendingPathComponent("\(t.slug).mp3")
+        let dest = folder.appendingPathComponent(t.url.lastPathComponent)
         // (the deck lives as long as the app, so holding on to it here is fine)
         let deck = self
         Task {
@@ -292,7 +294,10 @@ struct RecordCard: View {
         let t = place.turntable
         let on = place.recordOn
         VStack(alignment: .leading, spacing: 12) {
-            if on, let t, let song = t.yt {
+            if let t, let apple = t.apple {
+                RoomSongControls(place: place, state: t, song: apple)
+                if let open { Button("Record shelf", action: open).buttonStyle(.px(.paper, small: true)) }
+            } else if on, let t, let song = t.yt {
                 SongCard(place: place, state: t, song: song, listening: listening, open: open)
             } else if on, let t, let track = t.track(Values.nowMs()) {
                 jazz(t, track)
@@ -326,8 +331,10 @@ struct RecordCard: View {
         HStack(alignment: .top, spacing: 12) {
             SpinningRecord(on: deck.hearing)
             VStack(alignment: .leading, spacing: 3) {
+                Text("NOW PLAYING · " + (Records.shelf.first { $0.id == t.album }?.title ?? "Jazz café").uppercased())
+                    .font(.px(11, 700)).foregroundStyle(Color(hex: "#a84f4b"))
                 Text(track.title).font(.pxBodyBold).foregroundStyle(Color.inkSoft)
-                RecordCredit()
+                if t.album == "jazz" { RecordCredit() } else { Text("Soultied originals").font(.pxTiny) }
                 if let who = byLine(t) { Text(who).font(.pxSmall).foregroundStyle(Color.muted) }
             }
             Spacer(minLength: 0)
@@ -342,12 +349,12 @@ struct RecordCard: View {
         }
         VolumeRow()
         HStack(spacing: 8) {
-            Button("Next") {
+            Button("Next song") {
                 Haptics.tap()
                 place.nextTrack()
             }
             .buttonStyle(.px(.paper, small: true, wide: true))
-            if let open { Button("A song instead", action: open).buttonStyle(.px(.paper, small: true, wide: true)) }
+            if let open { Button("Records", action: open).buttonStyle(.px(.paper, small: true, wide: true)) }
             Button("Lift the needle") {
                 Haptics.tap()
                 place.liftNeedle()
@@ -499,69 +506,165 @@ struct RecordSheet: View {
     /// sideways there's no Home behind this, so a song plays here
     var hostsSong = false
     @Environment(\.dismiss) private var dismiss
-    @State private var link = ""
-    @State private var error: String?
+    @State private var choosing = false
+
+    private static let songs = Records.shelf.reduce(0) { $0 + $1.tracks.count }
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 14) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("The record player").font(.pxTitle).foregroundStyle(Color.inkSoft)
                     Text("Whatever you put on plays for both of you, in sync.").font(.pxBody).foregroundStyle(Color.muted)
                 }
-                if place.recordOn {
+                if place.recordOn || place.turntable?.apple != nil {
                     RecordCard(place: place, listening: hostsSong)
                 }
-                HStack(spacing: 12) {
-                    GlyphView(glyph: Icons.record, scale: 4)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Our jazz record").font(.pxBodyBold).foregroundStyle(Color.inkSoft)
-                        Text("Five soft jazz tracks, round and round.").font(.pxSmall).foregroundStyle(Color.muted)
-                    }
-                    Spacer(minLength: 0)
-                    Button("Put it on") {
-                        Haptics.tap()
-                        place.playRecord()
-                        RecordDeck.shared.bind(place)
-                        if RecordDeck.shared.mutedForMe { RecordDeck.shared.setMuted(false) }
-                        dismiss()
-                    }
-                    .buttonStyle(.px(.terracotta, small: true))
+                HStack(alignment: .firstTextBaseline) {
+                    Text("Records").font(.px(17, 700)).foregroundStyle(Color.inkSoft)
+                    Spacer(minLength: 8)
+                    Text("\(Records.shelf.count) records · \(Self.songs) songs, free to use").font(.px(12)).foregroundStyle(Color.muted)
                 }
-                .padding(12)
-                .pxInset()
-
-                VStack(alignment: .leading, spacing: 8) {
-                    PixelLabel(text: "A song from YouTube")
-                    Text("Paste a link from YouTube or YouTube Music (Share > Copy link).").font(.pxSmall).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
-                    PixelField(placeholder: "https://music.youtube.com/watch?v=…", text: $link, limit: 300)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .keyboardType(.URL)
-                        .onChange(of: link) { _, _ in error = nil }
-                    if let e = error { Text(e).font(.pxSmall).foregroundStyle(Color.thread).fixedSize(horizontal: false, vertical: true) }
-                    HStack(spacing: 8) {
-                        Button("Paste") {
-                            if let s = UIPasteboard.general.string { link = s }
-                        }
-                        .buttonStyle(.px(.paper, small: true))
-                        Button("Play") {
-                            error = place.playSong(link)
-                            if error == nil {
-                                Haptics.tap()
-                                if RecordDeck.shared.mutedForMe { RecordDeck.shared.setMuted(false) }
-                                link = ""
-                                dismiss()
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10, alignment: .top), count: 3), spacing: 12) {
+                    ForEach(Records.shelf, id: \.id) { record in
+                        let playing = place.recordOn && place.turntable?.apple == nil && place.turntable?.album == record.id
+                        Button {
+                            Haptics.tap()
+                            place.playRecord(record.id)
+                            RecordDeck.shared.bind(place)
+                            RecordDeck.shared.setMuted(false)
+                            dismiss()
+                        } label: {
+                            VStack(alignment: .leading, spacing: 4) {
+                                RecordSleeve(id: record.id, playing: playing)
+                                Text(record.title).font(.px(13, 700)).foregroundStyle(Color.inkSoft)
+                                    .lineLimit(2).fixedSize(horizontal: false, vertical: true)
+                                Text("\(record.tracks.count) songs").font(.px(11)).foregroundStyle(Color.muted)
                             }
+                            .frame(maxWidth: .infinity, alignment: .topLeading)
                         }
-                        .buttonStyle(.px(.terracotta, small: true, wide: true))
-                        .disabled(link.trimmingCharacters(in: .whitespaces).isEmpty)
+                        .buttonStyle(.press)
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel("\(record.title), \(record.tracks.count) songs" + (playing ? ", playing" : ""))
+                        .accessibilityAddTraits(.isButton)
                     }
                 }
+                ourSong
             }
             .padding(20)
         }
+        .sheet(isPresented: $choosing) { RoomSongPicker(place: place) }
         .scrollDismissesKeyboard(.interactively)
+    }
+
+    /// Our song (Plus): any song from Apple Music, for both of you
+    private var ourSong: some View {
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text("Our song").font(.px(15, 700)).foregroundStyle(Color(hex: "#fff4e2"))
+                    Text("PLUS").font(.px(10, 700)).foregroundStyle(Color(hex: "#2b1e1c"))
+                        .padding(.horizontal, 4).padding(.vertical, 1).background(Color(hex: "#e2b359"))
+                }
+                Text(place.ourSong.map { $0.artist.isEmpty ? $0.title : $0.title + " · " + $0.artist }
+                     ?? "Any song from Apple Music, for both of you. You both need Apple Music.")
+                    .font(.px(11)).foregroundStyle(Color(hex: "#e8d6bd")).fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+            Button { choosing = true } label: {
+                Text("Choose").font(.px(13, 700)).foregroundStyle(Color(hex: "#2b1e1c"))
+                    .padding(.horizontal, 10)
+                    .frame(height: 34)
+                    .background(Color(hex: "#e2b359"))
+                    .overlay(alignment: .bottom) { Rectangle().fill(Color(hex: "#b88a32")).frame(height: 4) }
+                    .padding(3)
+                    .background(Color(hex: "#2b1e1c"))
+            }
+            .buttonStyle(.press)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(Color(hex: "#3a2a2c"))
+        .overlay(Rectangle().strokeBorder(Color(hex: "#e2b359"), lineWidth: 3))
+        .background(Rectangle().fill(Color.black.opacity(0.3)).offset(x: 3, y: 3))
+    }
+}
+
+/// a record's sleeve on the shelf, each with its own little picture (the record shelf design); the one playing has
+/// a gold edge and its record peeking out
+struct RecordSleeve: View {
+    let id: String
+    var playing = false
+
+    var body: some View {
+        Canvas { context, size in
+            let g = context
+            func box(_ x: CGFloat, _ y: CGFloat, _ w: CGFloat, _ h: CGFloat, _ hex: String) {
+                g.fill(Path(CGRect(x: x, y: y, width: w, height: h)), with: .color(Color(hex: hex)))
+            }
+            func dot(_ x: CGFloat, _ y: CGFloat, _ d: CGFloat, _ hex: String) {
+                g.fill(Path(ellipseIn: CGRect(x: x, y: y, width: d, height: d)), with: .color(Color(hex: hex)))
+            }
+            let w = size.width, h = size.height
+            switch id {
+            case "lofi":
+                // a night sky: two stars and the moon
+                box(0, 0, w, h, "#4a3a5a")
+                box(10, 12, 6, 6, "#f2d48a")
+                box(30, 30, 4, 4, "#fff4e2")
+                dot(w - 32, 16, 18, "#f4ecd0")
+            case "piano":
+                // piano keys along the bottom
+                box(0, 0, w, h, "#fff8ea")
+                var x: CGFloat = 12
+                while x < w { box(x, h - 30, 3, 30, "#2b1e1c"); x += 15 }
+                for k: CGFloat in [9, 33, 60] { box(k, h - 30, 6, 18, "#2b1e1c") }
+            case "acoustic":
+                // the sun coming up over a hill
+                box(0, 0, w, h, "#8a9a72")
+                dot(w / 2 - 13, 14, 26, "#f2d66b")
+                box(0, h - 22, w, 22, "#6a7856")
+            case "rain":
+                // rain on blue
+                box(0, 0, w, h, "#5a79a3")
+                let slant = h * 0.268
+                var x: CGFloat = 9
+                while x < w + slant {
+                    var line = Path()
+                    line.move(to: CGPoint(x: x, y: 0))
+                    line.addLine(to: CGPoint(x: x - slant, y: h))
+                    g.stroke(line, with: .color(Color.white.opacity(0.35)), lineWidth: 2)
+                    x += 11.4
+                }
+            case "arcade":
+                // three blocks falling
+                box(0, 0, w, h, "#2b1e1c")
+                box(12, 14, 12, 12, "#e2b359")
+                box(36, 30, 12, 12, "#c4453f")
+                box(60, 46, 12, 12, "#7fb2d9")
+            default:
+                // the jazz café: a note on terracotta
+                box(0, 0, w, h, "#8f4b3a")
+                box(18, 14, 3, 22, "#f2d48a")
+                box(21, 14, 8, 3, "#f2d48a")
+                box(26, 17, 3, 5, "#f2d48a")
+                box(11, 31, 10, 7, "#f2d48a")
+            }
+            if playing {
+                dot(w - 39, 11, 60, "#3a3035")
+                dot(w - 36, 14, 54, "#1f1718")
+            }
+        }
+        .frame(height: 78)
+        .frame(maxWidth: .infinity)
+        .overlay(alignment: .bottomLeading) {
+            if playing { Text("PLAYING").font(.px(10, 700)).foregroundStyle(Color(hex: "#f2d48a")).padding(.leading, 7).padding(.bottom, 4) }
+        }
+        .padding(3)
+        .overlay(Rectangle().strokeBorder(Color(hex: "#2b1e1c"), lineWidth: 3))
+        .background(Rectangle().fill(Color.black.opacity(0.3)).offset(x: 3, y: 3))
+        .overlay { if playing { Rectangle().strokeBorder(Color(hex: "#e2b359"), lineWidth: 3).padding(-4) } }
+        .accessibilityHidden(true)
     }
 }
 
