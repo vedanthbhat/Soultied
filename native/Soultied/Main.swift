@@ -55,6 +55,8 @@ struct MainView: View {
         return resume
     }
     @State private var sheet: RoomSheet? = Launch.sheet.flatMap { RoomSheet(rawValue: $0) }
+    /// the menus open as floating cards over everything (FloatingCard.swift); the pages as sheets
+    @State private var card = FloatingCard.shared
     @State private var lettersStart: LettersTab = .today
     @State private var game: GameKind? = Launch.game.flatMap { GameKind(rawValue: $0) }
     @State private var escape = Launch.escape
@@ -87,7 +89,7 @@ struct MainView: View {
             // phone turns (Netflix going sideways used to close it)
             VStack(spacing: 0) {
                 ZStack {
-                    HomeView(place: place, paused: tab != .home || sheet != nil || game != nil || roomSideways, listening: tab == .home && game == nil && !escape && !roomSideways, go: go, onRoom: { open($0, sheet: false) }, invite: { sheet = .invite }, openGame: { k in
+                    HomeView(place: place, paused: tab != .home || sheet != nil || card.content != nil || game != nil || roomSideways, listening: tab == .home && game == nil && !escape && !roomSideways, go: go, onRoom: { open($0, sheet: false) }, invite: { sheet = .invite }, openGame: { k in
                         if place.canPlay(k) { game = k } else { PlusGate.shared.show(.game(k.info.name)) }
                     })
                         .opacity(tab == .home ? 1 : 0)
@@ -111,22 +113,25 @@ struct MainView: View {
                 RoomScene(place: place, couchOnly: false) { open($0, sheet: true) }
                     .ignoresSafeArea()
             }
-            Toasts(place: place, onHome: roomSideways || (tab == .home && sheet == nil), onLetter: { go(.letters) })
+            Toasts(place: place, onHome: roomSideways || (tab == .home && sheet == nil && card.content == nil), onLetter: { go(.letters) })
                 .padding(.bottom, roomSideways || tvSideways ? 12 : 84)
             // a card floating over everything, with the screen blurred behind it (the Us tiles: FloatingCard.swift)
             FloatingCardHost()
         }
         .onChange(of: tab) { _, _ in FloatingCard.shared.close() }
         .fullScreenCover(isPresented: $escape) { EscapeScreen(place: place).callBand(place) }
-        .sheet(item: $sheet) { s in
-            if s.isMenu {
-                // (the invite is already a card of its own)
-                sheetView(s).frostedSheet(boxed: s != .invite)
-            } else {
-                sheetView(s)
-                    .presentationDragIndicator(.visible)
-                    .presentationBackground(Color.paper)
-            }
+        // a page (letters, the wall, games, Us, watch) opens as a sheet; a menu floats up as a card
+        .sheet(item: Binding(get: { sheet.flatMap { $0.isMenu ? nil : $0 } }, set: { sheet = $0 })) { s in
+            sheetView(s)
+                // (a menu opened from a page floats up over the page)
+                .overlay { FloatingCardHost() }
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Color.paper)
+        }
+        .onChange(of: sheet) { _, s in if let s, s.isMenu { showMenu(s) } }
+        .onAppear {
+            // (opened straight away, for the screenshots)
+            if let s = sheet, s.isMenu { DispatchQueue.main.async { showMenu(s) } }
         }
         .fullScreenCover(item: $game) { k in GameScreen(place: place, kind: k).callBand(place) }
         // the record player: its sound follows the place's record, whichever tab you're on
@@ -146,9 +151,9 @@ struct MainView: View {
         // the first-run tour: what to tap to go where (Tour.swift)
         .overlayPreferenceValue(TourSpots.self) { spots in
             Group {
-                if tour.active && !sideways && sheet == nil && game == nil && !escape {
+                if tour.active && !sideways && sheet == nil && card.content == nil && game == nil && !escape {
                     TourOverlay(tour: tour, place: place, spots: spots)
-                } else if tab == .home && !sideways && sheet == nil && game == nil && !escape && !place.isDemo && RoomHints.wanted {
+                } else if tab == .home && !sideways && sheet == nil && card.content == nil && game == nil && !escape && !place.isDemo && RoomHints.wanted {
                     // a new place: the letter, the record player and the pet glow until they've been opened
                     RoomHints(spots: spots)
                 }
@@ -245,10 +250,16 @@ struct MainView: View {
         }
     }
 
+    /// a menu, as a card floating up over everything (the invite is already a card of its own; decorating fills it)
+    private func showMenu(_ s: RoomSheet) {
+        sheet = nil
+        card.show(boxed: s != .invite, fill: s == .decor || s == .petDecor) { sheetView(s) }
+    }
+
     @ViewBuilder
     func sheetView(_ s: RoomSheet) -> some View {
         switch s {
-        case .me: MeSheet(place: place, onLook: { sheet = nil; go(.us) })
+        case .me: MeSheet(place: place, onLook: { card.close(); go(.us) })
         case .them: ThemSheet(place: place)
         case .letters: LettersView(place: place, start: .today)
         case .wall: WallView(place: place)
@@ -416,10 +427,10 @@ struct MeSheet: View {
     let place: PlaceModel
     var onLook: () -> Void
     @State private var words = ""
-    @Environment(\.dismiss) private var dismiss
+    @MenuDismiss private var dismiss
 
     var body: some View {
-        ScrollView {
+        MenuScroll {
             VStack(alignment: .leading, spacing: 16) {
                 HStack(spacing: 12) {
                     BustView(look: place.myLook, size: 48)
@@ -476,7 +487,7 @@ struct MeSheet: View {
 struct ThemSheet: View {
     let place: PlaceModel
     @State private var sent: TouchKind?
-    @Environment(\.dismiss) private var dismiss
+    @MenuDismiss private var dismiss
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {

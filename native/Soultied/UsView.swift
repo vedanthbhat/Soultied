@@ -9,12 +9,6 @@ import SoultiedCore
 struct UsView: View {
     let app: AppModel
     let place: PlaceModel
-    @State private var editingPlace = false
-    @State private var confirmDelete = false
-    @State private var deleteFailed = false
-    @State private var soundsOff = Chiptune.shared.muted
-    @State private var decorating = false
-    @Environment(\.openURL) private var openURL
 
     private enum Panel: String, Identifiable {
         case apart, list, recap, lately, you, notifications, settings, invite
@@ -30,7 +24,7 @@ struct UsView: View {
                     HStack {
                         DarkHeading(title: "Us", sub: place.space?.name)
                         Spacer()
-                        Button("Settings") { panel = .settings }.buttonStyle(.px(.paper, small: true))
+                        Button("Settings") { open(.settings) }.buttonStyle(.px(.paper, small: true))
                     }
                     couple
                     Grid(horizontalSpacing: 10, verticalSpacing: 10) {
@@ -60,37 +54,24 @@ struct UsView: View {
                 panel = .settings
             } else if let target = Launch.scrollUs.flatMap(Panel.init(rawValue:)) { open(target) }
         }
-        .sheet(item: $panel) { selected in
-            if selected == .you { LookSheet(place: place).frostedSheet() } else { ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
-                    switch selected {
-                    case .apart, .list, .recap, .lately, .notifications, .invite, .you: EmptyView()
-                    case .settings:
-                        LookPicker()
-                        account
-                            .confirmationDialog("Delete your Soultied account?", isPresented: $confirmDelete, titleVisibility: .visible) {
-                                Button("Delete my account", role: .destructive) {
-                                    Task { deleteFailed = !(await app.deleteAccount()) }
-                                }
-                            } message: {
-                                Text("Your name and look come off the couch, and your account is deleted. \(place.partnerHere ? "\(place.theirName) keeps the place and your letters together." : "") This can’t be undone.")
-                            }
-                    }
-                }.padding(16)
-            }.frostedSheet() }
+        // (a panel asked for before the page was up: Settings after a new look, and the screenshots)
+        .onChange(of: panel) { _, p in
+            guard let p else { return }
+            panel = nil
+            open(p)
         }
         .background(RoomBackground())
-        .sheet(isPresented: $editingPlace) { PlaceSheet(place: place).frostedSheet() }
-        .sheet(isPresented: $decorating) { DecorView(place: place).frostedSheet() }
     }
 
-    /// You and Settings open as a sheet; the rest float up as a card over the page (FloatingCard.swift)
+    /// every panel floats up as a card over the page (FloatingCard.swift): You and Settings on a paper card of their
+    /// own, the rest made of their own cards
     private func open(_ target: Panel) {
-        guard Self.floats.contains(target) else { panel = target; return }
-        FloatingCard.shared.show { floating(target) }
+        switch target {
+        case .you: FloatingCard.shared.show(boxed: true) { LookSheet(place: place) }
+        case .settings: FloatingCard.shared.show { SettingsMenu(app: app, place: place) }
+        default: FloatingCard.shared.show { floating(target) }
+        }
     }
-
-    private static let floats: Set<Panel> = [.apart, .list, .recap, .lately, .notifications, .invite]
 
     @ViewBuilder
     private func floating(_ target: Panel) -> some View {
@@ -153,8 +134,10 @@ struct UsView: View {
                 Button("Invite your person") { open(.invite) }.buttonStyle(.px(.terracotta, small: true, wide: true))
             }
             HStack {
-                Button("Edit our place") { editingPlace = true }.buttonStyle(.px(.paper, small: true, wide: true))
-                Button("Decorate the room") { decorating = true }.buttonStyle(.px(.terracotta, small: true, wide: true))
+                Button("Edit our place") { FloatingCard.shared.show(boxed: true) { PlaceSheet(place: place) } }
+                    .buttonStyle(.px(.paper, small: true, wide: true))
+                Button("Decorate the room") { FloatingCard.shared.show(boxed: true, fill: true) { DecorView(place: place) } }
+                    .buttonStyle(.px(.terracotta, small: true, wide: true))
             }.evenRow()
         }.foregroundStyle(Color.inkSoft).pxCard()
     }
@@ -181,6 +164,31 @@ struct UsView: View {
         }
         .pxCard()
     }
+}
+
+/// Settings: the app's look, and your account (or the demo room's)
+struct SettingsMenu: View {
+    let app: AppModel
+    let place: PlaceModel
+    @State private var confirmDelete = false
+    @State private var deleteFailed = false
+    @State private var soundsOff = Chiptune.shared.muted
+    @Environment(\.openURL) private var openURL
+    @MenuDismiss private var dismiss
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            LookPicker()
+            account
+                .confirmationDialog("Delete your Soultied account?", isPresented: $confirmDelete, titleVisibility: .visible) {
+                    Button("Delete my account", role: .destructive) {
+                        Task { deleteFailed = !(await app.deleteAccount()) }
+                    }
+                } message: {
+                    Text("Your name and look come off the couch, and your account is deleted. \(place.partnerHere ? "\(place.theirName) keeps the place and your letters together." : "") This can’t be undone.")
+                }
+        }
+    }
 
     private var account: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -198,7 +206,7 @@ struct UsView: View {
                 }
             }
             HStack(spacing: 8) {
-                Button("Show me around again") { panel = nil; Tour.shared.start() }
+                Button("Show me around again") { dismiss(); Tour.shared.start() }
                     .buttonStyle(.px(.paper, small: true, wide: true))
                 // the little sounds when you press things and move around the room (the haptics stay)
                 Button(soundsOff ? "Sounds: off" : "Sounds: on") {
@@ -223,7 +231,6 @@ struct UsView: View {
 struct InviteCard: View {
     let place: PlaceModel
     @State private var copied = false
-    @State private var doodling = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -247,11 +254,10 @@ struct InviteCard: View {
                     }
                     .buttonStyle(.px(.paper, small: true, wide: true))
                 }.evenRow()
-                Button("Leave them a doodle") { doodling = true }.buttonStyle(.px(.paper, small: true))
-                    .sheet(isPresented: $doodling) {
-                        ScrollView { DoodlePanel(place: place) { doodling = false }.padding(16) }
-                            .frostedSheet()
-                    }
+                Button("Leave them a doodle") {
+                    FloatingCard.shared.show(boxed: true) { DoodlePanel(place: place) { FloatingCard.shared.close() }.padding(16) }
+                }
+                .buttonStyle(.px(.paper, small: true))
                 Text("It works for a week. You can make a fresh one any time.").font(.pxTiny).foregroundStyle(Color.muted)
             }
         }
@@ -263,10 +269,10 @@ struct LookSheet: View {
     let place: PlaceModel
     @State private var look = Wardrobe.defaultA
     @State private var name = ""
-    @Environment(\.dismiss) private var dismiss
+    @MenuDismiss private var dismiss
 
     var body: some View {
-        ScrollView {
+        MenuScroll {
             VStack(alignment: .leading, spacing: 16) {
                 HStack {
                     Text("Your look").font(.pxTitle).foregroundStyle(Color.inkSoft)
@@ -299,7 +305,7 @@ struct PlaceSheet: View {
     @State private var name = ""
     @State private var since = Date()
     @State private var sayWhen = false
-    @Environment(\.dismiss) private var dismiss
+    @MenuDismiss private var dismiss
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {

@@ -106,6 +106,9 @@ export const KitchenGame: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       } else if (n.kind === 'missed') {
         tone(220, 0.2, 0, 'triangle', 0.05);
         setToast(`A customer gave up on their ${DISHES[n.dish!].name.toLowerCase()}.`);
+      } else if (n.kind === 'swap') {
+        [523, 659, 523, 659].forEach((f, i) => tone(f, 0.08, i * 0.09, 'square', 0.04));
+        setToast(s.roles.chop === mySeat ? 'Switch! You’re chopping now.' : 'Switch! You’re cooking now.');
       }
     }
     seen.current.news = n?.at || seen.current.news || 1;
@@ -320,7 +323,7 @@ export const KitchenGame: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       }
       width={860}
     >
-      <div className="flex flex-col items-center gap-4 relative">
+      <div className="flex flex-col items-center gap-4 relative h-full overflow-y-auto pb-2">
         {tickets}
         {station}
         {toast && (

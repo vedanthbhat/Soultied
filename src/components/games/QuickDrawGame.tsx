@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useLiveGame } from '../../games/live/useLiveGame';
 import type { LiveGame } from '../../games/live/useLiveGame';
-import { QUICK, QuickAct, QuickState, QuickTap, TO_WIN } from '../../games/quickdraw';
+import { FAKE_MS, QUICK, QuickAct, QuickState, QuickTap, TO_WIN, toWinOf } from '../../games/quickdraw';
 import type { Seat } from '../../games/types';
 import { sfx, tone } from '../../escape/sfx';
-import { LiveFrame } from './LiveFrame';
+import { LiveFrame, WithStage } from './LiveFrame';
 import { Sprite } from './Pixel';
 
 const LANTERN = ['...hh...', '..hhhh..', '.gGGGGg.', 'gGGwGGGg', 'gGGGGGGg', 'gGGGGGGg', 'gGGGGGGg', '.gGGGGg.', '..hhhh..', '...hh...'];
@@ -17,6 +17,8 @@ export const QuickDrawGame: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const game = useLiveGame<QuickState, QuickAct>('quickdraw', QUICK);
   const { state: s, mySeat, them, partner, act, stage, clock } = game;
   const [lit, setLit] = useState(false);
+  // Fake-outs: the lantern flickering for a moment before it really lights
+  const [flick, setFlick] = useState(false);
   const litAtLocal = useRef<{ round: number; t: number } | null>(null);
   const tapped = useRef<number>(0);
 
@@ -24,14 +26,18 @@ export const QuickDrawGame: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   useEffect(() => {
     if (!s || s.phase !== 'play' || s.winner) {
       setLit(false);
+      setFlick(false);
       return;
     }
     if (litAtLocal.current?.round === s.round) return;
     setLit(false);
     let raf = 0;
     const when = clock(s.litAt);
+    const fake = s.fakeAt ? clock(s.fakeAt) : 0;
     const loop = () => {
-      if (Date.now() >= when) {
+      const t = Date.now();
+      setFlick(!!fake && t >= fake && t < fake + FAKE_MS && t < when);
+      if (t >= when) {
         litAtLocal.current = { round: s.round, t: performance.now() };
         setLit(true);
         tone(880, 0.12, 0, 'triangle', 0.06);
@@ -84,7 +90,7 @@ export const QuickDrawGame: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
   const pips = (seat: Seat) => (
     <span className="flex gap-1.5">
-      {[...Array(TO_WIN).keys()].map((i) => (
+      {[...Array(toWinOf(s)).keys()].map((i) => (
         <span key={i} style={{ width: 14, height: 14, background: (s?.score[seat] || 0) > i ? '#ffd76a' : 'rgba(239,227,203,.18)', boxShadow: '0 0 0 2px #1b1411' }} />
       ))}
     </span>
@@ -114,8 +120,8 @@ export const QuickDrawGame: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       }
       width={720}
     >
-      <div className="flex flex-col items-center gap-4">
-        <div className="flex items-center justify-between w-full max-w-[520px] font-bold">
+      <div className="flex flex-col items-center gap-4 h-full">
+        <div className="flex items-center justify-between w-full max-w-[640px] font-bold">
           <span className="flex items-center gap-2">You {pips(mySeat)}</span>
           <span className="flex items-center gap-2">
             {pips(them)} {partner}
@@ -123,7 +129,7 @@ export const QuickDrawGame: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         </div>
         <button
           type="button"
-          className="border-0 p-6 flex flex-col items-center gap-3 w-full max-w-[520px] select-none"
+          className="border-0 p-6 flex flex-col items-center justify-center gap-3 w-full max-w-[640px] select-none flex-1 min-h-[260px]"
           style={{ background: lit ? '#3a2f22' : '#1b1518', boxShadow: '0 0 0 4px #0f0b0c', cursor: 'pointer', touchAction: 'manipulation', color: '#efe3cb' }}
           onPointerDown={(e) => {
             e.preventDefault();
@@ -131,8 +137,8 @@ export const QuickDrawGame: React.FC<{ onBack: () => void }> = ({ onBack }) => {
           }}
           aria-label="Tap when the lantern lights"
         >
-          <span style={{ filter: lit ? 'drop-shadow(0 0 28px rgba(255,215,106,.85))' : 'none' }}>
-            <Sprite rows={LANTERN} pal={lit ? LIT : DARK} scale={16} />
+          <span style={{ filter: lit ? 'drop-shadow(0 0 28px rgba(255,215,106,.85))' : flick ? 'hue-rotate(-45deg) brightness(.75) drop-shadow(0 0 18px rgba(224,122,160,.7))' : 'none' }}>
+            <WithStage>{(stage) => <Sprite rows={LANTERN} pal={lit || flick ? LIT : DARK} scale={stage ? Math.max(12, Math.min(26, Math.floor((stage.h - 200) / 14))) : 16} />}</WithStage>
           </span>
           <span className="text-4xl font-bold">{big}</span>
         </button>

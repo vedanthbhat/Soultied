@@ -26,6 +26,10 @@ public struct Tug: LiveRules {
         public var pos: Double
         public var endsAt: Double
         public var winner: String?
+        /// the house rule: "final", "short" or "sprint"
+        public var rule: String?
+        /// Final stretch: the extra pull from taps in the last five seconds
+        public var bonus: [Side: Int]?
 
         public init?(_ d: Doc) {
             guard let e = d.num("endsAt") else { return nil }
@@ -33,15 +37,29 @@ public struct Tug: LiveRules {
             pos = d.num("pos") ?? 0
             endsAt = e
             winner = d.str("winner")
+            rule = d.str("rule")
+            if d["bonus"] is Doc { bonus = seats(d["bonus"]) }
         }
 
-        init(endsAt: Double) {
+        init(endsAt: Double, rule: String? = nil) {
             taps = [.a: 0, .b: 0]
             pos = 0
             self.endsAt = endsAt
+            self.rule = rule
+            if rule == "final" { bonus = [.a: 0, .b: 0] }
         }
 
-        public var doc: Doc { ["taps": seatsDoc(taps), "pos": pos, "endsAt": endsAt, "winner": winner as Any? ?? NSNull()] }
+        public var doc: Doc {
+            var d: Doc = ["taps": seatsDoc(taps), "pos": pos, "endsAt": endsAt, "winner": winner as Any? ?? NSNull()]
+            if let rule { d["rule"] = rule }
+            if let bonus { d["bonus"] = seatsDoc(bonus) }
+            return d
+        }
+
+        /// how big a lead pulls the ribbon all the way over
+        public var pull: Int { rule == "short" ? 14 : Tug.pull }
+        /// the lead, counting the Final stretch's extra pull
+        var lead: Int { (taps[.a] ?? 0) + (bonus?[.a] ?? 0) - (taps[.b] ?? 0) - (bonus?[.b] ?? 0) }
     }
 
     public struct Act: LiveValue {
@@ -61,17 +79,21 @@ public struct Tug: LiveRules {
     /// nil when nothing changed
     private func settle(_ s: State, _ now: Double) -> State? {
         if s.winner != nil { return nil }
-        let a = s.taps[.a] ?? 0, b = s.taps[.b] ?? 0
-        let pos = max(-1, min(1, Double(a - b) / Double(Self.pull)))
+        let l = s.lead
+        let pos = max(-1, min(1, Double(l) / Double(s.pull)))
         var n = s
         n.pos = pos
         if pos >= 1 { n.winner = "a"; return n }
         if pos <= -1 { n.winner = "b"; return n }
-        if now >= s.endsAt { n.winner = a == b ? "draw" : a > b ? "a" : "b"; return n }
+        if now >= s.endsAt { n.winner = l == 0 ? "draw" : l > 0 ? "a" : "b"; return n }
         return pos == s.pos ? nil : n
     }
 
-    public func initial(_ rng: @escaping Random, now: Double) -> State { State(endsAt: now + Play.countdownMs + Self.durationMs) }
+    public func initial(_ rng: @escaping Random, now: Double) -> State { initial(rng, now: now, rule: nil) }
+
+    public func initial(_ rng: @escaping Random, now: Double, rule: String?) -> State {
+        State(endsAt: now + Play.countdownMs + (rule == "sprint" ? Self.durationMs / 2 : Self.durationMs), rule: rule)
+    }
 
     public func act(_ s: State, _ seat: Side, _ a: Act, now: Double) -> State? {
         if s.winner != nil { return nil }
@@ -81,6 +103,11 @@ public struct Tug: LiveRules {
         if n <= mine { return nil }
         var next = s
         next.taps[seat] = n
+        // Final stretch: in the last five seconds every tap counts twice
+        if var b = next.bonus, now >= s.endsAt - 5000 {
+            b[seat] = (b[seat] ?? 0) + (n - mine)
+            next.bonus = b
+        }
         return settle(next, now) ?? next
     }
 
@@ -88,10 +115,10 @@ public struct Tug: LiveRules {
 
     public func result(_ s: State) -> LiveResult? {
         guard let w = s.winner else { return nil }
-        let a = s.taps[.a] ?? 0, b = s.taps[.b] ?? 0
-        if w == "draw" { return LiveResult(winner: "draw", line: "tied at \(a) taps each", score: s.taps) }
+        let a = s.taps[.a] ?? 0
+        if w == "draw" { return LiveResult(winner: "draw", line: s.bonus != nil ? "tied" : "tied at \(a) taps each", score: s.taps) }
         let all = abs(s.pos) >= 1
-        return LiveResult(winner: w, line: all ? "pulled the ribbon all the way over" : "won Tug of War by \(abs(a - b)) taps", score: s.taps)
+        return LiveResult(winner: w, line: all ? "pulled the ribbon all the way over" : "won Tug of War by \(abs(s.lead)) taps", score: s.taps)
     }
 
     public func bot(_ s: State, _ seat: Side, now: Double) -> Act? { rng() < 0.82 ? Act(taps: (s.taps[seat] ?? 0) + 1) : nil }
@@ -134,6 +161,20 @@ public struct Rps: LiveRules {
         public var showUntil: Double
         public var last: (hands: [Side: Hand], winner: Side?)?
         public var winner: Side?
+        /// the house rule: "quick", "banned" or "quickest"
+        public var rule: String?
+        /// Banned hand: the hand that isn't allowed, round by round (round 1 is the first)
+        public var bans: [Hand]?
+        /// Fastest wins ties: who picked first this round
+        public var first: Side?
+
+        /// how long there is to pick
+        public var pickMs: Double { rule == "quick" ? 2000 : Rps.pickMs }
+        /// the hand that isn't allowed this round (Banned hand)
+        public var banned: Hand? {
+            guard let b = bans, !b.isEmpty else { return nil }
+            return b[((round - 1) % b.count + b.count) % b.count]
+        }
 
         public init?(_ d: Doc) {
             guard let r = d.int("round") else { return nil }
@@ -145,15 +186,20 @@ public struct Rps: LiveRules {
             showUntil = d.num("showUntil") ?? 0
             if let l = d["last"] as? Doc { last = (Self.hands(l["hands"]), l.str("winner").flatMap { Side(rawValue: $0) }) }
             winner = d.str("winner").flatMap { Side(rawValue: $0) }
+            rule = d.str("rule")
+            bans = (d["bans"] as? [Any])?.compactMap { ($0 as? String).flatMap { Hand(rawValue: $0) } }
+            first = d.str("first").flatMap { Side(rawValue: $0) }
         }
 
-        init(now: Double) {
+        init(now: Double, rule: String? = nil, bans: [Hand]? = nil) {
             round = 1
             score = [.a: 0, .b: 0]
             phase = "pick"
             picks = [:]
-            pickUntil = now + Play.countdownMs + Rps.pickMs
+            pickUntil = now + Play.countdownMs + (rule == "quick" ? 2000 : Rps.pickMs)
             showUntil = 0
+            self.rule = rule
+            self.bans = bans
         }
 
         static func hands(_ raw: Any?) -> [Side: Hand] {
@@ -170,9 +216,13 @@ public struct Rps: LiveRules {
         }
 
         public var doc: Doc {
-            ["round": round, "score": seatsDoc(score), "phase": phase, "picks": Self.handsDoc(picks), "pickUntil": pickUntil, "showUntil": showUntil,
-             "last": last.map { ["hands": Self.handsDoc($0.hands), "winner": $0.winner?.rawValue as Any? ?? NSNull()] as Doc } as Any? ?? NSNull(),
-             "winner": winner?.rawValue as Any? ?? NSNull()]
+            var d: Doc = ["round": round, "score": seatsDoc(score), "phase": phase, "picks": Self.handsDoc(picks), "pickUntil": pickUntil, "showUntil": showUntil,
+                          "last": last.map { ["hands": Self.handsDoc($0.hands), "winner": $0.winner?.rawValue as Any? ?? NSNull()] as Doc } as Any? ?? NSNull(),
+                          "winner": winner?.rawValue as Any? ?? NSNull()]
+            if let rule { d["rule"] = rule }
+            if let bans { d["bans"] = bans.map(\.rawValue) }
+            if rule == "quickest" { d["first"] = first?.rawValue as Any? ?? NSNull() }
+            return d
         }
     }
 
@@ -200,6 +250,7 @@ public struct Rps: LiveRules {
         if a != nil && b == nil { w = .a }
         else if b != nil && a == nil { w = .b }
         else if let a, let b, a != b { w = a.beats == b ? .a : .b }
+        else if a != nil, b != nil, let f = s.first { w = f }
         var n = s
         if let w { n.score[w, default: 0] += 1 }
         n.phase = "show"
@@ -208,12 +259,18 @@ public struct Rps: LiveRules {
         return n
     }
 
-    public func initial(_ rng: @escaping Random, now: Double) -> State { State(now: now) }
+    public func initial(_ rng: @escaping Random, now: Double) -> State { initial(rng, now: now, rule: nil) }
+
+    public func initial(_ rng: @escaping Random, now: Double, rule: String?) -> State {
+        State(now: now, rule: rule, bans: rule == "banned" ? (0..<12).map { _ in Self.hands[floorInt(rng() * 3)] } : nil)
+    }
 
     public func act(_ s: State, _ seat: Side, _ a: Act, now: Double) -> State? {
         if s.winner != nil || s.phase != "pick" || a.round != s.round || s.picks[seat] != nil { return nil }
+        if a.hand == s.banned { return nil }
         var next = s
         next.picks[seat] = a.hand
+        if s.rule == "quickest" && s.first == nil { next.first = seat }
         return next.picks[seat.other] != nil ? reveal(next, now) : next
     }
 
@@ -230,7 +287,8 @@ public struct Rps: LiveRules {
             n.phase = "pick"
             n.round += 1
             n.picks = [:]
-            n.pickUntil = now + Self.pickMs
+            n.pickUntil = now + s.pickMs
+            if s.rule == "quickest" { n.first = nil }
             return n
         }
         return nil
@@ -244,8 +302,10 @@ public struct Rps: LiveRules {
     public func bot(_ s: State, _ seat: Side, now: Double) -> Act? {
         if s.phase != "pick" || s.picks[seat] != nil { return nil }
         let left = s.pickUntil - now
-        guard left < Self.pickMs - 900, rng() < 0.08 else { return nil }
-        return Act(round: s.round, hand: Self.hands[floorInt(rng() * 3)])
+        guard left < s.pickMs - 900, rng() < 0.08 else { return nil }
+        let hand = Self.hands[floorInt(rng() * 3)]
+        // (it knows the banned hand too)
+        return hand == s.banned ? nil : Act(round: s.round, hand: hand)
     }
 
     public var botMs: Double { 120 }
@@ -299,6 +359,13 @@ public struct QuickDraw: LiveRules {
         /// what happened last round
         public var last: (winner: Side?, taps: [Side: Tap])?
         public var winner: Side?
+        /// the house rule: "fake", "fuse" or "five"
+        public var rule: String?
+        /// Fake-outs: when the lantern flickers this round, before it really lights (0: it doesn't)
+        public var fakeAt: Double?
+
+        /// rounds to win
+        public var toWin: Int { rule == "five" ? 5 : QuickDraw.toWin }
 
         public init?(_ d: Doc) {
             guard let r = d.int("round") else { return nil }
@@ -306,17 +373,21 @@ public struct QuickDraw: LiveRules {
             score = seats(d["score"])
             phase = d.str("phase") ?? "play"
             litAt = d.num("litAt") ?? 0
+            rule = d.str("rule")
+            fakeAt = d.num("fakeAt")
             taps = Self.taps(d["taps"])
             showUntil = d.num("showUntil") ?? 0
             if let l = d["last"] as? Doc { last = (l.str("winner").flatMap { Side(rawValue: $0) }, Self.taps(l["taps"])) }
             winner = d.str("winner").flatMap { Side(rawValue: $0) }
         }
 
-        init(litAt: Double) {
+        init(litAt: Double, fakeAt: Double? = nil, rule: String? = nil) {
             round = 1
             score = [.a: 0, .b: 0]
             phase = "play"
             self.litAt = litAt
+            self.fakeAt = fakeAt
+            self.rule = rule
             taps = [:]
             showUntil = 0
         }
@@ -335,9 +406,12 @@ public struct QuickDraw: LiveRules {
         }
 
         public var doc: Doc {
-            ["round": round, "score": seatsDoc(score), "phase": phase, "litAt": litAt, "taps": Self.tapsDoc(taps), "showUntil": showUntil,
-             "last": last.map { ["winner": $0.winner?.rawValue as Any? ?? NSNull(), "taps": Self.tapsDoc($0.taps)] as Doc } as Any? ?? NSNull(),
-             "winner": winner?.rawValue as Any? ?? NSNull()]
+            var d: Doc = ["round": round, "score": seatsDoc(score), "phase": phase, "litAt": litAt, "taps": Self.tapsDoc(taps), "showUntil": showUntil,
+                          "last": last.map { ["winner": $0.winner?.rawValue as Any? ?? NSNull(), "taps": Self.tapsDoc($0.taps)] as Doc } as Any? ?? NSNull(),
+                          "winner": winner?.rawValue as Any? ?? NSNull()]
+            if let rule { d["rule"] = rule }
+            if let fakeAt { d["fakeAt"] = fakeAt }
+            return d
         }
     }
 
@@ -363,7 +437,20 @@ public struct QuickDraw: LiveRules {
     public var rng: Random
     public init(rng: @escaping Random = systemRandom) { self.rng = rng }
 
-    private func nextLit(_ now: Double) -> Double { now + 1400 + rng() * 2800 }
+    /// how long a fake-out flicker lasts
+    public static let fakeMs: Double = 260
+
+    private func nextLit(_ now: Double, _ rule: String?) -> Double { now + 1400 + rng() * (rule == "fuse" ? 6600 : 2800) }
+
+    /// a new round's lantern: when it lights, and (Fake-outs) whether and when it flickers first
+    private func lantern(_ from: Double, _ rule: String?) -> (litAt: Double, fakeAt: Double?) {
+        let litAt = nextLit(from, rule)
+        guard rule == "fake" else { return (litAt, nil) }
+        let r = rng()
+        // most rounds flicker once, somewhere between a beat after the round starts and a moment before it lights
+        let span = litAt - 1000 - from
+        return (litAt, r < 0.7 && span > 0 ? from + 600 + rng() * span : 0)
+    }
 
     private func resolve(_ s: State, _ now: Double) -> State {
         let t = s.taps
@@ -384,7 +471,12 @@ public struct QuickDraw: LiveRules {
         return n
     }
 
-    public func initial(_ rng: @escaping Random, now: Double) -> State { State(litAt: nextLit(now + Play.countdownMs)) }
+    public func initial(_ rng: @escaping Random, now: Double) -> State { initial(rng, now: now, rule: nil) }
+
+    public func initial(_ rng: @escaping Random, now: Double, rule: String?) -> State {
+        let l = lantern(now + Play.countdownMs, rule)
+        return State(litAt: l.litAt, fakeAt: l.fakeAt, rule: rule)
+    }
 
     public func act(_ s: State, _ seat: Side, _ a: Act, now: Double) -> State? {
         if s.winner != nil || s.phase != "play" || a.round != s.round || s.taps[seat] != nil { return nil }
@@ -406,14 +498,16 @@ public struct QuickDraw: LiveRules {
         if s.phase == "show" && now >= s.showUntil {
             var n = s
             let a = s.score[.a] ?? 0, b = s.score[.b] ?? 0
-            if a >= Self.toWin || b >= Self.toWin {
+            if a >= s.toWin || b >= s.toWin {
                 n.winner = a > b ? .a : .b
                 return n
             }
             n.phase = "play"
             n.round += 1
             n.taps = [:]
-            n.litAt = nextLit(now)
+            let l = lantern(now, s.rule)
+            n.litAt = l.litAt
+            if l.fakeAt != nil { n.fakeAt = l.fakeAt }
             return n
         }
         return nil

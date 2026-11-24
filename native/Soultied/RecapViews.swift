@@ -85,7 +85,7 @@ struct RecapCard: View {
             Button("Make a picture to share") { sharing = true }.buttonStyle(.px(.terracotta, wide: true))
         }
         .pxCard()
-        .sheet(isPresented: $sharing) { RecapShareSheet(place: place).frostedSheet() }
+        .floatingMenu(isPresented: $sharing) { RecapShareSheet(place: place) }
         // (the screenshots: the picture, made)
         .onAppear { if Launch.args.contains("-recapShare") { sharing = true } }
     }
@@ -145,10 +145,10 @@ struct RecapPicture: View {
 struct RecapShareSheet: View {
     let place: PlaceModel
     @State private var image: UIImage?
-    @Environment(\.dismiss) private var dismiss
+    @MenuDismiss private var dismiss
 
     var body: some View {
-        ScrollView {
+        MenuScroll {
             VStack(spacing: 16) {
                 if let image {
                     Image(uiImage: image).resizable().scaledToFit().frame(maxWidth: 340)

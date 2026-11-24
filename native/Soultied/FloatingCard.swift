@@ -3,8 +3,14 @@ import SwiftUI
 /*
  * A card that floats up from the bottom of the screen, over everything (the tab bar too), with the screen blurred
  * and see-through behind it. It's as tall as what's in it, and scrolls inside when that's taller than most of the
- * screen. Tap outside it, drag its little bar down or tap Done to close it. The Us page's tiles open in one.
- * (The website does the same with a card in the middle of the screen: UsPage.tsx.)
+ * screen. Tap outside it, drag its little bar down or tap Done to close it.
+ *
+ * Every menu opens in one: how you're feeling, your person, the invite, decorating, the record player, the pet,
+ * settings, your look, Plus, the bucket list and the rest, as well as the Us page's tiles. So they all look and
+ * move the same. (The website does the same with a card in the middle of the screen: `.st-frost`.)
+ *
+ * A menu inside a card closes itself with `@MenuDismiss` (instead of the sheet's `dismiss`), and scrolls with
+ * `MenuScroll` (the card does the scrolling).
  */
 
 @MainActor @Observable
@@ -13,12 +19,26 @@ final class FloatingCard {
     private(set) var content: AnyView?
     /// counts up each time a card opens, so each one is a fresh view
     private(set) var shown = 0
+    /// put what's in it on a paper card (false: it's made of its own cards, like the Us tiles' menus)
+    private(set) var boxed = false
+    /// as tall as the card can be, whatever's in it (for a menu that sizes itself to the room it has, like
+    /// decorating or Plus); otherwise the card fits what's in it
+    private(set) var fill = false
 
-    func show<V: View>(@ViewBuilder _ view: () -> V) {
+    /// where cards show: the tabs, and anything that covers them (the escape rooms). The newest one shows the card.
+    private(set) var hosts: [Int] = []
+    private var lastHost = 0
+    /// the host the open card belongs to
+    private(set) var cardHost: Int?
+
+    func show<V: View>(boxed: Bool = false, fill: Bool = false, @ViewBuilder _ view: () -> V) {
         Haptics.tap()
         let next = AnyView(view())
         withAnimation(.spring(response: 0.34, dampingFraction: 0.86)) {
             content = next
+            self.boxed = boxed
+            self.fill = fill
+            cardHost = hosts.last
             shown += 1
         }
     }
@@ -26,6 +46,79 @@ final class FloatingCard {
     func close() {
         guard content != nil else { return }
         withAnimation(.easeOut(duration: 0.2)) { content = nil }
+    }
+
+    func attach() -> Int {
+        lastHost += 1
+        hosts.append(lastHost)
+        return lastHost
+    }
+
+    func detach(_ id: Int) {
+        hosts.removeAll { $0 == id }
+        // (a card opened over something that's gone goes with it)
+        if cardHost == id { content = nil }
+    }
+}
+
+private struct InFloatingCardKey: EnvironmentKey { static let defaultValue = false }
+
+extension EnvironmentValues {
+    /// this view is in a floating card (so it closes the card, not a sheet)
+    var inFloatingCard: Bool {
+        get { self[InFloatingCardKey.self] }
+        set { self[InFloatingCardKey.self] = newValue }
+    }
+}
+
+/// closes a menu: the floating card it's in, or else the sheet or page it was opened as
+@propertyWrapper
+struct MenuDismiss: DynamicProperty {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.inFloatingCard) private var inCard
+
+    init() {}
+
+    var wrappedValue: () -> Void {
+        let system = self.dismiss, card = self.inCard
+        return {
+            MainActor.assumeIsolated {
+                if card { FloatingCard.shared.close() } else { system() }
+            }
+        }
+    }
+}
+
+extension View {
+    /// a menu that floats up as a card when `isPresented` turns on (it turns straight back off: the card closes
+    /// itself, with Done, a tap above it, a pull down or the menu's own buttons)
+    @MainActor
+    func floatingMenu<M: View>(isPresented: Binding<Bool>, boxed: Bool = true, fill: Bool = false, @ViewBuilder _ menu: @escaping () -> M) -> some View {
+        onChange(of: isPresented.wrappedValue) { _, on in
+            guard on else { return }
+            isPresented.wrappedValue = false
+            FloatingCard.shared.show(boxed: boxed, fill: fill, menu)
+        }
+    }
+
+    /// the same, for a menu about something (a photo, a reason for Plus): it floats up when `item` is set
+    @MainActor
+    func floatingMenu<Item: Identifiable, M: View>(item: Binding<Item?>, boxed: Bool = true, fill: Bool = false, @ViewBuilder _ menu: @escaping (Item) -> M) -> some View {
+        onChange(of: item.wrappedValue?.id) { _, id in
+            guard id != nil, let v = item.wrappedValue else { return }
+            item.wrappedValue = nil
+            FloatingCard.shared.show(boxed: boxed, fill: fill) { menu(v) }
+        }
+    }
+}
+
+/// a menu's scrolling: in a floating card the card scrolls (and fits the menu), anywhere else the menu does
+struct MenuScroll<Content: View>: View {
+    @Environment(\.inFloatingCard) private var inCard
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        if inCard { content() } else { ScrollView { content() } }
     }
 }
 
@@ -41,11 +134,16 @@ struct FloatingCardHost: View {
     @State private var height: CGFloat = 0
     @GestureState private var pull: CGFloat = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// this host's number (FloatingCard.hosts)
+    @State private var me = 0
+
+    /// the open card, if it's this host's to show
+    private var mine: AnyView? { me != 0 && (card.cardHost ?? card.hosts.last) == me && card.hosts.last == me ? card.content : nil }
 
     var body: some View {
         GeometryReader { geo in
             ZStack(alignment: .bottom) {
-                if let content = card.content {
+                if let content = mine {
                     Rectangle()
                         .fill(.ultraThinMaterial)
                         .overlay(Color.black.opacity(0.22))
@@ -56,20 +154,27 @@ struct FloatingCardHost: View {
                         .transition(.opacity)
                     VStack(spacing: 8) {
                         handle
-                        ScrollView {
-                            content
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                // (room for the cards' own shadows)
-                                .padding(.trailing, 4)
-                                .padding(.bottom, 6)
-                                .background(GeometryReader { g in
-                                    Color.clear.preference(key: FloatingCardHeight.self, value: g.size.height)
-                                })
+                        Group {
+                            if card.fill {
+                                // (a menu that sizes itself gets the whole card, and scrolls itself if it needs to)
+                                boxed(AnyView(content.frame(maxHeight: .infinity, alignment: .top))).frame(height: geo.size.height * 0.86)
+                            } else {
+                                ScrollView {
+                                    boxed(content)
+                                        // (room for the cards' own shadows)
+                                        .padding(.trailing, 4)
+                                        .padding(.bottom, 6)
+                                        .background(GeometryReader { g in
+                                            Color.clear.preference(key: FloatingCardHeight.self, value: g.size.height)
+                                        })
+                                }
+                                .scrollBounceBehavior(.basedOnSize)
+                                .scrollDismissesKeyboard(.interactively)
+                                .frame(height: min(max(height, 60), geo.size.height * 0.82))
+                                .onPreferenceChange(FloatingCardHeight.self) { height = $0 }
+                            }
                         }
-                        .scrollBounceBehavior(.basedOnSize)
-                        .scrollDismissesKeyboard(.interactively)
-                        .frame(height: min(max(height, 60), geo.size.height * 0.8))
-                        .onPreferenceChange(FloatingCardHeight.self) { height = $0 }
+                        .environment(\.inFloatingCard, true)
                     }
                     .padding(.horizontal, 12)
                     .padding(.bottom, 10)
@@ -80,7 +185,22 @@ struct FloatingCardHost: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
         }
-        .allowsHitTesting(card.content != nil)
+        .allowsHitTesting(mine != nil)
+        .onAppear { if me == 0 { me = card.attach() } }
+        .onDisappear {
+            card.detach(me)
+            me = 0
+        }
+    }
+
+    /// a menu goes on a paper card; the Us tiles' menus are made of their own cards
+    @ViewBuilder
+    private func boxed(_ content: AnyView) -> some View {
+        if card.boxed {
+            content.frame(maxWidth: .infinity, alignment: .leading).pxBox(.paper, shadow: true)
+        } else {
+            content.frame(maxWidth: .infinity, alignment: .leading)
+        }
     }
 
     /// a little bar to pull the card down by, and Done
@@ -150,6 +270,7 @@ private struct FrostedSheet: ViewModifier {
         .presentationBackground {
             Rectangle().fill(.ultraThinMaterial).overlay(Color.black.opacity(0.22))
         }
+        .environment(\.inFloatingCard, false)
     }
 }
 

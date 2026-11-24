@@ -123,7 +123,7 @@ struct RanksSheet: View {
     }
 
     var body: some View {
-        ScrollView {
+        MenuScroll {
             VStack(alignment: .leading, spacing: 16) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Couples board").font(.pxTitle).foregroundStyle(Color.inkSoft)

@@ -214,8 +214,9 @@ private struct PlusSheetHost: ViewModifier {
     @State private var gate = PlusGate.shared
 
     func body(content: Content) -> some View {
-        content.sheet(item: Binding(get: { gate.reason }, set: { gate.reason = $0 })) { r in
-            PlusSheet(place: place, reason: r).frostedSheet()
+        // (it floats up as a card as tall as it can be, with its plans pinned at the bottom: FloatingCard.swift)
+        content.floatingMenu(item: Binding(get: { gate.reason }, set: { gate.reason = $0 }), fill: true) { r in
+            PlusSheet(place: place, reason: r)
         }
     }
 }
@@ -423,7 +424,7 @@ struct PlusSheet: View {
     @State private var managing = false
     /// the plan picked (the year, to start with)
     @State private var yearly = true
-    @Environment(\.dismiss) private var dismiss
+    @MenuDismiss private var dismiss
     @Environment(\.openURL) private var openURL
 
     var body: some View {

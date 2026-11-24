@@ -16,14 +16,44 @@ Get Soultied ready for the App Store:
 
 ## What changed
 
+Claude, 24 Nov (step 2 of the plan, games):
+
+- **Live games fill the screen** (Tug of War, Quick Draw, Paper Scissors Stone, Coasters, Kitchen Rush), on the
+  website and on iPhone. Before the game it's the usual page (how to play, the invitation). From the countdown on:
+  a thin bar along the top (✕ to leave, your two faces, the house rule, the music), one line on what's happening,
+  and the board as big as the screen allows. On iPhone the status bar and home indicator hide too. At the end, who
+  won (or how the shift went) sits over the board with Play again and All games, and confetti for a win.
+  - Website: `LiveFrame.tsx` (`Stage` measures the room, `useStage` / `WithStage` let a board size itself).
+  - iPhone: `LiveFrame` in `LiveGamesView.swift` (`inGame`, `before`); Kitchen Rush scrolls (`scrolls: true`).
+- **House rules.** Every live game starts with one twist, the same on both screens (from the match's seed).
+  Either of you can swap it once while you're waiting for each other ("Another rule"). It's on the card before the
+  game, in the countdown and in the bar. The list is `src/games/live/houseRules.ts` and `HouseRules.swift`:
+  - Tug of War: Final stretch (taps count double in the last 5 s), Short rope (a lead of 14 wins), Sprint (10 s).
+  - Paper, Scissors, Stone: Quick hands (2 s to pick), Banned hand (one hand a round is crossed out), Fastest wins
+    ties.
+  - Quick Draw: Fake-outs (the lantern flickers pink first), Long fuse (up to 8 s), First to five.
+  - Coasters: Big cap, Turbo cap (faster, hardly slows), Quick match (first to 3).
+  - Kitchen Rush: Rush hour (orders come faster), Switch stations (chopper and cook swap at half time), Hungry
+    customers (tickets run out sooner).
+  - The rule's id goes in the game's state (`rule`); each game's rules read it. The fixtures play two games by
+    each rule (one each for Coasters), and `LiveRulesTests.testHouseRules` checks the list and the picks.
+  - An older iPhone build hosting a game ignores the rule (it isn't in its state), so the rule shows only when
+    both are on this build or newer.
+
 Claude, 24 Nov (step 1 of the plan below):
 
-- **Every menu is frosted.** On iPhone, the menus that open as sheets (how you're feeling, your person, the invite,
-  decorating, the record player, the pet, settings, your look, Plus, the bucket list, ranks, snaps, visits, photos)
-  now look like the Us cards: the screen blurred behind, the menu as a paper card at the bottom with a bar and Done,
-  and a tap on the blur closes it (`frostedSheet()` in `FloatingCard.swift`). Whole pages (letters, the wall, games,
-  Us, watch) still open as plain paper sheets. On the website, the panels and pop-ups use one shared backdrop
-  (`.st-frost` in `index.css`).
+- **Every menu floats up as a card** (iPhone), the same way the Us tiles do: the room or page blurred behind it,
+  the menu on a paper card rising from the bottom with a bar and Done, closed by Done, a tap on the blur or a pull
+  down. This replaced a first try with sheets (`frostedSheet`), which Vedanth saw on TestFlight as a flat grey
+  behind the menu. How it works (`FloatingCard.swift`):
+  - `FloatingCard.shared.show(boxed:fill:) { … }` opens a card; `FloatingCardHost` draws it. Hosts stack: the
+    tabs have one, and so do page sheets (Main.swift) and the escape rooms, and the newest one shows the card.
+  - Menus close themselves with `@MenuDismiss` (the card, or the sheet when they're not in a card) and scroll with
+    `MenuScroll` (in a card, the card scrolls and fits the menu's height).
+  - `.floatingMenu(isPresented:)` / `.floatingMenu(item:)` replace `.sheet` for menus. Decorating and Plus use
+    `fill: true` (the card is as tall as it can be).
+  - Settings moved into its own view (`SettingsMenu` in `UsView.swift`) so it updates while open.
+  - Website: the panels and pop-ups use one shared frosted backdrop (`.st-frost` in `index.css`).
 - **Real songs on the record shelf.** The made-up loops are gone. The five records are now real songs, credited
   while they play and under each sleeve:
   - Lo-fi evening and Retro arcade: HoliznaCC0 (Free Music Archive), CC0.
@@ -116,14 +146,22 @@ Claude, 23 Nov, first checkpoint (`95ee153`): PR #1 went onto `main` with these 
   - Coasters: simulated a puck wedged in each corner (it now comes out) and one resting on a rail (it's pushed back
     into play). The new fixtures cover the shelf on both sides.
   - Not built on a Mac yet: the Swift changes (frosted sheets, the shelf, Coasters) get their first build in CI.
+- **24 Nov, step 1 (`babce60`):** the site workflow made all 15 songs, and soultied.app serves them (each exactly
+  its listed length, at the jazz record's loudness).
+- **24 Nov, step 2 (before pushing), website:** `tsc` and the build pass. Playwright in the demo room at 390 × 844
+  and 1280 × 800: each live game fills the screen with the bar on top; the house rule shows on the card before the
+  game, in the countdown and in the bar; no page errors. The fixtures play every rule on both sides; the Swift side
+  first runs in CI.
+- **Floating menus (iPhone):** not built on a Mac before pushing. Check the CI screenshots that open menus (`mood`,
+  `record-sheet`, `pet`, `decor`, `plus`, `looks`, `us-*`): each should be a card over the blurred room.
 - **Not tested:** anything on a real iPhone, two-phone Our song, StoreKit, and the widgets on a real home screen.
 
 ## The plan from Vedanth's 24 Nov video
 
 1. Frosted menus, real music, the air hockey corners. **Done (this checkpoint).**
-2. Games fill the screen (no tab bar, sideways for action games, a backdrop, sounds, a countdown, a win screen,
-   your person's reactions along the edge) and house rules: a fun rule card at the start of each live game, with one
-   reroll. Then the final review and the App Store submission.
+2. Games fill the screen, and house rules for the live games. **Done (24 Nov, second push).** Not done from the
+   ideas: turning the phone sideways for action games, and reactions from your person along the edge. Then the
+   final review and the App Store submission.
 3. **Trust Fall:** a co-op platformer full of unfair traps, in the spirit of Unfair Mario but our own name,
    characters and levels. 10 levels; the first 3 are free, the rest are Plus.
 4. **Trap Swap** (you build traps on each other's level, then race through) and **Tied** (two characters tied by a

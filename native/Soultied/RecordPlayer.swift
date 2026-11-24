@@ -513,13 +513,13 @@ struct RecordSheet: View {
     let place: PlaceModel
     /// sideways there's no Home behind this, so a song plays here
     var hostsSong = false
-    @Environment(\.dismiss) private var dismiss
+    @MenuDismiss private var dismiss
     @State private var choosing = false
 
     private static let songs = Records.shelf.reduce(0) { $0 + $1.tracks.count }
 
     var body: some View {
-        ScrollView {
+        MenuScroll {
             VStack(alignment: .leading, spacing: 14) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("The record player").font(.pxTitle).foregroundStyle(Color.inkSoft)
@@ -562,7 +562,7 @@ struct RecordSheet: View {
             }
             .padding(20)
         }
-        .sheet(isPresented: $choosing) { RoomSongPicker(place: place).frostedSheet() }
+        .floatingMenu(isPresented: $choosing) { RoomSongPicker(place: place) }
         .scrollDismissesKeyboard(.interactively)
     }
 

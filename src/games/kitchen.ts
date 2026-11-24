@@ -46,7 +46,7 @@ export interface Order {
   until: number;
 }
 
-export type KitchenNews = { kind: 'served' | 'wrong' | 'burnt' | 'missed'; at: number; dish?: DishId };
+export type KitchenNews = { kind: 'served' | 'wrong' | 'burnt' | 'missed' | 'swap'; at: number; dish?: DishId };
 
 export interface KitchenState {
   roles: { chop: Seat; cook: Seat };
@@ -68,7 +68,16 @@ export interface KitchenState {
   burnt: number;
   news: KitchenNews | null;
   over: boolean;
+  /** the house rule (houseRules.ts): 'rush', 'swap' or 'hungry' */
+  rule?: string;
+  /** Switch stations: the two of you have swapped */
+  swapped?: boolean;
 }
+
+/** the gap between new orders, at the start of the shift and at the end (Rush hour: shorter) */
+const gapOf = (s: KitchenState) => (s.rule === 'rush' ? [8_000, 4_500] : ORDER_GAP);
+/** how long an order waits (Hungry customers: not as long) */
+export const patienceOf = (s: KitchenState | null | undefined) => (s?.rule === 'hungry' ? 30_000 : PATIENCE_MS);
 
 export type KitchenAct =
   | { t: 'take'; ing: Ing }
@@ -107,7 +116,7 @@ function newOrder(s: KitchenState, now: number, easy: boolean): KitchenState {
   const { next, r } = rand(s.seed);
   const list = easy ? EASY : ALL;
   const dish = list[Math.floor(r * list.length) % list.length];
-  return { ...s, seed: next, nextId: s.nextId + 1, orders: [...s.orders, { id: s.nextId, dish, at: now, until: now + PATIENCE_MS }] };
+  return { ...s, seed: next, nextId: s.nextId + 1, orders: [...s.orders, { id: s.nextId, dish, at: now, until: now + patienceOf(s) }] };
 }
 
 /** what the orders still need, less what's chopped, on the board or in the pot (the demo partner uses it) */
@@ -121,7 +130,7 @@ export function stillNeeded(s: KitchenState): Ing[] {
 }
 
 export const KITCHEN: LiveDef<KitchenState, KitchenAct> = {
-  init: (rng, now) => {
+  init: (rng, now, rule) => {
     const startAt = now + COUNTDOWN_MS;
     const chop: Seat = rng() < 0.5 ? 'a' : 'b';
     let s: KitchenState = {
@@ -129,7 +138,7 @@ export const KITCHEN: LiveDef<KitchenState, KitchenAct> = {
       startAt,
       endsAt: startAt + SHIFT_MS,
       orders: [],
-      nextOrderAt: startAt + ORDER_GAP[0],
+      nextOrderAt: startAt + (rule === 'rush' ? 8_000 : ORDER_GAP[0]),
       nextId: 1,
       seed: Math.floor(rng() * 4294967296) >>> 0,
       board: null,
@@ -141,6 +150,8 @@ export const KITCHEN: LiveDef<KitchenState, KitchenAct> = {
       burnt: 0,
       news: null,
       over: false,
+      ...(rule ? { rule } : {}),
+      ...(rule === 'swap' ? { swapped: false } : {}),
     };
     s = newOrder(s, startAt, true);
     s = newOrder(s, startAt, true);
@@ -178,6 +189,10 @@ export const KITCHEN: LiveDef<KitchenState, KitchenAct> = {
     if (s.over || now < s.startAt) return s;
     if (now >= s.endsAt) return { ...s, over: true };
     let n = s;
+    // Switch stations: halfway through, the chopper cooks and the cook chops (what's on the board, the pass and
+    // the pot stays where it is)
+    if (n.rule === 'swap' && !n.swapped && now >= n.startAt + SHIFT_MS / 2)
+      n = { ...n, roles: { chop: n.roles.cook, cook: n.roles.chop }, swapped: true, news: { kind: 'swap', at: now } };
     // a pot left on the stove
     if (n.cookStart !== null && now - n.cookStart >= COOK_MS + BURN_MS) n = { ...n, pot: [], cookStart: null, burnt: n.burnt + 1, news: { kind: 'burnt', at: now } };
     // customers who gave up
@@ -186,7 +201,8 @@ export const KITCHEN: LiveDef<KitchenState, KitchenAct> = {
     // new orders, more often as the shift goes on
     if (now >= n.nextOrderAt) {
       const k = Math.min(1, (now - n.startAt) / SHIFT_MS);
-      const gap = ORDER_GAP[0] + (ORDER_GAP[1] - ORDER_GAP[0]) * k;
+      const g = gapOf(n);
+      const gap = g[0] + (g[1] - g[0]) * k;
       n = n.orders.length < MAX_ORDERS ? newOrder(n, now, n.served + n.missed < 1) : n;
       n = { ...n, nextOrderAt: now + gap };
     }

@@ -25,7 +25,7 @@ final class LiveRulesTests: XCTestCase {
             if json(s.doc) != json(w["s"]!) { return "step \(i - 1) (\(op) at \(t)): \(json(s.doc)) want \(json(w["s"]!))" }
             return nil
         }
-        var s = rules.initial(seeded(seed), now: start)
+        var s = rules.initial(seeded(seed), now: start, rule: g.str("rule"))
         if let p = check(start, "init", nil, nil, nil, s) { return p }
         let begin = start + Play.countdownMs
         var res: LiveResult?
@@ -76,6 +76,30 @@ final class LiveRulesTests: XCTestCase {
             if let problem { XCTFail("\(kind) (seed \(g.int("seed") ?? 0)): \(problem)") }
         }
         XCTAssertEqual(kinds, ["tug", "rps", "quickdraw", "kitchen"])
+    }
+
+    /// the house rules are the website's: the same list, and the same one for the same seed (and swap)
+    func testHouseRules() throws {
+        guard let fx = LettersTests.fx?["houseRules"] as? Doc else { throw XCTSkip("no fixtures (set SOULTIED_FIXTURES)") }
+        let list = fx["list"] as! Doc
+        XCTAssertEqual(Set(list.keys), Set(HouseRules.list.keys.map(\.rawValue)))
+        for (k, raw) in list {
+            let kind = GameKind(rawValue: k)!
+            let want = (raw as! [[String]]).map { HouseRule(id: $0[0], name: $0[1], line: $0[2]) }
+            XCTAssertEqual(HouseRules.list[kind], want, k)
+        }
+        for p in fx["picks"] as! [[Any]] {
+            let kind = GameKind(rawValue: p[0] as! String)!
+            let seed = Int(Values.num(p[1])!), rerolls = Int(Values.num(p[2])!)
+            XCTAssertEqual(HouseRules.rule(kind, seed: seed, rerolls: rerolls)?.id, p[3] as? String, "\(kind) \(seed) \(rerolls)")
+        }
+        // a swap, once, only while you're waiting for each other
+        var m = Play.newLive(.rps, starter: .a)
+        let first = HouseRules.of(m)
+        m = HouseRules.reroll(m, .b)!
+        XCTAssertNotEqual(HouseRules.of(m), first)
+        XCTAssertNil(HouseRules.reroll(m, .a), "only once")
+        XCTAssertNil(HouseRules.reroll(Play.liveJoin(Play.newLive(.tug, starter: .a), .b)!, .a), "not once you're both in")
     }
 
     func testRulesBits() {

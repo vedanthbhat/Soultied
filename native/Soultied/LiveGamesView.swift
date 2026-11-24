@@ -22,6 +22,8 @@ struct LiveFrame<R: LiveRules, Content: View, Poster: View>: View {
     var outcome: ((LiveResult) -> Text)? = nil
     /// what each of you is up to, instead of wins (for the games you play on the same side)
     var coop: ((Side) -> String)? = nil
+    /// the game is taller than the screen, so it scrolls (Kitchen Rush)
+    var scrolls = false
     @ViewBuilder var poster: () -> Poster
     @ViewBuilder var content: () -> Content
     @Environment(\.dismiss) private var dismiss
@@ -34,6 +36,131 @@ struct LiveFrame<R: LiveRules, Content: View, Poster: View>: View {
     var body: some View {
         let stage = session.stage(now: now)
         let partner = place.theirName
+        // once the game's on, it fills the screen: a thin bar along the top, and the board under it
+        let immersive = session.state != nil && (stage == .count || stage == .play || stage == .over)
+        Group {
+            if immersive { inGame(stage, partner) } else { before(stage, partner) }
+        }
+        .background(GameBackdrop())
+        .statusBarHidden(immersive)
+        .persistentSystemOverlays(immersive ? .hidden : .automatic)
+        .onChange(of: session.end?.line) { _, _ in
+            guard let r = session.end else { return }
+            if r.winner == place.mySeat.rawValue || coop != nil {
+                Haptics.success()
+                Chiptune.shared.game(.win)
+                let c = Date()
+                cheer = c
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.6) { if cheer == c { cheer = nil } }
+            } else {
+                Haptics.soft()
+                Chiptune.shared.game(r.winner == "draw" ? .draw : .lose)
+            }
+        }
+        // three, two, one... go
+        .onChange(of: stage == .count ? count : 0) { _, n in
+            if n > 0 { Chiptune.shared.game(.count) }
+        }
+        .onChange(of: stage == .play) { _, playing in
+            if playing { Chiptune.shared.game(.go) }
+        }
+    }
+
+    /// the game itself: the bar along the top (leave, the two of you, the music), a line on what's happening,
+    /// and the board filling the rest; at the end, who won over the board
+    private func inGame(_ stage: LiveStage, _ partner: String) -> some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 10) {
+                Button("✕") { dismiss() }
+                    .buttonStyle(.px(.paper, small: true))
+                    .accessibilityLabel("Leave the game, back to all games")
+                MiniChip(place: place, side: place.mySeat, note: coop?(place.mySeat))
+                Text(coop != nil ? "&" : "vs").font(.px(13, 700)).foregroundStyle(Color.paper.opacity(0.6))
+                MiniChip(place: place, side: place.mySeat.other, note: coop?(place.mySeat.other))
+                Spacer(minLength: 0)
+                if let r = session.rule {
+                    Text(r.name)
+                        .font(.px(11, 700))
+                        .foregroundStyle(Color(hex: "#2b1e1c"))
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(Color(hex: "#e2b359"))
+                        .lineLimit(1)
+                        .accessibilityLabel("House rule: \(r.name). \(r.line)")
+                }
+                MusicToggle()
+            }
+            if stage != .over {
+                (stage == .count ? Text("Get ready…") : status(stage, partner))
+                    .font(.pxSmall)
+                    .foregroundStyle(Color.paper.opacity(0.9))
+                    .lineLimit(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            ZStack {
+                Group {
+                    if scrolls { ScrollView { content().padding(.bottom, 12) }.scrollBounceBehavior(.basedOnSize) } else { content() }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                if stage == .count { countdown }
+                if stage == .over { result(stage, partner) }
+                if let c = cheer { Confetti().id(c).allowsHitTesting(false) }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .animation(.easeOut(duration: 0.2), value: stage == .count)
+            .animation(.easeOut(duration: 0.2), value: stage == .over)
+        }
+        .padding(.horizontal, 12)
+        .padding(.top, 8)
+        .padding(.bottom, 6)
+    }
+
+    /// the number in the middle, before the game starts
+    private var countdown: some View {
+        VStack(spacing: 2) {
+            Text("STARTING IN").font(.px(13, 700)).tracking(2).foregroundStyle(Color.muted)
+            Text("\(count)").font(.px(64, 700)).foregroundStyle(Color.inkSoft)
+                .contentTransition(.numericText(countsDown: true))
+                .animation(.snappy(duration: 0.25), value: count)
+            if let r = session.rule {
+                VStack(spacing: 2) {
+                    Text("House rule: \(r.name)").font(.px(15, 700))
+                    Text(r.line).font(.pxSmall).multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
+                }
+                .foregroundStyle(Color.inkSoft)
+                .frame(maxWidth: 240)
+                .padding(.top, 6)
+            }
+        }
+        .padding(.horizontal, 28)
+        .padding(.vertical, 12)
+        .pxBox(.paper, shadow: true)
+        .allowsHitTesting(false)
+        .transition(.scale(scale: 0.8).combined(with: .opacity))
+    }
+
+    /// who won (or how the shift went), and what next
+    private func result(_ stage: LiveStage, _ partner: String) -> some View {
+        ZStack {
+            Color.black.opacity(0.45).ignoresSafeArea()
+            VStack(spacing: 14) {
+                status(stage, partner)
+                    .font(.px(19))
+                    .foregroundStyle(Color.inkSoft)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                actions(stage, partner)
+                Button("All games") { dismiss() }.buttonStyle(.px(.paper, wide: true))
+            }
+            .padding(18)
+            .pxBox(.paper, shadow: true)
+            .padding(.horizontal, 24)
+        }
+        .transition(.opacity)
+    }
+
+    /// before the game: how to play, the invitation, and something to look at
+    private func before(_ stage: LiveStage, _ partner: String) -> some View {
         ScrollView {
             VStack(spacing: 16) {
                 HStack(spacing: 8) {
@@ -62,54 +189,38 @@ struct LiveFrame<R: LiveRules, Content: View, Poster: View>: View {
                 if !session.demo, session.match?.status == .playing, !session.mode.words.isEmpty {
                     Text(session.mode.words).font(.pxTiny).foregroundStyle(Color.paper.opacity(0.7)).frame(maxWidth: .infinity).padding(.top, -8)
                 }
-                ZStack {
-                    if session.state != nil && (stage == .count || stage == .play || stage == .over) { content() } else { poster() }
-                    // (a small card over the middle of the board, not a full-width one)
-                    if stage == .count {
-                        VStack(spacing: 2) {
-                            Text("STARTING IN").font(.px(13, 700)).tracking(2).foregroundStyle(Color.muted)
-                            Text("\(count)").font(.px(64, 700)).foregroundStyle(Color.inkSoft)
-                                .contentTransition(.numericText(countsDown: true))
-                                .animation(.snappy(duration: 0.25), value: count)
-                        }
-                        .padding(.horizontal, 28)
-                        .padding(.vertical, 12)
-                        .pxBox(.paper, shadow: true)
-                        .allowsHitTesting(false)
-                        .transition(.scale(scale: 0.8).combined(with: .opacity))
-                    }
-                    if let c = cheer { Confetti().id(c).allowsHitTesting(false) }
-                }
-                // (the board, what's before it and the countdown all share the middle of the screen)
-                .frame(maxWidth: .infinity)
-                .animation(.easeOut(duration: 0.2), value: stage == .count)
+                if let r = session.rule, stage == .inviting || stage == .invited || stage == .waiting { ruleCard(r) }
+                poster()
+                    .frame(maxWidth: .infinity)
                 actions(stage, partner)
             }
             .padding(16)
             .padding(.bottom, 40)
         }
         .scrollBounceBehavior(.basedOnSize)
-        .background(GameBackdrop())
-        .onChange(of: session.end?.line) { _, _ in
-            guard let r = session.end else { return }
-            if r.winner == place.mySeat.rawValue || coop != nil {
-                Haptics.success()
-                Chiptune.shared.game(.win)
-                let c = Date()
-                cheer = c
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2.6) { if cheer == c { cheer = nil } }
-            } else {
-                Haptics.soft()
-                Chiptune.shared.game(r.winner == "draw" ? .draw : .lose)
+    }
+
+    /// this game's house rule, and (once, before it starts) a way to swap it
+    private func ruleCard(_ r: HouseRule) -> some View {
+        HStack(alignment: .center, spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("HOUSE RULE").font(.px(11, 700)).tracking(1.5).foregroundStyle(Color(hex: "#a84f4b"))
+                Text(r.name).font(.px(18, 700)).foregroundStyle(Color.inkSoft)
+                Text(r.line).font(.pxSmall).foregroundStyle(Color.inkSoft).fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+            if session.canReroll {
+                Button("Another rule") {
+                    Haptics.tap()
+                    session.reroll()
+                }
+                .buttonStyle(.px(.paper, small: true))
             }
         }
-        // three, two, one... go
-        .onChange(of: stage == .count ? count : 0) { _, n in
-            if n > 0 { Chiptune.shared.game(.count) }
-        }
-        .onChange(of: stage == .play) { _, playing in
-            if playing { Chiptune.shared.game(.go) }
-        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(Color(hex: "#fff4d6"))
+        .overlay(Rectangle().strokeBorder(Color(hex: "#e2b359"), lineWidth: 3))
     }
 
     private func status(_ stage: LiveStage, _ partner: String) -> Text {
@@ -154,6 +265,23 @@ struct LiveFrame<R: LiveRules, Content: View, Poster: View>: View {
                 EmptyView()
             }
         }
+    }
+}
+
+/// a small face and name, for the bar along the top of a game
+struct MiniChip: View {
+    let place: PlaceModel
+    let side: Side
+    var note: String? = nil
+    var body: some View {
+        HStack(spacing: 6) {
+            if let l = place.seatLook(side) { HeadView(look: l, size: 26) } else { Color.paper2.frame(width: 26, height: 26) }
+            VStack(alignment: .leading, spacing: 0) {
+                Text(side == place.mySeat ? "You" : place.seatName(side)).font(.px(13, 700)).foregroundStyle(Color.paper).lineLimit(1)
+                if let note, !note.isEmpty { Text(note).font(.pxTiny).foregroundStyle(Color.paper.opacity(0.75)).lineLimit(1) }
+            }
+        }
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -295,15 +423,15 @@ private struct TugBoard: View {
                 .foregroundStyle(Color.paper)
                 PressPad(enabled: live, onPress: tap) {
                     Text(live ? "TAP!" : s?.winner != nil ? "Done" : "Get ready…")
-                        .font(.px(34, 700))
+                        .font(.px(40, 700))
                         .foregroundStyle(Color.paperHi)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 30)
+                        .frame(maxWidth: .infinity, minHeight: 110, maxHeight: 380)
                         .background(Color.sage)
                         .overlay(Rectangle().strokeBorder(Color.sageD, lineWidth: 4))
                 }
                 .accessibilityLabel("Tap to pull")
             }
+            .frame(maxHeight: .infinity)
         }
     }
 
@@ -440,33 +568,39 @@ private struct RpsBoard: View {
                     GeometryReader { g in
                         ZStack(alignment: .leading) {
                             Color.paper.opacity(0.15)
-                            (left < 1500 ? Color(hex: "#e07a5f") : Color(hex: "#ffd76a")).frame(width: g.size.width * min(1, left / Rps.pickMs))
+                            (left < 1500 ? Color(hex: "#e07a5f") : Color(hex: "#ffd76a")).frame(width: g.size.width * min(1, left / (s?.pickMs ?? Rps.pickMs)))
                         }
                     }
                     .frame(height: 12)
                 }
                 HStack(spacing: 10) {
                     ForEach(Rps.hands, id: \.self) { h in
+                        // Banned hand: this round's banned one can't be picked
+                        let banned = s?.phase == "pick" && s?.banned == h
                         Button {
-                            guard picking, myPick == nil, let s else { return }
+                            guard picking, myPick == nil, !banned, let s else { return }
                             Haptics.tap()
                             session.act(Rps.Act(round: s.round, hand: h))
                         } label: {
                             VStack(spacing: 6) {
                                 GlyphView(glyph: HandArt.glyph(h), scale: 5.6)
-                                Text(h.name).font(.px(16, 700)).foregroundStyle(Color.inkSoft)
+                                Text(banned ? "Banned" : h.name).font(.px(16, 700)).foregroundStyle(Color.inkSoft)
                             }
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 10)
                             .pxBox()
                             .overlay { if myPick == h { Rectangle().strokeBorder(Color.butter, lineWidth: 3).padding(-6) } }
-                            .opacity(!picking || (myPick != nil && myPick != h) ? 0.55 : 1)
+                            .overlay { if banned { Text("✕").font(.px(54, 700)).foregroundStyle(Color(hex: "#c4453f")) } }
+                            .opacity(banned ? 0.4 : !picking || (myPick != nil && myPick != h) ? 0.55 : 1)
                         }
                         .buttonStyle(.plain)
-                        .disabled(!picking || myPick != nil)
+                        .disabled(!picking || myPick != nil || banned)
+                        .accessibilityLabel(banned ? "\(h.name), banned this round" : h.name)
                     }
                 }
             }
+            // (in the middle of the screen)
+            .frame(maxHeight: .infinity)
             .onChange(of: s?.phase == "show" ? s?.round : nil) { _, r in
                 guard r != nil, let w = s?.last?.winner else { return }
                 if w == me { Haptics.success() } else { Haptics.soft() }
@@ -525,6 +659,9 @@ private struct QuickDrawBoard: View {
         let playingRound = s?.phase == "play" && s?.winner == nil
         let lit = playingRound && litLocal?.round == s?.round
         let myTap = s?.phase == "play" ? s?.taps[me] : nil
+        // Fake-outs: the lantern flickering for a moment before it really lights
+        let fake = (s?.fakeAt ?? 0) > 0 ? session.local(s?.fakeAt ?? 0) : 0
+        let flick = playingRound && !lit && fake > 0 && now >= fake && now < fake + QuickDraw.fakeMs
         LiveFrame(place: place, session: session, title: "Quick Draw",
                   howTo: "When the lantern lights, tap. Quickest wins the round; tap while it’s dark and you lose it. First to \(QuickDraw.toWin).",
                   playing: playing(s, partner), now: now) {
@@ -532,20 +669,22 @@ private struct QuickDrawBoard: View {
         } content: {
             VStack(spacing: 14) {
                 HStack {
-                    HStack(spacing: 8) { Text("You"); Pips(won: s?.score[me] ?? 0, of: QuickDraw.toWin) }
+                    HStack(spacing: 8) { Text("You"); Pips(won: s?.score[me] ?? 0, of: s?.toWin ?? QuickDraw.toWin) }
                     Spacer()
-                    HStack(spacing: 8) { Pips(won: s?.score[them] ?? 0, of: QuickDraw.toWin); Text(partner).lineLimit(1) }
+                    HStack(spacing: 8) { Pips(won: s?.score[them] ?? 0, of: s?.toWin ?? QuickDraw.toWin); Text(partner).lineLimit(1) }
                 }
                 .font(.px(17, 700))
                 .foregroundStyle(Color.paper)
                 PressPad(onPress: tap) {
                     VStack(spacing: 14) {
-                        GlyphView(glyph: lit ? LanternArt.lit : LanternArt.dark, scale: 14)
-                            .shadow(color: lit ? Color(hex: "#ffd76a").opacity(0.85) : .clear, radius: 26)
+                        GlyphView(glyph: lit || flick ? LanternArt.lit : LanternArt.dark, scale: 18)
+                            .hueRotation(.degrees(flick ? -45 : 0))
+                            .brightness(flick ? -0.2 : 0)
+                            .shadow(color: lit ? Color(hex: "#ffd76a").opacity(0.85) : flick ? Color(hex: "#e07aa0").opacity(0.7) : .clear, radius: 26)
                         Text(big(s, myTap, lit, partner)).font(.px(34, 700)).foregroundStyle(Color.paper)
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 24)
+                    // (the whole rest of the screen is the pad)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(lit ? Color(hex: "#3a2f22") : Color(hex: "#1b1518"))
                     .overlay(Rectangle().strokeBorder(Color(hex: "#0f0b0c"), lineWidth: 4))
                 }

@@ -112,6 +112,8 @@ public protocol LiveRules {
     associatedtype A: LiveValue
     /// a fresh game; `rng` is seeded from the match so anything random comes out the same on both screens
     func initial(_ rng: @escaping Random, now: Double) -> S
+    /// a fresh game played by a house rule (HouseRules.swift); the rule's id goes in the state
+    func initial(_ rng: @escaping Random, now: Double, rule: String?) -> S
     /// someone did something (runs on the host); nil when it changes nothing
     func act(_ s: S, _ seat: Side, _ a: A, now: Double) -> S?
     /// time passing (runs on the host every tickMs once the countdown is over); nil when nothing changed
@@ -130,6 +132,7 @@ public protocol LiveRules {
 }
 
 public extension LiveRules {
+    func initial(_ rng: @escaping Random, now: Double, rule: String?) -> S { initial(rng, now: now) }
     func tick(_ s: S, now: Double) -> S? { nil }
     var hasTick: Bool { true }
     func bot(_ s: S, _ seat: Side, now: Double) -> A? { nil }
@@ -447,6 +450,24 @@ public final class LiveSession<R: LiveRules> {
         if let m = match, let c = Play.liveCancel(m) { place?.saveGame(c) }
     }
 
+    /// the house rule: the one being played by, or (before the game) the one it'll be
+    public var rule: HouseRule? {
+        if let s = state { return HouseRules.byId(kind, s.doc.str("rule")) }
+        guard let m = match, m.status != .over else { return nil }
+        return HouseRules.of(m)
+    }
+
+    /// whether the rule can still be swapped (once, before the game)
+    public var canReroll: Bool {
+        guard let m = match, m.status == .setup, HouseRules.of(m) != nil else { return false }
+        return (m.state.int("rerolls") ?? 0) < HouseRules.rerolls
+    }
+
+    /// swap the house rule for the next one
+    public func reroll() {
+        if let m = match, let r = HouseRules.reroll(m, mySeat) { place?.saveGame(r) }
+    }
+
     public func act(_ a: R.A, fast: Bool = false) {
         if host { apply(mySeat, a) } else { link?.send(["k": "a", "a": a.doc], fast: fast) }
     }
@@ -482,7 +503,7 @@ public final class LiveSession<R: LiveRules> {
 
         // start the game once you're both here
         if let m, playing, host, ready, demo || linkPartnerHere, eng?.mid != m.id {
-            let s = rules.initial(seeded(m.state.int("seed") ?? 0), now: now)
+            let s = rules.initial(seeded(m.state.int("seed") ?? 0), now: now, rule: HouseRules.of(m)?.id)
             eng = Engine(mid: m.id, g: "\(m.id):\(String(Int.random(in: 0..<60_000_000), radix: 36))", v: 1, s: s, startAt: now + Play.countdownMs, end: nil, phase: rules.phase(s))
             share(careful: true)
         }

@@ -18,6 +18,7 @@ import { type CarromState, botShot as carromBot, simulate as carromSim } from '.
 import { TUG } from '../src/games/tug';
 import { RPS } from '../src/games/rps';
 import { QUICK } from '../src/games/quickdraw';
+import { HOUSE_RULES, houseRule } from '../src/games/live/houseRules';
 import { COUNTDOWN_MS, type LiveDef, seeded } from '../src/games/live/lobby';
 import { DH, DW, OLD_DH, OLD_DW, WORDS, brushLine, brushSize, fillCells, fullCanvas, fullOps, judge, packCells, pickChoices } from '../src/games/doodle';
 import { COASTERS } from '../src/games/coasters';
@@ -255,17 +256,20 @@ for (let g = 0; g < 2; g++) {
 // small steps, each partner asked for a move every so often), with Math.random made repeatable, so the iPhone's
 // rules can be checked step by step
 type LiveStep = { t: number; op: 'init' | 'tick' | 'act'; seat?: Seat; a?: unknown; changed?: boolean; s: unknown };
-const live: Array<{ kind: string; seed: number; start: number; steps: LiveStep[]; result: unknown }> = [];
+const live: Array<{ kind: string; seed: number; start: number; rule?: string; steps: LiveStep[]; result: unknown }> = [];
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const liveDefs: Record<string, LiveDef<any, any>> = { tug: TUG, rps: RPS, quickdraw: QUICK, kitchen: KITCHEN };
 const realRandom = Math.random;
 for (const kind of Object.keys(liveDefs)) {
   const def = liveDefs[kind];
-  for (let g = 0; g < 6; g++) {
+  // six plain games, then two played by each of the game's house rules
+  const rules = [...Array(6).fill(undefined), ...(HOUSE_RULES[kind as GameKind] || []).flatMap((r) => [r.id, r.id])] as Array<string | undefined>;
+  for (let g = 0; g < rules.length; g++) {
+    const rule = rules[g];
     const seed = int(2 ** 31);
     Math.random = rng(seed ^ 0x5bd1e995);
     const start = 1_790_000_000_000 + g * 1000;
-    let s = def.init(seeded(seed), start);
+    let s = def.init(seeded(seed), start, rule);
     const steps: LiveStep[] = [{ t: start, op: 'init', s }];
     const begin = start + COUNTDOWN_MS;
     let res = null;
@@ -290,7 +294,7 @@ for (const kind of Object.keys(liveDefs)) {
       }
     }
     Math.random = realRandom;
-    live.push({ kind, seed, start, steps: JSON.parse(JSON.stringify(steps)), result: res });
+    live.push({ kind, seed, start, ...(rule ? { rule } : {}), steps: JSON.parse(JSON.stringify(steps)), result: res });
   }
 }
 
@@ -376,14 +380,15 @@ Date.now = realNow;
 // iPhone's table can be checked against the website's, step by step
 type CoasterStep = { op: 'tick' | 'act'; now: number; seat?: Seat; a?: unknown; before: unknown; after: unknown };
 const coasterSteps: CoasterStep[] = [];
-for (let g = 0; g < 3; g++) {
+// (three plain games, then one by each house rule)
+for (const [g, rule] of ([undefined, undefined, undefined, 'big', 'turbo', 'sudden'] as Array<string | undefined>).entries()) {
   const seed = int(2 ** 31);
   const start = 1_790_000_000_000 + g * 100_000;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let s: any = COASTERS.init(seeded(seed), start);
+  let s: any = COASTERS.init(seeded(seed), start, rule);
   const begin = start + COUNTDOWN_MS;
   let ticks = 0;
-  for (let t = begin; t < begin + 60_000 && !COASTERS.result(s); t += 2) {
+  for (let t = begin; t < begin + (rule ? 30_000 : 60_000) && !COASTERS.result(s); t += 2) {
     const el = t - begin;
     if (el % 16 === 0) {
       const n = COASTERS.tick!(s, t);
@@ -430,6 +435,14 @@ for (const room of ROOMS)
         room.draw(s, side, step, t);
         escape.push({ room: room.id, side, step, t, hash: fnv(s.data, fnv(s.emit, 0x811c9dc5)) });
       }
+
+// house rules: the list, and which one a game gets from its seed (and after a swap)
+const houseRules = {
+  list: Object.fromEntries(Object.entries(HOUSE_RULES).map(([k, l]) => [k, (l || []).map((r) => [r.id, r.name, r.line])])),
+  picks: (Object.keys(HOUSE_RULES) as GameKind[]).flatMap((kind) =>
+    [0, 1, 2, 5, 1234567, 2147483646, int(2 ** 31), int(2 ** 31)].flatMap((seed) => [0, 1, 2].map((rerolls) => [kind, seed, rerolls, houseRule(kind, seed, rerolls)?.id ?? null])),
+  ),
+};
 
 // the record player: where the record is at any moment (from both sides of the start, and many times round),
 // where each track starts, and reading YouTube links
@@ -997,5 +1010,5 @@ const ranks = {
 };
 
 const out = process.argv[2] || 'native-fixtures.json';
-writeFileSync(out, JSON.stringify({ cards, days, hashes, rngSeq, streaks, demo, same, chapters, games, live, doodle: { judges, brushes, fills, choices, games: doodles, olds, sizes }, coasters: coasterSteps, escape, record, watch: { looks, ...watch }, wall: { doodles: wallDoodles }, room: { scenes: roomScenes, fires, visits, seasons }, snaps, recaps: { cases: recaps, months: recapMonths }, wheres, buckets, voices, carromFrames, ranks, pet: { docs: pets, ...petWords }, tapes }));
+writeFileSync(out, JSON.stringify({ houseRules, cards, days, hashes, rngSeq, streaks, demo, same, chapters, games, live, doodle: { judges, brushes, fills, choices, games: doodles, olds, sizes }, coasters: coasterSteps, escape, record, watch: { looks, ...watch }, wall: { doodles: wallDoodles }, room: { scenes: roomScenes, fires, visits, seasons }, snaps, recaps: { cases: recaps, months: recapMonths }, wheres, buckets, voices, carromFrames, ranks, pet: { docs: pets, ...petWords }, tapes }));
 console.log(`wrote ${cards.length} card days, ${streaks.length} streaks, ${demo.length} demo rooms, ${games.length} game moves, ${live.length} live games, ${doodles.length} doodle moves to ${out}`);

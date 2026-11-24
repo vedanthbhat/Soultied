@@ -43,7 +43,7 @@ jobs:
       # the record shelf's songs (scripts/shelf-audio.mjs, run before the build): made once, then kept between runs,
       # so only a song that's new or changed in src/music/shelf.json is downloaded and made again
       - id: shelf
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: public/audio/shelf
           key: shelf-audio-${{ hashFiles('src/music/shelf.json', 'scripts/shelf-audio.mjs') }}

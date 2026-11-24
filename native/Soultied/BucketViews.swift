@@ -53,7 +53,7 @@ struct BucketCard: View {
                 .buttonStyle(.px(.sage, wide: true))
         }
         .pxCard()
-        .sheet(isPresented: $open) { BucketSheet(place: place).frostedSheet() }
+        .floatingMenu(isPresented: $open) { BucketSheet(place: place) }
         // (the screenshots: the list, open)
         .onAppear { if Launch.args.contains("-bucket") { open = true } }
     }
@@ -64,7 +64,7 @@ struct BucketSheet: View {
     @State private var text = ""
     @State private var ideasAt: Int?
     @State private var showDone = false
-    @Environment(\.dismiss) private var dismiss
+    @MenuDismiss private var dismiss
 
     /// three ideas that aren't on the list yet (a different three each time you ask)
     private var ideas: [String] {
@@ -78,7 +78,7 @@ struct BucketSheet: View {
     var body: some View {
         let v = place.bucket.view
         let next = nextName(place)
-        ScrollView {
+        MenuScroll {
             VStack(alignment: .leading, spacing: 16) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Our list").font(.pxTitle).foregroundStyle(Color.inkSoft)

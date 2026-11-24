@@ -174,7 +174,7 @@ struct RoomSongControls: View {
 
 struct RoomSongPicker: View {
     let place: PlaceModel
-    @Environment(\.dismiss) private var dismiss
+    @MenuDismiss private var dismiss
     @State private var authorized = false
     @State private var connecting = false
     @State private var query = ""
@@ -182,7 +182,7 @@ struct RoomSongPicker: View {
     @State private var status = ""
 
     var body: some View {
-        ScrollView {
+        MenuScroll {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Our song").font(.pxHeading)
                 if !place.plusOpen {

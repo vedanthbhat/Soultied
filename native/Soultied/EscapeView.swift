@@ -54,9 +54,9 @@ struct EscapeScreen: View {
             session.stop()
         }
         .onChange(of: place.partnerHere) { _, _ in session.start() }
-        .sheet(item: $plusReason) { r in
-            PlusSheet(place: place, reason: r).frostedSheet()
-        }
+        .floatingMenu(item: $plusReason, fill: true) { r in PlusSheet(place: place, reason: r) }
+        // (the escape rooms cover the tabs, so cards float up here)
+        .overlay { FloatingCardHost() }
         // keeps the clock, the holding and the pings going
         .task {
             while !Task.isCancelled {

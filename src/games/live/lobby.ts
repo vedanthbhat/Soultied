@@ -17,8 +17,10 @@ export interface LiveResult {
 export interface LiveLobby {
   phase: 'lobby' | 'live' | 'done';
   joined: Partial<Record<Seat, boolean>>;
-  /** so both screens agree on anything random (questions, cards) */
+  /** so both screens agree on anything random (questions, cards, the house rule) */
   seed: number;
+  /** how many times the house rule was swapped (houseRules.ts) */
+  rerolls?: number;
   result?: LiveResult | null;
 }
 
@@ -82,8 +84,8 @@ export function seeded(seed: number) {
 
 /** The rules of one live game; useLiveGame runs them. */
 export interface LiveDef<S, A> {
-  /** a fresh game; `rng` is seeded from the match so anything random is fair */
-  init: (rng: () => number, now: number) => S;
+  /** a fresh game; `rng` is seeded from the match so anything random is fair; `rule` is the house rule's id */
+  init: (rng: () => number, now: number, rule?: string) => S;
   /** someone did something (runs on the host) */
   act: (s: S, seat: Seat, a: A, now: number) => S;
   /** time passing (runs on the host every tickMs once the countdown is over) */

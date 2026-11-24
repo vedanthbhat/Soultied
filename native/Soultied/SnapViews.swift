@@ -95,11 +95,16 @@ struct SnapCard: View {
                 item = nil
             }
         }
-        .sheet(isPresented: Binding(get: { draft != nil }, set: { if !$0 { draft = nil } })) {
-            if let d = draft { SnapPostSheet(place: place, draft: d) { draft = nil }.frostedSheet() }
+        // (each floats up as a card: FloatingCard.swift)
+        .onChange(of: draft != nil) { _, has in
+            guard has, let d = draft else { return }
+            draft = nil
+            FloatingCard.shared.show(boxed: true) { SnapPostSheet(place: place, draft: d) { FloatingCard.shared.close() } }
         }
-        .sheet(isPresented: Binding(get: { viewing != nil }, set: { if !$0 { viewing = nil } })) {
-            if let v = viewing { SnapViewer(place: place, shot: v.shot, by: v.by).frostedSheet() }
+        .onChange(of: viewing != nil) { _, has in
+            guard has, let v = viewing else { return }
+            viewing = nil
+            FloatingCard.shared.show(boxed: true) { SnapViewer(place: place, shot: v.shot, by: v.by) }
         }
     }
 
@@ -158,7 +163,7 @@ struct SnapPostSheet: View {
     @State private var caption = ""
 
     var body: some View {
-        ScrollView {
+        MenuScroll {
             VStack(alignment: .leading, spacing: 16) {
                 Text(place.snapPromptToday).font(.pxTitle).foregroundStyle(Color.inkSoft).fixedSize(horizontal: false, vertical: true)
                 Image(uiImage: draft.preview).resizable().scaledToFit().frame(maxHeight: 340).frame(maxWidth: .infinity)
@@ -189,7 +194,7 @@ struct SnapViewer: View {
     @State private var pinned = false
 
     var body: some View {
-        ScrollView {
+        MenuScroll {
             VStack(alignment: .leading, spacing: 14) {
                 Text(by == place.me ? "Yours" : place.theirName).font(.pxTitle).foregroundStyle(Color.inkSoft)
                 DataImage(url: shot.photo).aspectRatio(CGFloat(max(1, shot.w)) / CGFloat(max(1, shot.h)), contentMode: .fit).frame(maxWidth: .infinity)

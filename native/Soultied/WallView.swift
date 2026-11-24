@@ -358,7 +358,7 @@ struct PhotosPanel: View {
                 item = nil
             }
         }
-        .sheet(item: $viewing) { p in PhotoViewer(place: place, photo: p).frostedSheet() }
+        .floatingMenu(item: $viewing) { p in PhotoViewer(place: place, photo: p) }
     }
 }
 
@@ -425,10 +425,10 @@ struct PhotoViewer: View {
     let photo: Photo
     @State private var big: String?
     @State private var caption = ""
-    @Environment(\.dismiss) private var dismiss
+    @MenuDismiss private var dismiss
 
     var body: some View {
-        ScrollView {
+        MenuScroll {
             VStack(alignment: .leading, spacing: 14) {
                 DataImage(url: big ?? photo.thumb).aspectRatio(CGFloat(photo.w) / CGFloat(max(1, photo.h)), contentMode: .fit).frame(maxWidth: .infinity)
                     .padding(PX).background(NotchedFrame(notch: PX).fill(Color.ink))

@@ -107,6 +107,15 @@ public struct Kitchen: LiveRules {
         public var burnt: Int
         public var news: News?
         public var over: Bool
+        /// the house rule: "rush", "swap" or "hungry"
+        public var rule: String?
+        /// Switch stations: the two of you have swapped
+        public var swapped: Bool?
+
+        /// how long an order waits (Hungry customers: not as long)
+        public var patienceMs: Double { rule == "hungry" ? 30_000 : Kitchen.patienceMs }
+        /// the gap between new orders, at the start of the shift and at the end (Rush hour: shorter)
+        var orderGap: (Double, Double) { rule == "rush" ? (8_000, 4_500) : Kitchen.orderGap }
 
         public static func == (l: State, r: State) -> Bool { l.json == r.json }
         var json: String { (try? JSONSerialization.data(withJSONObject: doc, options: [.sortedKeys])).map { String(decoding: $0, as: UTF8.self) } ?? "" }
@@ -131,15 +140,19 @@ public struct Kitchen: LiveRules {
             burnt = d.int("burnt") ?? 0
             if let n = d["news"] as? Doc, let kind = n.str("kind") { news = News(kind: kind, at: n.num("at") ?? 0, dish: n.str("dish").flatMap { Dish(rawValue: $0) }) }
             over = d.bool("over")
+            rule = d.str("rule")
+            if d["swapped"] is Bool || d["swapped"] is NSNumber { swapped = d.bool("swapped") }
         }
 
-        init(chop: Side, startAt: Double, seed: UInt32) {
+        init(chop: Side, startAt: Double, seed: UInt32, rule: String? = nil) {
+            self.rule = rule
+            if rule == "swap" { swapped = false }
             self.chop = chop
             cook = chop.other
             self.startAt = startAt
             endsAt = startAt + Kitchen.shiftMs
             orders = []
-            nextOrderAt = startAt + Kitchen.orderGap.0
+            nextOrderAt = startAt + (rule == "rush" ? 8_000 : Kitchen.orderGap.0)
             nextId = 1
             self.seed = seed
             pass = []
@@ -151,10 +164,13 @@ public struct Kitchen: LiveRules {
         }
 
         public var doc: Doc {
-            ["roles": ["chop": chop.rawValue, "cook": cook.rawValue], "startAt": startAt, "endsAt": endsAt, "orders": orders.map(\.doc), "nextOrderAt": nextOrderAt,
-             "nextId": nextId, "seed": Int(seed), "board": board.map { ["ing": $0.ing.rawValue, "chops": $0.chops] as Doc } as Any? ?? NSNull(),
-             "pass": pass.map(\.rawValue), "pot": pot.map(\.rawValue), "cookStart": cookStart as Any? ?? NSNull(), "served": served, "missed": missed, "burnt": burnt,
-             "news": news?.doc as Any? ?? NSNull(), "over": over]
+            var d: Doc = ["roles": ["chop": chop.rawValue, "cook": cook.rawValue], "startAt": startAt, "endsAt": endsAt, "orders": orders.map(\.doc), "nextOrderAt": nextOrderAt,
+                          "nextId": nextId, "seed": Int(seed), "board": board.map { ["ing": $0.ing.rawValue, "chops": $0.chops] as Doc } as Any? ?? NSNull(),
+                          "pass": pass.map(\.rawValue), "pot": pot.map(\.rawValue), "cookStart": cookStart as Any? ?? NSNull(), "served": served, "missed": missed, "burnt": burnt,
+                          "news": news?.doc as Any? ?? NSNull(), "over": over]
+            if let rule { d["rule"] = rule }
+            if let swapped { d["swapped"] = swapped }
+            return d
         }
     }
 
@@ -227,7 +243,7 @@ public struct Kitchen: LiveRules {
         var n = s
         n.seed = next
         n.nextId = s.nextId + 1
-        n.orders.append(Order(id: s.nextId, dish: dish, at: now, until: now + patienceMs))
+        n.orders.append(Order(id: s.nextId, dish: dish, at: now, until: now + s.patienceMs))
         return n
     }
 
@@ -240,10 +256,12 @@ public struct Kitchen: LiveRules {
         return need
     }
 
-    public func initial(_ rng: @escaping Random, now: Double) -> State {
+    public func initial(_ rng: @escaping Random, now: Double) -> State { initial(rng, now: now, rule: nil) }
+
+    public func initial(_ rng: @escaping Random, now: Double, rule: String?) -> State {
         let startAt = now + Play.countdownMs
         let chop: Side = rng() < 0.5 ? .a : .b
-        var s = State(chop: chop, startAt: startAt, seed: UInt32(floorInt(rng() * 4_294_967_296)))
+        var s = State(chop: chop, startAt: startAt, seed: UInt32(floorInt(rng() * 4_294_967_296)), rule: rule)
         s = Self.newOrder(s, startAt, easy: true)
         s = Self.newOrder(s, startAt, easy: true)
         return s
@@ -312,6 +330,15 @@ public struct Kitchen: LiveRules {
             return n
         }
         var changed = false
+        // Switch stations: halfway through, the chopper cooks and the cook chops (what's on the board, the pass and
+        // the pot stays where it is)
+        if s.rule == "swap", s.swapped == false, now >= s.startAt + Self.shiftMs / 2 {
+            n.chop = s.cook
+            n.cook = s.chop
+            n.swapped = true
+            n.news = News(kind: "swap", at: now, dish: nil)
+            changed = true
+        }
         // a pot left on the stove
         if let c = n.cookStart, now - c >= Self.cookMs + Self.burnMs {
             n.pot = []
@@ -331,7 +358,8 @@ public struct Kitchen: LiveRules {
         // new orders, more often as the shift goes on
         if now >= n.nextOrderAt {
             let k = min(1, (now - n.startAt) / Self.shiftMs)
-            let gap = Self.orderGap.0 + (Self.orderGap.1 - Self.orderGap.0) * k
+            let g = n.orderGap
+            let gap = g.0 + (g.1 - g.0) * k
             if n.orders.count < Self.maxOrders { n = Self.newOrder(n, now, easy: n.served + n.missed < 1) }
             n.nextOrderAt = now + gap
             changed = true

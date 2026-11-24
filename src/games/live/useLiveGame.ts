@@ -4,6 +4,7 @@ import { useGames } from '../GamesContext';
 import type { GameKind, Match, Seat } from '../types';
 import { otherSeat } from '../types';
 import { GameLink, type LinkMode, type PlayWire } from './link';
+import { REROLLS, liveReroll, ruleById, ruleOf } from './houseRules';
 import { COUNTDOWN_MS, type LiveDef, type LiveLobby, type LiveResult, liveCancel, liveFinish, liveJoin, liveStale, newLive, seeded } from './lobby';
 
 /**
@@ -136,7 +137,7 @@ export function useLiveGame<S, A>(kind: GameKind, def: LiveDef<S, A>) {
     if (!demo && !partnerHere) return;
     if (eng.current && eng.current.mid === m.id) return;
     const now = Date.now();
-    const s = defRef.current.init(seeded(m.state.seed), now);
+    const s = defRef.current.init(seeded(m.state.seed), now, ruleOf(m)?.id);
     eng.current = {
       mid: m.id,
       g: `${m.id}:${Math.random().toString(36).slice(2, 7)}`,
@@ -275,6 +276,11 @@ export function useLiveGame<S, A>(kind: GameKind, def: LiveDef<S, A>) {
     const j = cur ? liveJoin(cur, mySeat) : null;
     if (j) save(j);
   }, [save, mySeat]);
+  const reroll = useCallback(() => {
+    const cur = mRef.current;
+    const r = cur ? liveReroll(cur, mySeat) : null;
+    if (r) save(r);
+  }, [save, mySeat]);
   const cancel = useCallback(() => {
     const cur = mRef.current;
     const c = cur ? liveCancel(cur) : null;
@@ -313,6 +319,11 @@ export function useLiveGame<S, A>(kind: GameKind, def: LiveDef<S, A>) {
     invite,
     join,
     cancel,
+    /** the house rule: the one being played by, or (before the game) the one it'll be */
+    rule: view.s ? ruleById(kind, (view.s as unknown as { rule?: string }).rule) : m && m.status !== 'over' ? ruleOf(m) : null,
+    /** whether the rule can still be swapped (once, before the game) */
+    canReroll: !!m && m.status === 'setup' && (m.state.rerolls || 0) < REROLLS && !!ruleOf(m),
+    reroll,
     clock,
   };
 }

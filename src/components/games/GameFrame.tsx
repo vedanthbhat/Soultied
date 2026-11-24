@@ -57,6 +57,21 @@ const PlayerChip: React.FC<{ seat: Seat; match: Match | null; marker?: (s: Seat)
   );
 };
 
+/** a small face and name for the bar along the top of a game that fills the screen */
+export const MiniChip: React.FC<{ seat: Seat; note?: React.ReactNode }> = ({ seat, note }) => {
+  const { seatUser, seatName, mySeat } = useGames();
+  const user = seatUser(seat);
+  return (
+    <span className="flex items-center gap-1.5 min-w-0">
+      <span className="shrink-0 -my-1">{user ? <AvatarThumb config={user.avatar} region="head" size={30} /> : <span className="inline-block w-[30px] h-[30px]" />}</span>
+      <span className="flex flex-col min-w-0 leading-tight">
+        <span className="font-bold truncate text-sm">{seat === mySeat ? 'You' : seatName(seat)}</span>
+        {note ? <span className="text-[11px] opacity-75 truncate">{note}</span> : null}
+      </span>
+    </span>
+  );
+};
+
 export const GameFrame: React.FC<{
   title: string;
   onBack: () => void;

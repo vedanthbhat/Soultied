@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useLiveGame } from '../../games/live/useLiveGame';
 import type { LiveGame } from '../../games/live/useLiveGame';
-import { COASTERS, CORNER_R, CoastersAct, CoastersState, GOAL_X0, GOAL_X1, MALLET_R, MID, PUCK_R, TABLE_H, TABLE_W, TO_WIN, glide, reach } from '../../games/coasters';
+import { COASTERS, CORNER_R, CoastersAct, CoastersState, GOAL_X0, GOAL_X1, MALLET_R, MID, PUCK_R, TABLE_H, TABLE_W, TO_WIN, glide, reach, toWinOf, tuneOf } from '../../games/coasters';
 import type { Body } from '../../games/coasters';
 import type { Seat } from '../../games/types';
 import { tone } from '../../escape/sfx';
-import { LiveFrame, useNow } from './LiveFrame';
+import { LiveFrame, useNow, useStage } from './LiveFrame';
 
 /** coasters move at most this fast (the same as the rules), for drawing them between updates */
 const MALLET_SPEED = 330;
@@ -103,10 +103,10 @@ function coaster(ctx: CanvasRenderingContext2D, x: number, y: number, band: stri
   disc(ctx, x, y, 1, band);
 }
 
-function cap(ctx: CanvasRenderingContext2D, x: number, y: number) {
-  disc(ctx, x + 1, y + 1, PUCK_R, 'rgba(20,10,8,.45)');
-  disc(ctx, x, y, PUCK_R, '#8f2f2b');
-  disc(ctx, x, y, PUCK_R - 1, '#c4453f');
+function cap(ctx: CanvasRenderingContext2D, x: number, y: number, r = PUCK_R) {
+  disc(ctx, x + 1, y + 1, r, 'rgba(20,10,8,.45)');
+  disc(ctx, x, y, r, '#8f2f2b');
+  disc(ctx, x, y, r - 1, '#c4453f');
   ctx.fillStyle = '#f08a80';
   ctx.fillRect(Math.round(x) - 1, Math.round(y) - 2, 2, 1);
 }
@@ -169,7 +169,7 @@ const Table: React.FC<{
         return;
       }
       const age = Math.max(0, (Date.now() - clock(s.t)) / 1000);
-      const p: Body = Date.now() < clock(s.serveAt) ? s.puck : glide(s.puck, age);
+      const p: Body = Date.now() < clock(s.serveAt) ? s.puck : glide(s.puck, age, s.rule);
       const mine = s.mal[mySeat];
       const want = aim.current && live ? aim.current : { x: mine.tx, y: mine.ty };
       const m1 = towards(mine, want.x, want.y, age + 0.05);
@@ -178,7 +178,7 @@ const Table: React.FC<{
       const pv = view(p.x, p.y);
       const v1 = view(m1.x, m1.y);
       const v2 = view(m2.x, m2.y);
-      cap(ctx, pv.x, pv.y);
+      cap(ctx, pv.x, pv.y, tuneOf(s.rule).r);
       coaster(ctx, v2.x, v2.y, '#8a9a72');
       coaster(ctx, v1.x, v1.y, '#b8674f');
     };
@@ -204,6 +204,9 @@ const Table: React.FC<{
     });
   };
 
+  // in a game, the table is as big as the screen allows (leaving room for the scores above and below it)
+  const stage = useStage();
+  const fitW = stage ? Math.max(120, Math.min(stage.w - 12, ((stage.h - 84) * TABLE_W) / TABLE_H)) : 0;
   return (
     <canvas
       ref={ref}
@@ -211,9 +214,7 @@ const Table: React.FC<{
       height={TABLE_H}
       className="pixelated block mx-auto select-none"
       style={{
-        height: 'min(62vh, 640px)',
-        aspectRatio: `${TABLE_W} / ${TABLE_H}`,
-        maxWidth: '100%',
+        ...(stage ? { width: fitW, height: (fitW * TABLE_H) / TABLE_W } : { height: 'min(62vh, 640px)', aspectRatio: `${TABLE_W} / ${TABLE_H}`, maxWidth: '100%' }),
         boxShadow: '0 0 0 4px #1b1411, 8px 8px 0 4px rgba(0,0,0,.35)',
         touchAction: 'none',
         cursor: live ? 'none' : 'default',
@@ -259,7 +260,7 @@ export const CoastersGame: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
   const pips = (seat: Seat) => (
     <span className="flex gap-1.5 flex-wrap">
-      {[...Array(TO_WIN).keys()].map((i) => (
+      {[...Array(toWinOf(s)).keys()].map((i) => (
         <span key={i} style={{ width: 12, height: 12, background: (s?.score[seat] || 0) > i ? '#ffd76a' : 'rgba(239,227,203,.18)', boxShadow: '0 0 0 2px #1b1411' }} />
       ))}
     </span>
@@ -287,7 +288,7 @@ export const CoastersGame: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       poster={<Table state={null} mySeat={mySeat} clock={clock} live={false} />}
       width={720}
     >
-      <div className="flex flex-col items-center gap-3">
+      <div className="flex flex-col items-center justify-center gap-3 h-full">
         <div className="flex items-center justify-between w-full max-w-[420px] font-bold gap-3">
           <span className="flex items-center gap-2">
             {partner} {pips(them)}

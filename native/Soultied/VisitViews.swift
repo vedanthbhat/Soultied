@@ -37,7 +37,7 @@ struct CountdownCard: View {
         }
         .pxCard()
         .accessibilityElement(children: .combine)
-        .sheet(isPresented: $editing) { VisitSheet(place: place).frostedSheet() }
+        .floatingMenu(isPresented: $editing) { VisitSheet(place: place) }
     }
 }
 
@@ -45,7 +45,7 @@ struct VisitSheet: View {
     let place: PlaceModel
     @State private var day = Date()
     @State private var what = ""
-    @Environment(\.dismiss) private var dismiss
+    @MenuDismiss private var dismiss
 
     private var range: ClosedRange<Date> {
         let start = Calendar.current.startOfDay(for: Date())
@@ -53,7 +53,7 @@ struct VisitSheet: View {
     }
 
     var body: some View {
-        ScrollView {
+        MenuScroll {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Next time together").font(.pxTitle).foregroundStyle(Color.inkSoft)
                 Text("Pick the day you’ll see each other. \(place.theirName) gets the countdown too, on Soultied and on the widgets.")

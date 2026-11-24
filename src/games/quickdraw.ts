@@ -30,11 +30,30 @@ export interface QuickState {
   /** what happened last round */
   last: { winner: Seat | null; taps: Partial<Record<Seat, QuickTap>> } | null;
   winner: Seat | null;
+  /** the house rule (houseRules.ts): 'fake', 'fuse' or 'five' */
+  rule?: string;
+  /** Fake-outs: when the lantern flickers this round, before it really lights (0: it doesn't) */
+  fakeAt?: number;
 }
+
+/** rounds to win */
+export const toWinOf = (s: QuickState | null | undefined) => (s?.rule === 'five' ? 5 : TO_WIN);
+/** how long a fake-out flicker lasts */
+export const FAKE_MS = 260;
 
 export type QuickAct = QuickTap & { round: number };
 
-const nextLit = (now: number) => now + 1400 + Math.random() * 2800;
+const nextLit = (now: number, rule?: string) => now + 1400 + Math.random() * (rule === 'fuse' ? 6600 : 2800);
+
+/** a new round's lantern: when it lights, and (Fake-outs) whether and when it flickers first */
+function lantern(from: number, rule?: string): { litAt: number; fakeAt?: number } {
+  const litAt = nextLit(from, rule);
+  if (rule !== 'fake') return { litAt };
+  const r = Math.random();
+  // most rounds flicker once, somewhere between a beat after the round starts and a moment before it lights
+  const span = litAt - 1000 - from;
+  return { litAt, fakeAt: r < 0.7 && span > 0 ? from + 600 + Math.random() * span : 0 };
+}
 
 function resolve(s: QuickState, now: number): QuickState {
   const t = s.taps;
@@ -55,15 +74,16 @@ function resolve(s: QuickState, now: number): QuickState {
 }
 
 export const QUICK: LiveDef<QuickState, QuickAct> = {
-  init: (_rng, now) => ({
+  init: (_rng, now, rule) => ({
     round: 1,
     score: { a: 0, b: 0 },
     phase: 'play',
-    litAt: nextLit(now + COUNTDOWN_MS),
+    ...lantern(now + COUNTDOWN_MS, rule),
     taps: {},
     showUntil: 0,
     last: null,
     winner: null,
+    ...(rule ? { rule } : {}),
   }),
   act: (s, seat, a, now) => {
     if (s.winner || s.phase !== 'play' || !a || a.round !== s.round || s.taps[seat]) return s;
@@ -78,8 +98,8 @@ export const QUICK: LiveDef<QuickState, QuickAct> = {
     if (s.winner) return s;
     if (s.phase === 'play' && now > s.litAt + WINDOW_MS) return resolve(s, now);
     if (s.phase === 'show' && now >= s.showUntil) {
-      if (s.score.a >= TO_WIN || s.score.b >= TO_WIN) return { ...s, winner: s.score.a > s.score.b ? 'a' : 'b' };
-      return { ...s, phase: 'play', round: s.round + 1, taps: {}, litAt: nextLit(now) };
+      if (s.score.a >= toWinOf(s) || s.score.b >= toWinOf(s)) return { ...s, winner: s.score.a > s.score.b ? 'a' : 'b' };
+      return { ...s, phase: 'play', round: s.round + 1, taps: {}, ...lantern(now, s.rule) };
     }
     return s;
   },

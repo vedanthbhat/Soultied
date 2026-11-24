@@ -63,7 +63,21 @@ export interface CoastersState {
   hits: number;
   lastGoal: Seat | null;
   winner: Seat | null;
+  /** the house rule (houseRules.ts): 'big', 'turbo' or 'sudden' */
+  rule?: string;
 }
+
+/** how the cap behaves under a house rule: its size, its top speed, and how much it slows */
+export interface Tune {
+  r: number;
+  max: number;
+  glide: number;
+}
+const TUNE: Tune = { r: PUCK_R, max: MAX_PUCK, glide: GLIDE };
+export const tuneOf = (rule?: string | null): Tune =>
+  rule === 'big' ? { ...TUNE, r: 6 } : rule === 'turbo' ? { ...TUNE, max: 330, glide: 0.86 } : TUNE;
+/** goals to win */
+export const toWinOf = (s: CoastersState | null | undefined) => (s?.rule === 'sudden' ? 3 : TO_WIN);
 
 export interface CoastersAct {
   /** where I want my coaster, on the table (not my screen's turned-round view of it) */
@@ -88,11 +102,11 @@ const home = (seat: Seat): Coaster => {
 /** the puck, waiting in the half of whoever's to serve */
 const served = (to: Seat): Body => ({ x: TABLE_W / 2, y: to === 'a' ? MID + 24 : MID - 24, vx: 0, vy: 0 });
 
-function hit(p: Body, m: Coaster) {
+function hit(p: Body, m: Coaster, r: number) {
   const dx = p.x - m.x;
   const dy = p.y - m.y;
   const d = Math.hypot(dx, dy);
-  const min = PUCK_R + MALLET_R;
+  const min = r + MALLET_R;
   if (d >= min) return false;
   const nx = d > 1e-4 ? dx / d : 0;
   const ny = d > 1e-4 ? dy / d : m.y > MID ? -1 : 1;
@@ -107,7 +121,8 @@ function hit(p: Body, m: Coaster) {
 }
 
 /** Move everything on by `dt` seconds. Returns who scored, if anyone did. */
-function step(s: { puck: Body; mal: Record<Seat, Coaster> }, dt: number, puckLive: boolean) {
+function step(s: { puck: Body; mal: Record<Seat, Coaster> }, dt: number, puckLive: boolean, tune: Tune = TUNE) {
+  const PR = tune.r;
   let touches = 0;
   let goal: Seat | null = null;
   const n = Math.max(1, Math.ceil(dt / STEP));
@@ -129,44 +144,44 @@ function step(s: { puck: Body; mal: Record<Seat, Coaster> }, dt: number, puckLiv
     if (!puckLive) continue;
     p.x += p.vx * h;
     p.y += p.vy * h;
-    const drag = Math.pow(GLIDE, h);
+    const drag = Math.pow(tune.glide, h);
     p.vx *= drag;
     p.vy *= drag;
-    const hitA = hit(p, s.mal.a);
-    const hitB = hit(p, s.mal.b);
+    const hitA = hit(p, s.mal.a, PR);
+    const hitB = hit(p, s.mal.b, PR);
     if (hitA) touches++;
     if (hitB) touches++;
     const sp = Math.hypot(p.vx, p.vy);
-    if (sp > MAX_PUCK) {
-      p.vx *= MAX_PUCK / sp;
-      p.vy *= MAX_PUCK / sp;
+    if (sp > tune.max) {
+      p.vx *= tune.max / sp;
+      p.vy *= tune.max / sp;
     }
     // the side rails
-    if (p.x < PUCK_R) {
-      p.x = PUCK_R;
+    if (p.x < PR) {
+      p.x = PR;
       p.vx = Math.abs(p.vx) * RAIL_E;
-    } else if (p.x > TABLE_W - PUCK_R) {
-      p.x = TABLE_W - PUCK_R;
+    } else if (p.x > TABLE_W - PR) {
+      p.x = TABLE_W - PR;
       p.vx = -Math.abs(p.vx) * RAIL_E;
     }
     // the ends: a rail, except for the goal mouth
     const mouth = p.x > GOAL_X0 + 1 && p.x < GOAL_X1 - 1;
-    if (p.y < PUCK_R && !mouth) {
-      p.y = PUCK_R;
+    if (p.y < PR && !mouth) {
+      p.y = PR;
       p.vy = Math.abs(p.vy) * RAIL_E;
-    } else if (p.y > TABLE_H - PUCK_R && !mouth) {
-      p.y = TABLE_H - PUCK_R;
+    } else if (p.y > TABLE_H - PR && !mouth) {
+      p.y = TABLE_H - PR;
       p.vy = -Math.abs(p.vy) * RAIL_E;
     }
     // the corners are rounded, so the puck rolls out of one rather than getting wedged in it
-    let edge = p.x <= PUCK_R + 0.5 || p.x >= TABLE_W - PUCK_R - 0.5 || (!mouth && (p.y <= PUCK_R + 0.5 || p.y >= TABLE_H - PUCK_R - 0.5));
+    let edge = p.x <= PR + 0.5 || p.x >= TABLE_W - PR - 0.5 || (!mouth && (p.y <= PR + 0.5 || p.y >= TABLE_H - PR - 0.5));
     const cx = p.x < CORNER_R ? CORNER_R : p.x > TABLE_W - CORNER_R ? TABLE_W - CORNER_R : -1;
     const cy = p.y < CORNER_R ? CORNER_R : p.y > TABLE_H - CORNER_R ? TABLE_H - CORNER_R : -1;
     if (cx >= 0 && cy >= 0) {
       const dx = p.x - cx;
       const dy = p.y - cy;
       const d = Math.hypot(dx, dy);
-      const most = CORNER_R - PUCK_R;
+      const most = CORNER_R - PR;
       if (d > most) {
         const nx = dx / d;
         const ny = dy / d;
@@ -188,8 +203,8 @@ function step(s: { puck: Body; mal: Record<Seat, Coaster> }, dt: number, puckLiv
       p.vx = (tx / d) * NUDGE;
       p.vy = (ty / d) * NUDGE;
     }
-    if (p.y < -PUCK_R) goal = 'a';
-    else if (p.y > TABLE_H + PUCK_R) goal = 'b';
+    if (p.y < -PR) goal = 'a';
+    else if (p.y > TABLE_H + PR) goal = 'b';
   }
   return { touches, goal };
 }
@@ -198,16 +213,17 @@ function step(s: { puck: Body; mal: Record<Seat, Coaster> }, dt: number, puckLiv
  * Where the puck will look to be `dt` seconds after a state (for drawing between updates):
  * it slides on, bouncing off the rails, but never into a goal.
  */
-export function glide(p: Body, dt: number): Body {
+export function glide(p: Body, dt: number, rule?: string | null): Body {
   const q = { ...p };
   const s = { puck: q, mal: { a: { ...home('a'), x: -99, y: -99, tx: -99, ty: -99 }, b: { ...home('b'), x: -99, y: -99, tx: -99, ty: -99 } } };
-  step(s, Math.max(0, Math.min(0.15, dt)), true);
-  q.y = clamp(q.y, -PUCK_R, TABLE_H + PUCK_R);
+  const tune = tuneOf(rule);
+  step(s, Math.max(0, Math.min(0.15, dt)), true, tune);
+  q.y = clamp(q.y, -tune.r, TABLE_H + tune.r);
   return q;
 }
 
 export const COASTERS: LiveDef<CoastersState, CoastersAct> = {
-  init: (rng, now) => ({
+  init: (rng, now, rule) => ({
     puck: served(rng() < 0.5 ? 'a' : 'b'),
     mal: { a: home('a'), b: home('b') },
     score: { a: 0, b: 0 },
@@ -216,6 +232,7 @@ export const COASTERS: LiveDef<CoastersState, CoastersAct> = {
     hits: 0,
     lastGoal: null,
     winner: null,
+    ...(rule ? { rule } : {}),
   }),
   act: (s, seat, a) => {
     if (s.winner || !a || !Number.isFinite(a.x) || !Number.isFinite(a.y)) return s;
@@ -228,7 +245,7 @@ export const COASTERS: LiveDef<CoastersState, CoastersAct> = {
     if (s.winner) return s;
     const dt = Math.max(0, Math.min(0.05, (now - s.t) / 1000));
     const next = { puck: { ...s.puck }, mal: { a: { ...s.mal.a }, b: { ...s.mal.b } } };
-    const { touches, goal } = step(next, dt, now >= s.serveAt);
+    const { touches, goal } = step(next, dt, now >= s.serveAt, tuneOf(s.rule));
     const round = (b: Body) => ({ ...b, x: r2(b.x), y: r2(b.y), vx: r2(b.vx), vy: r2(b.vy) });
     const base = {
       ...s,
@@ -246,7 +263,7 @@ export const COASTERS: LiveDef<CoastersState, CoastersAct> = {
       lastGoal: goal,
       puck: served(conceded),
       serveAt: now + SERVE_MS,
-      winner: score[goal] >= TO_WIN ? goal : null,
+      winner: score[goal] >= toWinOf(s) ? goal : null,
     };
   },
   result: (s) => {
@@ -258,11 +275,11 @@ export const COASTERS: LiveDef<CoastersState, CoastersAct> = {
   // the demo room's partner: guards its goal, and goes for the puck when it's on their side
   bot: (s, seat, now) => {
     if (s.winner || now < s.serveAt - 300) return null;
-    const p = glide(s.puck, 0.08);
+    const p = glide(s.puck, 0.08, s.rule);
     const mine = seat === 'a' ? p.y > MID : p.y < MID;
     const back = seat === 'a' ? 1 : -1;
     const jitter = (Math.sin(now / 370) + Math.sin(now / 910)) * 3;
-    if (mine) return { x: p.x + jitter * 0.6, y: p.y + back * (PUCK_R + 2) };
+    if (mine) return { x: p.x + jitter * 0.6, y: p.y + back * (tuneOf(s.rule).r + 2) };
     const homeY = seat === 'a' ? TABLE_H - 20 : 20;
     return { x: TABLE_W / 2 + (p.x - TABLE_W / 2) * 0.55 + jitter, y: homeY };
   },

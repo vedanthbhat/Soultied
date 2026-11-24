@@ -153,7 +153,7 @@ struct PetSheet: View {
     @State private var said: PetSaid?
 
     var body: some View {
-        ScrollView {
+        MenuScroll {
             VStack(alignment: .leading, spacing: 16) {
                 if let v = place.petView, let item = Catalogue.item(.pet, place.decor.pet) {
                     let name = place.petCallName

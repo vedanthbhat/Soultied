@@ -1,10 +1,10 @@
 import React, { useEffect, useRef } from 'react';
 import { useLiveGame } from '../../games/live/useLiveGame';
 import type { LiveGame } from '../../games/live/useLiveGame';
-import { HANDS, Hand, PICK_MS, RPS, RpsAct, RpsState, TO_WIN } from '../../games/rps';
+import { HANDS, Hand, PICK_MS, RPS, RpsAct, RpsState, TO_WIN, bannedHand, pickMsOf } from '../../games/rps';
 import type { Seat } from '../../games/types';
 import { sfx, tone } from '../../escape/sfx';
-import { LiveFrame, useNow } from './LiveFrame';
+import { LiveFrame, useNow, useStage } from './LiveFrame';
 import { Sprite } from './Pixel';
 
 const ART: Record<Hand, { rows: string[]; pal: Record<string, string> }> = {
@@ -30,6 +30,12 @@ export const HandArt: React.FC<{ hand: Hand; size: number; flip?: boolean }> = (
   </span>
 );
 
+/** bigger hands when the screen's tall enough for them */
+const Big: React.FC<{ children: (big: boolean) => React.ReactNode }> = ({ children }) => {
+  const stage = useStage();
+  return <>{children(!!stage && stage.h > 560)}</>;
+};
+
 export const RpsGame: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const game = useLiveGame<RpsState, RpsAct>('rps', RPS);
   const { state: s, mySeat, them, partner, act, stage, clock } = game;
@@ -49,7 +55,7 @@ export const RpsGame: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   }, [s, mySeat]);
 
   const pick = (h: Hand) => {
-    if (!picking || myPick || !s) return;
+    if (!picking || myPick || !s || bannedHand(s) === h) return;
     act({ round: s.round, hand: h });
     tone(520, 0.05, 0, 'square', 0.03);
   };
@@ -110,58 +116,68 @@ export const RpsGame: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       }
       width={760}
     >
-      <div className="flex flex-col items-center gap-4">
-        <div className="flex items-center justify-between w-full max-w-[560px] font-bold">
-          <span className="flex items-center gap-2">You {pips(mySeat)}</span>
-          <span className="flex items-center gap-2">
-            {pips(them)} {partner}
-          </span>
-        </div>
-        {/* the table: your hand on the left, theirs on the right */}
-        <div className="flex items-center justify-around w-full max-w-[560px] py-4" style={{ background: '#3a2b25', boxShadow: '0 0 0 4px #1b1411', minHeight: 170 }}>
-          <div className="flex flex-col items-center gap-2">
-            {shown?.hands[mySeat] || myPick ? <HandArt hand={(shown?.hands[mySeat] || myPick) as Hand} size={110} /> : <span className="text-6xl opacity-40">?</span>}
-            <span className="text-sm opacity-80">You</span>
-          </div>
-          <div className="text-3xl font-bold opacity-70">vs</div>
-          <div className="flex flex-col items-center gap-2">
-            {shown?.hands[them] ? (
-              <HandArt hand={shown.hands[them] as Hand} size={110} flip />
-            ) : (
-              <span className="text-6xl" style={{ opacity: theyPicked ? 0.9 : 0.35 }}>
-                {theyPicked ? '✓' : '?'}
+      <Big>
+        {(big) => (
+          <div className="flex flex-col items-center justify-center gap-5 h-full">
+            <div className="flex items-center justify-between w-full max-w-[560px] font-bold">
+              <span className="flex items-center gap-2">You {pips(mySeat)}</span>
+              <span className="flex items-center gap-2">
+                {pips(them)} {partner}
               </span>
+            </div>
+            {/* the table: your hand on the left, theirs on the right */}
+            <div className="flex items-center justify-around w-full max-w-[560px] py-4" style={{ background: '#3a2b25', boxShadow: '0 0 0 4px #1b1411', minHeight: big ? 240 : 170 }}>
+              <div className="flex flex-col items-center gap-2">
+                {shown?.hands[mySeat] || myPick ? <HandArt hand={(shown?.hands[mySeat] || myPick) as Hand} size={big ? 150 : 110} /> : <span className="text-6xl opacity-40">?</span>}
+                <span className="text-sm opacity-80">You</span>
+              </div>
+              <div className="text-3xl font-bold opacity-70">vs</div>
+              <div className="flex flex-col items-center gap-2">
+                {shown?.hands[them] ? (
+                  <HandArt hand={shown.hands[them] as Hand} size={big ? 150 : 110} flip />
+                ) : (
+                  <span className="text-6xl" style={{ opacity: theyPicked ? 0.9 : 0.35 }}>
+                    {theyPicked ? '✓' : '?'}
+                  </span>
+                )}
+                <span className="text-sm opacity-80">{partner}</span>
+              </div>
+            </div>
+            {s?.phase === 'pick' && (
+              <div className="w-full max-w-[560px] h-3" style={{ background: 'rgba(239,227,203,.15)' }}>
+                <div style={{ width: `${Math.min(1, left / pickMsOf(s)) * 100}%`, height: '100%', background: left < 1500 ? '#e07a5f' : '#ffd76a', transition: 'width 100ms linear' }} />
+              </div>
             )}
-            <span className="text-sm opacity-80">{partner}</span>
-          </div>
-        </div>
-        {s?.phase === 'pick' && (
-          <div className="w-full max-w-[560px] h-3" style={{ background: 'rgba(239,227,203,.15)' }}>
-            <div style={{ width: `${(left / PICK_MS) * 100}%`, height: '100%', background: left < 1500 ? '#e07a5f' : '#ffd76a', transition: 'width 100ms linear' }} />
+            <div className="flex gap-2.5 flex-wrap justify-center">
+              {HANDS.map((h) => {
+                // Banned hand: this round's banned one can't be picked
+                const banned = s?.phase === 'pick' && bannedHand(s) === h;
+                return (
+                  <button
+                    key={h}
+                    type="button"
+                    className="px-box border-0 flex flex-col items-center gap-1.5 px-3 py-2.5 relative"
+                    style={{
+                      color: 'var(--ink-soft)',
+                      cursor: picking && !myPick && !banned ? 'pointer' : 'default',
+                      opacity: banned ? 0.35 : !picking || (myPick && myPick !== h) ? 0.55 : 1,
+                      outline: myPick === h ? '3px solid #e2b359' : undefined,
+                      outlineOffset: 4,
+                    }}
+                    disabled={!picking || !!myPick || banned}
+                    aria-label={banned ? `${NAME[h]}, banned this round` : NAME[h]}
+                    onClick={() => pick(h)}
+                  >
+                    <HandArt hand={h} size={big ? 72 : 56} />
+                    <span className="font-bold">{banned ? 'Banned' : NAME[h]}</span>
+                    {banned && <span className="absolute inset-0 flex items-center justify-center text-6xl font-bold" style={{ color: '#c4453f' }} aria-hidden>✕</span>}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
-        <div className="flex gap-2.5 flex-wrap justify-center">
-          {HANDS.map((h) => (
-            <button
-              key={h}
-              type="button"
-              className="px-box border-0 flex flex-col items-center gap-1.5 px-3 py-2.5"
-              style={{
-                color: 'var(--ink-soft)',
-                cursor: picking && !myPick ? 'pointer' : 'default',
-                opacity: !picking || (myPick && myPick !== h) ? 0.55 : 1,
-                outline: myPick === h ? '3px solid #e2b359' : undefined,
-                outlineOffset: 4,
-              }}
-              disabled={!picking || !!myPick}
-              onClick={() => pick(h)}
-            >
-              <HandArt hand={h} size={56} />
-              <span className="font-bold">{NAME[h]}</span>
-            </button>
-          ))}
-        </div>
-      </div>
+      </Big>
     </LiveFrame>
   );
 };

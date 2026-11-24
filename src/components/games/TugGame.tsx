@@ -62,7 +62,7 @@ export const TugGame: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       }
       poster={<Field pos={0} me={me?.avatar} you={you?.avatar} />}
     >
-      <div className="flex flex-col items-center gap-4">
+      <div className="flex flex-col items-center justify-center gap-4 h-full">
         <Field pos={pos} me={me?.avatar} you={you?.avatar} />
         <div className="flex items-center justify-between w-full max-w-[640px] font-bold text-lg">
           <span>You · {myCount}</span>
@@ -73,8 +73,8 @@ export const TugGame: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         </div>
         <button
           type="button"
-          className="px-btn px-btn--sage w-full max-w-[640px] select-none"
-          style={{ fontSize: 34, padding: '28px 0', touchAction: 'manipulation' }}
+          className="px-btn px-btn--sage w-full max-w-[640px] select-none flex-1 min-h-[110px] max-h-[380px]"
+          style={{ fontSize: 40, touchAction: 'manipulation' }}
           disabled={!live}
           onPointerDown={(e) => {
             e.preventDefault();

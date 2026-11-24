@@ -130,8 +130,8 @@ enum CoastersArt {
         r.disc(x, y, 1, band)
     }
 
-    static func cap(_ r: inout Raster, _ x: Double, _ y: Double) {
-        let R = Int(Coasters.puckR)
+    static func cap(_ r: inout Raster, _ x: Double, _ y: Double, radius: Double = Coasters.puckR) {
+        let R = Int(radius)
         r.disc(x + 1, y + 1, R, RGB(20, 10, 8), 0.45)
         r.disc(x, y, R, RGB("#8f2f2b"))
         r.disc(x, y, R - 1, RGB("#c4453f"))
@@ -171,18 +171,19 @@ private struct CoastersBoard: View {
         } content: {
             VStack(spacing: 10) {
                 HStack {
-                    HStack(spacing: 8) { Text(partner).lineLimit(1).fixedSize(); Pips(won: s?.score[them] ?? 0, of: Coasters.toWin) }
+                    HStack(spacing: 8) { Text(partner).lineLimit(1).fixedSize(); Pips(won: s?.score[them] ?? 0, of: s?.toWin ?? Coasters.toWin) }
                     Spacer()
                     Text("their goal ↑").font(.pxSmall).opacity(0.7)
                 }
                 ZStack {
-                    table(s, live: live).frame(height: 440)
+                    // (as big as the screen allows: the table keeps its shape)
+                    table(s, live: live).frame(maxWidth: .infinity, maxHeight: .infinity)
                     if let f = flash, now - f.at < 1000 {
                         Text(f.who == me ? "Goal!" : "\(partner) scores").font(.px(30, 700)).foregroundStyle(Color.inkSoft).padding(.horizontal, 20).padding(.vertical, 8).pxCard()
                     }
                 }
                 HStack {
-                    HStack(spacing: 8) { Text("You"); Pips(won: s?.score[me] ?? 0, of: Coasters.toWin) }
+                    HStack(spacing: 8) { Text("You"); Pips(won: s?.score[me] ?? 0, of: s?.toWin ?? Coasters.toWin) }
                     Spacer()
                     Text("your goal ↓").font(.pxSmall).opacity(0.7)
                 }
@@ -213,14 +214,14 @@ private struct CoastersBoard: View {
         var r = CoastersArt.table
         if let s {
             let age = max(0, (now - session.local(s.t)) / 1000)
-            let p = now < session.local(s.serveAt) ? s.puck : Coasters.glide(s.puck, age)
+            let p = now < session.local(s.serveAt) ? s.puck : Coasters.glide(s.puck, age, rule: s.rule)
             let mine = s.mal[me]!, other = s.mal[me.other]!
             let target: (x: Double, y: Double) = (x: mine.tx, y: mine.ty)
             let want: (x: Double, y: Double) = live ? (aim ?? target) : target
             let m1 = Coasters.towards(mine.x, mine.y, want.x, want.y, age + 0.05)
             let m2 = Coasters.towards(other.x, other.y, other.tx, other.ty, age)
             let pv = view(p.x, p.y), v1 = view(m1.x, m1.y), v2 = view(m2.x, m2.y)
-            CoastersArt.cap(&r, pv.0, pv.1)
+            CoastersArt.cap(&r, pv.0, pv.1, radius: s.tune.r)
             CoastersArt.coaster(&r, v2.0, v2.1, CoastersArt.theirs)
             CoastersArt.coaster(&r, v1.0, v1.1, CoastersArt.mine)
         } else {
@@ -335,7 +336,7 @@ private struct KitchenBoard: View {
                   howTo: "One of you chops, the other cooks. Chop what the tickets need, put it in the pot, cook it and serve it before the ticket runs out. Ninety seconds, on the same side.",
                   playing: say((role, true), (" Served \(s?.served ?? 0) · \(clock(left)) left", false)), now: now,
                   outcome: { r in say(("Shift over!", true), (" You \(r.line).\(tally)", false)) },
-                  coop: { side in note(side, s, hostNow) }) {
+                  coop: { side in note(side, s, hostNow) }, scrolls: true) {
             HStack(spacing: 10) { ForEach(Kitchen.Ing.allCases, id: \.self) { GlyphView(glyph: VegArt.whole($0), scale: 5) } }.padding(.vertical, 20)
         } content: {
             VStack(spacing: 14) {
@@ -366,6 +367,10 @@ private struct KitchenBoard: View {
                         toast = ("Burnt! The pot was left on too long.", now)
                         Haptics.soft()
                         Chiptune.shared.game(.miss)
+                    case "swap":
+                        toast = (s?.chop == place.mySeat ? "Switch! You’re chopping now." : "Switch! You’re cooking now.", now)
+                        Haptics.success()
+                        Chiptune.shared.game(.go)
                     default:
                         toast = ("A customer gave up on their \(n.dish?.name.lowercased() ?? "order").", now)
                         Haptics.soft()

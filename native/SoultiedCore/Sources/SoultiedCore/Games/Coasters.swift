@@ -98,6 +98,13 @@ public struct Coasters: LiveRules {
         public var hits: Int
         public var lastGoal: Side?
         public var winner: Side?
+        /// the house rule: "big", "turbo" or "sudden"
+        public var rule: String?
+
+        /// how the cap behaves under the house rule
+        public var tune: Tune { Coasters.tune(rule) }
+        /// goals to win
+        public var toWin: Int { rule == "sudden" ? 3 : Coasters.toWin }
 
         public init?(_ d: Doc) {
             guard let t = d.num("t") else { return nil }
@@ -111,9 +118,11 @@ public struct Coasters: LiveRules {
             hits = d.int("hits") ?? 0
             lastGoal = d.str("lastGoal").flatMap { Side(rawValue: $0) }
             winner = d.str("winner").flatMap { Side(rawValue: $0) }
+            rule = d.str("rule")
         }
 
-        init(puck: Body, now: Double) {
+        init(puck: Body, now: Double, rule: String? = nil) {
+            self.rule = rule
             self.puck = puck
             mal = [.a: Coasters.home(.a), .b: Coasters.home(.b)]
             score = [.a: 0, .b: 0]
@@ -123,8 +132,26 @@ public struct Coasters: LiveRules {
         }
 
         public var doc: Doc {
-            ["puck": puck.doc, "mal": ["a": mal[.a]!.doc, "b": mal[.b]!.doc], "score": ["a": score[.a] ?? 0, "b": score[.b] ?? 0], "serveAt": serveAt, "t": t, "hits": hits,
-             "lastGoal": lastGoal?.rawValue as Any? ?? NSNull(), "winner": winner?.rawValue as Any? ?? NSNull()]
+            var d: Doc = ["puck": puck.doc, "mal": ["a": mal[.a]!.doc, "b": mal[.b]!.doc], "score": ["a": score[.a] ?? 0, "b": score[.b] ?? 0], "serveAt": serveAt, "t": t,
+                          "hits": hits, "lastGoal": lastGoal?.rawValue as Any? ?? NSNull(), "winner": winner?.rawValue as Any? ?? NSNull()]
+            if let rule { d["rule"] = rule }
+            return d
+        }
+    }
+
+    /// how the cap behaves under a house rule: its size, its top speed, and how much it slows
+    public struct Tune: Sendable {
+        public var r: Double
+        public var max: Double
+        public var glide: Double
+    }
+
+    public static func tune(_ rule: String?) -> Tune {
+        let t = Tune(r: puckR, max: maxPuck, glide: glideKeep)
+        switch rule {
+        case "big": return Tune(r: 6, max: t.max, glide: t.glide)
+        case "turbo": return Tune(r: t.r, max: 330, glide: 0.86)
+        default: return t
         }
     }
 
@@ -160,10 +187,10 @@ public struct Coasters: LiveRules {
     /// the puck, waiting in the half of whoever's to serve
     static func served(_ to: Side) -> Body { Body(x: w / 2, y: to == .a ? mid + 24 : mid - 24) }
 
-    static func hit(_ p: inout Body, _ m: Coaster) -> Bool {
+    static func hit(_ p: inout Body, _ m: Coaster, _ r: Double) -> Bool {
         let dx = p.x - m.x, dy = p.y - m.y
         let d = (dx * dx + dy * dy).squareRoot()
-        let min = puckR + malletR
+        let min = r + malletR
         if d >= min { return false }
         let nx = d > 1e-4 ? dx / d : 0
         let ny = d > 1e-4 ? dy / d : m.y > mid ? -1 : 1
@@ -178,7 +205,8 @@ public struct Coasters: LiveRules {
     }
 
     /// moves everything on by `dt` seconds; who scored, if anyone did
-    static func step(_ puck: inout Body, _ mal: inout [Side: Coaster], _ dt: Double, _ puckLive: Bool) -> (touches: Int, goal: Side?) {
+    static func step(_ puck: inout Body, _ mal: inout [Side: Coaster], _ dt: Double, _ puckLive: Bool, _ tune: Tune = Coasters.tune(nil)) -> (touches: Int, goal: Side?) {
+        let pr = tune.r
         var touches = 0
         var goal: Side?
         let n = max(1, Int((dt / stepS).rounded(.up)))
@@ -201,43 +229,43 @@ public struct Coasters: LiveRules {
             if !puckLive { continue }
             puck.x += puck.vx * hh
             puck.y += puck.vy * hh
-            let drag = pow(glideKeep, hh)
+            let drag = pow(tune.glide, hh)
             puck.vx *= drag
             puck.vy *= drag
-            let hitA = hit(&puck, mal[.a]!)
-            let hitB = hit(&puck, mal[.b]!)
+            let hitA = hit(&puck, mal[.a]!, pr)
+            let hitB = hit(&puck, mal[.b]!, pr)
             if hitA { touches += 1 }
             if hitB { touches += 1 }
             let sp = (puck.vx * puck.vx + puck.vy * puck.vy).squareRoot()
-            if sp > maxPuck {
-                puck.vx *= maxPuck / sp
-                puck.vy *= maxPuck / sp
+            if sp > tune.max {
+                puck.vx *= tune.max / sp
+                puck.vy *= tune.max / sp
             }
             // the side rails
-            if puck.x < puckR {
-                puck.x = puckR
+            if puck.x < pr {
+                puck.x = pr
                 puck.vx = abs(puck.vx) * railE
-            } else if puck.x > w - puckR {
-                puck.x = w - puckR
+            } else if puck.x > w - pr {
+                puck.x = w - pr
                 puck.vx = -abs(puck.vx) * railE
             }
             // the ends: a rail, except for the goal mouth
             let mouth = puck.x > goalX0 + 1 && puck.x < goalX1 - 1
-            if puck.y < puckR && !mouth {
-                puck.y = puckR
+            if puck.y < pr && !mouth {
+                puck.y = pr
                 puck.vy = abs(puck.vy) * railE
-            } else if puck.y > h - puckR && !mouth {
-                puck.y = h - puckR
+            } else if puck.y > h - pr && !mouth {
+                puck.y = h - pr
                 puck.vy = -abs(puck.vy) * railE
             }
             // the corners are rounded, so the puck rolls out of one rather than getting wedged in it
-            var edge = puck.x <= puckR + 0.5 || puck.x >= w - puckR - 0.5 || (!mouth && (puck.y <= puckR + 0.5 || puck.y >= h - puckR - 0.5))
+            var edge = puck.x <= pr + 0.5 || puck.x >= w - pr - 0.5 || (!mouth && (puck.y <= pr + 0.5 || puck.y >= h - pr - 0.5))
             let cx = puck.x < cornerR ? cornerR : puck.x > w - cornerR ? w - cornerR : -1
             let cy = puck.y < cornerR ? cornerR : puck.y > h - cornerR ? h - cornerR : -1
             if cx >= 0 && cy >= 0 {
                 let dx = puck.x - cx, dy = puck.y - cy
                 let d = (dx * dx + dy * dy).squareRoot()
-                let most = cornerR - puckR
+                let most = cornerR - pr
                 if d > most {
                     let nx = dx / d, ny = dy / d
                     puck.x = cx + nx * most
@@ -259,21 +287,22 @@ public struct Coasters: LiveRules {
                 puck.vx = (tx / d) * nudge
                 puck.vy = (ty / d) * nudge
             }
-            if puck.y < -puckR { goal = .a } else if puck.y > h + puckR { goal = .b }
+            if puck.y < -pr { goal = .a } else if puck.y > h + pr { goal = .b }
         }
         return (touches, goal)
     }
 
     /// where the puck will look to be `dt` seconds after a state (for drawing between updates): it slides on,
     /// bouncing off the rails, but never into a goal
-    public static func glide(_ p: Body, _ dt: Double) -> Body {
+    public static func glide(_ p: Body, _ dt: Double, rule: String? = nil) -> Body {
         var q = p
         var far = Coaster(x: -99, y: -99)
         far.tx = -99
         far.ty = -99
         var mal: [Side: Coaster] = [.a: far, .b: far]
-        _ = step(&q, &mal, max(0, min(0.15, dt)), true)
-        q.y = clamp(q.y, -puckR, h + puckR)
+        let t = tune(rule)
+        _ = step(&q, &mal, max(0, min(0.15, dt)), true, t)
+        q.y = clamp(q.y, -t.r, h + t.r)
         return q
     }
 
@@ -286,7 +315,11 @@ public struct Coasters: LiveRules {
         return (x + dx * k, y + dy * k)
     }
 
-    public func initial(_ rng: @escaping Random, now: Double) -> State { State(puck: Self.served(rng() < 0.5 ? .a : .b), now: now) }
+    public func initial(_ rng: @escaping Random, now: Double) -> State { initial(rng, now: now, rule: nil) }
+
+    public func initial(_ rng: @escaping Random, now: Double, rule: String?) -> State {
+        State(puck: Self.served(rng() < 0.5 ? .a : .b), now: now, rule: rule)
+    }
 
     public func act(_ s: State, _ seat: Side, _ a: Act, now: Double) -> State? {
         if s.winner != nil { return nil }
@@ -305,7 +338,7 @@ public struct Coasters: LiveRules {
         let dt = max(0, min(0.05, (now - s.t) / 1000))
         var puck = s.puck
         var mal = s.mal
-        let (touches, goal) = Self.step(&puck, &mal, dt, now >= s.serveAt)
+        let (touches, goal) = Self.step(&puck, &mal, dt, now >= s.serveAt, s.tune)
         func round(_ c: Coaster) -> Coaster {
             var r = c
             r.x = Self.r2(c.x)
@@ -324,7 +357,7 @@ public struct Coasters: LiveRules {
         n.lastGoal = goal
         n.puck = Self.served(goal.other)
         n.serveAt = now + Self.serveMs
-        n.winner = (n.score[goal] ?? 0) >= Self.toWin ? goal : nil
+        n.winner = (n.score[goal] ?? 0) >= s.toWin ? goal : nil
         return n
     }
 
@@ -336,11 +369,11 @@ public struct Coasters: LiveRules {
     /// the demo room's partner: guards its goal, and goes for the puck when it's on their side
     public func bot(_ s: State, _ seat: Side, now: Double) -> Act? {
         if s.winner != nil || now < s.serveAt - 300 { return nil }
-        let p = Self.glide(s.puck, 0.08)
+        let p = Self.glide(s.puck, 0.08, rule: s.rule)
         let mine = seat == .a ? p.y > Self.mid : p.y < Self.mid
         let back: Double = seat == .a ? 1 : -1
         let jitter = (sin(now / 370) + sin(now / 910)) * 3
-        if mine { return Act(x: p.x + jitter * 0.6, y: p.y + back * (Self.puckR + 2)) }
+        if mine { return Act(x: p.x + jitter * 0.6, y: p.y + back * (s.tune.r + 2)) }
         let homeY = seat == .a ? Self.h - 20 : 20
         return Act(x: Self.w / 2 + (p.x - Self.w / 2) * 0.55 + jitter, y: homeY)
     }
