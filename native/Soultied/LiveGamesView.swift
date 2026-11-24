@@ -330,12 +330,12 @@ struct LiveHost<R: LiveRules, Screen: View>: View {
                 UIApplication.shared.isIdleTimerDisabled = false
                 session.close()
             }
-            // re-draws the screen and keeps the game moving, fifty times a second
+            // re-draws the screen and keeps the game moving, about sixty times a second
             .task {
                 while !Task.isCancelled {
                     session.pulse()
                     now = Values.nowMs()
-                    try? await Task.sleep(nanoseconds: 20_000_000)
+                    try? await Task.sleep(nanoseconds: 16_000_000)
                 }
             }
             .onChange(of: place.games[session.kind]?.seq) { _, _ in session.sync() }

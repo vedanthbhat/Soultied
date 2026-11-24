@@ -121,23 +121,36 @@ const towards = (m: { x: number; y: number }, tx: number, ty: number, dt: number
   return { x: m.x + dx * k, y: m.y + dy * k };
 };
 
+type XY = { x: number; y: number };
+
 /**
  * The table on screen. Your own goal is always at the bottom (the other seat sees it turned round).
  * Your coaster follows your finger or mouse straight away; everything else is the host's last word,
- * moved on to now.
+ * moved on to now. On the other screen (not the host's), when a new word puts the cap or their coaster
+ * somewhere a little different, it slides there quickly rather than jumping.
  */
 const Table: React.FC<{
   state: CoastersState | null;
   mySeat: Seat;
   clock: (t: number) => number;
   live: boolean;
+  /** this screen keeps the game (nothing to smooth: it's all worked out here) */
+  host?: boolean;
   onAim?: (a: CoastersAct) => void;
-}> = ({ state, mySeat, clock, live, onAim }) => {
+}> = ({ state, mySeat, clock, live, host = true, onAim }) => {
   const ref = useRef<HTMLCanvasElement | null>(null);
   const table = useRef<HTMLCanvasElement | null>(null);
   const sRef = useRef(state);
   sRef.current = state;
-  const aim = useRef<{ x: number; y: number } | null>(null);
+  const aim = useRef<XY | null>(null);
+  /** what the last frame showed: your own coaster, the cap and their coaster, and how far the latest word moved them */
+  const mem = useRef<{ mine: XY | null; at: number; heard: number; shown: Record<string, XY>; miss: Record<string, XY> }>({
+    mine: null,
+    at: 0,
+    heard: NaN,
+    shown: {},
+    miss: {},
+  });
   const flip = mySeat === 'b';
   const view = (x: number, y: number) => (flip ? { x: TABLE_W - x, y: TABLE_H - y } : { x, y });
 
@@ -168,14 +181,43 @@ const Table: React.FC<{
         cap(ctx, p.x, p.y);
         return;
       }
-      const age = Math.max(0, (Date.now() - clock(s.t)) / 1000);
-      const p: Body = Date.now() < clock(s.serveAt) ? s.puck : glide(s.puck, age, s.rule);
+      const now = Date.now();
+      const m = mem.current;
+      const dt = Math.max(0, Math.min(0.1, (now - m.at) / 1000));
+      m.at = now;
+      const fresh = s.t !== m.heard;
+      m.heard = s.t;
+      const age = Math.max(0, (now - clock(s.t)) / 1000);
+      const p: Body = now < clock(s.serveAt) ? s.puck : glide(s.puck, age, s.rule);
       const mine = s.mal[mySeat];
-      const want = aim.current && live ? aim.current : { x: mine.tx, y: mine.ty };
-      const m1 = towards(mine, want.x, want.y, age + 0.05);
+      // your own coaster goes where your finger takes it straight away (as it will on the host's screen)
+      let m1 = towards(mine, mine.tx, mine.ty, age + 0.05);
+      if (live && aim.current) {
+        m1 = towards(m.mine || mine, aim.current.x, aim.current.y, dt);
+        m.mine = m1;
+      } else m.mine = null;
+      const smooth = (key: string, at: XY, still = false): XY => {
+        if (host) return at;
+        let miss = m.miss[key] || { x: 0, y: 0 };
+        const last = m.shown[key];
+        if (fresh && last) {
+          miss = { x: last.x - at.x, y: last.y - at.y };
+          // a jump that big is a real one
+          if (miss.x * miss.x + miss.y * miss.y > 80 * 80) miss = { x: 0, y: 0 };
+        }
+        // (the cap waiting to be served sits exactly where it is)
+        if (still) miss = { x: 0, y: 0 };
+        const keep = Math.exp(-dt / 0.1);
+        miss = { x: miss.x * keep, y: miss.y * keep };
+        m.miss[key] = miss;
+        const out = { x: at.x + miss.x, y: at.y + miss.y };
+        m.shown[key] = out;
+        return out;
+      };
+      const cp = smooth('cap', p, now < clock(s.serveAt));
       const other = s.mal[them];
-      const m2 = towards(other, other.tx, other.ty, age);
-      const pv = view(p.x, p.y);
+      const m2 = smooth('them', towards(other, other.tx, other.ty, age));
+      const pv = view(cp.x, cp.y);
       const v1 = view(m1.x, m1.y);
       const v2 = view(m2.x, m2.y);
       cap(ctx, pv.x, pv.y, tuneOf(s.rule).r);
@@ -185,7 +227,7 @@ const Table: React.FC<{
     raf = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(raf);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mySeat, clock, live]);
+  }, [mySeat, clock, live, host]);
 
   // where your finger or mouse is, on the table: sent at most once a frame
   const pending = useRef(false);
@@ -232,7 +274,7 @@ const Table: React.FC<{
 
 export const CoastersGame: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const game = useLiveGame<CoastersState, CoastersAct>('coasters', COASTERS);
-  const { state: s, mySeat, them, partner, act, stage, clock } = game;
+  const { state: s, mySeat, them, partner, act, stage, clock, host } = game;
   const now = useNow(stage === 'play' || stage === 'count', 200);
   const live = stage === 'play' && !!s && !s.winner;
 
@@ -296,7 +338,7 @@ export const CoastersGame: React.FC<{ onBack: () => void }> = ({ onBack }) => {
           <span className="opacity-70 text-sm">their goal ↑</span>
         </div>
         <div className="relative">
-          <Table state={s} mySeat={mySeat} clock={clock} live={live} onAim={(a) => act(a, true)} />
+          <Table state={s} mySeat={mySeat} clock={clock} live={live} host={host} onAim={(a) => act(a, true)} />
           {flash && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <div className="px-box px-shadow px-pop px-5 py-2 text-3xl font-bold" style={{ color: 'var(--ink-soft)' }}>

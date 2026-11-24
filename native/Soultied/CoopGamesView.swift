@@ -149,12 +149,26 @@ struct CoastersGameView: View {
     }
 }
 
+/// what the table last showed (CoastersBoard): kept from one frame to the next, without redrawing anything
+private final class TableMemory {
+    /// your own coaster, where your finger's taking it
+    var mine: (x: Double, y: Double)?
+    /// the last frame's time
+    var at: Double = 0
+    /// the host's time of the last word drawn
+    var heard: Double = .nan
+    /// the cap and their coaster as last drawn, and how far the latest word moved them (shrinking to nothing)
+    var shown: [String: (x: Double, y: Double)] = [:]
+    var miss: [String: (x: Double, y: Double)] = [:]
+}
+
 private struct CoastersBoard: View {
     let place: PlaceModel
     let session: LiveSession<Coasters>
     let now: Double
     /// where your finger is, on the table
     @State private var aim: (x: Double, y: Double)?
+    @State private var memory = TableMemory()
     @State private var flash: (who: Side, at: Double)?
     @State private var goals = -1
 
@@ -213,14 +227,47 @@ private struct CoastersBoard: View {
         func view(_ x: Double, _ y: Double) -> (Double, Double) { flip ? (Coasters.w - x, Coasters.h - y) : (x, y) }
         var r = CoastersArt.table
         if let s {
+            let mem = memory
+            let dt = max(0, min(0.1, (now - mem.at) / 1000))
+            mem.at = now
+            let fresh = s.t != mem.heard
+            mem.heard = s.t
             let age = max(0, (now - session.local(s.t)) / 1000)
             let p = now < session.local(s.serveAt) ? s.puck : Coasters.glide(s.puck, age, rule: s.rule)
             let mine = s.mal[me]!, other = s.mal[me.other]!
-            let target: (x: Double, y: Double) = (x: mine.tx, y: mine.ty)
-            let want: (x: Double, y: Double) = live ? (aim ?? target) : target
-            let m1 = Coasters.towards(mine.x, mine.y, want.x, want.y, age + 0.05)
-            let m2 = Coasters.towards(other.x, other.y, other.tx, other.ty, age)
-            let pv = view(p.x, p.y), v1 = view(m1.x, m1.y), v2 = view(m2.x, m2.y)
+            // your own coaster goes where your finger takes it straight away (as it will on the host's screen),
+            // rather than waiting to hear back where it got to
+            var m1 = Coasters.towards(mine.x, mine.y, mine.tx, mine.ty, age + 0.05)
+            if live, let aim {
+                let from = mem.mine ?? (x: mine.x, y: mine.y)
+                m1 = Coasters.towards(from.x, from.y, aim.x, aim.y, dt)
+                mem.mine = m1
+            } else {
+                mem.mine = nil
+            }
+            // on the other screen, the cap and their coaster are the host's last word moved on to now; when a new
+            // word puts them somewhere a little different, they slide there quickly rather than jump
+            let serving = now < session.local(s.serveAt)
+            func smooth(_ key: String, _ at: (x: Double, y: Double), still: Bool = false) -> (x: Double, y: Double) {
+                if session.host { return at }
+                var miss = mem.miss[key] ?? (x: 0, y: 0)
+                if fresh, let last = mem.shown[key] {
+                    miss = (x: last.x - at.x, y: last.y - at.y)
+                    // a jump that big is a real one
+                    if miss.x * miss.x + miss.y * miss.y > 80 * 80 { miss = (x: 0, y: 0) }
+                }
+                // (the cap waiting to be served sits exactly where it is)
+                if still { miss = (x: 0, y: 0) }
+                let keep = exp(-dt / 0.1)
+                miss = (x: miss.x * keep, y: miss.y * keep)
+                mem.miss[key] = miss
+                let out = (x: at.x + miss.x, y: at.y + miss.y)
+                mem.shown[key] = out
+                return out
+            }
+            let cap = smooth("cap", (x: p.x, y: p.y), still: serving)
+            let m2 = smooth("them", Coasters.towards(other.x, other.y, other.tx, other.ty, age))
+            let pv = view(cap.x, cap.y), v1 = view(m1.x, m1.y), v2 = view(m2.x, m2.y)
             CoastersArt.cap(&r, pv.0, pv.1, radius: s.tune.r)
             CoastersArt.coaster(&r, v2.0, v2.1, CoastersArt.theirs)
             CoastersArt.coaster(&r, v1.0, v1.1, CoastersArt.mine)

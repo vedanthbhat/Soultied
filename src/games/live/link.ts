@@ -36,8 +36,11 @@ const GONE_DIRECT_MS = 6000;
 const GONE_RELAY_MS = 12000;
 /** how long the direct line gets to open before we settle for the channel */
 const DIRECT_WAIT_MS = 6500;
-/** the slowest we'll send fast-changing things over the channel */
-const RELAY_FAST_MS = 220;
+/**
+ * how often fast-changing things go over the channel, at most: about fifteen times a second, so a coaster
+ * the other person moves glides rather than hops (it was four times a second, which air hockey felt)
+ */
+const RELAY_FAST_MS = 66;
 
 export interface LinkOptions {
   chan: LiveChannel<PlayWire>;
@@ -290,7 +293,7 @@ export class GameLink {
   /**
    * Send something to the other person. `fast` is for things that change all
    * the time (a position, a tap count): only the latest matters, so over the
-   * channel they're sent at most a few times a second.
+   * channel they're sent at most every RELAY_FAST_MS.
    */
   send(d: unknown, fast = false) {
     if (this.closed) return;

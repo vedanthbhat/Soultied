@@ -182,8 +182,8 @@ public enum LinkMode: String, Sendable {
 
 /**
  * The website's GameLink, over the channel only. Messages are numbered, so one that arrives twice is only
- * handled once; fast-changing things (a tap count, a position) are sent at most a few times a second, and
- * only the newest counts.
+ * handled once; fast-changing things (a tap count, a position) are sent at most every `fastMs`, and only the
+ * newest counts.
  */
 public final class GameLink {
     public private(set) var mode: LinkMode = .waiting
@@ -192,8 +192,9 @@ public final class GameLink {
 
     /// how long without a word before we think they've gone
     static let goneMs: Double = 12000
-    /// the slowest we'll send fast-changing things
-    static let fastMs: Double = 220
+    /// how often fast-changing things go, at most: about fifteen times a second, so a coaster the other person
+    /// moves glides rather than hops (it was four times a second, which air hockey felt)
+    static let fastMs: Double = 66
 
     private let chan: LiveChannel
     private let me: String

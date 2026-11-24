@@ -16,6 +16,25 @@ Get Soultied ready for the App Store:
 
 ## What changed
 
+Claude, 24 Nov (live games over the cloud, smoother):
+
+- **Coasters no longer hops on the other person's screen.** Vedanth saw Juju's coaster glitch while his own was
+  smooth. Between two iPhones every move goes through Firestore (the iPhone has no direct line), and moves and the
+  host's updates went only four times a second.
+  - Fast-changing things (a coaster's position, Tug of War's taps) now go about fifteen times a second over the
+    cloud: `RELAY_FAST_MS` in `link.ts` and `GameLink.fastMs` in `Live.swift` (220 ms → 66 ms). This costs about
+    three times the Firestore writes during those games (roughly 25 writes a second for the two of you in Coasters).
+  - Your own coaster follows your finger straight away on your screen, host or not, instead of waiting to hear back
+    from the host where it got to.
+  - On the screen that isn't hosting, the cap and the other coaster slide over a tenth of a second when an update
+    puts them somewhere a little different, instead of jumping. (`TableMemory` in `CoopGamesView.swift`, `mem` in
+    `CoastersGame.tsx`.) A simulation of 66 ms updates with 120–300 ms delays: the biggest jump between frames went
+    from about a third of the table to under 10 units, with no extra delay.
+  - The iPhone redraws live games about 60 times a second (was 50).
+  - Still there: the cloud's own delay (a few tenths of a second each way). The real cure is a direct line between
+    the two iPhones, as the website has between browsers (WebRTC); that needs the WebRTC framework in the iPhone
+    app and a two-phone test, so it's for a later update.
+
 Claude, 24 Nov (step 2 of the plan, games):
 
 - **Live games fill the screen** (Tug of War, Quick Draw, Paper Scissors Stone, Coasters, Kitchen Rush), on the
@@ -184,7 +203,9 @@ The new games ship as an update after the App Store submission.
 3. Vedanth: try the TestFlight build. Run the two-phone Our song checklist below, go through onboarding as a new
    person, and add both new widgets.
 4. Final review before the App Store (Claude): checks, security and privacy (Firestore rules, keys, what's
-   collected), App Store metadata and screenshots, then submit.
+   collected), App Store metadata and screenshots, then submit. Vedanth asked on 24 Nov to submit after the
+   Coasters fix.
+5. Later: a direct line for live games on iPhone (WebRTC), so air hockey between two iPhones skips the cloud.
 
 ### Two-iPhone checklist for Our song
 
