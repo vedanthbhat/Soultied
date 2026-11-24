@@ -19,6 +19,13 @@ for png in shots:
     jpg = os.path.join(out, name + '.jpg')
     subprocess.run(['sips', '-Z', '1200', '-s', 'format', 'jpeg', '-s', 'formatOptions', '70', png, '--out', jpg], check=True, capture_output=True)
 
+# the App Store's screenshots (the 6.9-inch iPhone), untouched, ready to upload
+store = sorted(glob.glob(os.path.join(tmp, 'appstore', '*.png')))
+if store:
+    os.makedirs(os.path.join(out, 'appstore'))
+    for png in store:
+        shutil.copy(png, os.path.join(out, 'appstore', os.path.basename(png)))
+
 # the shared code's tests (the end of the log), and the build's errors and warnings (each once)
 core = os.path.join(tmp, 'core.log')
 if os.path.exists(core):
@@ -38,6 +45,8 @@ if os.path.exists(build):
 
 with open(os.path.join(out, 'README.md'), 'w') as f:
     f.write(f'# The iPhone app, as of {sha[:7]}\n\nFrom {run}\n\n')
+    if store:
+        f.write('The App Store screenshots (6.9-inch iPhone, full size) are in [appstore/](appstore/).\n\n')
     for png in shots:
         name = os.path.splitext(os.path.basename(png))[0]
         f.write(f'## {name}\n\n![{name}]({name}.jpg)\n\n')

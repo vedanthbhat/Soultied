@@ -31,6 +31,8 @@ Claude, 24 Nov (live games over the cloud, smoother):
     `CoastersGame.tsx`.) A simulation of 66 ms updates with 120–300 ms delays: the biggest jump between frames went
     from about a third of the table to under 10 units, with no extra delay.
   - The iPhone redraws live games about 60 times a second (was 50).
+  - The iPhone workflow also takes the App Store's screenshots now: 8 screens on the 6.9-inch iPhone, full size,
+    kept as PNGs in `appstore/` on the native-shots branch, ready to upload to App Store Connect.
   - Still there: the cloud's own delay (a few tenths of a second each way). The real cure is a direct line between
     the two iPhones, as the website has between browsers (WebRTC); that needs the WebRTC framework in the iPhone
     app and a two-phone test, so it's for a later update.

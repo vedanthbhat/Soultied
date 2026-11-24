@@ -269,6 +269,41 @@ jobs:
           ls -la "$RUNNER_TEMP/shots"
           echo "dev=$dev" >> "$GITHUB_OUTPUT"
 
+      # The App Store's screenshots: the biggest iPhone (6.9-inch, the size App Store Connect asks for), full size, as
+      # PNGs (they're kept in native-shots/appstore/, ready to upload)
+      - name: Take the App Store screenshots
+        if: steps.shots.outcome == 'success'
+        continue-on-error: true
+        run: |
+          set -x
+          xcrun simctl shutdown "${{ steps.shots.outputs.dev }}" || true
+          app="$RUNNER_TEMP/dd/Build/Products/Debug-iphonesimulator/Soultied.app"
+          dev=$(xcrun simctl list devices available -j | python3 -c "import json,sys; d=json.load(sys.stdin)['devices']; ds=[x for k,v in d.items() if 'iOS' in k for x in v if x['name'].startswith('iPhone') and 'Pro Max' in x['name']]; print(ds[-1]['udid'])")
+          xcrun simctl boot "$dev"
+          xcrun simctl bootstatus "$dev" -b
+          xcrun simctl status_bar "$dev" override --time 9:41 --batteryLevel 100 --cellularBars 4 || true
+          xcrun simctl install "$dev" "$app"
+          mkdir -p "$RUNNER_TEMP/appstore"
+          n=0
+          store() {
+            n=$((n + 1))
+            name=$(printf '%02d-%s' "$n" "$1"); shift
+            xcrun simctl terminate "$dev" app.soultied.ios 2>/dev/null || true
+            xcrun simctl launch "$dev" app.soultied.ios "$@"
+            sleep 10
+            xcrun simctl io "$dev" screenshot "$RUNNER_TEMP/appstore/$name.png"
+          }
+          store home -demo -tab home
+          store letters -demo -tab letters
+          store play -demo -tab play
+          store coasters -demo -game coasters -invite
+          store wall -demo -open wall
+          store mood -demo -open me
+          store watch -demo -tab watch
+          store us -demo -tab us
+          xcrun simctl shutdown "$dev" || true
+          ls -la "$RUNNER_TEMP/appstore"
+
       # (not when a newer push stopped this run: its empty page would replace the last good one)
       - name: Keep the screenshots and the build's messages (on the native-shots branch)
         if: ${{ !cancelled() }}
