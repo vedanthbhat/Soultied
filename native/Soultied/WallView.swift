@@ -213,7 +213,7 @@ struct DoodlePanel: View {
             .padding(PX)
             .background(NotchedFrame(notch: PX).fill(Color.ink))
 
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 8), spacing: 6) {
+            EvenGrid(columns: 8, spacing: 6, rowSpacing: 6) {
                 ForEach(0..<16, id: \.self) { i in
                     Button {
                         ink = UInt8(i)

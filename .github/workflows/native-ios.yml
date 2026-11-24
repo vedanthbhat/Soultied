@@ -250,7 +250,7 @@ jobs:
           shot home-snap -demo -tab home -scrollHome snap
           # holding the couch, and your month together (the picture to share)
           shot home-hold -demo -tab home -scrollHome touches -hold
-          shot recap-share -demo -tab us -recapShare
+          shot recap-share -demo -tab us -scrollUs recap -recapShare
           # the five questions when you move in
           shot about -demo -about
           shot about-plus -demo -about -aboutPlus
@@ -260,7 +260,7 @@ jobs:
           shot widgets-keepsakes -widgets keepsakes
           # our list (on Us, and open)
           shot us-list -demo -tab us -scrollUs list
-          shot bucket -demo -tab us -bucket
+          shot bucket -demo -tab us -scrollUs list -bucket
           # voice notes on the wall (Rohan's, playing)
           shot wall-voices -demo -open wall -voices -voicePlay
           # the couples board: Rohan's asked to go on it; and on it together

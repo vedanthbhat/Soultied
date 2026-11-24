@@ -71,7 +71,7 @@ struct RecapCard: View {
                     Text(place.recapMemory).font(.pxTiny).foregroundStyle(Color.muted)
                 }
             }
-            LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+            EvenGrid(columns: 2, spacing: 10, rowSpacing: 10) {
                 ForEach(stats(r)) { s in
                     VStack(alignment: .leading, spacing: 0) {
                         Text(s.n).font(.px(24, 700)).foregroundStyle(Color.inkSoft)
@@ -106,7 +106,7 @@ struct RecapPicture: View {
                 Image(decorative: room, scale: 1).resizable().interpolation(.none).aspectRatio(contentMode: .fit)
                     .padding(3).background(Color(hex: "#3a2a26"))
             }
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 10) {
+            EvenGrid(columns: 3, spacing: 8, rowSpacing: 10) {
                 ForEach(shortStats(recap)) { s in
                     VStack(spacing: 1) {
                         Text(s.n).font(.px(22, 700)).foregroundStyle(Color(hex: "#3a2a26"))

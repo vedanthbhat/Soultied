@@ -122,6 +122,71 @@ struct MenuScroll<Content: View>: View {
     }
 }
 
+/// Cells in rows of even columns, all laid out at once: the grid for a menu. (A LazyVGrid works out how tall it is
+/// from what's on screen, and a floating card is as tall as what's in it, so in a card that's taller than the screen
+/// the two went round and round, and the app hung: the record player's menu did.)
+struct EvenGrid: Layout {
+    var columns = 2
+    /// as many columns as fit, each at least this wide (instead of a set number)
+    var minimum: CGFloat? = nil
+    var spacing: CGFloat = 10
+    var rowSpacing: CGFloat = 10
+    /// where a cell sits in its column and row, if it's smaller than them
+    var alignment: Alignment = .center
+
+    private func count(_ width: CGFloat) -> Int {
+        guard let minimum else { return max(1, columns) }
+        return max(1, Int((width + spacing) / (minimum + spacing)))
+    }
+
+    private func cellWidth(_ width: CGFloat, _ n: Int) -> CGFloat {
+        max(0, (width - spacing * CGFloat(n - 1)) / CGFloat(n))
+    }
+
+    /// each row's cells' sizes, at this width
+    private func measure(_ width: CGFloat, _ subviews: Subviews) -> (w: CGFloat, rows: [[CGSize]]) {
+        let n = count(width), w = cellWidth(width, n)
+        var rows: [[CGSize]] = []
+        for start in stride(from: 0, to: subviews.count, by: n) {
+            rows.append(subviews[start..<min(start + n, subviews.count)].map { $0.sizeThatFits(ProposedViewSize(width: w, height: nil)) })
+        }
+        return (w, rows)
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width: CGFloat
+        if let w = proposal.width, w.isFinite {
+            width = w
+        } else {
+            // (asked how wide it'd like to be: as wide as its widest cell, in every column)
+            let widest = subviews.map { $0.sizeThatFits(.unspecified).width }.max() ?? 0
+            let n = minimum == nil ? max(1, columns) : 1
+            width = widest * CGFloat(n) + spacing * CGFloat(n - 1)
+        }
+        let rows = measure(width, subviews).rows
+        var height: CGFloat = rowSpacing * CGFloat(max(0, rows.count - 1))
+        for sizes in rows { height += sizes.map(\.height).max() ?? 0 }
+        return CGSize(width: width, height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let (w, rows) = measure(bounds.width, subviews)
+        let n = count(bounds.width)
+        let ax: CGFloat = alignment.horizontal == .leading ? 0 : alignment.horizontal == .trailing ? 1 : 0.5
+        let ay: CGFloat = alignment.vertical == .top ? 0 : alignment.vertical == .bottom ? 1 : 0.5
+        var y = bounds.minY
+        for (r, sizes) in rows.enumerated() {
+            let h = sizes.map(\.height).max() ?? 0
+            for (c, size) in sizes.enumerated() {
+                let x = bounds.minX + CGFloat(c) * (w + spacing)
+                subviews[r * n + c].place(at: CGPoint(x: x + (w - size.width) * ax, y: y + (h - size.height) * ay), anchor: .topLeading,
+                                          proposal: ProposedViewSize(width: w, height: size.height))
+            }
+            y += h + rowSpacing
+        }
+    }
+}
+
 private struct FloatingCardHeight: PreferenceKey {
     static let defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
@@ -132,6 +197,8 @@ struct FloatingCardHost: View {
     @State private var card = FloatingCard.shared
     /// how tall what's in the card is (it's measured, then the card fits it)
     @State private var height: CGFloat = 0
+    /// when the height last started changing, and how many times since (see fit)
+    @State private var settling = (since: Date.distantPast, changes: 0)
     @GestureState private var pull: CGFloat = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// this host's number (FloatingCard.hosts)
@@ -171,7 +238,7 @@ struct FloatingCardHost: View {
                                 .scrollBounceBehavior(.basedOnSize)
                                 .scrollDismissesKeyboard(.interactively)
                                 .frame(height: min(max(height, 60), geo.size.height * 0.82))
-                                .onPreferenceChange(FloatingCardHeight.self) { height = $0 }
+                                .onPreferenceChange(FloatingCardHeight.self) { h in MainActor.assumeIsolated { fit(h) } }
                             }
                         }
                         .environment(\.inFloatingCard, true)
@@ -191,6 +258,17 @@ struct FloatingCardHost: View {
             card.detach(me)
             me = 0
         }
+    }
+
+    /// the card takes the height of what's in it. If that keeps changing with the card's own height (going back and
+    /// forth), it stops at the taller after a few goes, rather than going round forever.
+    private func fit(_ measured: CGFloat) {
+        let h = measured.rounded(.up)
+        guard abs(h - height) >= 1 else { return }
+        let now = Date()
+        if now.timeIntervalSince(settling.since) > 0.5 { settling = (now, 0) }
+        settling.changes += 1
+        height = settling.changes > 6 ? max(height, h) : h
     }
 
     /// a menu goes on a paper card; the Us tiles' menus are made of their own cards

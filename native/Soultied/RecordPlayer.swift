@@ -533,7 +533,7 @@ struct RecordSheet: View {
                     Spacer(minLength: 8)
                     Text("\(Records.shelf.count) records · \(Self.songs) songs, free to use").font(.px(12)).foregroundStyle(Color.muted)
                 }
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10, alignment: .top), count: 3), spacing: 12) {
+                EvenGrid(columns: 3, spacing: 10, rowSpacing: 12, alignment: .top) {
                     ForEach(Records.shelf, id: \.id) { record in
                         let playing = place.recordOn && place.turntable?.apple == nil && place.turntable?.album == record.id
                         Button {

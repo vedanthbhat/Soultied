@@ -53,6 +53,9 @@ Claude, 24 Nov (step 1 of the plan below):
   - `.floatingMenu(isPresented:)` / `.floatingMenu(item:)` replace `.sheet` for menus. Decorating and Plus use
     `fill: true` (the card is as tall as it can be).
   - Settings moved into its own view (`SettingsMenu` in `UsView.swift`) so it updates while open.
+  - A menu in a card uses `EvenGrid` (a plain grid, in `FloatingCard.swift`), never `LazyVGrid`. The first build
+    with cards hung on the record player's menu: a lazy grid in a card taller than the screen kept changing the
+    card's height and back. The card also stops resizing itself after a few quick changes, keeping the taller one.
   - Website: the panels and pop-ups use one shared frosted backdrop (`.st-frost` in `index.css`).
 - **Real songs on the record shelf.** The made-up loops are gone. The five records are now real songs, credited
   while they play and under each sleeve:
@@ -153,7 +156,10 @@ Claude, 23 Nov, first checkpoint (`95ee153`): PR #1 went onto `main` with these 
   game, in the countdown and in the bar; no page errors. The fixtures play every rule on both sides; the Swift side
   first runs in CI.
 - **Floating menus (iPhone):** not built on a Mac before pushing. Check the CI screenshots that open menus (`mood`,
-  `record-sheet`, `pet`, `decor`, `plus`, `looks`, `us-*`): each should be a card over the blurred room.
+  `record-sheet`, `pet`, `decor`, `plus`, `looks`, `us-*`, `bucket`, `recap-share`, `ranks`): each should be a
+  card over the blurred room. In the 19203ef build all of them were, except `record-sheet`, which was blank (the
+  app hung; fixed in the next push), and `bucket` and `recap-share`, whose screenshots no longer opened their tile
+  first (fixed in the workflow).
 - **Not tested:** anything on a real iPhone, two-phone Our song, StoreKit, and the widgets on a real home screen.
 
 ## The plan from Vedanth's 24 Nov video

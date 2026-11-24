@@ -440,7 +440,7 @@ struct MeSheet: View {
                     }
                 }
                 Text("It shows over your head on the couch for a day, for \(place.theirName) to see.").font(.pxSmall).foregroundStyle(Color.muted)
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 98), spacing: 8)], spacing: 8) {
+                EvenGrid(minimum: 98, spacing: 8, rowSpacing: 8) {
                     ForEach(MOODS) { m in
                         Button {
                             Haptics.tap()
@@ -533,7 +533,7 @@ struct TouchButtons: View {
     @State private var busy: TouchKind?
 
     var body: some View {
-        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: compact ? 6 : 10), count: compact ? 6 : 3), spacing: 10) {
+        EvenGrid(columns: compact ? 6 : 3, spacing: compact ? 6 : 10, rowSpacing: 10) {
             ForEach(Array(TOUCHES.enumerated()), id: \.element.id) { i, t in
                 Button {
                     guard busy == nil else { return }
