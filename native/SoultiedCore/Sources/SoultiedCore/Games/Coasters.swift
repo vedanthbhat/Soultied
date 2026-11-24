@@ -28,6 +28,11 @@ public struct Coasters: LiveRules {
     static let railE: Double = 0.9
     /// the table's drag: the puck keeps this much of its speed after a second
     static let glideKeep: Double = 0.72
+    /// the table's corners are rounded, this much, so the puck can't wedge itself in one
+    public static let cornerR: Double = 14
+    /// a puck slower than this, resting against a rail, gets pushed gently back into play (at nudge)
+    static let settle: Double = 2
+    static let nudge: Double = 15
     /// after a goal, the puck waits this long in the half of whoever let it in
     public static let serveMs: Double = 1100
     static let stepS: Double = 0.004
@@ -199,8 +204,10 @@ public struct Coasters: LiveRules {
             let drag = pow(glideKeep, hh)
             puck.vx *= drag
             puck.vy *= drag
-            if hit(&puck, mal[.a]!) { touches += 1 }
-            if hit(&puck, mal[.b]!) { touches += 1 }
+            let hitA = hit(&puck, mal[.a]!)
+            let hitB = hit(&puck, mal[.b]!)
+            if hitA { touches += 1 }
+            if hitB { touches += 1 }
             let sp = (puck.vx * puck.vx + puck.vy * puck.vy).squareRoot()
             if sp > maxPuck {
                 puck.vx *= maxPuck / sp
@@ -222,6 +229,35 @@ public struct Coasters: LiveRules {
             } else if puck.y > h - puckR && !mouth {
                 puck.y = h - puckR
                 puck.vy = -abs(puck.vy) * railE
+            }
+            // the corners are rounded, so the puck rolls out of one rather than getting wedged in it
+            var edge = puck.x <= puckR + 0.5 || puck.x >= w - puckR - 0.5 || (!mouth && (puck.y <= puckR + 0.5 || puck.y >= h - puckR - 0.5))
+            let cx = puck.x < cornerR ? cornerR : puck.x > w - cornerR ? w - cornerR : -1
+            let cy = puck.y < cornerR ? cornerR : puck.y > h - cornerR ? h - cornerR : -1
+            if cx >= 0 && cy >= 0 {
+                let dx = puck.x - cx, dy = puck.y - cy
+                let d = (dx * dx + dy * dy).squareRoot()
+                let most = cornerR - puckR
+                if d > most {
+                    let nx = dx / d, ny = dy / d
+                    puck.x = cx + nx * most
+                    puck.y = cy + ny * most
+                    let vn = puck.vx * nx + puck.vy * ny
+                    if vn > 0 {
+                        puck.vx -= (1 + railE) * vn * nx
+                        puck.vy -= (1 + railE) * vn * ny
+                    }
+                    edge = true
+                }
+            }
+            // a puck that's come to rest against a rail (and isn't held there by a coaster) drifts back into its own half
+            if edge && !hitA && !hitB && (puck.vx * puck.vx + puck.vy * puck.vy).squareRoot() < settle {
+                let tx = w / 2 - puck.x
+                let ty = (puck.y < mid ? mid / 2 : mid + mid / 2) - puck.y
+                let d0 = (tx * tx + ty * ty).squareRoot()
+                let d = d0 > 0 ? d0 : 1
+                puck.vx = (tx / d) * nudge
+                puck.vy = (ty / d) * nudge
             }
             if puck.y < -puckR { goal = .a } else if puck.y > h + puckR { goal = .b }
         }

@@ -61,9 +61,8 @@ struct UsView: View {
             } else if let target = Launch.scrollUs.flatMap(Panel.init(rawValue:)) { open(target) }
         }
         .sheet(item: $panel) { selected in
-            if selected == .you { LookSheet(place: place).presentationBackground(Color.paper) } else { ScrollView {
+            if selected == .you { LookSheet(place: place).frostedSheet() } else { ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
-                    HStack { Spacer(); Button("Done") { panel = nil }.buttonStyle(.px(.paper, small: true)) }
                     switch selected {
                     case .apart, .list, .recap, .lately, .notifications, .invite, .you: EmptyView()
                     case .settings:
@@ -78,11 +77,11 @@ struct UsView: View {
                             }
                     }
                 }.padding(16)
-            }.presentationDragIndicator(.visible).presentationBackground(Color.paper) }
+            }.frostedSheet() }
         }
         .background(RoomBackground())
-        .sheet(isPresented: $editingPlace) { PlaceSheet(place: place).presentationDetents([.medium]).presentationBackground(Color.paper) }
-        .sheet(isPresented: $decorating) { DecorView(place: place).presentationDragIndicator(.visible).presentationBackground(Color.paper) }
+        .sheet(isPresented: $editingPlace) { PlaceSheet(place: place).frostedSheet() }
+        .sheet(isPresented: $decorating) { DecorView(place: place).frostedSheet() }
     }
 
     /// You and Settings open as a sheet; the rest float up as a card over the page (FloatingCard.swift)
@@ -251,7 +250,7 @@ struct InviteCard: View {
                 Button("Leave them a doodle") { doodling = true }.buttonStyle(.px(.paper, small: true))
                     .sheet(isPresented: $doodling) {
                         ScrollView { DoodlePanel(place: place) { doodling = false }.padding(16) }
-                            .presentationDragIndicator(.visible).presentationBackground(Color.paper)
+                            .frostedSheet()
                     }
                 Text("It works for a week. You can make a fresh one any time.").font(.pxTiny).foregroundStyle(Color.muted)
             }
@@ -313,7 +312,6 @@ struct PlaceSheet: View {
             if sayWhen {
                 DatePicker("Together since", selection: $since, in: ...Date(), displayedComponents: .date).font(.pxBody).tint(Color.terracotta)
             }
-            Spacer()
             Button("Save") {
                 place.rename(name.isEmpty ? (place.space?.name ?? "Our Little Place") : name, togetherSince: sayWhen ? Day.today(since) : nil)
                 dismiss()

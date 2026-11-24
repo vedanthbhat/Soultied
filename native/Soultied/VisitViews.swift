@@ -37,7 +37,7 @@ struct CountdownCard: View {
         }
         .pxCard()
         .accessibilityElement(children: .combine)
-        .sheet(isPresented: $editing) { VisitSheet(place: place).presentationDetents([.large]).presentationBackground(Color.paper) }
+        .sheet(isPresented: $editing) { VisitSheet(place: place).frostedSheet() }
     }
 }
 

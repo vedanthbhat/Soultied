@@ -30,6 +30,11 @@ const HIT_E = 0.92;
 const RAIL_E = 0.9;
 /** the table's drag: the puck keeps this much of its speed after a second */
 const GLIDE = 0.72;
+/** the table's corners are rounded, this much, so the puck can't wedge itself in one */
+export const CORNER_R = 14;
+/** a puck slower than this, resting against a rail, gets pushed gently back into play (at NUDGE) */
+const SETTLE = 2;
+const NUDGE = 15;
 /** after a goal, the puck waits this long in the half of whoever let it in */
 export const SERVE_MS = 1100;
 const STEP = 0.004;
@@ -127,8 +132,10 @@ function step(s: { puck: Body; mal: Record<Seat, Coaster> }, dt: number, puckLiv
     const drag = Math.pow(GLIDE, h);
     p.vx *= drag;
     p.vy *= drag;
-    if (hit(p, s.mal.a)) touches++;
-    if (hit(p, s.mal.b)) touches++;
+    const hitA = hit(p, s.mal.a);
+    const hitB = hit(p, s.mal.b);
+    if (hitA) touches++;
+    if (hitB) touches++;
     const sp = Math.hypot(p.vx, p.vy);
     if (sp > MAX_PUCK) {
       p.vx *= MAX_PUCK / sp;
@@ -150,6 +157,36 @@ function step(s: { puck: Body; mal: Record<Seat, Coaster> }, dt: number, puckLiv
     } else if (p.y > TABLE_H - PUCK_R && !mouth) {
       p.y = TABLE_H - PUCK_R;
       p.vy = -Math.abs(p.vy) * RAIL_E;
+    }
+    // the corners are rounded, so the puck rolls out of one rather than getting wedged in it
+    let edge = p.x <= PUCK_R + 0.5 || p.x >= TABLE_W - PUCK_R - 0.5 || (!mouth && (p.y <= PUCK_R + 0.5 || p.y >= TABLE_H - PUCK_R - 0.5));
+    const cx = p.x < CORNER_R ? CORNER_R : p.x > TABLE_W - CORNER_R ? TABLE_W - CORNER_R : -1;
+    const cy = p.y < CORNER_R ? CORNER_R : p.y > TABLE_H - CORNER_R ? TABLE_H - CORNER_R : -1;
+    if (cx >= 0 && cy >= 0) {
+      const dx = p.x - cx;
+      const dy = p.y - cy;
+      const d = Math.hypot(dx, dy);
+      const most = CORNER_R - PUCK_R;
+      if (d > most) {
+        const nx = dx / d;
+        const ny = dy / d;
+        p.x = cx + nx * most;
+        p.y = cy + ny * most;
+        const vn = p.vx * nx + p.vy * ny;
+        if (vn > 0) {
+          p.vx -= (1 + RAIL_E) * vn * nx;
+          p.vy -= (1 + RAIL_E) * vn * ny;
+        }
+        edge = true;
+      }
+    }
+    // a puck that's come to rest against a rail (and isn't held there by a coaster) drifts back into its own half
+    if (edge && !hitA && !hitB && Math.hypot(p.vx, p.vy) < SETTLE) {
+      const tx = TABLE_W / 2 - p.x;
+      const ty = (p.y < MID ? MID / 2 : MID + MID / 2) - p.y;
+      const d = Math.hypot(tx, ty) || 1;
+      p.vx = (tx / d) * NUDGE;
+      p.vy = (ty / d) * NUDGE;
     }
     if (p.y < -PUCK_R) goal = 'a';
     else if (p.y > TABLE_H + PUCK_R) goal = 'b';

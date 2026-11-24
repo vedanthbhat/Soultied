@@ -50,6 +50,40 @@ final class TurntableTests: XCTestCase {
         XCTAssertEqual(Records.startFor(-1, now), Records.startFor(4, now))
     }
 
+    /// the shelf's records are the website's: the same songs, in the same order, of the same lengths and from the
+    /// same artists, and each one is at the same spot at the same moment
+    func testTheShelf() throws {
+        let fx = try fixtures()
+        let web = fx["shelf"] as! [Doc]
+        XCTAssertEqual(web.count, Records.shelf.count)
+        for (w, record) in zip(web, Records.shelf) {
+            XCTAssertEqual(w["id"] as? String, record.id)
+            XCTAssertEqual(w["title"] as? String, record.title)
+            XCTAssertEqual(w["artist"] as? String, record.credit.artist, record.id)
+            XCTAssertEqual(w["source"] as? String, record.credit.source, record.id)
+            XCTAssertEqual(w["license"] as? String, record.credit.license, record.id)
+            let songs = w["tracks"] as! [[Any]]
+            XCTAssertEqual(songs.count, record.tracks.count, record.id)
+            for (s, t) in zip(songs, record.tracks) {
+                XCTAssertEqual(s[0] as? String, t.slug)
+                XCTAssertEqual(s[1] as? String, t.title)
+                XCTAssertEqual(Values.num(s[2])!, t.secs, t.slug)
+            }
+        }
+        let rows = fx["albums"] as! [[Any]]
+        XCTAssertEqual(rows.count, Records.shelf.count * 40)
+        for r in rows {
+            let album = r[0] as! String, startedAt = Values.num(r[1])!, now = Double(r[2] as! String)!
+            let w = Records.whereAt(startedAt, now, album: album)
+            XCTAssertEqual(w.index, Int(Values.num(r[3])!), "\(album) \(startedAt) \(now)")
+            XCTAssertEqual(w.offset, Double(r[4] as! String)!, "\(album) \(startedAt) \(now)")
+        }
+        // every song but the jazz record's comes from the site's shelf folder, as an MP3
+        for record in Records.shelf where record.id != "jazz" {
+            for t in record.tracks { XCTAssertEqual(t.url.absoluteString, "https://soultied.app/audio/shelf/\(t.slug).mp3") }
+        }
+    }
+
     func testWhatEachButtonWrites() {
         let now = 1_790_000_000_000.0
         // the record goes on from where it was left

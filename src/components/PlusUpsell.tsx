@@ -5,8 +5,7 @@ import { PERKS } from '../plus/rules';
 /** "That's in Soultied Plus": what it adds, and a way to get it, over whatever you tapped. */
 export const PlusUpsell: React.FC<{ heading: string; blurb: string; onClose: () => void }> = ({ heading, blurb, onClose }) => (
   <div
-    className="fixed inset-0 z-[80] flex items-center justify-center p-4"
-    style={{ background: 'rgba(20, 14, 16, 0.62)' }}
+    className="st-frost fixed inset-0 z-[80] flex items-center justify-center p-4"
     role="dialog"
     aria-modal="true"
     aria-label={heading}

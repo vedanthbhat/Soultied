@@ -40,6 +40,16 @@ jobs:
       # AI Studio doesn't keep a package-lock.json, so install from package.json
       - run: npm install --no-audit --no-fund
       - run: npm run lint
+      # the record shelf's songs (scripts/shelf-audio.mjs, run before the build): made once, then kept between runs,
+      # so only a song that's new or changed in src/music/shelf.json is downloaded and made again
+      - id: shelf
+        uses: actions/cache@v4
+        with:
+          path: public/audio/shelf
+          key: shelf-audio-${{ hashFiles('src/music/shelf.json', 'scripts/shelf-audio.mjs') }}
+          restore-keys: shelf-audio-
+      - if: steps.shelf.outputs.cache-hit != 'true'
+        run: command -v ffmpeg >/dev/null || (sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg)
       - run: npm run build
         env:
           # Optional: a relay for video calls on networks that block direct ones (see src/watch/ice.ts).

@@ -40,12 +40,10 @@ targets:
       # (the icon's picture is drawn by scripts/ios-assets.mjs before a build)
       - path: ../public/fonts/PixelifySans-Variable.ttf
         buildPhase: resources
-      # the record's Night in Venice, for the first tour (so it plays straight away, even offline)
       - path: ../public/plus-popcorn.png
         buildPhase: resources
-      - path: ../public/audio/shelf
-        type: folder
-        buildPhase: resources
+      # the record's Night in Venice, for the first tour (so it plays straight away, even offline). The other
+      # records' songs are downloaded from soultied.app the first time one goes on (RecordPlayer.swift).
       - path: ../public/audio/night-in-venice.mp3
         buildPhase: resources
       # Firebase's settings for this app (app.soultied.ios, in the soultied-c1543 project): made from

@@ -423,6 +423,14 @@ label {
     opacity: 0;
   }
 }
+/* Every menu over the place (panels, pickers, Plus, the Us cards) sits on the same frosted screen: what's behind
+   it blurred and dimmed, as on the iPhone (FloatingCard.swift) */
+.st-frost {
+  background: rgba(27, 18, 20, 0.32);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+}
+
 .st-bulb {
   animation: st-twinkle 2.4s ease-in-out infinite;
 }

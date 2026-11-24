@@ -85,19 +85,75 @@ struct FloatingCardHost: View {
 
     /// a little bar to pull the card down by, and Done
     private var handle: some View {
+        CardHandle { card.close() }
+            .gesture(
+                DragGesture()
+                    .updating($pull) { value, state, _ in state = value.translation.height }
+                    .onEnded { value in if value.translation.height > 70 { card.close() } }
+            )
+    }
+}
+
+/// the bar along the top of a floating card: a little handle, and Done
+struct CardHandle: View {
+    let done: () -> Void
+
+    var body: some View {
         ZStack {
             Rectangle().fill(Color.paper.opacity(0.85)).frame(width: 44, height: 6)
             HStack {
                 Spacer()
-                Button("Done") { card.close() }.buttonStyle(.px(.paper, small: true))
+                Button("Done", action: done).buttonStyle(.px(.paper, small: true))
             }
         }
         .frame(height: 40)
         .contentShape(Rectangle())
-        .gesture(
-            DragGesture()
-                .updating($pull) { value, state, _ in state = value.translation.height }
-                .onEnded { value in if value.translation.height > 70 { card.close() } }
-        )
     }
+}
+
+/*
+ * Every other menu (the invite, how you're feeling, settings, your look, Plus, decorating, the record player and
+ * the rest) still opens as a sheet, but dressed the same as the floating cards: the screen blurred and see-through
+ * behind it, the menu as a paper card at the bottom with the same bar and Done on top. Tapping the blurred part
+ * closes it, as does pulling it down. A menu that's taller than the screen fills it and scrolls inside.
+ */
+private struct FrostedSheet: ViewModifier {
+    @Environment(\.dismiss) private var dismiss
+    /// put it on a paper card (false: it's already made of its own cards, like the Us tiles' menus)
+    let boxed: Bool
+
+    func body(content: Content) -> some View {
+        VStack(spacing: 8) {
+            // the blurred screen above the card
+            Color.clear
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .contentShape(Rectangle())
+                .onTapGesture { dismiss() }
+                .accessibilityHidden(true)
+            CardHandle { dismiss() }
+            Group {
+                if boxed {
+                    content.frame(maxWidth: .infinity, alignment: .leading).pxBox(.paper, shadow: true)
+                } else {
+                    content.frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            // (the card gets the room it needs first; whatever's left is the blur above it)
+            .layoutPriority(1)
+        }
+        .padding(.horizontal, 12)
+        .padding(.top, 12)
+        .padding(.bottom, 10)
+        .presentationDetents([.large])
+        .presentationDragIndicator(.hidden)
+        .presentationCornerRadius(0)
+        .presentationBackground {
+            Rectangle().fill(.ultraThinMaterial).overlay(Color.black.opacity(0.22))
+        }
+    }
+}
+
+extension View {
+    /// a menu in a sheet, dressed like the floating cards (see FrostedSheet)
+    func frostedSheet(boxed: Bool = true) -> some View { modifier(FrostedSheet(boxed: boxed)) }
 }

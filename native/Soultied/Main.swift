@@ -33,6 +33,13 @@ enum RoomSheet: String, Identifiable {
     /// the wall, open at the doodle pad, the photos, the voice notes or the memories (a tap on a home-screen widget)
     case doodle, photos, countdown, voices, memories
     var id: String { rawValue }
+    /// a menu (frosted, like the floating cards) rather than a whole page (a tab's view, up while the room's sideways)
+    var isMenu: Bool {
+        switch self {
+        case .me, .them, .invite, .decor, .music, .pet, .petDecor, .countdown: true
+        case .letters, .wall, .play, .us, .watch, .doodle, .photos, .voices, .memories: false
+        }
+    }
 }
 
 struct MainView: View {
@@ -112,9 +119,14 @@ struct MainView: View {
         .onChange(of: tab) { _, _ in FloatingCard.shared.close() }
         .fullScreenCover(isPresented: $escape) { EscapeScreen(place: place).callBand(place) }
         .sheet(item: $sheet) { s in
-            sheetView(s)
-                .presentationDragIndicator(.visible)
-                .presentationBackground(Color.paper)
+            if s.isMenu {
+                // (the invite is already a card of its own)
+                sheetView(s).frostedSheet(boxed: s != .invite)
+            } else {
+                sheetView(s)
+                    .presentationDragIndicator(.visible)
+                    .presentationBackground(Color.paper)
+            }
         }
         .fullScreenCover(item: $game) { k in GameScreen(place: place, kind: k).callBand(place) }
         // the record player: its sound follows the place's record, whichever tab you're on
@@ -236,8 +248,8 @@ struct MainView: View {
     @ViewBuilder
     func sheetView(_ s: RoomSheet) -> some View {
         switch s {
-        case .me: MeSheet(place: place, onLook: { sheet = nil; go(.us) }).presentationDetents([.medium, .large])
-        case .them: ThemSheet(place: place).presentationDetents([.height(360), .medium])
+        case .me: MeSheet(place: place, onLook: { sheet = nil; go(.us) })
+        case .them: ThemSheet(place: place)
         case .letters: LettersView(place: place, start: .today)
         case .wall: WallView(place: place)
         case .doodle: WallView(place: place, start: .doodle)
@@ -248,10 +260,10 @@ struct MainView: View {
         case .decor: DecorView(place: place)
         case .play: PlayView(place: place)
         case .us: UsView(app: app, place: place)
-        case .invite: ScrollView { InviteCard(place: place).padding(16) }
-        case .music: RecordSheet(place: place, hostsSong: roomSideways).presentationDetents([.medium, .large])
+        case .invite: InviteCard(place: place)
+        case .music: RecordSheet(place: place, hostsSong: roomSideways)
         case .watch: WatchView(place: place)
-        case .pet: PetSheet(place: place, choose: { sheet = .petDecor }).presentationDetents([.medium, .large])
+        case .pet: PetSheet(place: place, choose: { sheet = .petDecor })
         case .petDecor: DecorView(place: place, start: .pet)
         }
     }

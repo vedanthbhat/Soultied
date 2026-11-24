@@ -215,9 +215,7 @@ private struct PlusSheetHost: ViewModifier {
 
     func body(content: Content) -> some View {
         content.sheet(item: Binding(get: { gate.reason }, set: { gate.reason = $0 })) { r in
-            PlusSheet(place: place, reason: r)
-                .presentationDragIndicator(.visible)
-                .presentationBackground(Color.paper)
+            PlusSheet(place: place, reason: r).frostedSheet()
         }
     }
 }

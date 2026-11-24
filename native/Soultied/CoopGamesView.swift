@@ -102,6 +102,16 @@ enum CoastersArt {
         r.fill(W - 2, 0, 2, H, rail)
         r.fill(0, 0, W, 2, rail)
         r.fill(0, H - 2, W, 2, rail)
+        // the rounded corners (the puck rolls round them: Coasters.cornerR)
+        let cr = Coasters.cornerR
+        for j in 0..<Int(cr) {
+            let dy = cr - (Double(j) + 0.5)
+            let w = Int((cr - (cr * cr - dy * dy).squareRoot()).rounded(.up)) + 1
+            r.fill(0, j, w, 1, rail)
+            r.fill(W - w, j, w, 1, rail)
+            r.fill(0, H - 1 - j, w, 1, rail)
+            r.fill(W - w, H - 1 - j, w, 1, rail)
+        }
         let g0 = Int(Coasters.goalX0), g1 = Int(Coasters.goalX1)
         r.fill(g0, 0, g1 - g0, 3, RGB("#140c0e"))
         r.fill(g0, H - 3, g1 - g0, 3, RGB("#140c0e"))

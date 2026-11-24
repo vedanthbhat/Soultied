@@ -2,105 +2,125 @@
   {
     "id": "lofi",
     "title": "Lo-fi evening",
+    "credit": "holizna",
     "tracks": [
       {
-        "slug": "lofi-1",
-        "title": "Window Seat",
-        "secs": 48
+        "slug": "fire-place",
+        "title": "Fire Place",
+        "secs": 170,
+        "from": "https://files.freemusicarchive.org/storage-freemusicarchive-org/tracks/qUQGTyL3bMTaIVqsuZ3dUS2u2ep2ZmVr86sWwZ0j.mp3"
       },
       {
-        "slug": "lofi-2",
-        "title": "Last Train",
-        "secs": 48
+        "slug": "snow-drift",
+        "title": "Snow Drift",
+        "secs": 173,
+        "from": "https://files.freemusicarchive.org/storage-freemusicarchive-org/tracks/K0WPofXI9S27E24ORSKxrYhlyFe2g7zldVkmR6KF.mp3"
       },
       {
-        "slug": "lofi-3",
-        "title": "Lamp Light",
-        "secs": 48
+        "slug": "winter-blues",
+        "title": "Winter Blues",
+        "secs": 223,
+        "from": "https://files.freemusicarchive.org/storage-freemusicarchive-org/tracks/b9aaLxa3HIdDsfDmLDUsR27znNe0aldiVWRJbDF9.mp3"
       }
     ]
   },
   {
     "id": "piano",
     "title": "Soft piano",
+    "credit": "macleod",
     "tracks": [
       {
-        "slug": "piano-1",
-        "title": "Little Hours",
-        "secs": 48
+        "slug": "gymnopedie-no-1",
+        "title": "Gymnopedie No. 1",
+        "secs": 187,
+        "from": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Gymnopedie%20No%201.mp3"
       },
       {
-        "slug": "piano-2",
-        "title": "Two Teacups",
-        "secs": 48
+        "slug": "avec-soin",
+        "title": "Avec Soin",
+        "secs": 145,
+        "from": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Avec%20Soin.mp3"
       },
       {
-        "slug": "piano-3",
-        "title": "First Light",
-        "secs": 48
+        "slug": "friday-morning",
+        "title": "Friday Morning",
+        "secs": 210,
+        "from": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Friday%20Morning.mp3"
       }
     ]
   },
   {
     "id": "acoustic",
     "title": "Acoustic morning",
+    "credit": "macleod",
     "tracks": [
       {
-        "slug": "acoustic-1",
-        "title": "Open Window",
-        "secs": 48
+        "slug": "morning",
+        "title": "Morning",
+        "secs": 153,
+        "from": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Morning.mp3"
       },
       {
-        "slug": "acoustic-2",
-        "title": "Sunday Walk",
-        "secs": 48
+        "slug": "carefree",
+        "title": "Carefree",
+        "secs": 205,
+        "from": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Carefree.mp3"
       },
       {
-        "slug": "acoustic-3",
-        "title": "Golden Hour",
-        "secs": 48
+        "slug": "easy-lemon",
+        "title": "Easy Lemon",
+        "secs": 126,
+        "from": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Easy%20Lemon.mp3"
       }
     ]
   },
   {
     "id": "rain",
     "title": "Rainy day",
+    "credit": "macleod",
     "tracks": [
       {
-        "slug": "rain-1",
-        "title": "Rain on Glass",
-        "secs": 48
+        "slug": "dreamer",
+        "title": "Dreamer",
+        "secs": 204,
+        "from": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Dreamer.mp3"
       },
       {
-        "slug": "rain-2",
-        "title": "Under One Roof",
-        "secs": 48
+        "slug": "comfortable-mystery",
+        "title": "Comfortable Mystery",
+        "secs": 236,
+        "from": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Comfortable%20Mystery.mp3"
       },
       {
-        "slug": "rain-3",
-        "title": "After the Shower",
-        "secs": 48
+        "slug": "blue-paint",
+        "title": "Blue Paint",
+        "secs": 131,
+        "from": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Blue%20Paint.mp3"
       }
     ]
   },
   {
     "id": "arcade",
     "title": "Retro arcade",
+    "credit": "holizna",
     "tracks": [
       {
-        "slug": "arcade-1",
-        "title": "Extra Heart",
-        "secs": 48
+        "slug": "comfort-game-1",
+        "title": "Comfort Game 1",
+        "secs": 135,
+        "from": "https://files.freemusicarchive.org/storage-freemusicarchive-org/tracks/662zS7xARjpO2oCvK0HLvb7GyHMVyiDCiUz39HfA.mp3"
       },
       {
-        "slug": "arcade-2",
-        "title": "Player Two",
-        "secs": 48
+        "slug": "comfort-games-2",
+        "title": "Comfort Games 2",
+        "secs": 144,
+        "from": "https://files.freemusicarchive.org/storage-freemusicarchive-org/tracks/5jjf24DKTYdwa3w68M9g5loxlWpCw0uN1muOokkT.mp3"
       },
       {
-        "slug": "arcade-3",
-        "title": "Save Point",
-        "secs": 48
+        "slug": "comfort-games-3",
+        "title": "Comfort Games 3",
+        "secs": 143,
+        "from": "https://files.freemusicarchive.org/storage-freemusicarchive-org/tracks/hoYdZoAvg8FmECMUnnZJXfTCKr3XN6q0UDVRFhut.mp3"
       }
     ]
   }

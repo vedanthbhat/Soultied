@@ -53,7 +53,7 @@ struct BucketCard: View {
                 .buttonStyle(.px(.sage, wide: true))
         }
         .pxCard()
-        .sheet(isPresented: $open) { BucketSheet(place: place).presentationDragIndicator(.visible).presentationBackground(Color.paper) }
+        .sheet(isPresented: $open) { BucketSheet(place: place).frostedSheet() }
         // (the screenshots: the list, open)
         .onAppear { if Launch.args.contains("-bucket") { open = true } }
     }

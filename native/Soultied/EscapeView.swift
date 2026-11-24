@@ -55,9 +55,7 @@ struct EscapeScreen: View {
         }
         .onChange(of: place.partnerHere) { _, _ in session.start() }
         .sheet(item: $plusReason) { r in
-            PlusSheet(place: place, reason: r)
-                .presentationDragIndicator(.visible)
-                .presentationBackground(Color.paper)
+            PlusSheet(place: place, reason: r).frostedSheet()
         }
         // keeps the clock, the holding and the pings going
         .task {

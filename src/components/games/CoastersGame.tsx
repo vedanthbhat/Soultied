@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useLiveGame } from '../../games/live/useLiveGame';
 import type { LiveGame } from '../../games/live/useLiveGame';
-import { COASTERS, CoastersAct, CoastersState, GOAL_X0, GOAL_X1, MALLET_R, MID, PUCK_R, TABLE_H, TABLE_W, TO_WIN, glide, reach } from '../../games/coasters';
+import { COASTERS, CORNER_R, CoastersAct, CoastersState, GOAL_X0, GOAL_X1, MALLET_R, MID, PUCK_R, TABLE_H, TABLE_W, TO_WIN, glide, reach } from '../../games/coasters';
 import type { Body } from '../../games/coasters';
 import type { Seat } from '../../games/types';
 import { tone } from '../../escape/sfx';
@@ -51,6 +51,15 @@ function drawTable(ctx: CanvasRenderingContext2D) {
   ctx.fillRect(TABLE_W - 2, 0, 2, TABLE_H);
   ctx.fillRect(0, 0, TABLE_W, 2);
   ctx.fillRect(0, TABLE_H - 2, TABLE_W, 2);
+  // the rounded corners (the puck rolls round them: CORNER_R)
+  for (let j = 0; j < CORNER_R; j++) {
+    const dy = CORNER_R - (j + 0.5);
+    const w = Math.ceil(CORNER_R - Math.sqrt(CORNER_R * CORNER_R - dy * dy)) + 1;
+    ctx.fillRect(0, j, w, 1);
+    ctx.fillRect(TABLE_W - w, j, w, 1);
+    ctx.fillRect(0, TABLE_H - 1 - j, w, 1);
+    ctx.fillRect(TABLE_W - w, TABLE_H - 1 - j, w, 1);
+  }
   ctx.fillStyle = '#140c0e';
   ctx.fillRect(GOAL_X0, 0, GOAL_X1 - GOAL_X0, 3);
   ctx.fillRect(GOAL_X0, TABLE_H - 3, GOAL_X1 - GOAL_X0, 3);

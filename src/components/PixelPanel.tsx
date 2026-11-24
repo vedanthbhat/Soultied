@@ -21,11 +21,10 @@ export const PixelPanel: React.FC<Props> = ({ title, kicker, onClose, children, 
 
   return (
     <div
-      className="fixed inset-0 z-40 flex items-end sm:items-center justify-center p-3 sm:p-6 px-ui"
+      className="st-frost fixed inset-0 z-40 flex items-end sm:items-center justify-center p-3 sm:p-6 px-ui"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
-      style={{ background: 'rgba(16,10,12,0.35)' }}
     >
       <div
         ref={ref}

@@ -685,7 +685,7 @@ export const EscapeGame: React.FC<{ onExit: () => void }> = ({ onExit }) => {
 
       {/* the ending */}
       {endingOpen && progress.finishedAt && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center p-4" style={{ background: 'rgba(10,6,8,.72)' }}>
+        <div className="st-frost fixed inset-0 z-40 flex items-center justify-center p-4">
           <EndingCard
             room={room}
             time={progress.finishedAt - progress.startedAt}

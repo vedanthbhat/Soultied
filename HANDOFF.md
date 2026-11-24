@@ -16,6 +16,28 @@ Get Soultied ready for the App Store:
 
 ## What changed
 
+Claude, 24 Nov (step 1 of the plan below):
+
+- **Every menu is frosted.** On iPhone, the menus that open as sheets (how you're feeling, your person, the invite,
+  decorating, the record player, the pet, settings, your look, Plus, the bucket list, ranks, snaps, visits, photos)
+  now look like the Us cards: the screen blurred behind, the menu as a paper card at the bottom with a bar and Done,
+  and a tap on the blur closes it (`frostedSheet()` in `FloatingCard.swift`). Whole pages (letters, the wall, games,
+  Us, watch) still open as plain paper sheets. On the website, the panels and pop-ups use one shared backdrop
+  (`.st-frost` in `index.css`).
+- **Real songs on the record shelf.** The made-up loops are gone. The five records are now real songs, credited
+  while they play and under each sleeve:
+  - Lo-fi evening and Retro arcade: HoliznaCC0 (Free Music Archive), CC0.
+  - Soft piano, Acoustic morning and Rainy day: Kevin MacLeod (incompetech.com), CC BY 4.0.
+  - The list, with where each song comes from, is `src/music/shelf.json`; the credits are in
+    `public/audio/CREDITS.txt`.
+  - `scripts/shelf-audio.mjs` (run before each build) downloads them, evens their volume out to match the jazz
+    record, and makes each one a 96 kbps MP3 exactly as long as `shelf.json` says. The site workflow installs
+    ffmpeg and keeps the made songs in the Actions cache, so they're only made again when `shelf.json` changes.
+  - The iPhone app no longer carries the songs: it downloads each one from soultied.app the first time it plays.
+    The song list is in `Turntable.swift` too; `TurntableTests.testTheShelf` checks it against the website's.
+- **Coasters (air hockey):** the table's corners are rounded, so the puck can't wedge in one, and a puck resting
+  still against a rail gets a gentle push back into play. Same on web and iPhone.
+
 Claude, 23 Nov, second checkpoint:
 
 - **Onboarding is shorter.** New people see 4 steps, then the room:
@@ -80,12 +102,40 @@ Claude, 23 Nov, first checkpoint (`95ee153`): PR #1 went onto `main` with these 
   - The first re-send (`16ad648`) never ran: the iPhone workflow only starts when files under `native/` (and a few
     others) change, and that push only touched HANDOFF.md. The Bluetooth rename above touches `native/`, so its push
     builds and sends the app again.
+- **The re-send (`b3ef993`, CI run #86)** built, signed and reached TestFlight (build 1086).
+- **24 Nov checkpoint (before pushing):**
+  - Website: `tsc` and the production build pass. Playwright at 390 × 844 in the demo room, with no page errors:
+    the record player opens over a blurred room; each sleeve shows its artist; Lo-fi evening, Soft piano and Retro
+    arcade each load `audio/shelf/<song>.mp3` and the card credits the right artist with working links. (This used
+    stand-in tones, because this sandbox can't reach incompetech or the Free Music Archive.)
+  - `shelf-audio.mjs` was tried against local copies of the jazz MP3s: a song is padded or trimmed to its exact
+    length at about -22 LUFS, 96 kbps, 32 kHz; a wrong-length file and a missing one are both refused; songs already
+    made are skipped; without ffmpeg it only warns off GitHub. **The real downloads first happen in the site
+    workflow on this push.** If a song can't be made there, the build stops and the run page shows a
+    "Record shelf" error naming it.
+  - Coasters: simulated a puck wedged in each corner (it now comes out) and one resting on a rail (it's pushed back
+    into play). The new fixtures cover the shelf on both sides.
+  - Not built on a Mac yet: the Swift changes (frosted sheets, the shelf, Coasters) get their first build in CI.
 - **Not tested:** anything on a real iPhone, two-phone Our song, StoreKit, and the widgets on a real home screen.
+
+## The plan from Vedanth's 24 Nov video
+
+1. Frosted menus, real music, the air hockey corners. **Done (this checkpoint).**
+2. Games fill the screen (no tab bar, sideways for action games, a backdrop, sounds, a countdown, a win screen,
+   your person's reactions along the edge) and house rules: a fun rule card at the start of each live game, with one
+   reroll. Then the final review and the App Store submission.
+3. **Trust Fall:** a co-op platformer full of unfair traps, in the spirit of Unfair Mario but our own name,
+   characters and levels. 10 levels; the first 3 are free, the rest are Plus.
+4. **Trap Swap** (you build traps on each other's level, then race through) and **Tied** (two characters tied by a
+   thread, climbing a tower). Both Plus. All three share one platformer engine, on web and iPhone.
+
+The new games ship as an update after the App Store submission.
 
 ## Next unfinished step
 
-1. Check that this re-send reaches TestFlight. If it fails on signing again, check that the App Store Connect key
-   secrets still belong to the team that owns `app.soultied.ios`.
+1. Check this push: the site workflow made all 15 shelf songs (its summary says "Record shelf songs: 15 made"), the
+   iPhone build and tests pass, and the frosted menus look right in the CI screenshots. Then start step 2 of the
+   plan.
 2. Vedanth: tick MusicKit under Identifiers › `app.soultied.ios` › App Services.
 3. Vedanth: try the TestFlight build. Run the two-phone Our song checklist below, go through onboarding as a new
    person, and add both new widgets.

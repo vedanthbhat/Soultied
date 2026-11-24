@@ -21,11 +21,31 @@ public struct RecordTrack: Sendable, Equatable, Identifiable {
     /// the same 96 kbps MP3 the website plays
     public var url: URL { Records.tracks.contains(self)
         ? URL(string: "https://soultied.app/audio/\(slug).mp3")!
-        : URL(string: "https://soultied.app/audio/shelf/\(slug).wav")! }
+        : URL(string: "https://soultied.app/audio/shelf/\(slug).mp3")! }
 }
 
-/// The record: five soft jazz tracks by Kevin MacLeod (incompetech.com), CC BY 4.0. The credit shows whenever
-/// one is playing.
+/// who made a record's songs, and the licence they're shared under (shown whenever one is playing, as it asks)
+public struct SongCredit: Sendable, Equatable {
+    public let artist: String
+    /// where they're from, as it's written in the credit
+    public let source: String
+    public let sourceURL: URL
+    public let license: String
+    public let licenseURL: URL
+
+    public static let macLeod = SongCredit(
+        artist: "Kevin MacLeod", source: "incompetech.com", sourceURL: URL(string: "https://incompetech.com")!,
+        license: "CC BY 4.0", licenseURL: URL(string: "https://creativecommons.org/licenses/by/4.0/")!)
+    public static let holizna = SongCredit(
+        artist: "HoliznaCC0", source: "freemusicarchive.org",
+        sourceURL: URL(string: "https://freemusicarchive.org/music/holiznacc0/")!,
+        license: "CC0", licenseURL: URL(string: "https://creativecommons.org/publicdomain/zero/1.0/")!)
+}
+
+/// The records on the shelf (src/music/records.ts and src/music/shelf.json). The jazz record, the first one on, is
+/// five soft jazz tracks by Kevin MacLeod (incompetech.com), CC BY 4.0. The others are songs by Kevin MacLeod
+/// (CC BY 4.0) and HoliznaCC0 (CC0, given to the public domain), downloaded from soultied.app the first time
+/// one goes on. Whoever made what's playing is credited while it plays.
 public enum Records {
     public static let tracks: [RecordTrack] = [
         RecordTrack(slug: "study-and-relax", title: "Study And Relax", secs: 223.452),
@@ -35,40 +55,37 @@ public enum Records {
         RecordTrack(slug: "cool-vibes", title: "Cool Vibes", secs: 218.448),
     ]
 
-    public static let shelf: [(id: String, title: String, tracks: [RecordTrack])] = [
-        ("jazz", "Jazz café", tracks),
-        ("lofi", "Lo-fi evening", [
-            RecordTrack(slug: "lofi-1", title: "Window Seat", secs: 48),
-            RecordTrack(slug: "lofi-2", title: "Last Train", secs: 48),
-            RecordTrack(slug: "lofi-3", title: "Lamp Light", secs: 48),
+    public static let shelf: [(id: String, title: String, credit: SongCredit, tracks: [RecordTrack])] = [
+        ("jazz", "Jazz café", .macLeod, tracks),
+        ("lofi", "Lo-fi evening", .holizna, [
+            RecordTrack(slug: "fire-place", title: "Fire Place", secs: 170),
+            RecordTrack(slug: "snow-drift", title: "Snow Drift", secs: 173),
+            RecordTrack(slug: "winter-blues", title: "Winter Blues", secs: 223),
         ]),
-        ("piano", "Soft piano", [
-            RecordTrack(slug: "piano-1", title: "Little Hours", secs: 48),
-            RecordTrack(slug: "piano-2", title: "Two Teacups", secs: 48),
-            RecordTrack(slug: "piano-3", title: "First Light", secs: 48),
+        ("piano", "Soft piano", .macLeod, [
+            RecordTrack(slug: "gymnopedie-no-1", title: "Gymnopedie No. 1", secs: 187),
+            RecordTrack(slug: "avec-soin", title: "Avec Soin", secs: 145),
+            RecordTrack(slug: "friday-morning", title: "Friday Morning", secs: 210),
         ]),
-        ("acoustic", "Acoustic morning", [
-            RecordTrack(slug: "acoustic-1", title: "Open Window", secs: 48),
-            RecordTrack(slug: "acoustic-2", title: "Sunday Walk", secs: 48),
-            RecordTrack(slug: "acoustic-3", title: "Golden Hour", secs: 48),
+        ("acoustic", "Acoustic morning", .macLeod, [
+            RecordTrack(slug: "morning", title: "Morning", secs: 153),
+            RecordTrack(slug: "carefree", title: "Carefree", secs: 205),
+            RecordTrack(slug: "easy-lemon", title: "Easy Lemon", secs: 126),
         ]),
-        ("rain", "Rainy day", [
-            RecordTrack(slug: "rain-1", title: "Rain on Glass", secs: 48),
-            RecordTrack(slug: "rain-2", title: "Under One Roof", secs: 48),
-            RecordTrack(slug: "rain-3", title: "After the Shower", secs: 48),
+        ("rain", "Rainy day", .macLeod, [
+            RecordTrack(slug: "dreamer", title: "Dreamer", secs: 204),
+            RecordTrack(slug: "comfortable-mystery", title: "Comfortable Mystery", secs: 236),
+            RecordTrack(slug: "blue-paint", title: "Blue Paint", secs: 131),
         ]),
-        ("arcade", "Retro arcade", [
-            RecordTrack(slug: "arcade-1", title: "Extra Heart", secs: 48),
-            RecordTrack(slug: "arcade-2", title: "Player Two", secs: 48),
-            RecordTrack(slug: "arcade-3", title: "Save Point", secs: 48),
+        ("arcade", "Retro arcade", .holizna, [
+            RecordTrack(slug: "comfort-game-1", title: "Comfort Game 1", secs: 135),
+            RecordTrack(slug: "comfort-games-2", title: "Comfort Games 2", secs: 144),
+            RecordTrack(slug: "comfort-games-3", title: "Comfort Games 3", secs: 143),
         ]),
     ]
     public static func selection(_ id: String) -> [RecordTrack] { shelf.first { $0.id == id }?.tracks ?? tracks }
-
-    public static let artist = "Kevin MacLeod"
-    public static let sourceURL = URL(string: "https://incompetech.com")!
-    public static let license = "CC BY 4.0"
-    public static let licenseURL = URL(string: "https://creativecommons.org/licenses/by/4.0/")!
+    /// who made the songs on a record (the jazz record's, for one that isn't on the shelf)
+    public static func credit(_ id: String) -> SongCredit { shelf.first { $0.id == id }?.credit ?? .macLeod }
 
     /// a record left on switches itself off after a while, so nobody walks back in to music hours later
     public static let autoOffMs: Double = 2 * 60 * 60 * 1000

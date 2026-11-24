@@ -38,7 +38,7 @@ struct PlayView: View {
         .background(RoomBackground())
         .fullScreenCover(isPresented: $escaping) { EscapeScreen(place: place).coversTabs() }
         .fullScreenCover(item: $open) { k in GameScreen(place: place, kind: k).coversTabs() }
-        .sheet(isPresented: $ranking) { RanksSheet(place: place).presentationDragIndicator(.visible).presentationBackground(Color.paper) }
+        .sheet(isPresented: $ranking) { RanksSheet(place: place).frostedSheet() }
         // (the screenshots: the couples board, open; and on it together)
         .onAppear { if Launch.args.contains("-ranks") { ranking = true } }
         .task {

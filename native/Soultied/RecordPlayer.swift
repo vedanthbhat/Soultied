@@ -54,6 +54,10 @@ final class RecordDeck {
         volume = (d.object(forKey: Self.volumeKey) as? Double).map { min(1, max(0, $0)) } ?? 0.6
         mutedForMe = d.bool(forKey: Self.mutedKey)
         ender.done = { [weak self] in self?.sync() }
+        // the shelf's old made-up loops (WAVs), kept from before the records had real songs, aren't played any more
+        let kept = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0].appendingPathComponent("records")
+        for old in (try? FileManager.default.contentsOfDirectory(at: kept, includingPropertiesForKeys: nil)) ?? []
+        where old.pathExtension == "wav" { try? FileManager.default.removeItem(at: old) }
         let c = NotificationCenter.default
         observers = [
             c.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in
@@ -235,7 +239,6 @@ final class RecordDeck {
     }
 
     private func cached(_ t: RecordTrack) -> URL? {
-        if let local = Bundle.main.url(forResource: t.slug, withExtension: "wav", subdirectory: "shelf") { return local }
         let u = folder.appendingPathComponent(t.url.lastPathComponent)
         return FileManager.default.fileExists(atPath: u.path) ? u : nil
     }
@@ -334,7 +337,7 @@ struct RecordCard: View {
                 Text("NOW PLAYING · " + (Records.shelf.first { $0.id == t.album }?.title ?? "Jazz café").uppercased())
                     .font(.px(11, 700)).foregroundStyle(Color(hex: "#a84f4b"))
                 Text(track.title).font(.pxBodyBold).foregroundStyle(Color.inkSoft)
-                if t.album == "jazz" { RecordCredit() } else { Text("Soultied originals").font(.pxTiny) }
+                RecordCredit(album: t.album)
                 if let who = byLine(t) { Text(who).font(.pxSmall).foregroundStyle(Color.muted) }
             }
             Spacer(minLength: 0)
@@ -466,16 +469,21 @@ private struct VolumeRow: View {
     }
 }
 
-/// the record's credit, as its licence asks
+/// who made the record that's playing, as its licence asks
 struct RecordCredit: View {
+    var album = "jazz"
+
     /// (made as a plain string first: links written straight into a LocalizedStringKey with \(…) wouldn't be links;
     /// the licence's name keeps together, with no-break spaces)
-    private static let line: String = Records.artist + " ([incompetech.com](" + Records.sourceURL.absoluteString + ")) · ["
-        + Records.license.replacingOccurrences(of: " ", with: "\u{00A0}") + "](" + Records.licenseURL.absoluteString + ")"
+    private var line: String {
+        let c = Records.credit(album)
+        return c.artist + " ([" + c.source + "](" + c.sourceURL.absoluteString + ")) · ["
+            + c.license.replacingOccurrences(of: " ", with: "\u{00A0}") + "](" + c.licenseURL.absoluteString + ")"
+    }
 
     var body: some View {
         // one line of text with its two links, so it wraps between words
-        Text(LocalizedStringKey(Self.line))
+        Text(LocalizedStringKey(line))
             .font(.pxSmall)
             .foregroundStyle(Color.muted)
             .tint(Color.terracottaD)
@@ -500,7 +508,7 @@ struct SpinningRecord: View {
 
 /* ---------- choosing what goes on ---------- */
 
-/// The record player: the jazz record, or a song from YouTube.
+/// The record player: a record from the shelf, or Our song.
 struct RecordSheet: View {
     let place: PlaceModel
     /// sideways there's no Home behind this, so a song plays here
@@ -539,13 +547,14 @@ struct RecordSheet: View {
                                 RecordSleeve(id: record.id, playing: playing)
                                 Text(record.title).font(.px(13, 700)).foregroundStyle(Color.inkSoft)
                                     .lineLimit(2).fixedSize(horizontal: false, vertical: true)
-                                Text("\(record.tracks.count) songs").font(.px(11)).foregroundStyle(Color.muted)
+                                Text("\(record.tracks.count) songs\n\(record.credit.artist)").font(.px(11)).foregroundStyle(Color.muted)
+                                    .fixedSize(horizontal: false, vertical: true)
                             }
                             .frame(maxWidth: .infinity, alignment: .topLeading)
                         }
                         .buttonStyle(.press)
                         .accessibilityElement(children: .ignore)
-                        .accessibilityLabel("\(record.title), \(record.tracks.count) songs" + (playing ? ", playing" : ""))
+                        .accessibilityLabel("\(record.title), \(record.tracks.count) songs by \(record.credit.artist)" + (playing ? ", playing" : ""))
                         .accessibilityAddTraits(.isButton)
                     }
                 }
@@ -553,7 +562,7 @@ struct RecordSheet: View {
             }
             .padding(20)
         }
-        .sheet(isPresented: $choosing) { RoomSongPicker(place: place) }
+        .sheet(isPresented: $choosing) { RoomSongPicker(place: place).frostedSheet() }
         .scrollDismissesKeyboard(.interactively)
     }
 

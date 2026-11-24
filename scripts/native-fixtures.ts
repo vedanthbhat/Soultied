@@ -24,7 +24,7 @@ import { COASTERS } from '../src/games/coasters';
 import { KITCHEN } from '../src/games/kitchen';
 import { ROOMS } from '../src/escape/rooms';
 import { Scene } from '../src/escape/scene';
-import { RECORD_MS, startFor, whereAt } from '../src/music/records';
+import { RECORD_MS, shelf, startFor, whereAt } from '../src/music/records';
 import { parseYouTubeId, parseYouTubeStart } from '../src/watch/youtubeLink';
 import { renderWatchRoom, type WatchState } from '../src/pixel/watchRoom';
 import { renderRoom, type RoomState } from '../src/pixel/room';
@@ -433,7 +433,13 @@ for (const room of ROOMS)
 
 // the record player: where the record is at any moment (from both sides of the start, and many times round),
 // where each track starts, and reading YouTube links
-const record: { where: Array<[number, string, number, string]>; starts: number[][]; links: Array<[string, string | null, number]> } = { where: [], starts: [], links: [] };
+const record: {
+  where: Array<[number, string, number, string]>;
+  starts: number[][];
+  links: Array<[string, string | null, number]>;
+  shelf: Array<{ id: string; title: string; artist: string; source: string; license: string; tracks: Array<[string, string, number]> }>;
+  albums: Array<[string, number, string, number, string]>;
+} = { where: [], starts: [], links: [], shelf: [], albums: [] };
 {
   const r = rng(77);
   const base = 1_790_000_000_000;
@@ -445,6 +451,18 @@ const record: { where: Array<[number, string, number, string]>; starts: number[]
     record.where.push([startedAt, String(now), w.index, String(w.offset)]);
   }
   for (const i of [-7, -1, 0, 1, 2, 3, 4, 5, 6, 11]) record.starts.push([i, base + i, startFor(i, base + i)]);
+  // the shelf's records (the same songs, in the same order and of the same lengths, on both), and where each one is
+  for (const rec of shelf) {
+    const c = rec.credit;
+    record.shelf.push({ id: rec.id, title: rec.title, artist: c.artist, source: c.source, license: c.license, tracks: rec.tracks.map((t) => [t.slug, t.title, t.secs]) });
+    const ms = rec.tracks.reduce((sum, t) => sum + t.secs * 1000, 0);
+    for (let i = 0; i < 40; i++) {
+      const startedAt = base + Math.floor(r() * 4e9) - 2e9;
+      const now = i % 5 === 0 ? startedAt + Math.floor(r() * 7) * ms / 3 : base + Math.floor(r() * 4e9) - 2e9 + r();
+      const w = whereAt(startedAt, now, rec.tracks);
+      record.albums.push([rec.id, startedAt, String(now), w.index, String(w.offset)]);
+    }
+  }
   for (const l of [
     'dQw4w9WgXcQ', ' dQw4w9WgXcQ ', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'youtube.com/watch?v=dQw4w9WgXcQ&t=1m30s',
     'https://youtu.be/dQw4w9WgXcQ?t=42', 'https://youtu.be/dQw4w9WgXcQ?si=abc&t=2h3m4s', 'https://m.youtube.com/watch?v=dQw4w9WgXcQ&start=75',

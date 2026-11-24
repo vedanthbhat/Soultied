@@ -85,7 +85,7 @@ struct RecapCard: View {
             Button("Make a picture to share") { sharing = true }.buttonStyle(.px(.terracotta, wide: true))
         }
         .pxCard()
-        .sheet(isPresented: $sharing) { RecapShareSheet(place: place).presentationBackground(Color.paper) }
+        .sheet(isPresented: $sharing) { RecapShareSheet(place: place).frostedSheet() }
         // (the screenshots: the picture, made)
         .onAppear { if Launch.args.contains("-recapShare") { sharing = true } }
     }

@@ -1,5 +1,7 @@
 Music on the record player in the living room
 
+Jazz café
+
 "Study And Relax" Kevin MacLeod (incompetech.com)
 Licensed under Creative Commons: By Attribution 4.0
 https://creativecommons.org/licenses/by/4.0/
@@ -23,3 +25,80 @@ https://creativecommons.org/licenses/by/4.0/
 Changes: each track was re-encoded from the original 320 kbps MP3 to a
 96 kbps MP3, and its volume was evened out to match the others. Nothing
 else was changed.
+
+
+The other records on the shelf. Each song is downloaded from where its artist
+shared it, re-encoded to a 96 kbps MP3 with its volume evened out to match
+the jazz record, and made exactly as long as the record player counts it
+(a fraction of a second trimmed or added at the end, with a short fade).
+Nothing else was changed (scripts/shelf-audio.mjs).
+
+Lo-fi evening
+
+"Fire Place" HoliznaCC0 (freemusicarchive.org/music/holiznacc0)
+Dedicated to the public domain: CC0 1.0 Universal
+https://creativecommons.org/publicdomain/zero/1.0/
+
+"Snow Drift" HoliznaCC0 (freemusicarchive.org/music/holiznacc0)
+Dedicated to the public domain: CC0 1.0 Universal
+https://creativecommons.org/publicdomain/zero/1.0/
+
+"Winter Blues" HoliznaCC0 (freemusicarchive.org/music/holiznacc0)
+Dedicated to the public domain: CC0 1.0 Universal
+https://creativecommons.org/publicdomain/zero/1.0/
+
+Soft piano
+
+"Gymnopedie No. 1" Kevin MacLeod (incompetech.com)
+Licensed under Creative Commons: By Attribution 4.0
+https://creativecommons.org/licenses/by/4.0/
+
+"Avec Soin" Kevin MacLeod (incompetech.com)
+Licensed under Creative Commons: By Attribution 4.0
+https://creativecommons.org/licenses/by/4.0/
+
+"Friday Morning" Kevin MacLeod (incompetech.com)
+Licensed under Creative Commons: By Attribution 4.0
+https://creativecommons.org/licenses/by/4.0/
+
+Acoustic morning
+
+"Morning" Kevin MacLeod (incompetech.com)
+Licensed under Creative Commons: By Attribution 4.0
+https://creativecommons.org/licenses/by/4.0/
+
+"Carefree" Kevin MacLeod (incompetech.com)
+Licensed under Creative Commons: By Attribution 4.0
+https://creativecommons.org/licenses/by/4.0/
+
+"Easy Lemon" Kevin MacLeod (incompetech.com)
+Licensed under Creative Commons: By Attribution 4.0
+https://creativecommons.org/licenses/by/4.0/
+
+Rainy day
+
+"Dreamer" Kevin MacLeod (incompetech.com)
+Licensed under Creative Commons: By Attribution 4.0
+https://creativecommons.org/licenses/by/4.0/
+
+"Comfortable Mystery" Kevin MacLeod (incompetech.com)
+Licensed under Creative Commons: By Attribution 4.0
+https://creativecommons.org/licenses/by/4.0/
+
+"Blue Paint" Kevin MacLeod (incompetech.com)
+Licensed under Creative Commons: By Attribution 4.0
+https://creativecommons.org/licenses/by/4.0/
+
+Retro arcade
+
+"Comfort Game 1" HoliznaCC0 (freemusicarchive.org/music/holiznacc0)
+Dedicated to the public domain: CC0 1.0 Universal
+https://creativecommons.org/publicdomain/zero/1.0/
+
+"Comfort Games 2" HoliznaCC0 (freemusicarchive.org/music/holiznacc0)
+Dedicated to the public domain: CC0 1.0 Universal
+https://creativecommons.org/publicdomain/zero/1.0/
+
+"Comfort Games 3" HoliznaCC0 (freemusicarchive.org/music/holiznacc0)
+Dedicated to the public domain: CC0 1.0 Universal
+https://creativecommons.org/publicdomain/zero/1.0/

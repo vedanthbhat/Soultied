@@ -1,14 +1,15 @@
 import albums from './shelf.json';
 /**
- * The record on the turntable: five soft jazz tracks by Kevin MacLeod
- * (incompetech.com), licensed under Creative Commons: By Attribution 4.0.
- * They're stored in public/audio as 96 kbps MP3s (re-encoded from the
- * originals, with their volumes evened out); the credit is shown whenever
- * one is playing.
+ * The records on the shelf. The jazz record, the first one on, is five soft jazz tracks by Kevin MacLeod
+ * (incompetech.com), licensed under Creative Commons: By Attribution 4.0. They're stored in public/audio as
+ * 96 kbps MP3s (re-encoded from the originals, with their volumes evened out).
  *
- * The record plays for both of you: the shared state is just "on, and when
- * the first track would have started", so each of you works out the same
- * track and the same spot in it from the clock.
+ * The other records (src/music/shelf.json) are songs by Kevin MacLeod (CC BY 4.0) and HoliznaCC0 (CC0, given to
+ * the public domain). scripts/shelf-audio.mjs downloads them and makes them into the same kind of MP3 before each
+ * build, in public/audio/shelf. Whatever's playing shows who made it, as the licences ask.
+ *
+ * A record plays for both of you: the shared state is just "on, and when the first track would have started", so
+ * each of you works out the same track and the same spot in it from the clock.
  */
 
 export interface Track {
@@ -26,15 +27,49 @@ export const TRACKS: Track[] = [
   { slug: 'cool-vibes', title: 'Cool Vibes', secs: 218.448 },
 ];
 
-export const shelf = [{id:'jazz',title:'Jazz café',tracks:TRACKS}, ...albums];
+/** who made a record's songs, and the licence they're shared under */
+export interface Credit {
+  artist: string;
+  /** where they're from, as it's written in the credit */
+  source: string;
+  sourceUrl: string;
+  license: string;
+  licenseUrl: string;
+}
+
+export const CREDITS: Record<'macleod' | 'holizna', Credit> = {
+  macleod: {
+    artist: 'Kevin MacLeod',
+    source: 'incompetech.com',
+    sourceUrl: 'https://incompetech.com',
+    license: 'CC BY 4.0',
+    licenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
+  },
+  holizna: {
+    artist: 'HoliznaCC0',
+    source: 'freemusicarchive.org',
+    sourceUrl: 'https://freemusicarchive.org/music/holiznacc0/',
+    license: 'CC0',
+    licenseUrl: 'https://creativecommons.org/publicdomain/zero/1.0/',
+  },
+};
+
+export interface ShelfRecord {
+  id: string;
+  title: string;
+  credit: Credit;
+  tracks: Track[];
+}
+
+export const shelf: ShelfRecord[] = [
+  { id: 'jazz', title: 'Jazz café', credit: CREDITS.macleod, tracks: TRACKS },
+  ...albums.map((a) => ({ id: a.id, title: a.title, credit: CREDITS[a.credit as keyof typeof CREDITS], tracks: a.tracks })),
+];
 export const tracksFor = (id?: string) => shelf.find(record => record.id === id)?.tracks ?? TRACKS;
+/** who made the songs on a record (the jazz record's, for one that isn't on the shelf) */
+export const creditFor = (id?: string) => shelf.find(record => record.id === id)?.credit ?? CREDITS.macleod;
 
-export const ARTIST = 'Kevin MacLeod';
-export const SOURCE_URL = 'https://incompetech.com';
-export const LICENSE = 'CC BY 4.0';
-export const LICENSE_URL = 'https://creativecommons.org/licenses/by/4.0/';
-
-export const trackUrl = (t: Track) => import.meta.env.BASE_URL + (TRACKS.includes(t) ? "audio/"+t.slug+".mp3" : "audio/shelf/"+t.slug+".wav");
+export const trackUrl = (t: Track) => import.meta.env.BASE_URL + (TRACKS.includes(t) ? 'audio/' : 'audio/shelf/') + t.slug + '.mp3';
 
 /** The whole record, once through, in milliseconds. */
 export const RECORD_MS = TRACKS.reduce((s, t) => s + t.secs * 1000, 0);

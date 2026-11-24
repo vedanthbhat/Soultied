@@ -96,10 +96,10 @@ struct SnapCard: View {
             }
         }
         .sheet(isPresented: Binding(get: { draft != nil }, set: { if !$0 { draft = nil } })) {
-            if let d = draft { SnapPostSheet(place: place, draft: d) { draft = nil }.presentationBackground(Color.paper) }
+            if let d = draft { SnapPostSheet(place: place, draft: d) { draft = nil }.frostedSheet() }
         }
         .sheet(isPresented: Binding(get: { viewing != nil }, set: { if !$0 { viewing = nil } })) {
-            if let v = viewing { SnapViewer(place: place, shot: v.shot, by: v.by).presentationBackground(Color.paper) }
+            if let v = viewing { SnapViewer(place: place, shot: v.shot, by: v.by).frostedSheet() }
         }
     }
 

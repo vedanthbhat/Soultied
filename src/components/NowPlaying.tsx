@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { useStreamHub } from '../stream/StreamHub';
 import { useTurntable } from '../music/TurntableContext';
-import { shelf, TRACKS, ARTIST, LICENSE, LICENSE_URL, SOURCE_URL } from '../music/records';
+import { shelf, creditFor } from '../music/records';
 import { describeYouTubeError, loadYouTubeApi, YTPlayer, YTState } from '../watch/youtube';
 import { songStalled, songStep, songSync } from '../music/songSync';
 import { Sprite } from './games/Pixel';
@@ -54,7 +54,24 @@ export const NowPlaying: React.FC = () => {
   );
 };
 
-/** The jazz record. */
+/** who made the song that's playing, with links, as its licence asks */
+const Credit: React.FC<{ album?: string }> = ({ album }) => {
+  const c = creditFor(album);
+  return (
+    <span className="text-xs text-[var(--muted)]">
+      {c.artist} (
+      <a className="underline" href={c.sourceUrl} target="_blank" rel="noreferrer">
+        {c.source}
+      </a>
+      ) ·{' '}
+      <a className="underline" href={c.licenseUrl} target="_blank" rel="noreferrer">
+        {c.license}
+      </a>
+    </span>
+  );
+};
+
+/** What's on the record player, and who made it. */
 const RecordCard: React.FC<{ who: string; fromThem: boolean }> = ({ who, fromThem }) => {
   const tt = useTurntable();
   if (!tt.track) return null;
@@ -66,16 +83,7 @@ const RecordCard: React.FC<{ who: string; fromThem: boolean }> = ({ who, fromThe
           NOW PLAYING · {(shelf.find((r) => r.id === tt.album)?.title ?? 'Jazz café').toUpperCase()}
         </span>
         <span className="font-semibold truncate">{tt.track.title}</span>
-        <span className="text-xs text-[var(--muted)]">
-          {TRACKS.includes(tt.track) ? <>{ARTIST} (
-          <a className="underline" href={SOURCE_URL} target="_blank" rel="noreferrer">
-            incompetech.com
-          </a>
-          ) ·{' '}
-          <a className="underline" href={LICENSE_URL} target="_blank" rel="noreferrer">
-            {LICENSE}
-          </a></> : "Soultied originals"}
-        </span>
+        <Credit album={tt.album ?? undefined} />
         {fromThem && !tt.blocked && <span className="text-xs text-[var(--muted)]">{who} put this on</span>}
       </span>
       {tt.blocked && (
@@ -415,7 +423,7 @@ const RecordPicker: React.FC = () => {
   }, [tt]);
 
   return (
-    <div className="fixed inset-0 z-50 px-ui flex items-center justify-center p-4" style={{ background: 'rgba(29, 21, 18, 0.45)' }} onClick={tt.closePicker}>
+    <div className="st-frost fixed inset-0 z-50 px-ui flex items-center justify-center p-4" onClick={tt.closePicker}>
       <div
         className="px-box px-shadow px-pop w-full max-w-[460px] max-h-[90dvh] overflow-y-auto p-5 flex flex-col gap-4"
         role="dialog"
@@ -449,12 +457,16 @@ const RecordPicker: React.FC = () => {
                 key={record.id}
                 className="flex flex-col gap-1 text-left"
                 aria-pressed={playing}
-                aria-label={`${record.title}, ${record.tracks.length} songs${playing ? ', playing' : ''}`}
+                aria-label={`${record.title}, ${record.tracks.length} songs by ${record.credit.artist}${playing ? ', playing' : ''}`}
                 onClick={() => tt.playJazz(record.id)}
               >
                 <Sleeve id={record.id} playing={playing} />
                 <strong className="text-[13px] leading-tight">{record.title}</strong>
-                <small className="text-[11px] text-[var(--muted)]">{record.tracks.length} songs</small>
+                <small className="text-[11px] leading-tight text-[var(--muted)]">
+                  {record.tracks.length} songs
+                  <br />
+                  {record.credit.artist}
+                </small>
               </button>
             );
           })}

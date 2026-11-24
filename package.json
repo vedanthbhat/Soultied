@@ -4,9 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "predev": "node scripts/record-audio.mjs",
-    "prebuild": "node scripts/record-audio.mjs",
-    "preios:assets": "node scripts/record-audio.mjs",
+    "predev": "node scripts/shelf-audio.mjs",
+    "prebuild": "node scripts/shelf-audio.mjs",
     "dev": "vite --port=3000 --host=0.0.0.0",
     "build": "vite build && node scripts/watch-pages.mjs",
     "preview": "vite preview",

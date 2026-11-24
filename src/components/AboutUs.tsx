@@ -130,7 +130,7 @@ export const AboutUs: React.FC<{ onDone: () => void }> = ({ onDone }) => {
   const steps = offerPlus ? 4 : 3;
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-stretch sm:items-center justify-center sm:p-4 overflow-y-auto" style={{ background: 'rgba(20, 14, 16, 0.55)' }} role="dialog" aria-modal="true" aria-label="About the two of you">
+    <div className="st-frost fixed inset-0 z-[70] flex items-stretch sm:items-center justify-center sm:p-4 overflow-y-auto" role="dialog" aria-modal="true" aria-label="About the two of you">
       <div className="px-box px-shadow px-pop w-full max-w-[440px] min-h-[100dvh] sm:min-h-0 p-5 flex flex-col gap-3.5" key={atPlus ? 'plus' : 'far'}>
         <div className="flex gap-1.5" aria-label={`Step ${atPlus ? 4 : 3} of ${steps}`}>
           {Array.from({ length: steps }, (_, i) => (

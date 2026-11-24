@@ -358,7 +358,7 @@ struct PhotosPanel: View {
                 item = nil
             }
         }
-        .sheet(item: $viewing) { p in PhotoViewer(place: place, photo: p) }
+        .sheet(item: $viewing) { p in PhotoViewer(place: place, photo: p).frostedSheet() }
     }
 }
 
